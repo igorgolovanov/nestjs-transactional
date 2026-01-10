@@ -25,4 +25,5 @@ module.exports = {
   clearMocks: true,
   restoreMocks: true,
   verbose: false,
+  passWithNoTests: true,
 };
