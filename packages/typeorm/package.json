@@ -1,0 +1,72 @@
+{
+  "name": "@nestjs-transactional/typeorm",
+  "version": "0.0.0",
+  "description": "TypeORM adapter for @nestjs-transactional/core — EntityManager propagation, savepoints, multi-datasource",
+  "license": "MIT",
+  "author": "Igor Golovanov",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "directory": "packages/typeorm"
+  },
+  "bugs": {
+    "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
+  },
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/typeorm#readme",
+  "keywords": [
+    "nestjs",
+    "typeorm",
+    "transaction",
+    "transactional",
+    "spring",
+    "entity-manager",
+    "savepoint"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rimraf dist *.tsbuildinfo coverage",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:integration": "jest --config jest.integration.config.js",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "peerDependencies": {
+    "@nestjs-transactional/core": "workspace:^",
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
+    "@nestjs/typeorm": "^10.0.0 || ^11.0.0",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
+    "rxjs": "^7.0.0",
+    "typeorm": "^0.3.25"
+  },
+  "devDependencies": {
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/typeorm": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.25"
+  }
+}

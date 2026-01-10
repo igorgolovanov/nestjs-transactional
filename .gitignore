@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# Test artifacts
+junit.xml
+test-results/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Changesets state
+# (Keep .changeset/config.json and *.md entries — only ignore generated)
+.changeset/.pre.json
+
+# Misc
+.cache/

@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+.changeset/*.md
+CHANGELOG.md
+
+# Hand-authored docs with intentional line wrapping
+CLAUDE.md
+docs/
