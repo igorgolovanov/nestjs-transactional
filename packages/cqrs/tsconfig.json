@@ -7,6 +7,6 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],
-  "exclude": ["**/*.spec.ts", "**/*.integration.spec.ts", "dist", "node_modules", "coverage"],
+  "exclude": ["dist", "node_modules", "coverage"],
   "references": [{ "path": "../core" }]
 }
