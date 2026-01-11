@@ -7,3 +7,4 @@ export * from './types/domain-event';
 export * from './types/errors';
 
 export * from './context/transaction.context';
+export * from './manager/adapter.registry';

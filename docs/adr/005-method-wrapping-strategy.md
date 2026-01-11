@@ -5,124 +5,128 @@ Accepted — 2026-04-23
 
 ## Context
 
-`@Transactional()` декоратор должен оборачивать методы в transaction context.
-В NestJS есть несколько возможных механизмов перехвата вызовов:
+The `@Transactional()` decorator must wrap methods in a transaction context.
+NestJS provides several possible mechanisms for intercepting method calls:
 
-1. **NestJS Interceptors** (через APP_INTERCEPTOR) — работают только на request
+1. **NestJS Interceptors** (via `APP_INTERCEPTOR`) — only fire at the request
    boundary: controllers, resolvers, gateways, message patterns.
 
-2. **Prototype method wrapping в декораторе** — декоратор напрямую заменяет
-   `descriptor.value` на обёртку. Проблема: нет доступа к DI-контейнеру для
-   получения TransactionManager.
+2. **Prototype method wrapping inside the decorator** — the decorator directly
+   replaces `descriptor.value` with a wrapper. Problem: there is no access to
+   the DI container to obtain a `TransactionManager`.
 
-3. **Runtime wrapping через DiscoveryService** — сервис сканирует провайдеры
-   при `OnApplicationBootstrap` и оборачивает методы на уровне instance.
+3. **Runtime wrapping via DiscoveryService** — a service scans all providers at
+   `OnApplicationBootstrap` and wraps methods at the instance level.
 
-Ни один механизм не покрывает все cases сам по себе. Сервисы `@Injectable`
-не ловятся interceptor'ами. Декораторы не могут resolve'ить DI. Runtime
-wrapping не работает для controllers (у них уже есть NestJS pipeline).
+No single mechanism covers all cases on its own. `@Injectable` services are not
+caught by interceptors. Decorators cannot resolve DI. Runtime wrapping does not
+work for controllers (they already have the NestJS request pipeline).
 
 ## Decision
 
-Декоратор `@Transactional` — **metadata only**. Он не модифицирует метод,
-только пишет metadata через `Reflect.defineMetadata(TRANSACTIONAL_METADATA, ...)`.
+The `@Transactional` decorator is **metadata-only**. It does not modify the
+method; it only writes metadata via `Reflect.defineMetadata(TRANSACTIONAL_METADATA, ...)`.
 
-Реальное обёртывание выполняют **три координированных механизма**, каждый
-для своего контекста:
+Actual wrapping is performed by **three coordinated mechanisms**, each for its
+own context:
 
 ### 1. TransactionalInterceptor (via APP_INTERCEPTOR)
-Для **request boundary**: controllers, resolvers, gateways, message
-patterns. Читает metadata с handler через Reflector и оборачивает вызов в
-`manager.run()`. Регистрируется автоматически в `TransactionalModule.forRoot()`
-(opt-out через `registerInterceptor: false`).
+For the **request boundary**: controllers, resolvers, gateways, message
+patterns. Reads metadata from the handler via `Reflector` and wraps the call in
+`manager.run()`. Registered automatically in `TransactionalModule.forRoot()`
+(opt-out via `registerInterceptor: false`).
 
 ### 2. TransactionalMethodsBootstrap (via OnApplicationBootstrap)
-Для **обычных `@Injectable` сервисов**. На `OnApplicationBootstrap`:
-- Сканирует все провайдеры через `DiscoveryService` + `MetadataScanner`
-- Для каждого метода с `@Transactional` metadata — оборачивает
-  `instance[methodName]` через замыкание, вызывающее `manager.run()`
-- Skip'ает classes с NestJS controller/resolver/gateway metadata (их
-  обрабатывает Interceptor)
-- Skip'ает CQRS handler classes (их обрабатывает CqrsHandlerWrapper)
-- Opt-out через `useMethodBootstrap: false` в module options
+For **regular `@Injectable` services**. At `OnApplicationBootstrap`:
+- Scans all providers via `DiscoveryService` + `MetadataScanner`
+- For each method carrying `@Transactional` metadata — wraps
+  `instance[methodName]` via a closure that calls `manager.run()`
+- Skips classes with NestJS controller/resolver/gateway metadata (handled by
+  the Interceptor)
+- Skips CQRS handler classes (handled by `CqrsHandlerWrapper`)
+- Opt-out via `useMethodBootstrap: false` in module options
 
-### 3. CqrsHandlerWrapper (via OnApplicationBootstrap, в @nestjs-transactional/cqrs)
-Специализация для `@CommandHandler`, `@QueryHandler`, `@EventsHandler`.
-Логически аналогичен `TransactionalMethodsBootstrap`, но работает
-специфично с `execute()` методом handler'ов и интегрируется с
-`TransactionalEventPublisher` для AggregateRoot events.
+### 3. CqrsHandlerWrapper (via OnApplicationBootstrap, in @nestjs-transactional/cqrs)
+Specialization for `@CommandHandler`, `@QueryHandler`, `@EventsHandler`.
+Logically analogous to `TransactionalMethodsBootstrap`, but works specifically
+with the `execute()` method of handlers and integrates with
+`TransactionalEventPublisher` for `AggregateRoot` events.
 
 ## Coordination between mechanisms
 
-Двойное обёртывание предотвращается через **wrapping marker**:
+Double-wrapping is prevented via a **wrapping marker**:
 
 ```typescript
 const WRAPPED_MARKER = Symbol.for('@nestjs-transactional/wrapped');
 
-// Перед wrapping
+// Before wrapping
 if (Reflect.getMetadata(WRAPPED_MARKER, instance[methodName]) === true) {
-  return;  // уже обёрнут
+  return;  // already wrapped
 }
 
-// После wrapping
+// After wrapping
 Reflect.defineMetadata(WRAPPED_MARKER, true, wrapped);
 instance[methodName] = wrapped;
 ```
 
-Причины выбора `Reflect.defineMetadata` вместо instance-level `WeakSet`:
+Reasons for choosing `Reflect.defineMetadata` over an instance-level `WeakSet`:
 
-- **Stateless**: marker живёт на самом методе, не на внешнем трекере
-- **Test-safe**: при пересоздании TestingModule метадата перезаписывается
-  свежими методами
-- **No cross-instance leakage**: каждый созданный класс/метод получает
-  свой marker независимо от истории других инстансов
-- **`Symbol.for`** даёт shared symbol на случай edge case с двумя
-  версиями пакета в одном дереве зависимостей
+- **Stateless**: the marker lives on the method itself, not on an external
+  tracker
+- **Test-safe**: when `TestingModule` is recreated, the metadata is
+  overwritten along with fresh methods
+- **No cross-instance leakage**: each created class/method gets its own
+  marker independently of the history of other instances
+- **`Symbol.for`** provides a shared symbol to handle the edge case of two
+  versions of the package in the same dependency tree
 
-Fallback: если по каким-то причинам метод всё же обёрнут дважды
-(в обход маркера), propagation mode REQUIRED гарантирует корректное
-поведение — существующая транзакция переиспользуется, новая не создаётся.
+Fallback: if a method is somehow wrapped twice (bypassing the marker),
+propagation mode `REQUIRED` guarantees correct behavior — the existing
+transaction is reused and no second transaction is started.
 
 ## Alternatives Considered
 
-### Только Interceptor
-Не покрывает service-to-service calls. Отвергнуто.
+### Interceptor only
+Does not cover service-to-service calls. Rejected.
 
-### Prototype wrapping в декораторе
-Требует либо глобальный singleton TransactionManager (анти-паттерн, ломает
-DI), либо lazy resolution через `Inject.get()` (сложность, race conditions
-при concurrent initialization). Отвергнуто.
+### Prototype wrapping inside the decorator
+Requires either a global singleton `TransactionManager` (anti-pattern,
+breaks DI) or lazy resolution via `Inject.get()` (complexity, race conditions
+during concurrent initialization). Rejected.
 
-### Один универсальный bootstrap без interceptor
-Не работает для controllers — NestJS создаёт ExecutionContext для
-request pipeline, и interceptor-based подход более natural для request
-handling (лучше интегрируется с exception filters, guards, pipes).
-Отвергнуто в пользу комбинированного подхода.
+### Single universal bootstrap without an interceptor
+Does not work for controllers — NestJS creates an `ExecutionContext` for the
+request pipeline, and the interceptor-based approach is more natural for
+request handling (better integration with exception filters, guards, pipes).
+Rejected in favour of the combined approach.
 
 ### WeakSet-based wrapping tracking
-Хранение обёрнутых методов в `WeakSet<Function>` внутри
-`TransactionalMethodsBootstrap`. Проблемы: state живёт на инстансе
-сервиса, которого при частых `Test.createTestingModule()` может
-создаваться много; логика проверки "wrapped?" усложняется необходимостью
-трекать и original, и wrapper. Отвергнуто в пользу Reflect metadata marker.
+Storing wrapped methods in a `WeakSet<Function>` inside
+`TransactionalMethodsBootstrap`. Issues: state lives on the service instance,
+of which many may be created during frequent `Test.createTestingModule()` calls;
+the "is it wrapped?" check logic becomes more complex because both the original
+and the wrapper must be tracked. Rejected in favour of the Reflect metadata
+marker.
 
 ## Consequences
 
 ### Positive
-- Unified API для пользователя: `@Transactional()` "просто работает" везде
-- Clean separation of concerns: каждый механизм делает одну вещь
-- Testability: каждый wrapper можно отключить через module options для
-  unit-testing в изоляции
-- Test-safe: marker-based tracking stateless
+- Unified API for users: `@Transactional()` "just works" everywhere
+- Clean separation of concerns: each mechanism does one thing
+- Testability: each wrapper can be disabled via module options for isolated
+  unit testing
+- Test-safe: marker-based tracking is stateless
 
 ### Negative
-- Больше infrastructure кода (3 компонента вместо 1)
-- Отладка "почему не обёрнуто?" требует знания всех трёх механизмов
-- Runtime wrapping через DiscoveryService делает debugging чуть менее
-  straightforward (методы на instance отличаются от prototype)
+- More infrastructure code (3 components instead of 1)
+- Debugging "why isn't it wrapped?" requires familiarity with all three
+  mechanisms
+- Runtime wrapping via `DiscoveryService` makes debugging slightly less
+  straightforward (instance methods differ from prototype methods)
 
 ### Mitigations
-- Каждый механизм — в отдельном файле с понятным именем
-- Logging на debug level при wrapping: "Wrapped method X.Y with
-  metadata {propagation: 'REQUIRED'}"
-- ADR документирует решение, будущие вопросы разрулить отсылкой сюда
+- Each mechanism lives in a separate file with a clear name
+- Debug-level logging at wrap time: `"Wrapped method X.Y with metadata
+  {propagation: 'REQUIRED'}"`
+- This ADR documents the decision; future questions can be resolved by
+  referring back to it
