@@ -8,3 +8,4 @@ export * from './types/errors';
 
 export * from './context/transaction.context';
 export * from './manager/adapter.registry';
+export * from './manager/transaction.manager';
