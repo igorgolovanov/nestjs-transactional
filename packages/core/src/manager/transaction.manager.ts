@@ -4,6 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { TransactionContext, type ActiveTransaction } from '../context/transaction.context';
 import { IllegalTransactionStateError } from '../types/errors';
+import { PropagationMode } from '../types/propagation';
 import type { TransactionAdapter } from '../types/transaction-adapter';
 import type { ExtendedTransactionOptions } from '../types/transaction-options';
 
@@ -29,15 +30,15 @@ type InternalResult<T> =
   | { readonly ok: false; readonly error: unknown };
 
 /**
- * Runtime that executes a callback inside a transaction, joining an active
- * one when one already exists (propagation `REQUIRED`, the default Spring
- * behaviour). Also exposes registration points for before/after commit and
- * after rollback hooks that the surrounding transaction fires at the
- * appropriate phase.
+ * Runtime that executes a callback inside a transaction, following the
+ * requested {@link PropagationMode}. Exposes registration points for
+ * before/after-commit and after-rollback hooks that the surrounding
+ * transaction fires at the appropriate phase.
  *
- * Only `REQUIRED` propagation is supported in this iteration. Other modes
- * (`REQUIRES_NEW`, `NESTED`, etc.) are ignored for now and will be added in
- * subsequent iterations.
+ * All seven Spring-compatible propagation modes are supported:
+ * `REQUIRED`, `REQUIRES_NEW`, `NESTED`, `SUPPORTS`, `NOT_SUPPORTED`,
+ * `NEVER`, `MANDATORY`. See {@link TransactionManager.run} for the
+ * per-mode behaviour.
  */
 @Injectable()
 export class TransactionManager {
@@ -52,25 +53,107 @@ export class TransactionManager {
    * Execute `fn` inside a transaction managed by the adapter resolved from
    * `options` (or defaults from {@link AdapterRegistry}).
    *
-   * Behaviour (propagation `REQUIRED`):
-   * - If a transaction is already active on the current async context for
-   *   the selected adapter instance, `fn` joins that transaction and runs
-   *   directly. No new adapter call, no additional hook lifecycle.
-   * - Otherwise, a new transaction is started via
-   *   `adapter.runInTransaction`; commit hooks fire on success, rollback
-   *   hooks fire on failure, both routed through {@link runHooks}.
+   * Behaviour by propagation mode:
+   * - `REQUIRED` (default): join the active transaction for this adapter
+   *   instance if one exists; otherwise start a new transaction.
+   * - `REQUIRES_NEW`: always start a new, independent transaction. If an
+   *   outer transaction is active, its {@link ActiveTransaction} entry is
+   *   suspended out of the context Map for the duration of the inner call
+   *   and restored afterwards.
+   * - `NESTED`: if an outer transaction is active, run inside a savepoint
+   *   on that transaction (via {@link TransactionAdapter.runInSavepoint}).
+   *   A savepoint rollback leaves the outer transaction intact. Lifecycle
+   *   hooks registered inside a `NESTED` block attach to the outer
+   *   transaction and fire on the outer commit/rollback. If no outer
+   *   transaction is active, `NESTED` degrades to `REQUIRED`.
+   * - `SUPPORTS`: run `fn` in the outer transaction if present; otherwise
+   *   run `fn` directly with no transaction and no lifecycle hooks.
+   * - `NOT_SUPPORTED`: suspend the outer transaction (remove its entry
+   *   from the context Map) and run `fn` without transactional context.
+   *   Restore on return. Note that the adapter-level connection/query
+   *   runner is NOT actually suspended — this is a context-level opt-out.
+   * - `NEVER`: throw {@link IllegalTransactionStateError} if an outer
+   *   transaction is active; otherwise run `fn` directly.
+   * - `MANDATORY`: throw {@link IllegalTransactionStateError} if no outer
+   *   transaction is active; otherwise join it.
+   *
+   * Both inner and outer transactions share the surrounding
+   * {@link TransactionContext} store — same `correlationId`, same Map —
+   * only the Map slot at `instanceName` is swapped as propagation requires.
    */
   async run<T>(options: ExtendedTransactionOptions, fn: () => Promise<T>): Promise<T> {
     const adapterName = options.adapter ?? this.registry.getDefaultAdapterName();
     const instanceName = options.adapterInstance ?? this.registry.getDefaultInstanceName();
+    const propagation = options.propagation ?? PropagationMode.REQUIRED;
 
     const existing = TransactionContext.getActiveTransaction(instanceName);
-    if (existing !== undefined) {
-      return fn();
-    }
 
-    const adapter = this.registry.get(adapterName, instanceName);
-    return this.startNew(adapter, adapterName, instanceName, options, fn);
+    switch (propagation) {
+      case PropagationMode.REQUIRED: {
+        if (existing !== undefined) {
+          return fn();
+        }
+        const adapter = this.registry.get(adapterName, instanceName);
+        return this.startNew(adapter, adapterName, instanceName, options, fn);
+      }
+
+      case PropagationMode.REQUIRES_NEW: {
+        const adapter = this.registry.get(adapterName, instanceName);
+        if (existing === undefined) {
+          return this.startNew(adapter, adapterName, instanceName, options, fn);
+        }
+        TransactionContext.removeActiveTransaction(instanceName);
+        try {
+          return await this.startNew(adapter, adapterName, instanceName, options, fn);
+        } finally {
+          TransactionContext.setActiveTransaction(instanceName, existing);
+        }
+      }
+
+      case PropagationMode.NESTED: {
+        const adapter = this.registry.get(adapterName, instanceName);
+        if (existing === undefined) {
+          return this.startNew(adapter, adapterName, instanceName, options, fn);
+        }
+        return this.runNestedSavepoint(adapter, existing, options, fn);
+      }
+
+      case PropagationMode.SUPPORTS: {
+        return fn();
+      }
+
+      case PropagationMode.NOT_SUPPORTED: {
+        if (existing === undefined) {
+          return fn();
+        }
+        TransactionContext.removeActiveTransaction(instanceName);
+        try {
+          return await fn();
+        } finally {
+          TransactionContext.setActiveTransaction(instanceName, existing);
+        }
+      }
+
+      case PropagationMode.NEVER: {
+        if (existing !== undefined) {
+          throw new IllegalTransactionStateError(
+            `Propagation NEVER cannot be invoked inside an active transaction ` +
+              `(instance: '${instanceName}')`,
+          );
+        }
+        return fn();
+      }
+
+      case PropagationMode.MANDATORY: {
+        if (existing === undefined) {
+          throw new IllegalTransactionStateError(
+            `Propagation MANDATORY requires an active transaction, but none is ` +
+              `active (instance: '${instanceName}')`,
+          );
+        }
+        return fn();
+      }
+    }
   }
 
   /**
@@ -183,6 +266,49 @@ export class TransactionManager {
       return TransactionContext.run(correlationId, body);
     }
     return body();
+  }
+
+  /**
+   * Run `fn` inside a savepoint on `parent.handle`. Used by
+   * {@link PropagationMode.NESTED} when there is an active outer transaction.
+   *
+   * The manager intentionally does NOT create a new
+   * {@link ActiveTransaction} for the savepoint — hook registrations inside
+   * `fn` fall through {@link currentTransaction} to the outer transaction,
+   * which is the Spring-style semantic: nested events "promote" to the
+   * enclosing transaction and fire when that transaction commits.
+   *
+   * Rollback semantics follow `shouldRollback`: errors that match the
+   * rollback rules cause the adapter to roll back to the savepoint (the
+   * outer transaction is unaffected); errors that do NOT match lead to a
+   * savepoint release (commit-inside-savepoint) and the error is re-raised
+   * to the caller after the release.
+   */
+  private async runNestedSavepoint<T>(
+    adapter: TransactionAdapter,
+    parent: ActiveTransaction,
+    options: ExtendedTransactionOptions,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const result = await adapter.runInSavepoint(
+      parent.handle,
+      async (): Promise<InternalResult<T>> => {
+        try {
+          const value = await fn();
+          return { ok: true, value };
+        } catch (err) {
+          if (this.shouldRollback(err, options)) {
+            throw err; // adapter rolls back to savepoint
+          }
+          return { ok: false, error: err };
+        }
+      },
+    );
+
+    if (result.ok) {
+      return result.value;
+    }
+    throw result.error;
   }
 
   private currentTransaction(): ActiveTransaction {
