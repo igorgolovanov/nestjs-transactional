@@ -404,6 +404,9 @@ TransactionContext: class (static methods)
 TransactionalModule.forRoot(options): DynamicModule
 TransactionalModule.forRootAsync(options): DynamicModule
 
+// Interceptor (usually wired via TransactionalModule; exported for manual binding)
+TransactionalInterceptor: class implements NestInterceptor
+
 // Errors
 TransactionError (base)
 IllegalTransactionStateError
@@ -422,8 +425,14 @@ InMemoryTransactionAdapter: class
 
 - AdapterRegistry internals (registered through DI, but the implementation
   is internal)
-- TransactionalInterceptor (registered via APP_INTERCEPTOR inside the module)
 - Hook execution internals
+
+### Exported but typically wired via `TransactionalModule`
+
+- `TransactionalInterceptor` — registered via `APP_INTERCEPTOR` by
+  `TransactionalModule.forRoot` (enabled by default; opt out with
+  `registerInterceptor: false`). Exported so advanced consumers can bind
+  it manually on specific controllers instead of globally.
 
 ---
 

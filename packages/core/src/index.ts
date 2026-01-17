@@ -11,3 +11,6 @@ export * from './manager/adapter.registry';
 export * from './manager/transaction.manager';
 
 export * from './decorators/transactional.decorator';
+
+export * from './interceptor/transactional.interceptor';
+export * from './module/transactional.module';
