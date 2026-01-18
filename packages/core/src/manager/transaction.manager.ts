@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { TransactionContext, type ActiveTransaction } from '../context/transaction.context';
+import {
+  TRANSACTION_OBSERVERS,
+  type TransactionCommitContext,
+  type TransactionObserver,
+  type TransactionRollbackContext,
+  type TransactionStartContext,
+} from '../observability/transaction-observer';
 import { IllegalTransactionStateError } from '../types/errors';
 import { PropagationMode } from '../types/propagation';
 import type { TransactionAdapter } from '../types/transaction-adapter';
@@ -47,6 +54,9 @@ export class TransactionManager {
   constructor(
     @Inject(ADAPTER_REGISTRY)
     private readonly registry: AdapterRegistry,
+    @Optional()
+    @Inject(TRANSACTION_OBSERVERS)
+    private readonly observers: readonly TransactionObserver[] = [],
   ) {}
 
   /**
@@ -199,6 +209,7 @@ export class TransactionManager {
     const correlationId = outerStore?.correlationId ?? randomUUID();
 
     let activeTx: ActiveTransaction | undefined;
+    const startTime = Date.now();
 
     const body = async (): Promise<T> => {
       let result: InternalResult<T>;
@@ -218,6 +229,14 @@ export class TransactionManager {
               correlationId,
             };
             TransactionContext.setActiveTransaction(instanceName, activeTx);
+
+            this.notifyStart({
+              transactionId: handle.id,
+              adapterName,
+              adapterInstanceName: instanceName,
+              correlationId,
+              options,
+            });
 
             try {
               try {
@@ -244,15 +263,35 @@ export class TransactionManager {
         );
       } catch (rollbackError) {
         if (activeTx !== undefined) {
+          this.notifyRollback({
+            transactionId: activeTx.handle.id,
+            adapterName,
+            adapterInstanceName: instanceName,
+            correlationId,
+            options,
+            durationMs: Date.now() - startTime,
+            error: rollbackError,
+            rollbackCount: activeTx.afterRollbackHooks.length,
+          });
           await this.runHooks(activeTx.afterRollbackHooks, rollbackError);
         }
         throw rollbackError;
       }
 
-      // Adapter has committed. Fire afterCommit hooks regardless of whether
-      // we are about to re-raise a business error — the database state is
-      // what the hook subscribers care about, and it has been persisted.
+      // Adapter has committed. Fire the observer event and afterCommit
+      // hooks regardless of whether we are about to re-raise a business
+      // error — the database state is what the subscribers care about,
+      // and it has been persisted.
       if (activeTx !== undefined) {
+        this.notifyCommit({
+          transactionId: activeTx.handle.id,
+          adapterName,
+          adapterInstanceName: instanceName,
+          correlationId,
+          options,
+          durationMs: Date.now() - startTime,
+          commitCount: activeTx.afterCommitHooks.length,
+        });
         await this.runHooks(activeTx.afterCommitHooks);
       }
 
@@ -266,6 +305,45 @@ export class TransactionManager {
       return TransactionContext.run(correlationId, body);
     }
     return body();
+  }
+
+  private notifyStart(ctx: TransactionStartContext): void {
+    for (const observer of this.observers) {
+      try {
+        observer.onTransactionStart?.(ctx);
+      } catch (err) {
+        this.logger.warn(
+          `TransactionObserver.onTransactionStart failed: ${String(err)}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
+    }
+  }
+
+  private notifyCommit(ctx: TransactionCommitContext): void {
+    for (const observer of this.observers) {
+      try {
+        observer.onTransactionCommit?.(ctx);
+      } catch (err) {
+        this.logger.warn(
+          `TransactionObserver.onTransactionCommit failed: ${String(err)}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
+    }
+  }
+
+  private notifyRollback(ctx: TransactionRollbackContext): void {
+    for (const observer of this.observers) {
+      try {
+        observer.onTransactionRollback?.(ctx);
+      } catch (err) {
+        this.logger.warn(
+          `TransactionObserver.onTransactionRollback failed: ${String(err)}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
+    }
   }
 
   /**
