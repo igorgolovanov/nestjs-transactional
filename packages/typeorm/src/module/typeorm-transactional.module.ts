@@ -1,4 +1,4 @@
-import { type DynamicModule, Inject, Injectable, Module, type OnModuleInit } from '@nestjs/common';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { ADAPTER_REGISTRY, AdapterRegistry } from '@nestjs-transactional/core';
 import type { DataSource } from 'typeorm';
 
@@ -7,19 +7,19 @@ import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter';
 /**
  * Options accepted by {@link TypeOrmTransactionalModule.forFeature}.
  */
-export interface TypeOrmTransactionalModuleOptions {
+export interface TypeOrmTransactionalOptions {
   /**
    * Adapter instance name under which this TypeORM DataSource is
    * registered with the core {@link AdapterRegistry}. Defaults to
-   * `'default'`. Use distinct names when registering multiple
-   * DataSources (e.g. `'primary'`, `'billing'`).
+   * `'default'`. Use distinct names for multi-datasource setups
+   * (`'primary'`, `'billing'`, ...).
    */
   readonly instanceName?: string;
 
   /**
-   * DataSource to bind, either directly or through a factory. A factory
-   * allows async resolution (e.g. reading from config) and is invoked
-   * once at module init time.
+   * DataSource to bind, either directly or through a factory. The factory
+   * allows async resolution (e.g. reading from configuration) and runs
+   * once at module-init time.
    */
   readonly dataSource: DataSource | (() => Promise<DataSource> | DataSource);
 
@@ -30,87 +30,57 @@ export interface TypeOrmTransactionalModuleOptions {
   readonly isDefault?: boolean;
 }
 
-const TYPEORM_ADAPTER_OPTIONS = Symbol('TYPEORM_TRANSACTIONAL_ADAPTER_OPTIONS');
-
-interface ResolvedOptions {
-  readonly instanceName: string;
-  readonly dataSource: DataSource;
-  readonly isDefault: boolean;
-}
-
-/**
- * Internal service that runs at module init to register the adapter with
- * the core {@link AdapterRegistry}. Implemented as a provider with
- * `OnModuleInit` rather than a raw `useFactory` side effect so that the
- * DataSource-factory resolution happens lazily (before tests / app code
- * touches the registry) and is visible in the DI graph.
- */
-@Injectable()
-class TypeOrmAdapterRegistrar implements OnModuleInit {
-  constructor(
-    @Inject(TYPEORM_ADAPTER_OPTIONS)
-    private readonly options: ResolvedOptions,
-    @Inject(ADAPTER_REGISTRY)
-    private readonly registry: AdapterRegistry,
-  ) {}
-
-  onModuleInit(): void {
-    const adapter = new TypeOrmTransactionAdapter(
-      this.options.dataSource,
-      this.options.instanceName,
-    );
-    this.registry.register(
-      {
-        adapterName: 'typeorm',
-        instanceName: this.options.instanceName,
-        adapter,
-      },
-      this.options.isDefault,
-    );
-  }
-}
-
 /**
  * NestJS module that binds a TypeORM {@link DataSource} to the core
  * {@link AdapterRegistry} as an adapter instance. Import once per
- * DataSource in your application:
+ * DataSource:
  *
  * ```ts
  * @Module({
  *   imports: [
- *     TransactionalModule.forRoot(),
+ *     TransactionalModule.forRoot({ isGlobal: true }),
  *     TypeOrmTransactionalModule.forFeature({ dataSource: primaryDs }),
  *     TypeOrmTransactionalModule.forFeature({
  *       instanceName: 'billing',
- *       dataSource: billingDs,
+ *       dataSource: () => billingDs,
  *     }),
  *   ],
  * })
  * export class AppModule {}
  * ```
  *
- * Requires `TransactionalModule.forRoot()` (or `forRootAsync`) to be
- * imported alongside — the core module provides the
- * {@link AdapterRegistry} instance this module registers against.
+ * Requires `TransactionalModule.forRoot({ isGlobal: true })` — the core
+ * module provides the `AdapterRegistry` this module writes into, and
+ * `isGlobal: true` is needed so that the registry is visible inside
+ * `TypeOrmTransactionalModule`'s provider scope.
  */
 @Module({})
 export class TypeOrmTransactionalModule {
-  static forFeature(options: TypeOrmTransactionalModuleOptions): DynamicModule {
-    const resolvedOptionsProvider = {
-      provide: TYPEORM_ADAPTER_OPTIONS,
-      useFactory: async (): Promise<ResolvedOptions> => ({
-        instanceName: options.instanceName ?? 'default',
-        dataSource:
-          typeof options.dataSource === 'function'
-            ? await options.dataSource()
-            : options.dataSource,
-        isDefault: options.isDefault ?? false,
-      }),
-    };
+  static forFeature(options: TypeOrmTransactionalOptions): DynamicModule {
+    const instanceName = options.instanceName ?? 'default';
+    const providerToken = `TYPEORM_ADAPTER_${instanceName}`;
 
     return {
       module: TypeOrmTransactionalModule,
-      providers: [resolvedOptionsProvider, TypeOrmAdapterRegistrar],
+      providers: [
+        {
+          provide: providerToken,
+          useFactory: async (registry: AdapterRegistry): Promise<TypeOrmTransactionAdapter> => {
+            const ds =
+              typeof options.dataSource === 'function'
+                ? await options.dataSource()
+                : options.dataSource;
+
+            const adapter = new TypeOrmTransactionAdapter(ds, instanceName);
+            registry.register(
+              { adapterName: 'typeorm', instanceName, adapter },
+              options.isDefault ?? false,
+            );
+            return adapter;
+          },
+          inject: [ADAPTER_REGISTRY],
+        },
+      ],
     };
   }
 }
