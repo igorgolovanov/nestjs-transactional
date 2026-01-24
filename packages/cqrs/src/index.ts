@@ -21,3 +21,6 @@ export {
 } from './handlers/handler-wrapper';
 
 export { CqrsTransactionalBootstrap } from './handlers/bootstrap';
+
+export { TransactionalEventPublisher } from './event-publisher/transactional-event-publisher';
+export { TransactionalEventPublisherAdapter } from './event-publisher/transactional-event-publisher-adapter';
