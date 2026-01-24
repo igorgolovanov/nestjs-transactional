@@ -13,3 +13,11 @@ export {
 export { TransactionalEventDispatcher } from './event-dispatcher/event-dispatcher';
 
 export { TransactionalListenerScanner } from './handlers/listener-scanner';
+
+export {
+  CQRS_HANDLER_WRAPPER_OPTIONS,
+  CqrsHandlerWrapper,
+  type HandlerWrapperOptions,
+} from './handlers/handler-wrapper';
+
+export { CqrsTransactionalBootstrap } from './handlers/bootstrap';
