@@ -24,3 +24,9 @@ export { CqrsTransactionalBootstrap } from './handlers/bootstrap';
 
 export { TransactionalEventPublisher } from './event-publisher/transactional-event-publisher';
 export { TransactionalEventPublisherAdapter } from './event-publisher/transactional-event-publisher-adapter';
+
+export {
+  CQRS_TRANSACTIONAL_OPTIONS,
+  CqrsTransactionalModule,
+  type CqrsTransactionalOptions,
+} from './module/cqrs-transactional.module';
