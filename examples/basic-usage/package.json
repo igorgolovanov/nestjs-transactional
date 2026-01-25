@@ -1,0 +1,27 @@
+{
+  "name": "@nestjs-transactional-examples/basic-usage",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal NestJS app with one @Transactional service on sqljs",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "start": "tsc && node dist/main.js"
+  },
+  "dependencies": {
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/typeorm": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "sql.js": "^1.11.0",
+    "typeorm": "^0.3.25"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/sql.js": "^1.4.9",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  }
+}

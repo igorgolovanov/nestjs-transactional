@@ -318,9 +318,9 @@ describe('CqrsHandlerWrapper (integration with @nestjs/cqrs)', () => {
     // fire-and-forget error handling on the EventBus subscription.
     const handler = module.get(AuditEventHandler);
 
-    await expect(manager.run({}, async () => handler.handle(new AuditEvent('boom')))).rejects.toThrow(
-      'audit boom',
-    );
+    await expect(
+      manager.run({}, async () => handler.handle(new AuditEvent('boom'))),
+    ).rejects.toThrow('audit boom');
 
     // AuditEventHandler's @Transactional wrap runs its own inner tx;
     // combined with the outer manager.run the outer adapter call is the

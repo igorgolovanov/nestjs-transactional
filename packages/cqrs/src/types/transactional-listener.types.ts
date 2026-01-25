@@ -43,8 +43,7 @@ export interface TransactionalEventsListenerOptions {
  * {@link TransactionalEventsListener}. All option fields are required (the
  * decorator fills in defaults) and the target event type is captured.
  */
-export interface TransactionalEventsListenerMetadata
-  extends Required<TransactionalEventsListenerOptions> {
+export interface TransactionalEventsListenerMetadata extends Required<TransactionalEventsListenerOptions> {
   readonly eventType: Type;
 }
 

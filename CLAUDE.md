@@ -891,10 +891,11 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Phase**: Phase 2 complete — Phase 3 (`@nestjs-transactional/cqrs`) not started.
+**Phase**: Phases 1, 2, 3 complete — Phase 4 (CI/CD, publishing,
+examples) in progress.
 
-**Test suite**: 124 unit tests green across 10 suites (106 core + 18
-typeorm). Integration specs (10 tests in 2 files) compile and are
+**Test suite**: 175 unit tests green (114 core + 18 typeorm + 43 cqrs).
+TypeORM integration specs (10 tests in 2 files) compile and are
 discovered by the integration Jest config but have not been run yet —
 they need Docker for testcontainers-node.
 
@@ -905,7 +906,7 @@ they need Docker for testcontainers-node.
 - Changesets initialised
 - CI workflow at `.github/workflows/ci.yml` — Node 20 + 22 matrix: lint, build, test, type-check
 
-### Phase 1 — `@nestjs-transactional/core` — mostly done
+### Phase 1 — `@nestjs-transactional/core` — DONE
 - Types: `PropagationMode` (all 7 Spring modes), `IsolationLevel`,
   `TransactionOptions`, `ExtendedTransactionOptions`, `TransactionHandle`,
   `TransactionAdapter<THandle>`, `DomainEvent`, errors (`TransactionError`
@@ -923,15 +924,15 @@ they need Docker for testcontainers-node.
 - `@Transactional()` / `@ReadOnly()` / `@TransactionalOn()` decorators
   (metadata-only via `reflect-metadata`)
 - `TransactionalInterceptor` — `APP_INTERCEPTOR` for the request boundary
+- **`TransactionalMethodsBootstrap`** — `OnApplicationBootstrap` service
+  that wraps every `@Transactional()` method on plain `@Injectable()`
+  providers with `TransactionManager.run(...)`. Skips CQRS handlers (by
+  metadata) and already-wrapped methods (by `WRAPPED_MARKER`).
+  Registered by `TransactionalModule.forRoot` unless the caller sets
+  `registerMethodsBootstrap: false`.
 - `TransactionalModule.forRoot` + `forRootAsync`
 - `TransactionObserver` + `TRANSACTION_OBSERVERS` for monitoring
 - `docs/architecture/core-design.md` documents the three extension points
-
-**One item remains open in Phase 1:** `TransactionalMethodsBootstrap` —
-the second of ADR-005's three wrapping mechanisms, for service-level
-`@Transactional()` on plain `@Injectable()` providers. Without it,
-`@Transactional` on a service method is metadata-only and nothing wraps
-it at runtime. **This is the first task of the next session.**
 
 ### Phase 2 — `@nestjs-transactional/typeorm` — DONE
 - `TypeOrmTransactionAdapter` using `DataSource.transaction(...)` and
@@ -950,10 +951,58 @@ it at runtime. **This is the first task of the next session.**
 per-dialect SQL; `forFeature` does not accept an `InjectionToken` for
 the DataSource yet.
 
-### Phase 3 — `@nestjs-transactional/cqrs` — NOT STARTED
-Package skeleton only; `src/index.ts` is `export {}`. See
-`docs/sessions/phase-2-complete.md` §5 for a five-prompt sequence to
-deliver it.
+### Phase 3 — `@nestjs-transactional/cqrs` — DONE
+- `TransactionPhase` enum + `TransactionalEventsListenerMetadata` types
+- `@TransactionalEventsListener(EventType, { phase, fallbackExecution, async })`
+  decorator (metadata-only)
+- `TransactionalEventDispatcher` — routes events to listeners via
+  `manager.registerBeforeCommit` / `registerAfterCommit` /
+  `registerAfterRollback`; fallback execution outside a transaction
+  goes via `queueMicrotask` (or warn-log + skip); `async: true` is
+  fire-and-forget regardless of phase
+- `TransactionalListenerScanner` — `OnModuleInit` that walks every
+  provider via `DiscoveryService` + `MetadataScanner` and auto-registers
+  decorated methods with the dispatcher
+- `CqrsHandlerWrapper` + `CqrsTransactionalBootstrap` — wrap
+  `@CommandHandler` / `@QueryHandler` / `@EventsHandler` instances at
+  application bootstrap; classify by metadata key, honour method-level
+  `@Transactional` > class-level > kind defaults (`defaultQueryOptions`,
+  `defaultCommandOptions`)
+- `TransactionalEventPublisher` + `TransactionalEventPublisherAdapter`
+  — drop-in replacement for `@nestjs/cqrs`'s `EventPublisher`;
+  `mergeObjectContext` / `mergeClassContext` route aggregate events
+  through the dispatcher so `AggregateRoot.commit()` attaches phase
+  hooks instead of publishing immediately
+- `CqrsTransactionalModule.forRoot({ wrapCommandHandlers, wrapQueryHandlers,
+  wrapEventHandlers, defaultQueryOptions, defaultCommandOptions,
+  useTransactionalEventPublisher })` — single entry point
+
+**Limitations documented in `packages/cqrs/README.md`:**
+- Only works with singleton handlers (request-scoped handlers are
+  resolved per-request by `@nestjs/cqrs` via `ModuleRef.resolve`,
+  producing a fresh instance our bootstrap wrap has not mutated).
+- Direct `eventBus.publish(...)` calls (outside an aggregate) bypass
+  the transactional dispatcher. Only `AggregateRoot.commit()`-emitted
+  events via `mergeObjectContext` / `mergeClassContext` get phase-aware
+  semantics.
+- `@nestjs/cqrs` handler-metadata constants (`__commandHandler__` etc.)
+  are re-declared as string literals because `@nestjs/cqrs` does not
+  re-export them. See DD-002 — the coupling is accepted.
+
+### Phase 4 — CI/CD, publishing, examples — IN PROGRESS
+- Runnable examples under `examples/*` (added to `pnpm-workspace.yaml`):
+  - `examples/basic-usage/` — `@Transactional` on a plain service
+  - `examples/multi-datasource/` — `@Transactional` + `@TransactionalOn`
+    against two `TypeOrmTransactionalModule.forFeature` registrations
+  - `examples/cqrs-full-stack/` — full CQRS flow with aggregate,
+    command, query, and `AFTER_COMMIT` / `AFTER_ROLLBACK` listeners
+  - Each has `pnpm start` (`tsc && node dist/main.js`) and a README.
+- **Still open in Phase 4:** full GitHub Actions publish workflow,
+  changesets release automation, npm publish setup, `dist/**/*.spec.*`
+  filtering out of the publish tarball (see §3.8 of
+  `docs/sessions/phase-2-complete.md`), `@nestjs-transactional/core/testing`
+  subpath resolution under `moduleResolution: "node"` (currently
+  unreachable from sibling packages — they inline a fake adapter).
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 
@@ -974,15 +1023,36 @@ deliver it.
    `AdapterRegistry` is not visible in the typeorm module's provider
    scope and DI fails at init.
 
-4. **Test file layout in typeorm package:** unit tests under
-   `packages/typeorm/test/unit/`, integration under
-   `packages/typeorm/test/integration/`, shared fixtures under
-   `packages/typeorm/test/shared/`. Core still colocates `.spec.ts` next
-   to source. Adopt the typeorm layout for `cqrs` tests.
+4. **Test file layout is inconsistent across packages.** Core colocates
+   `.spec.ts` next to source. TypeORM uses `test/unit/`,
+   `test/integration/`, `test/shared/`. CQRS mostly colocates in `src/`
+   with one exception (`test/unit/transactional-events-listener.decorator.spec.ts`
+   — historical, can be moved to match). Pick one per package and stay
+   consistent within the package.
 
 5. **Session handoff notes live under `docs/sessions/`.** Read
    `docs/sessions/phase-2-complete.md` first when resuming after a
    long gap — it lists current state, open issues, and the next-session
    prompt sequence in more detail than this status block.
-- ADR-005 document will be written in Phase 1 before the iteration on
-  TransactionalMethodsBootstrap
+
+6. **Do NOT import `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.**
+   The transactional module imports `CqrsModule` internally and overrides
+   the `EventPublisher` DI token. A duplicate `CqrsModule` import in the
+   consumer shadows the override — handlers inject the original
+   `EventPublisher` from `CqrsModule` and aggregate events bypass the
+   dispatcher. Documented in `packages/cqrs/README.md`.
+
+7. **`CQRS_TRANSACTIONAL_OPTIONS` + `CQRS_HANDLER_WRAPPER_OPTIONS` are
+   separate injection tokens.** The module-level token is a string
+   (`'CQRS_TRANSACTIONAL_OPTIONS'`); the handler-wrapper-level one is a
+   `Symbol`. `CqrsTransactionalModule.forRoot` builds the wrapper via
+   `useFactory`, passing the resolved options directly — it does not
+   wire the Symbol token. If you instantiate `CqrsHandlerWrapper`
+   outside the module, provide the Symbol token yourself.
+
+8. **`WRAPPED_MARKER` is shared via `Symbol.for('@nestjs-transactional/wrapped')`.**
+   The core package does not re-export the symbol from its public
+   barrel (internal per JSDoc), but re-deriving it in any package gives
+   the same identity — `Symbol.for` is process-global. All three
+   wrapping mechanisms (interceptor, methods-bootstrap, cqrs handler
+   wrapper) check this marker before wrapping to prevent double-wrap.

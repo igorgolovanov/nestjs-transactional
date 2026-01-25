@@ -8,10 +8,7 @@ import {
 } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionalModule, Transactional } from '@nestjs-transactional/core';
-import {
-  TypeOrmTransactionalModule,
-  getCurrentEntityManager,
-} from '@nestjs-transactional/typeorm';
+import { TypeOrmTransactionalModule, getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
 
 import { TransactionalEventsListener } from '../decorators/transactional-events-listener.decorator';
@@ -183,9 +180,9 @@ describe('CqrsTransactionalModule (E2E: TypeORM + CQRS + Transactional)', () => 
     const projection = module.get(OrderProjection);
     const repo = module.get(OrderRepository);
 
-    await expect(
-      commandBus.execute(new PlaceOrderCommand('order-2', true)),
-    ).rejects.toThrow('simulated failure');
+    await expect(commandBus.execute(new PlaceOrderCommand('order-2', true))).rejects.toThrow(
+      'simulated failure',
+    );
 
     const row = await repo.findById('order-2', ds);
     expect(row).toBeNull();

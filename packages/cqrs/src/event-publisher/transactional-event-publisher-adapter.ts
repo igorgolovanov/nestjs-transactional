@@ -1,10 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  AggregateRoot,
-  EventBus,
-  EventPublisher,
-  type IEvent,
-} from '@nestjs/cqrs';
+import { AggregateRoot, EventBus, EventPublisher, type IEvent } from '@nestjs/cqrs';
 
 import { TransactionalEventPublisher } from './transactional-event-publisher';
 

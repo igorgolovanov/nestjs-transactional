@@ -13,6 +13,7 @@ export * from './manager/transaction.manager';
 export * from './decorators/transactional.decorator';
 
 export * from './interceptor/transactional.interceptor';
+export * from './bootstrap/transactional-methods.bootstrap';
 export * from './module/transactional.module';
 
 export * from './observability/transaction-observer';

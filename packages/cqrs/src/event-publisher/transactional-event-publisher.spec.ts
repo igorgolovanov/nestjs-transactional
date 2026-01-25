@@ -23,10 +23,7 @@ import {
 import { TransactionalEventsListener } from '../decorators/transactional-events-listener.decorator';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
-import {
-  CQRS_HANDLER_WRAPPER_OPTIONS,
-  CqrsHandlerWrapper,
-} from '../handlers/handler-wrapper';
+import { CQRS_HANDLER_WRAPPER_OPTIONS, CqrsHandlerWrapper } from '../handlers/handler-wrapper';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
@@ -92,7 +89,10 @@ class Order extends AggregateRoot {
 let midTransactionGate: Promise<void> | null = null;
 
 class PlaceOrderCommand {
-  constructor(readonly orderId: string, readonly shouldFail = false) {}
+  constructor(
+    readonly orderId: string,
+    readonly shouldFail = false,
+  ) {}
 }
 
 class PlaceOrderClassCommand {
@@ -247,9 +247,7 @@ describe('TransactionalEventPublisher (integration with AggregateRoot)', () => {
   });
 
   it('does not fire an AFTER_COMMIT listener when the transaction rolls back', async () => {
-    await expect(
-      commandBus.execute(new PlaceOrderCommand('o-fail', true)),
-    ).rejects.toThrow('boom');
+    await expect(commandBus.execute(new PlaceOrderCommand('o-fail', true))).rejects.toThrow('boom');
     await drainEventLoop();
 
     expect(listener.afterCommit).toHaveLength(0);
@@ -257,9 +255,9 @@ describe('TransactionalEventPublisher (integration with AggregateRoot)', () => {
   });
 
   it('fires an AFTER_ROLLBACK listener with the causing error when the transaction rolls back', async () => {
-    await expect(
-      commandBus.execute(new PlaceOrderCommand('o-fail-2', true)),
-    ).rejects.toThrow('boom');
+    await expect(commandBus.execute(new PlaceOrderCommand('o-fail-2', true))).rejects.toThrow(
+      'boom',
+    );
     await drainEventLoop();
 
     expect(listener.afterRollback).toHaveLength(1);

@@ -7,10 +7,7 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
 import { TransactionalEventPublisher } from '../event-publisher/transactional-event-publisher';
 import { TransactionalEventPublisherAdapter } from '../event-publisher/transactional-event-publisher-adapter';
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
-import {
-  CqrsHandlerWrapper,
-  type HandlerWrapperOptions,
-} from '../handlers/handler-wrapper';
+import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner';
 
 /**
@@ -81,9 +78,13 @@ export class CqrsTransactionalModule {
     const resolved: Required<
       Pick<
         CqrsTransactionalOptions,
-        'wrapCommandHandlers' | 'wrapQueryHandlers' | 'wrapEventHandlers' | 'useTransactionalEventPublisher'
+        | 'wrapCommandHandlers'
+        | 'wrapQueryHandlers'
+        | 'wrapEventHandlers'
+        | 'useTransactionalEventPublisher'
       >
-    > & Pick<CqrsTransactionalOptions, 'defaultQueryOptions' | 'defaultCommandOptions'> = {
+    > &
+      Pick<CqrsTransactionalOptions, 'defaultQueryOptions' | 'defaultCommandOptions'> = {
       wrapCommandHandlers: options.wrapCommandHandlers ?? true,
       wrapQueryHandlers: options.wrapQueryHandlers ?? true,
       wrapEventHandlers: options.wrapEventHandlers ?? true,

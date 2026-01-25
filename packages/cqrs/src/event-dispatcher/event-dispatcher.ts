@@ -203,11 +203,7 @@ export class TransactionalEventDispatcher {
     });
   }
 
-  private callListener(
-    listener: RegisteredListener,
-    event: unknown,
-    error?: unknown,
-  ): unknown {
+  private callListener(listener: RegisteredListener, event: unknown, error?: unknown): unknown {
     return listener.handler(event, error);
   }
 

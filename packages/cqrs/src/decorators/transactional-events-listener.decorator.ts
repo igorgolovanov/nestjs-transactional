@@ -45,11 +45,7 @@ export function TransactionalEventsListener<T = unknown>(
     async: options.async ?? false,
   };
 
-  return (
-    _target: object,
-    _propertyKey: string | symbol,
-    descriptor: PropertyDescriptor,
-  ): void => {
+  return (_target: object, _propertyKey: string | symbol, descriptor: PropertyDescriptor): void => {
     const methodTarget: unknown = descriptor.value;
     if (typeof methodTarget !== 'function') {
       return;

@@ -140,7 +140,9 @@ export class CqrsHandlerWrapper {
       }
     }
 
-    this.logger.log(`Wrapped ${wrappedCount} CQRS handler${wrappedCount === 1 ? '' : 's'} with @Transactional`);
+    this.logger.log(
+      `Wrapped ${wrappedCount} CQRS handler${wrappedCount === 1 ? '' : 's'} with @Transactional`,
+    );
   }
 
   private classifyHandler(metatype: object): HandlerKind | null {
