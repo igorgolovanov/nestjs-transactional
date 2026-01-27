@@ -30,7 +30,8 @@
     "typecheck": "tsc --build --force",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "pnpm build && changeset publish"
+    "changeset:publish": "pnpm build && changeset publish",
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",
