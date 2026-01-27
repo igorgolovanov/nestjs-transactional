@@ -29,10 +29,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist",
-    "src",
-    "README.md",
-    "LICENSE"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "!dist/**/*.spec.*"
   ],
   "exports": {
     ".": {
@@ -44,11 +44,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -p tsconfig.build.json",
     "clean": "rimraf dist *.tsbuildinfo coverage",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "type-check": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\""
   },
   "peerDependencies": {
