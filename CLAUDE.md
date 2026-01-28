@@ -891,13 +891,24 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Phase**: Phases 1, 2, 3 complete — Phase 4 (CI/CD, publishing,
-examples) in progress.
+**Last updated**: 2026-04-24.
+**Session handoff**: `docs/sessions/2026-04-24-handoff.md` — read
+first when resuming.
+
+**Phase**: Phases 1, 2, 3 complete. Phase 4 substantially done —
+examples, release workflow, publishing hygiene, and npm provenance
+all in place; the only remaining blockers for tagging 0.1.0 are
+running the TypeORM integration tests against Docker and wiring the
+`NPM_TOKEN` GitHub secret.
 
 **Test suite**: 175 unit tests green (114 core + 18 typeorm + 43 cqrs).
 TypeORM integration specs (10 tests in 2 files) compile and are
-discovered by the integration Jest config but have not been run yet —
-they need Docker for testcontainers-node.
+discovered by the integration Jest config but **have not been run yet**
+in any session — they need Docker for testcontainers-node.
+
+**Publishable tarballs** (`npm pack --dry-run`): core 34.6 KB / 59
+entries, typeorm 7.8 KB / 17 entries, cqrs 21.6 KB / 32 entries — zero
+spec files in any tarball after the `tsconfig.build.json` split.
 
 ### Phase 0 — Monorepo setup — DONE
 - pnpm workspaces, TypeScript project references (composite: true)
@@ -989,7 +1000,7 @@ the DataSource yet.
   are re-declared as string literals because `@nestjs/cqrs` does not
   re-export them. See DD-002 — the coupling is accepted.
 
-### Phase 4 — CI/CD, publishing, examples — IN PROGRESS
+### Phase 4 — CI/CD, publishing, examples — SUBSTANTIALLY DONE
 - Runnable examples under `examples/*` (added to `pnpm-workspace.yaml`):
   - `examples/basic-usage/` — `@Transactional` on a plain service
   - `examples/multi-datasource/` — `@Transactional` + `@TransactionalOn`
@@ -997,12 +1008,43 @@ the DataSource yet.
   - `examples/cqrs-full-stack/` — full CQRS flow with aggregate,
     command, query, and `AFTER_COMMIT` / `AFTER_ROLLBACK` listeners
   - Each has `pnpm start` (`tsc && node dist/main.js`) and a README.
-- **Still open in Phase 4:** full GitHub Actions publish workflow,
-  changesets release automation, npm publish setup, `dist/**/*.spec.*`
-  filtering out of the publish tarball (see §3.8 of
-  `docs/sessions/phase-2-complete.md`), `@nestjs-transactional/core/testing`
-  subpath resolution under `moduleResolution: "node"` (currently
-  unreachable from sibling packages — they inline a fake adapter).
+- GitHub Actions release workflow at `.github/workflows/release.yml`
+  (push-to-main, `id-token: write`, `changesets/action@v1` for
+  Version PR + publish).
+- Root `README.md` + `CONTRIBUTING.md` with setup, tests, changeset
+  workflow, commit style, dependency boundaries, release + provenance.
+- Changelog generator upgraded to `@changesets/changelog-github` for
+  PR-linked entries.
+- `dist/**/*.spec.*` leakage fixed via per-package `tsconfig.build.json`
+  (emit, excludes specs) vs `tsconfig.json` (noEmit, for jest + IDE +
+  type-check script). Narrow `files` array in each `package.json`
+  with `!dist/**/*.spec.*` negation as a second-line guard.
+- npm provenance wired via `publishConfig: { access: "public",
+  provenance: true }` in each publishable `package.json` (not via a
+  `changeset publish --provenance` flag — that flag does not exist in
+  `@changesets/cli@2.31`).
+
+**Still open in Phase 4 (blockers for tagging 0.1.0):**
+- Run TypeORM integration tests on a Docker-enabled machine
+  (`pnpm --filter @nestjs-transactional/typeorm test:integration`).
+  10 tests discovered, 0 executed to date.
+- Add `NPM_TOKEN` as a GitHub repo secret (granular publish token
+  scoped to `@nestjs-transactional` — classic tokens are
+  incompatible with OIDC provenance).
+- Create the first changeset bumping all three packages to 0.1.0
+  with an initial-release summary.
+
+**Deferred to post-0.1.0:**
+- `moduleResolution: "bundler"` migration to unlock
+  `@nestjs-transactional/core/testing` subpath from sibling packages
+  (currently they inline a fake adapter).
+- Coverage pipeline (Codecov / Coveralls) + badge.
+- Unify cqrs test layout (iteration 3.1's decorator spec is in
+  `test/unit/`, everything else is colocated in `src/**`).
+- Bridge `eventBus.publish(...)` → transactional dispatcher for
+  non-aggregate event emissions.
+- `@nestjs/testing` in cqrs `devDependencies` (currently resolves via
+  hoisted root).
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 
