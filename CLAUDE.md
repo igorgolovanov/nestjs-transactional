@@ -2,8 +2,11 @@
 
 ## Overview
 
-This repository contains three npm packages that provide Spring Framework-style
-declarative transaction management for NestJS applications:
+This repository aims to deliver Spring Modulith-equivalent transaction and
+event-delivery infrastructure for NestJS applications, split across a
+growing set of npm packages organised by concern.
+
+### Current (published / in-tree)
 
 - **@nestjs-transactional/core** — base infrastructure: AsyncLocalStorage context,
   TransactionManager with propagation modes, `@Transactional()` decorator,
@@ -19,12 +22,66 @@ declarative transaction management for NestJS applications:
   (BEFORE_COMMIT, AFTER_COMMIT, AFTER_ROLLBACK, AFTER_COMPLETION), and an
   EventPublisher override that integrates with AggregateRoot.
 
+### Planned (Phase 5–8)
+
+- **@nestjs-transactional/outbox-core** — persistent Event Publication
+  Registry: event lifecycle states, repository SPI, async worker,
+  staleness monitor, startup recovery. ORM-agnostic.
+
+- **@nestjs-transactional/outbox-typeorm** — TypeORM persistence
+  implementation of the outbox-core SPI (`event_publication` table,
+  `FOR UPDATE SKIP LOCKED` worker safety, archive completion mode).
+
+### Future (not scheduled)
+
+- **@nestjs-transactional/outbox-kafka** — event externalization to Kafka
+- **@nestjs-transactional/testing** — integration testing utilities
+  cross-cutting over core / typeorm / cqrs / outbox
+
 ## Mission Statement
 
 Give NestJS applications transaction management on par with Spring Framework:
 a declarative `@Transactional`, the full set of propagation modes, support for
 multiple DataSources in the same app, and a tight integration with
 event-driven paradigms through CQRS with phase-aware listeners.
+
+---
+
+## Spring Modulith Parity Goal
+
+This monorepo aims to provide Spring Modulith-equivalent functionality
+for NestJS applications, not just Spring Framework core.
+
+### Scope coverage
+
+**Spring Framework core features (covered in existing packages):**
+- `@Transactional` with propagation modes (core)
+- `@TransactionalEventListener` with transaction phases (cqrs)
+- Multi-DataSource support (typeorm)
+- AsyncLocalStorage for transaction context (core)
+
+**Spring Modulith features (partially covered, expansion planned):**
+- Event Publication Registry with persistent log — outbox-core (Phase 5)
+- `@ApplicationModuleListener` shortcut — cqrs integration (Phase 7)
+- Failed / Incomplete / Completed publications API — outbox-core (Phase 5)
+- Staleness monitor — outbox-core (Phase 5)
+- Republish on restart — outbox-core (Phase 5)
+- Completion modes (UPDATE / DELETE / ARCHIVE) — outbox-core (Phase 5)
+- `PublishedEvents` test utility — outbox-core `/testing` (Phase 8)
+- Event externalization to brokers — future (not scheduled)
+
+**Explicitly out of scope:**
+- Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)
+  — use `@nx/enforce-module-boundaries` or similar for this
+- Documentation generation (Spring Modulith's `Documenter`) — use TypeDoc
+
+### Positioning note
+
+This is a deliberate scope commitment made after comparing with Spring
+Modulith 2.0.5 documentation
+(https://docs.spring.io/spring-modulith/reference/events.html).
+Prior positioning of "Spring Framework equivalent" was insufficient —
+production systems need the delivery guarantees Spring Modulith provides.
 
 ---
 
@@ -128,6 +185,14 @@ Design Decisions section below:
 - **ADR-003**: Not patching @nestjs/cqrs — `docs/adr/003-not-patching-nestjs-cqrs.md`
 - **ADR-004**: Public API stability policy — `docs/adr/004-public-api-stability.md`
 - **ADR-005**: Method wrapping strategy — `docs/adr/005-method-wrapping-strategy.md`
+
+Planned (to be created):
+
+- **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md` (Phase 5)
+- **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md` (Phase 5)
+- **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md` (Phase 5)
+- **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md` (Phase 5)
+- **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md` (Phase 7)
 
 Process: every significant architectural decision gets a new ADR numbered n+1.
 The discussion is captured; the status is one of accepted / rejected /
@@ -368,6 +433,97 @@ second one being started.
 Debugging requires familiarity with all three mechanisms. Mitigation:
 a detailed ADR-005, debug-level logging at wrap time, and a clear file
 layout with obvious names.
+
+### DD-009: Implement full Event Publication Registry (Spring Modulith parity)
+
+**Context**: Scope reassessment after detailed comparison with Spring
+Modulith 2.0.5. Our existing `@TransactionalEventsListener` provides
+phase-based dispatching (like Spring Framework core) but lacks the
+persistent event log, retry, recovery, and delivery guarantees that
+Spring Modulith provides for production systems.
+
+**Alternatives considered**:
+- Keep current scope (Spring Framework only), mention gap in documentation.
+  Rejected: insufficient for production event-driven architectures.
+- Recommend an external outbox library. Rejected: fragments the ecosystem,
+  each library has different semantics from @nestjs-transactional packages.
+- Implement as a single pattern inside the cqrs package. Rejected: couples
+  persistence concerns to CQRS, prevents use of outbox without CQRS.
+
+**Decision**: Implement full Event Publication Registry equivalent as
+separate `outbox-core` + `outbox-typeorm` packages. Integration with cqrs
+via `HybridEventPublisher` and the `@ApplicationModuleListener` decorator.
+
+**Consequences**:
+- Significant scope expansion (~3 weeks of work).
+- Production-ready delivery guarantees.
+- Clear migration path from in-memory `@TransactionalEventsListener` to
+  persistent `@OutboxEventListener`.
+- Larger surface area to maintain.
+
+### DD-010: Split outbox into core + persistence packages
+
+**Context**: Need to support multiple persistence backends (TypeORM now,
+Prisma / MikroORM / MongoDB in future).
+
+**Alternatives considered**:
+- Single `@nestjs-transactional/outbox` package with TypeORM baked in.
+  Rejected: forces users to adopt TypeORM.
+- `@nestjs-transactional/outbox-{backend}` monolithic packages (one per
+  backend). Rejected: duplicates core logic.
+
+**Decision**: `outbox-core` with an `EventPublicationRepository` SPI plus
+separate `outbox-{backend}` packages implementing the SPI. Follows the
+existing pattern (core + typeorm).
+
+**Consequences**: Clean separation, easy to add backends. Users must
+install two packages, slightly more setup.
+
+### DD-011: Hybrid event publishing (in-memory + persistent coexistence)
+
+**Context**: The cqrs package currently publishes events via the in-memory
+`TransactionalEventDispatcher`. Events also need to be routed to the
+outbox for persistence when the outbox is available, without breaking
+existing behavior.
+
+**Alternatives considered**:
+- Replace the in-memory dispatcher entirely with the outbox. Rejected:
+  breaking change; the in-memory path has valid use cases (cache
+  invalidation, metrics).
+- Make users choose per listener. Rejected: usability nightmare.
+
+**Decision**: `HybridEventPublisher` delegates to both paths. Listeners
+annotated with `@OutboxEventListener` metadata are automatically SKIPPED
+by the in-memory dispatcher (so there is no double invocation). Listeners
+annotated only with `@TransactionalEventsListener` continue running
+in-memory as before.
+
+**Consequences**: Seamless coexistence. Slight cognitive load: developers
+must understand which decorator provides which guarantees.
+
+### DD-012: @ApplicationModuleListener as smart default
+
+**Context**: Spring Modulith's `@ApplicationModuleListener` is the
+recommended default for cross-module integration. It combines
+AFTER_COMMIT, async execution, a new transaction, and persistence. Users
+should not need to manually compose 3–4 decorators for the common case.
+
+**Alternatives considered**:
+- Only provide `@OutboxEventListener`, let users compose with
+  `@Transactional` when needed. Rejected: does not match Spring Modulith
+  DX.
+- Make it a composite decorator that works without the outbox. Done
+  partially (see Decision below).
+
+**Decision**: `@ApplicationModuleListener` is a composite decorator in the
+cqrs package. When the outbox is configured — it provides full persistent
+delivery. Without the outbox — it falls back to
+`@TransactionalEventsListener({ phase: AFTER_COMMIT, async: true })` +
+`@Transactional({ propagation: REQUIRES_NEW })` semantics. Behavior in
+both modes is documented explicitly.
+
+**Consequences**: Matches Spring Modulith DX. Behavior differs based on
+config — must be clearly documented to avoid surprises.
 
 ---
 
@@ -679,6 +835,23 @@ export class TransactionAdapterNotFoundError extends TransactionError {
   mechanisms that have DI access (see ADR-005)
 - **DO NOT use TC39 stage-3 decorator syntax** — the whole ecosystem is
   on legacy + reflect-metadata (see DD-007)
+- **DO NOT publish events outside a transaction via `OutboxEventPublisher`**
+  — that is a design error. Publish events inside a `@Transactional`
+  method so that publication entries are committed atomically with the
+  business data. (Exception: tests with the outbox disabled may call
+  `publish` directly.)
+- **DO NOT rename handler methods carelessly once the outbox is in use**
+  — the method name is part of the listener ID. Renaming it makes
+  existing publications in the database unresolvable. Use an explicit
+  `options.id` in `@OutboxEventListener` for stability:
+  `@OutboxEventListener(SomeEvent, { id: 'stable-listener-id' })`.
+- **DO NOT mix `@TransactionalEventsListener` and `@OutboxEventListener`
+  on the same method without understanding the consequences** — in most
+  cases use `@ApplicationModuleListener` (the smart default) or commit
+  to exactly one of the two.
+- **DO NOT apply the `event_publication` schema in production without a
+  migration** — auto schema initialization is development-only.
+  Production requires an explicit migration step.
 
 ---
 
@@ -727,6 +900,26 @@ The cqrs package may expose:
 ```typescript
 import { TransactionalTestingModule } from '@nestjs-transactional/cqrs/testing';
 ```
+
+### Testing events and outbox
+
+The outbox-core and cqrs packages (Phase 8) export testing utilities via
+the `/testing` subpath:
+
+- **`PublishedEvents`**: query events published during a test.
+- **`AssertablePublishedEvents`**: fluent assertions on published events.
+- **`InMemoryEventPublicationRepository`**: fast in-memory replacement
+  for the TypeORM repository (already available from Phase 5).
+
+Integration tests should use `testcontainers-node` for a real Postgres
+specifically when testing the outbox-typeorm package. For general
+application testing (even with the outbox enabled) the in-memory
+repository is sufficient.
+
+Coverage targets:
+- outbox-core: 90% lines, 85% branches
+- outbox-typeorm: 85% lines (the remainder is TypeORM integration that
+  is hard to cover in unit tests)
 
 ---
 
@@ -823,11 +1016,76 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 - NPM publishing setup
 - Documentation generation
 
-### Future phases (not committed, tentative)
-- **@nestjs-transactional/outbox**: Transactional Outbox pattern helpers
-- **@nestjs-transactional/prisma**: Prisma adapter
-- **@nestjs-transactional/drizzle**: Drizzle adapter
-- **OpenTelemetry integration**: built-in tracing
+### Phase 5: @nestjs-transactional/outbox-core (planned)
+
+Core infrastructure for the Event Publication Registry:
+- `EventPublication` types and lifecycle states (`PUBLISHED`, `PROCESSING`,
+  `COMPLETED`, `FAILED`, `RESUBMITTED`)
+- `EventSerializer` abstraction with a JSON default implementation
+- `EventTypeRegistry` for deserialization
+- `EventPublicationRepository` SPI
+- `EventPublicationRegistry` — central lifecycle coordinator
+- `OutboxListenerRegistry` and the `@OutboxEventListener` decorator
+- `OutboxEventPublisher` — high-level API
+- `EventPublicationProcessor` — async worker
+- `StalenessMonitor` — detects stuck publications
+- `FailedEventPublications`, `IncompleteEventPublications`,
+  `CompletedEventPublications` — public APIs
+- `StartupRecoveryService` — republish on restart
+- `OutboxModule` (`forRoot` / `forRootAsync`), `OutboxProcessingModule`
+- In-memory repository for testing
+
+### Phase 6: @nestjs-transactional/outbox-typeorm (planned)
+
+TypeORM persistence implementation:
+- `EventPublicationEntity` with proper indexes
+- `EventPublicationArchiveEntity` (for ARCHIVE completion mode)
+- `TypeOrmEventPublicationRepository` implementing the SPI from outbox-core
+- Uses `FOR UPDATE SKIP LOCKED` for concurrent worker safety
+- Schema migration (`createEventPublication`)
+- Auto schema initialization (development only)
+- `OutboxTypeOrmModule`
+
+### Phase 7: @nestjs-transactional/cqrs outbox integration (planned)
+
+Changes to the existing cqrs package:
+- `HybridEventPublisher` — delegates to both the in-memory dispatcher and
+  the outbox
+- `TransactionalEventPublisherAdapter` updated to use `HybridEventPublisher`
+- `TransactionalListenerScanner` updated to skip `@OutboxEventListener`
+  methods (prevents double invocation)
+- `@ApplicationModuleListener` composite decorator (smart default)
+- `OutboxEventPublisher.scheduleForPublication` for a sync publish API
+  with batched writes
+- `CqrsTransactionalModule` options extended for outbox config
+
+### Phase 8: Testing utilities (planned)
+
+In outbox-core (`/testing` subpath) and cqrs (`/testing` subpath):
+- `PublishedEvents`: inspect events during tests
+- `AssertablePublishedEvents` with a fluent API
+- Integration with Jest
+- Documentation with examples
+
+### Phase 9: Documentation and release (planned)
+
+- `docs/architecture/outbox-pattern.md`
+- `docs/architecture/outbox-integration-with-cqrs.md`
+- ADR-006 through ADR-009 (and ADR-010 from Phase 7)
+- Migration guide: `@TransactionalEventsListener` → `@OutboxEventListener`
+- Full working example in `examples/outbox-full-stack/`
+- CI updates for new packages
+- Changesets for version bumps
+- Update main README with the expanded roadmap
+
+### Future phases (not scheduled)
+
+- **@nestjs-transactional/outbox-kafka**: event externalization to Kafka
+- **@nestjs-transactional/outbox-rabbitmq**: RabbitMQ externalization
+- **@nestjs-transactional/outbox-prisma**: Prisma persistence backend
+- **@nestjs-transactional/outbox-mongodb**: MongoDB persistence backend
+- **OpenTelemetry integration**: tracing across transaction and event
+  boundaries
 - **ESM dual packaging**: ESM export support
 
 ---
@@ -892,159 +1150,43 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 ## Current Status
 
 **Last updated**: 2026-04-24.
-**Session handoff**: `docs/sessions/2026-04-24-handoff.md` — read
-first when resuming.
 
-**Phase**: Phases 1, 2, 3 complete. Phase 4 substantially done —
-examples, release workflow, publishing hygiene, and npm provenance
-all in place; the only remaining blockers for tagging 0.1.0 are
-running the TypeORM integration tests against Docker and wiring the
-`NPM_TOKEN` GitHub secret.
+### Completed
 
-**Test suite**: 175 unit tests green (114 core + 18 typeorm + 43 cqrs).
-TypeORM integration specs (10 tests in 2 files) compile and are
-discovered by the integration Jest config but **have not been run yet**
-in any session — they need Docker for testcontainers-node.
+- Phase 0: Monorepo setup (pnpm workspaces, TypeScript project references)
+- Phase 1: `@nestjs-transactional/core` (all propagation modes, decorators,
+  interceptor, method bootstrap, observability)
+- Phase 2: `@nestjs-transactional/typeorm` (adapter, helpers,
+  multi-datasource)
+- Phase 3: `@nestjs-transactional/cqrs` (phase-based dispatching,
+  AggregateRoot integration, auto-wrapping)
+- Phase 4: Examples and CI/CD (basic, multi-datasource, cqrs-full-stack
+  examples; GitHub Actions with lint / build / test)
+- Post-Phase-4 technical debt: spec files excluded from publish tarballs,
+  provenance configured, coverage reporting in CI
 
-**Publishable tarballs** (`npm pack --dry-run`): core 34.6 KB / 59
-entries, typeorm 7.8 KB / 17 entries, cqrs 21.6 KB / 32 entries — zero
-spec files in any tarball after the `tsconfig.build.json` split.
+### In Progress / Starting
 
-### Phase 0 — Monorepo setup — DONE
-- pnpm workspaces, TypeScript project references (composite: true)
-- Jest + ts-jest + `setupFiles: ['reflect-metadata']`
-- ESLint 8 (legacy `.eslintrc.js`) + Prettier 3
-- Changesets initialised
-- CI workflow at `.github/workflows/ci.yml` — Node 20 + 22 matrix: lint, build, test, type-check
+- Phase 5: `@nestjs-transactional/outbox-core` infrastructure
 
-### Phase 1 — `@nestjs-transactional/core` — DONE
-- Types: `PropagationMode` (all 7 Spring modes), `IsolationLevel`,
-  `TransactionOptions`, `ExtendedTransactionOptions`, `TransactionHandle`,
-  `TransactionAdapter<THandle>`, `DomainEvent`, errors (`TransactionError`
-  base + `IllegalTransactionStateError`, `TransactionAdapterNotFoundError`,
-  `OutboxWriteError`)
-- `TransactionContext` — `AsyncLocalStorage`-backed store with
-  `ActiveTransaction` entries
-- `AdapterRegistry` + `ADAPTER_REGISTRY` DI token
-- `InMemoryTransactionAdapter` (exported via `/testing` subpath)
-- `TransactionManager` — all seven propagation modes (REQUIRED,
-  REQUIRES_NEW, NESTED savepoint, SUPPORTS, NOT_SUPPORTED, NEVER,
-  MANDATORY), rollback rules (`rollbackFor` / `noRollbackFor`),
-  lifecycle hooks (before-commit / after-commit / after-rollback),
-  observers
-- `@Transactional()` / `@ReadOnly()` / `@TransactionalOn()` decorators
-  (metadata-only via `reflect-metadata`)
-- `TransactionalInterceptor` — `APP_INTERCEPTOR` for the request boundary
-- **`TransactionalMethodsBootstrap`** — `OnApplicationBootstrap` service
-  that wraps every `@Transactional()` method on plain `@Injectable()`
-  providers with `TransactionManager.run(...)`. Skips CQRS handlers (by
-  metadata) and already-wrapped methods (by `WRAPPED_MARKER`).
-  Registered by `TransactionalModule.forRoot` unless the caller sets
-  `registerMethodsBootstrap: false`.
-- `TransactionalModule.forRoot` + `forRootAsync`
-- `TransactionObserver` + `TRANSACTION_OBSERVERS` for monitoring
-- `docs/architecture/core-design.md` documents the three extension points
+### Blocked / Awaiting
 
-### Phase 2 — `@nestjs-transactional/typeorm` — DONE
-- `TypeOrmTransactionAdapter` using `DataSource.transaction(...)` and
-  raw `SAVEPOINT` SQL for nested transactions
-- `TypeOrmTransactionHandle` (extends core handle with `entityManager`)
-- `getCurrentEntityManager(adapterInstance?, fallback?)` +
-  `isInTransaction(adapterInstance?)` helpers
-- `TypeOrmTransactionalModule.forFeature` — inline `useFactory` that
-  registers the adapter with the shared `AdapterRegistry`
-- Integration scaffolding: `test/setup-testcontainers.ts` with
-  `startPostgresContainer` / `stopPostgresContainer` /
-  `createAdditionalDatabase` helpers, plus `jest.integration.config.js`
+- None
 
-**Limitations documented in `docs/sessions/phase-2-complete.md` §4:**
-`readOnly` and `timeout` options accepted but not yet mapped to
-per-dialect SQL; `forFeature` does not accept an `InjectionToken` for
-the DataSource yet.
+### Next
 
-### Phase 3 — `@nestjs-transactional/cqrs` — DONE
-- `TransactionPhase` enum + `TransactionalEventsListenerMetadata` types
-- `@TransactionalEventsListener(EventType, { phase, fallbackExecution, async })`
-  decorator (metadata-only)
-- `TransactionalEventDispatcher` — routes events to listeners via
-  `manager.registerBeforeCommit` / `registerAfterCommit` /
-  `registerAfterRollback`; fallback execution outside a transaction
-  goes via `queueMicrotask` (or warn-log + skip); `async: true` is
-  fire-and-forget regardless of phase
-- `TransactionalListenerScanner` — `OnModuleInit` that walks every
-  provider via `DiscoveryService` + `MetadataScanner` and auto-registers
-  decorated methods with the dispatcher
-- `CqrsHandlerWrapper` + `CqrsTransactionalBootstrap` — wrap
-  `@CommandHandler` / `@QueryHandler` / `@EventsHandler` instances at
-  application bootstrap; classify by metadata key, honour method-level
-  `@Transactional` > class-level > kind defaults (`defaultQueryOptions`,
-  `defaultCommandOptions`)
-- `TransactionalEventPublisher` + `TransactionalEventPublisherAdapter`
-  — drop-in replacement for `@nestjs/cqrs`'s `EventPublisher`;
-  `mergeObjectContext` / `mergeClassContext` route aggregate events
-  through the dispatcher so `AggregateRoot.commit()` attaches phase
-  hooks instead of publishing immediately
-- `CqrsTransactionalModule.forRoot({ wrapCommandHandlers, wrapQueryHandlers,
-  wrapEventHandlers, defaultQueryOptions, defaultCommandOptions,
-  useTransactionalEventPublisher })` — single entry point
+- Phase 5 iterations per the plan in session history
+- After Phase 5: Phase 6 (outbox-typeorm)
+- Then: Phase 7 (cqrs integration), Phase 8 (testing utilities),
+  Phase 9 (docs + release)
 
-**Limitations documented in `packages/cqrs/README.md`:**
-- Only works with singleton handlers (request-scoped handlers are
-  resolved per-request by `@nestjs/cqrs` via `ModuleRef.resolve`,
-  producing a fresh instance our bootstrap wrap has not mutated).
-- Direct `eventBus.publish(...)` calls (outside an aggregate) bypass
-  the transactional dispatcher. Only `AggregateRoot.commit()`-emitted
-  events via `mergeObjectContext` / `mergeClassContext` get phase-aware
-  semantics.
-- `@nestjs/cqrs` handler-metadata constants (`__commandHandler__` etc.)
-  are re-declared as string literals because `@nestjs/cqrs` does not
-  re-export them. See DD-002 — the coupling is accepted.
+### Key recent decisions
 
-### Phase 4 — CI/CD, publishing, examples — SUBSTANTIALLY DONE
-- Runnable examples under `examples/*` (added to `pnpm-workspace.yaml`):
-  - `examples/basic-usage/` — `@Transactional` on a plain service
-  - `examples/multi-datasource/` — `@Transactional` + `@TransactionalOn`
-    against two `TypeOrmTransactionalModule.forFeature` registrations
-  - `examples/cqrs-full-stack/` — full CQRS flow with aggregate,
-    command, query, and `AFTER_COMMIT` / `AFTER_ROLLBACK` listeners
-  - Each has `pnpm start` (`tsc && node dist/main.js`) and a README.
-- GitHub Actions release workflow at `.github/workflows/release.yml`
-  (push-to-main, `id-token: write`, `changesets/action@v1` for
-  Version PR + publish).
-- Root `README.md` + `CONTRIBUTING.md` with setup, tests, changeset
-  workflow, commit style, dependency boundaries, release + provenance.
-- Changelog generator upgraded to `@changesets/changelog-github` for
-  PR-linked entries.
-- `dist/**/*.spec.*` leakage fixed via per-package `tsconfig.build.json`
-  (emit, excludes specs) vs `tsconfig.json` (noEmit, for jest + IDE +
-  type-check script). Narrow `files` array in each `package.json`
-  with `!dist/**/*.spec.*` negation as a second-line guard.
-- npm provenance wired via `publishConfig: { access: "public",
-  provenance: true }` in each publishable `package.json` (not via a
-  `changeset publish --provenance` flag — that flag does not exist in
-  `@changesets/cli@2.31`).
-
-**Still open in Phase 4 (blockers for tagging 0.1.0):**
-- Run TypeORM integration tests on a Docker-enabled machine
-  (`pnpm --filter @nestjs-transactional/typeorm test:integration`).
-  10 tests discovered, 0 executed to date.
-- Add `NPM_TOKEN` as a GitHub repo secret (granular publish token
-  scoped to `@nestjs-transactional` — classic tokens are
-  incompatible with OIDC provenance).
-- Create the first changeset bumping all three packages to 0.1.0
-  with an initial-release summary.
-
-**Deferred to post-0.1.0:**
-- `moduleResolution: "bundler"` migration to unlock
-  `@nestjs-transactional/core/testing` subpath from sibling packages
-  (currently they inline a fake adapter).
-- Coverage pipeline (Codecov / Coveralls) + badge.
-- Unify cqrs test layout (iteration 3.1's decorator spec is in
-  `test/unit/`, everything else is colocated in `src/**`).
-- Bridge `eventBus.publish(...)` → transactional dispatcher for
-  non-aggregate event emissions.
-- `@nestjs/testing` in cqrs `devDependencies` (currently resolves via
-  hoisted root).
+- Scope expanded from Spring Framework parity to Spring Modulith parity
+  (DD-009)
+- Outbox split into core + typeorm packages (DD-010)
+- Hybrid event publishing chosen over replacement (DD-011)
+- `@ApplicationModuleListener` as smart default (DD-012)
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 
