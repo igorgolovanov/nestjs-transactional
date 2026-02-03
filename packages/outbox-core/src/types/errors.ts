@@ -50,3 +50,16 @@ export class SerializationError extends OutboxError {
 export class DeserializationError extends OutboxError {
   readonly code = 'DESERIALIZATION_ERROR';
 }
+
+/**
+ * Raised when two listeners are registered with the same id. Listener
+ * ids must be globally unique because they are stored on each
+ * `EventPublication` row and drive retry / resume resolution.
+ */
+export class DuplicateListenerIdError extends OutboxError {
+  readonly code = 'DUPLICATE_LISTENER_ID';
+
+  constructor(id: string) {
+    super(`Listener with id '${id}' is already registered`);
+  }
+}
