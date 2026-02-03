@@ -10,3 +10,5 @@ export * from './serialization/event-type-registry';
 export * from './serialization/json-event-serializer';
 
 export * from './repository/event-publication-repository';
+
+export * from './registry/event-publication-registry';
