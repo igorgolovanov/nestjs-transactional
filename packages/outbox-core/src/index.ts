@@ -18,3 +18,5 @@ export * from './registry/outbox-listener-scanner';
 export * from './decorators/outbox-event-listener.decorator';
 
 export * from './dispatcher/outbox-event-publisher';
+export * from './dispatcher/event-publication-processor';
+export * from './dispatcher/processor-options';
