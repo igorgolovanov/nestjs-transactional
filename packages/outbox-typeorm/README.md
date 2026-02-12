@@ -9,10 +9,11 @@ NestJS module wiring.
 ## Status
 
 **Alpha / in development.** Iteration 6.2 delivered the entities and
-the repository implementation; Iteration 6.3 adds the schema migration
-and a `SchemaInitializer` for development-time auto-init. Module
-wiring (`OutboxTypeOrmModule`) arrives in a subsequent iteration. The
-public API is not yet stable and will change between 0.x releases.
+the repository implementation; Iteration 6.3 added the schema
+migration and a `SchemaInitializer` for development-time auto-init;
+Iteration 6.4 adds `OutboxTypeOrmModule` so the pieces compose as a
+single NestJS module. The public API is not yet stable and will
+change between 0.x releases.
 
 ## What ships today
 
@@ -68,35 +69,128 @@ pnpm add @nestjs-transactional/core \
 Peer dependencies: `@nestjs/common`, `@nestjs/core`, `@nestjs/typeorm`,
 `reflect-metadata`, `rxjs`, `typeorm`.
 
-## Usage (manual wiring, pending `OutboxTypeOrmModule`)
+## Usage
 
-Until the module wiring lands, the repository can be constructed and
-provided manually:
+Full wiring for an application that publishes, processes, and
+recovers events against a TypeORM-backed registry:
 
 ```typescript
-import { EVENT_PUBLICATION_REPOSITORY } from '@nestjs-transactional/outbox-core';
+import { Module } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { TransactionalModule } from '@nestjs-transactional/core';
+import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import {
+  OutboxModule,
+  OutboxProcessingModule,
+} from '@nestjs-transactional/outbox-core';
 import {
   EventPublicationEntity,
   EventPublicationArchiveEntity,
-  TypeOrmEventPublicationRepository,
+  OutboxTypeOrmModule,
+  typeOrmEventPublicationRepositoryProvider,
 } from '@nestjs-transactional/outbox-typeorm';
+
+import { OrderPlacedEvent } from './events';
+
+const dataSource = new DataSource({
+  type: 'postgres',
+  // ...
+  entities: [
+    EventPublicationEntity,
+    EventPublicationArchiveEntity,
+    // ...your domain entities
+  ],
+});
 
 @Module({
   imports: [
+    // 1. Core transaction infrastructure — must be global so
+    //    downstream modules can see TransactionManager.
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forFeature({ dataSource }),
-    TypeOrmModule.forFeature([EventPublicationEntity, EventPublicationArchiveEntity]),
-    OutboxModule.forRoot({
-      eventTypes: [/* ... */],
-      repository: {
-        provide: EVENT_PUBLICATION_REPOSITORY,
-        useFactory: (ds: DataSource) => new TypeOrmEventPublicationRepository(ds),
-        inject: [getDataSourceToken()],
-      },
+
+    // 2. TypeORM adapter registration — binds `dataSource` under
+    //    the `default` instance name so @Transactional can target
+    //    it.
+    TypeOrmTransactionalModule.forFeature({ dataSource, isDefault: true }),
+
+    // 3. TypeORM persistence backend for the outbox. Registers the
+    //    TypeOrm repository class token and SchemaInitializer.
+    OutboxTypeOrmModule.forFeature({
+      dataSource,
+      schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
     }),
+
+    // 4. Outbox-core wiring. Forward the TypeORM repository via the
+    //    aliasing Provider so outbox-core does NOT install its
+    //    InMemory default.
+    OutboxModule.forRoot({
+      eventTypes: [OrderPlacedEvent],
+      repository: typeOrmEventPublicationRepositoryProvider,
+      republishOnStartup: true,
+      processor: { pollingInterval: 1000, batchSize: 100 },
+      staleness: { processing: 60_000, monitorInterval: 30_000 },
+    }),
+
+    // 5. Only in worker processes — starts the processor and
+    //    staleness monitor on bootstrap. API-only apps that just
+    //    publish events should NOT import this.
+    OutboxProcessingModule,
   ],
 })
 export class AppModule {}
+```
+
+### Why the `repository` forwarding provider
+
+`OutboxModule.forRoot` defaults to
+`InMemoryEventPublicationRepository` for the
+`EVENT_PUBLICATION_REPOSITORY` token when `repository` is omitted.
+Passing `typeOrmEventPublicationRepositoryProvider` replaces that
+default with a `useExisting` alias pointing at the TypeORM
+implementation registered by `OutboxTypeOrmModule.forFeature`. Leaving
+the option out would install two providers for the same token —
+the InMemory one would win and your publications would never reach
+the database.
+
+### Publishing events
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { Transactional } from '@nestjs-transactional/core';
+import { OutboxEventPublisher } from '@nestjs-transactional/outbox-core';
+
+@Injectable()
+export class PlaceOrderHandler {
+  constructor(private readonly outbox: OutboxEventPublisher) {}
+
+  @Transactional()
+  async handle(orderId: string): Promise<void> {
+    // ...persist business data in the same transaction...
+    await this.outbox.publish(new OrderPlacedEvent(orderId));
+  }
+}
+```
+
+The publication row commits atomically with the business data. If
+the transaction rolls back, the publication row is rolled back too
+— there is no "event published without the business change landing"
+failure mode.
+
+### Declaring a listener
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { OutboxEventListener } from '@nestjs-transactional/outbox-core';
+
+@Injectable()
+export class InventoryHandlers {
+  @OutboxEventListener(OrderPlacedEvent)
+  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+    // Runs in a fresh REQUIRES_NEW transaction after the publishing
+    // transaction has committed, retried on exception, resumable
+    // across process restarts.
+  }
+}
 ```
 
 ## Schema management
