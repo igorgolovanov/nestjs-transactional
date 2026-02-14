@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
+import { Logger } from '@nestjs/common';
 import {
   AdapterRegistry,
   IllegalTransactionStateError,
+  PropagationMode,
   TransactionManager,
   type TransactionAdapter,
   type TransactionHandle,
@@ -182,6 +184,92 @@ describe('OutboxEventPublisher', () => {
       await expect(
         publisher.publishAll([new OrderPlacedEvent('order-1'), new OrderPlacedEvent('order-2')]),
       ).rejects.toBeInstanceOf(IllegalTransactionStateError);
+    });
+  });
+
+  describe('scheduleForPublication', () => {
+    beforeEach(() => {
+      listenerRegistry.register({
+        id: 'Inventory.onOrderPlaced',
+        eventType: 'OrderPlacedEvent',
+        invoke: async () => {},
+      });
+    });
+
+    it('buffers events inside a transaction and flushes them via a single beforeCommit hook', async () => {
+      const registerBeforeCommitSpy = jest.spyOn(manager, 'registerBeforeCommit');
+
+      await manager.run({}, async () => {
+        publisher.scheduleForPublication(new OrderPlacedEvent('order-1'));
+        publisher.scheduleForPublication(new OrderPlacedEvent('order-2'));
+        publisher.scheduleForPublication(new OrderPlacedEvent('order-3'));
+
+        // Not yet flushed — the beforeCommit hook has not fired.
+        expect(repo.count()).toBe(0);
+      });
+
+      // After commit the hook has flushed the buffer.
+      expect(repo.count()).toBe(3);
+      expect(repo.getAll().map((p) => JSON.parse(p.serializedEvent).orderId)).toEqual([
+        'order-1',
+        'order-2',
+        'order-3',
+      ]);
+
+      // One hook per transaction, not one per event.
+      expect(registerBeforeCommitSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('flushes nothing when the transaction rolls back', async () => {
+      await expect(
+        manager.run({}, async () => {
+          publisher.scheduleForPublication(new OrderPlacedEvent('order-a'));
+          publisher.scheduleForPublication(new OrderPlacedEvent('order-b'));
+          throw new Error('force rollback');
+        }),
+      ).rejects.toThrow('force rollback');
+
+      expect(repo.count()).toBe(0);
+    });
+
+    it('keeps per-transaction buffers isolated — nested REQUIRES_NEW flushes independently', async () => {
+      // Outer publishes one event, then opens a REQUIRES_NEW inner that
+      // publishes a second. The inner must flush on its own commit
+      // without dragging the outer event along.
+      let innerFlushCount = -1;
+      await manager.run({}, async () => {
+        publisher.scheduleForPublication(new OrderPlacedEvent('outer'));
+
+        await manager.run({ propagation: PropagationMode.REQUIRES_NEW }, async () => {
+          publisher.scheduleForPublication(new OrderPlacedEvent('inner'));
+          // Inside the inner tx, nothing has been flushed yet.
+          expect(repo.count()).toBe(0);
+        });
+
+        innerFlushCount = repo.count();
+      });
+
+      // After the inner commits, its event is persisted. The outer's
+      // event is still buffered until the outer commits.
+      expect(innerFlushCount).toBe(1);
+      expect(repo.count()).toBe(2);
+      const listenerIds = repo.getAll().map((p) => JSON.parse(p.serializedEvent).orderId);
+      expect(listenerIds).toContain('outer');
+      expect(listenerIds).toContain('inner');
+    });
+
+    it('outside a transaction falls back to fire-and-forget publish and logs the failure', async () => {
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+      // publish() throws synchronously-ish (rejects) outside a tx;
+      // scheduleForPublication catches and logs. We assert the
+      // rejection was swallowed by awaiting a microtask flush.
+      publisher.scheduleForPublication(new OrderPlacedEvent('nowhere'));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy.mock.calls[0]![0]).toContain('scheduleForPublication outside a transaction');
+      expect(repo.count()).toBe(0);
     });
   });
 });

@@ -18,6 +18,14 @@ phases without forking `@nestjs/cqrs` (see ADR-003).
   dispatcher, so `AFTER_COMMIT` listeners only fire once the transaction
   actually commits — no more "event published, then transaction rolled
   back" race.
+- **`HybridEventPublisher`** — the strategy wired by
+  `CqrsTransactionalModule.forRoot()` into the `EventPublisher`
+  override. Routes aggregate events through the in-memory dispatcher
+  AND, when an outbox scheduler is bound to the
+  `OUTBOX_PUBLICATION_SCHEDULER` token, also through
+  `@nestjs-transactional/outbox-core` for durable delivery. Without
+  the outbox binding, behaves identically to
+  `TransactionalEventPublisher`.
 - **`CqrsHandlerWrapper` + `CqrsTransactionalBootstrap`** — bootstrap-time
   wrapping of every `@CommandHandler` / `@QueryHandler` / `@EventsHandler`
   instance that carries `@Transactional()` metadata (method-level or
@@ -209,6 +217,63 @@ Useful for genuinely fire-and-forget side effects.
 - `AggregateRoot.commit()` routes events through the dispatcher — set
   `useTransactionalEventPublisher: false` to leave `@nestjs/cqrs`'s
   standard `EventPublisher` in place (useful for gradual adoption).
+
+## Outbox integration
+
+`CqrsTransactionalModule.forRoot()` always wires `HybridEventPublisher`
+into the `EventPublisher` DI override. By default, `HybridEventPublisher`
+routes events only through the in-memory dispatcher — no outbox side
+effects. To turn on durable delivery, bind your outbox publisher under
+the `OUTBOX_PUBLICATION_SCHEDULER` token:
+
+```ts
+import { Module } from '@nestjs/common';
+import { OutboxEventPublisher, OutboxModule } from '@nestjs-transactional/outbox-core';
+import { CqrsTransactionalModule, OUTBOX_PUBLICATION_SCHEDULER } from '@nestjs-transactional/cqrs';
+
+@Module({
+  imports: [
+    // ...the usual wiring — TransactionalModule, a typeorm adapter,
+    // OutboxTypeOrmModule, OutboxModule, CqrsModule, CqrsTransactionalModule...
+    CqrsTransactionalModule.forRoot(),
+  ],
+  providers: [
+    {
+      provide: OUTBOX_PUBLICATION_SCHEDULER,
+      useExisting: OutboxEventPublisher,
+    },
+  ],
+})
+export class AppModule {}
+```
+
+With that binding in place, a single `aggregate.commit()` call:
+
+1. Attaches one `AFTER_COMMIT` hook per `@TransactionalEventsListener`
+   registered for the event — fires after the transaction commits,
+   entirely in-memory, no DB rows.
+2. Buffers the event for outbox publication — a single
+   `beforeCommit` hook per transaction flushes the whole buffer into
+   `event_publication` rows, atomically with the business write.
+3. Once the transaction commits, the outbox processor (running in
+   a worker) polls those rows and invokes every
+   `@OutboxEventListener` registered for the event.
+
+Rollback rolls back all three: no in-memory listeners fire, no
+publication rows are persisted, nothing downstream runs. This is the
+core guarantee of the outbox pattern — "event published only if the
+business change landed".
+
+Choosing between listener flavours:
+
+- **`@TransactionalEventsListener`** — cheap, in-process, phase-aware,
+  non-durable. Use for side effects that are OK to lose on a crash
+  between commit and invocation (metrics, cache invalidation,
+  enrichment of in-memory state).
+- **`@OutboxEventListener`** — durable, retry-on-failure,
+  resumable-across-restart, delivered by a worker. Use for integration
+  with external systems, email sends, billing events, or any side
+  effect where at-least-once delivery matters.
 
 ## Limitations
 

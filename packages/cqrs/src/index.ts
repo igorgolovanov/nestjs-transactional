@@ -24,6 +24,11 @@ export { CqrsTransactionalBootstrap } from './handlers/bootstrap';
 
 export { TransactionalEventPublisher } from './event-publisher/transactional-event-publisher';
 export { TransactionalEventPublisherAdapter } from './event-publisher/transactional-event-publisher-adapter';
+export {
+  HybridEventPublisher,
+  OUTBOX_PUBLICATION_SCHEDULER,
+  type OutboxPublicationScheduler,
+} from './event-publisher/hybrid-event-publisher';
 
 export {
   CQRS_TRANSACTIONAL_OPTIONS,

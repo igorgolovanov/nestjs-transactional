@@ -65,10 +65,12 @@
   },
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/cqrs": "workspace:*",
     "@nestjs-transactional/outbox-core": "workspace:*",
     "@nestjs-transactional/typeorm": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
+    "@nestjs/cqrs": "^11.0.0",
     "@nestjs/testing": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
     "@testcontainers/postgresql": "^10.13.0",
