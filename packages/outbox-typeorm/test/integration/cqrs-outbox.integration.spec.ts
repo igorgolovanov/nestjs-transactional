@@ -10,6 +10,7 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
+  ApplicationModuleListener,
   CqrsTransactionalModule,
   OUTBOX_PUBLICATION_SCHEDULER,
   TransactionalEventsListener,
@@ -99,6 +100,22 @@ class PersistentInventoryHandlers {
   }
 }
 
+/**
+ * Listener using the composite `@ApplicationModuleListener`. With the
+ * outbox bound, delivery MUST go exclusively through the outbox path
+ * — the in-memory scanner skips this method, so we expect exactly one
+ * invocation per published event.
+ */
+@Injectable()
+class ApplicationModuleHandlers {
+  received: OrderPlacedEvent[] = [];
+
+  @ApplicationModuleListener(OrderPlacedEvent, { id: 'ApplicationModule.stable-id' })
+  async onOrderPlaced(event: OrderPlacedEvent): Promise<void> {
+    this.received.push(event);
+  }
+}
+
 // The module that wires CqrsTransactionalModule + OutboxTypeOrmModule
 // + OutboxModule together, with the outbox scheduler binding that
 // turns the hybrid publisher into a dual-path router.
@@ -145,6 +162,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
         PlaceOrderHandler,
         InMemoryInventoryHandlers,
         PersistentInventoryHandlers,
+        ApplicationModuleHandlers,
       ],
     }).compile();
     await app.init();
@@ -204,6 +222,38 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
         .getRepository(EventPublicationEntity)
         .findOneOrFail({ where: { id: rows[0]!.id } });
       expect(updated.status).toBe(PublicationStatus.COMPLETED);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('@ApplicationModuleListener: outbox is bound → delivers EXACTLY ONCE via the outbox, skipping the in-memory fallback', async () => {
+    const app = await buildApp();
+    try {
+      const commandBus = app.get(CommandBus);
+      const appModuleListener = app.get(ApplicationModuleHandlers);
+      const processor = app.get(EventPublicationProcessor);
+
+      await commandBus.execute(new PlaceOrderCommand('order-am-1'));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      // The in-memory fallback must NOT fire — the scanner skipped the
+      // @ApplicationModuleListener registration because the outbox
+      // scheduler is bound.
+      expect(appModuleListener.received).toHaveLength(0);
+
+      // The publication row is present and the stable listener id
+      // matches the explicit one we gave to @ApplicationModuleListener.
+      const rows = await ctx.dataSource.getRepository(EventPublicationEntity).find();
+      const amRow = rows.find((r) => r.listenerId === 'ApplicationModule.stable-id');
+      expect(amRow).toBeDefined();
+      expect(amRow!.status).toBe(PublicationStatus.PUBLISHED);
+
+      await processor.processBatch();
+
+      // Exactly one delivery, via the outbox path.
+      expect(appModuleListener.received).toHaveLength(1);
+      expect(appModuleListener.received[0]!.orderId).toBe('order-am-1');
     } finally {
       await app.close();
     }

@@ -2,8 +2,20 @@ import 'reflect-metadata';
 
 import { type Type } from '@nestjs/common';
 
-/** Metadata key under which {@link OutboxEventListenerMetadata} is stored on the decorated method. */
-export const OUTBOX_EVENT_LISTENER_METADATA = Symbol('OUTBOX_EVENT_LISTENER_METADATA');
+/**
+ * Metadata key under which {@link OutboxEventListenerMetadata} is stored
+ * on the decorated method.
+ *
+ * Uses `Symbol.for(...)` so the key is process-globally unique: other
+ * packages (notably `@nestjs-transactional/cqrs`'s
+ * `@ApplicationModuleListener`) can re-derive the same key via
+ * `Symbol.for('@nestjs-transactional/outbox-event-listener-metadata')`
+ * and write compatible metadata without a hard dependency on this
+ * module. See CLAUDE.md convention #8 on well-known shared symbols.
+ */
+export const OUTBOX_EVENT_LISTENER_METADATA = Symbol.for(
+  '@nestjs-transactional/outbox-event-listener-metadata',
+);
 
 /**
  * Options accepted by {@link OutboxEventListener}.

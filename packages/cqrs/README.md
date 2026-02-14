@@ -274,6 +274,48 @@ Choosing between listener flavours:
   resumable-across-restart, delivered by a worker. Use for integration
   with external systems, email sends, billing events, or any side
   effect where at-least-once delivery matters.
+- **`@ApplicationModuleListener`** — smart default, composite of the
+  two. When the outbox is wired, delivery goes through the outbox
+  (durable). Without the outbox, delivery falls back to the in-memory
+  dispatcher with `AFTER_COMMIT` + `async: true` semantics. Matches
+  Spring Modulith's `@ApplicationModuleListener` contract — "the
+  thing you reach for by default when wiring cross-module listeners,
+  so you do not have to revisit every call site when persistence
+  comes online".
+
+## Delivery guarantees at a glance
+
+| Decorator | Persisted? | Retry on failure? | Survives process restart? | Transaction | Typical use case |
+| --- | --- | --- | --- | --- | --- |
+| `@TransactionalEventsListener` | No — in-memory only | No | No | Joins the publishing transaction's lifecycle (fires at configured phase) | Cache invalidation, metrics, in-process enrichment |
+| `@OutboxEventListener` | Yes — `event_publication` row per listener | Yes — via operator-triggered resubmit | Yes — `republishOnStartup` replays | `REQUIRES_NEW` per invocation (default) | External API calls, emails, billing events, cross-module integration where loss is unacceptable |
+| `@ApplicationModuleListener` | Yes if outbox wired, No otherwise | Yes if outbox wired | Yes if outbox wired | `REQUIRES_NEW` (outbox) or `AFTER_COMMIT + async: true` (fallback) | Default choice for cross-module listeners — upgrades gracefully when the outbox comes online |
+
+How `@ApplicationModuleListener` routes depends on module wiring, not
+on call-site configuration: write one decorator, and the same
+listener runs via the in-memory path during early development and via
+the durable outbox once the team is ready to stand up the worker
+process. `TransactionalListenerScanner` detects the overlap between
+the composite's in-memory metadata and the outbox metadata at
+bootstrap and skips the in-memory registration when the outbox
+scheduler is bound — so the listener fires exactly once.
+
+```ts
+@Injectable()
+export class InventoryHandlers {
+  @ApplicationModuleListener(OrderPlacedEvent)
+  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+    // with outbox wired: runs from the worker, retried on failure.
+    // without outbox:    runs in-memory after commit, fire-and-forget.
+  }
+}
+```
+
+Supply a stable `id` when the method name might change:
+
+```ts
+@ApplicationModuleListener(OrderPlacedEvent, { id: 'Inventory.stable-id' })
+```
 
 ## Limitations
 

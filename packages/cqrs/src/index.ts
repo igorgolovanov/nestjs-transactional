@@ -10,6 +10,12 @@ export {
   getTransactionalEventsListenerMetadata,
 } from './decorators/transactional-events-listener.decorator';
 
+export {
+  ApplicationModuleListener,
+  type ApplicationModuleListenerOptions,
+  hasOutboxListenerMetadata,
+} from './decorators/application-module-listener.decorator';
+
 export { TransactionalEventDispatcher } from './event-dispatcher/event-dispatcher';
 
 export { TransactionalListenerScanner } from './handlers/listener-scanner';

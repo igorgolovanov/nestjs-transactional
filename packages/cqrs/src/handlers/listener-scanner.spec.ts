@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionManager } from '@nestjs-transactional/core';
 
+import { ApplicationModuleListener } from '../decorators/application-module-listener.decorator';
 import { TransactionalEventsListener } from '../decorators/transactional-events-listener.decorator';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import {
+  OUTBOX_PUBLICATION_SCHEDULER,
+  type OutboxPublicationScheduler,
+} from '../event-publisher/hybrid-event-publisher';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
 import { TransactionalListenerScanner } from './listener-scanner';
@@ -172,5 +177,66 @@ describe('TransactionalListenerScanner', () => {
     );
     expect(call).toBeDefined();
     expect(call?.[2]).toMatchObject({ eventType: UnrelatedEvent });
+  });
+
+  describe('outbox-aware skip logic', () => {
+    @Injectable()
+    class ApplicationModuleService {
+      @ApplicationModuleListener(OrderPlaced)
+      async onOrderPlaced(_event: OrderPlaced): Promise<void> {}
+    }
+
+    @Injectable()
+    class PureTransactionalService {
+      @TransactionalEventsListener(OrderPlaced)
+      onOrderPlaced(_event: OrderPlaced): void {}
+    }
+
+    const fakeOutboxScheduler: OutboxPublicationScheduler = {
+      scheduleForPublication: (): void => undefined,
+    };
+
+    it('registers @ApplicationModuleListener methods in-memory when the outbox scheduler is NOT bound', async () => {
+      await buildModule([ApplicationModuleService]);
+
+      const instance = module.get(ApplicationModuleService);
+      const call = registerSpy.mock.calls.find(
+        ([inst, method]) => inst === instance && method === 'onOrderPlaced',
+      );
+      expect(call).toBeDefined();
+      expect(call?.[2]).toMatchObject({
+        eventType: OrderPlaced,
+        phase: TransactionPhase.AFTER_COMMIT,
+        async: true,
+      });
+    });
+
+    it('SKIPS @ApplicationModuleListener methods when the outbox scheduler IS bound', async () => {
+      jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+
+      await buildModule([
+        ApplicationModuleService,
+        { provide: OUTBOX_PUBLICATION_SCHEDULER, useValue: fakeOutboxScheduler },
+      ]);
+
+      const instance = module.get(ApplicationModuleService);
+      const call = registerSpy.mock.calls.find(
+        ([inst, method]) => inst === instance && method === 'onOrderPlaced',
+      );
+      expect(call).toBeUndefined();
+    });
+
+    it('still registers PURE @TransactionalEventsListener methods when the outbox scheduler is bound', async () => {
+      await buildModule([
+        PureTransactionalService,
+        { provide: OUTBOX_PUBLICATION_SCHEDULER, useValue: fakeOutboxScheduler },
+      ]);
+
+      const instance = module.get(PureTransactionalService);
+      const call = registerSpy.mock.calls.find(
+        ([inst, method]) => inst === instance && method === 'onOrderPlaced',
+      );
+      expect(call).toBeDefined();
+    });
   });
 });
