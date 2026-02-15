@@ -118,6 +118,70 @@ await this.failedEventPublications.resubmit(
 await this.completedEventPublications.purge(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 ```
 
+## Testing utilities
+
+Exported via the `/testing` subpath for assertions about which events
+the code under test published. Mirrors Spring Modulith's
+`PublishedEvents` / `AssertablePublishedEvents`.
+
+```typescript
+import {
+  PublishedEvents,
+  AssertablePublishedEvents,
+} from '@nestjs-transactional/outbox-core/testing';
+
+describe('PlaceOrder', () => {
+  let app: TestingModule;
+  let assertablePublishedEvents: AssertablePublishedEvents;
+
+  beforeEach(async () => {
+    app = await Test.createTestingModule({
+      imports: [
+        TransactionalModule.forRoot({ isGlobal: true /* ... */ }),
+        OutboxModule.forRoot({ eventTypes: [OrderPlacedEvent] }),
+      ],
+      providers: [
+        PlaceOrderService,
+        PublishedEvents,
+        AssertablePublishedEvents,
+      ],
+    }).compile();
+    await app.init();
+    assertablePublishedEvents = app.get(AssertablePublishedEvents);
+  });
+
+  it('publishes OrderPlacedEvent for the placed order', async () => {
+    const service = app.get(PlaceOrderService);
+    await service.place('order-123');
+
+    const view = await assertablePublishedEvents.contains(OrderPlacedEvent);
+    view.matching((e) => e.orderId, 'order-123').hasSize(1);
+  });
+
+  it('publishes nothing when validation rejects the command', async () => {
+    const service = app.get(PlaceOrderService);
+    await service.placeInvalid().catch(() => undefined);
+
+    await assertablePublishedEvents.doesNotContain(OrderPlacedEvent);
+  });
+});
+```
+
+`PublishedEvents.ofType(EventType)` returns a fluent `PublishedEventsView`
+for read-only inspection (`.get()`, `.count()`,
+`.matching(predicate)`, `.matching(getter, expected)`).
+`AssertablePublishedEvents.contains(EventType)` is the assertion-first
+counterpart — it throws `PublishedEventsAssertionError` when zero
+events match, and returns an `AssertionView` whose `.matching(...)`
+and `.hasSize(...)` operate synchronously over the already-fetched
+events.
+
+The utilities read through the wired `EventPublicationRepository`
+implementation, so the default `InMemoryEventPublicationRepository`
+works out of the box for unit-level tests. Integration tests that use
+`@nestjs-transactional/outbox-typeorm` with a real Postgres get the
+same API for free.
+
 ## Status
 
 **Alpha / in development.** This package is being built iteratively as
