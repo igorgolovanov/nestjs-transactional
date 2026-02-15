@@ -19,23 +19,29 @@ growing set of npm packages organised by concern.
 - **@nestjs-transactional/cqrs** — integration with `@nestjs/cqrs`: runtime
   wrappers for CommandHandler/QueryHandler/EventHandler, the
   `@TransactionalEventsListener` decorator with Spring-like phases
-  (BEFORE_COMMIT, AFTER_COMMIT, AFTER_ROLLBACK, AFTER_COMPLETION), and an
-  EventPublisher override that integrates with AggregateRoot.
+  (BEFORE_COMMIT, AFTER_COMMIT, AFTER_ROLLBACK, AFTER_COMPLETION),
+  `HybridEventPublisher` + `@ApplicationModuleListener` that bridge to
+  the outbox when wired, and an EventPublisher override that integrates
+  with AggregateRoot.
 
-- **@nestjs-transactional/outbox-core** *(alpha — Phase 5 in progress)* —
-  persistent Event Publication Registry: event lifecycle states,
-  repository SPI, async worker, staleness monitor, startup recovery.
-  ORM-agnostic. Package skeleton in-tree; public API still empty.
+- **@nestjs-transactional/outbox-core** *(alpha)* — persistent Event
+  Publication Registry: lifecycle states, repository SPI, async worker,
+  staleness monitor, startup recovery, operator APIs
+  (Failed/Incomplete/Completed), testing utilities
+  (`PublishedEvents`, `AssertablePublishedEvents`). ORM-agnostic.
 
-### Planned (Phase 6–8)
-
-- **@nestjs-transactional/outbox-typeorm** — TypeORM persistence
-  implementation of the outbox-core SPI (`event_publication` table,
-  `FOR UPDATE SKIP LOCKED` worker safety, archive completion mode).
+- **@nestjs-transactional/outbox-typeorm** *(alpha)* — TypeORM
+  persistence backend for the outbox: `event_publication` + archive
+  entities, `TypeOrmEventPublicationRepository` with
+  `FOR UPDATE SKIP LOCKED`, shipped migration, development-time
+  `SchemaInitializer`, and `OutboxTypeOrmModule` for wiring.
 
 ### Future (not scheduled)
 
 - **@nestjs-transactional/outbox-kafka** — event externalization to Kafka
+- **@nestjs-transactional/outbox-rabbitmq** — RabbitMQ externalization
+- **@nestjs-transactional/outbox-prisma** — Prisma persistence backend
+- **@nestjs-transactional/outbox-mongodb** — MongoDB persistence backend
 - **@nestjs-transactional/testing** — integration testing utilities
   cross-cutting over core / typeorm / cqrs / outbox
 
@@ -202,14 +208,14 @@ Design Decisions section below:
 - **ADR-003**: Not patching @nestjs/cqrs — `docs/adr/003-not-patching-nestjs-cqrs.md`
 - **ADR-004**: Public API stability policy — `docs/adr/004-public-api-stability.md`
 - **ADR-005**: Method wrapping strategy — `docs/adr/005-method-wrapping-strategy.md`
+- **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md`
+- **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md`
 
-Planned (to be created):
+Planned (not yet written):
 
-- **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md` (Phase 5)
-- **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md` (Phase 5)
-- **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md` (Phase 5)
-- **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md` (Phase 5)
-- **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md` (Phase 7)
+- **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md`
+- **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md`
+- **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md`
 
 Process: every significant architectural decision gets a new ADR numbered n+1.
 The discussion is captured; the status is one of accepted / rejected /
@@ -1166,7 +1172,8 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-24.
+**Last updated**: 2026-04-24 (Phase 9, Iteration 9.1 — comprehensive
+outbox documentation).
 
 ### Completed
 
@@ -1181,30 +1188,57 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
   examples; GitHub Actions with lint / build / test)
 - Post-Phase-4 technical debt: spec files excluded from publish tarballs,
   provenance configured, coverage reporting in CI
+- Phase 5: `@nestjs-transactional/outbox-core` (alpha) — types, SPI,
+  event publication registry, outbox publisher, async processor,
+  staleness monitor, startup recovery, operator APIs
+  (Failed/Incomplete/Completed), in-memory repo, `OutboxModule` +
+  `OutboxProcessingModule`. 143 unit tests.
+- Phase 6: `@nestjs-transactional/outbox-typeorm` (alpha) — entities
+  (hot + archive), `TypeOrmEventPublicationRepository` with
+  `FOR UPDATE SKIP LOCKED`, migration + development-time
+  `SchemaInitializer` (shared factory), `OutboxTypeOrmModule` +
+  `typeOrmEventPublicationRepositoryProvider`. 20 integration
+  tests (Postgres via testcontainers).
+- Phase 7: CQRS ↔ outbox integration —
+  `OutboxEventPublisher.scheduleForPublication` (sync, per-tx
+  buffer via WeakMap<ActiveTransaction, events[]>,
+  single beforeCommit flush hook),
+  `HybridEventPublisher` with `@Optional()` outbox scheduler via
+  `OUTBOX_PUBLICATION_SCHEDULER` structural token,
+  `@ApplicationModuleListener` composite decorator (shared
+  `Symbol.for('@nestjs-transactional/outbox-event-listener-metadata')`
+  key), `TransactionalListenerScanner` skip-logic when outbox
+  scheduler is bound.
+- Phase 8: Testing utilities — `PublishedEvents`,
+  `AssertablePublishedEvents`, `PublishedEventsAssertionError`
+  exported via `/testing` subpath of outbox-core. 15 unit tests.
 
-### In Progress / Starting
+### In Progress
 
-- **Phase 5: `@nestjs-transactional/outbox-core` infrastructure** —
-  package skeleton created (Iteration 5.1): `packages/outbox-core/`
-  with `src/` subfolders (types, repository, registry, dispatcher,
-  recovery, module, testing), `test/` (unit, integration),
-  `tsconfig.build.json` / `tsconfig.json` split, `jest.config.js`,
-  `package.json` with peer deps on `@nestjs-transactional/core`,
-  `publishConfig.provenance`, `/testing` subpath. Root `tsconfig.json`
-  has a project reference. Build / lint / type-check green on the
-  empty scaffold. Next iterations will flesh out event types,
-  repository SPI, registry, and decorators.
+- **Phase 9: Documentation & release** —
+  Iteration 9.1 shipped: ADR-006 (outbox rationale), ADR-007
+  (outbox architecture), `docs/architecture/outbox-pattern.md`,
+  `docs/architecture/outbox-integration-with-cqrs.md`,
+  `docs/guides/migrating-to-outbox.md`,
+  `examples/outbox-full-stack/`, updated root README with
+  roadmap and outbox packages, updated CLAUDE.md.
 
 ### Blocked / Awaiting
 
-- None
+- Pre-0.1.0 release blockers: Docker integration tests in CI,
+  NPM_TOKEN setup, first changeset for outbox packages.
 
 ### Next
 
-- Phase 5 iterations per the plan in session history
-- After Phase 5: Phase 6 (outbox-typeorm)
-- Then: Phase 7 (cqrs integration), Phase 8 (testing utilities),
-  Phase 9 (docs + release)
+- Phase 9 iteration 9.2: release automation for the outbox
+  packages — changeset entries, CI matrix tweaks if needed,
+  first 0.1.0-alpha release.
+- ADR-008 (event serialization), ADR-009 (listener id
+  stability), ADR-010 (hybrid event publishing) — when the
+  related design decisions need more room than the DD section.
+- Future phases (not scheduled): outbox-kafka, outbox-rabbitmq,
+  outbox-prisma, outbox-mongodb, OpenTelemetry integration,
+  ESM dual packaging.
 
 ### Key recent decisions
 
