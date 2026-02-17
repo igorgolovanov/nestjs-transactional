@@ -38,9 +38,9 @@ export const OUTBOX_PUBLICATION_SCHEDULER = Symbol('OUTBOX_PUBLICATION_SCHEDULER
 /**
  * `IEventPublisher` implementation that routes aggregate-emitted
  * events through BOTH the in-memory transactional dispatcher
- * (`@TransactionalEventsListener`) AND — when wired — the outbox
- * (`@OutboxEventListener`). Both paths run inside the surrounding
- * transaction:
+ * (`@TransactionalEventsHandler`) AND — when wired — the outbox
+ * (`@OutboxEventsHandler`, introduced in a later phase). Both paths
+ * run inside the surrounding transaction:
  *
  * - In-memory: the dispatcher attaches hooks to the current
  *   transaction so listeners fire at the configured phase

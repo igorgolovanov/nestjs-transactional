@@ -3,13 +3,8 @@ import { DiscoveryModule } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionManager } from '@nestjs-transactional/core';
 
-import { ApplicationModuleListener } from '../decorators/application-module-listener.decorator';
-import { TransactionalEventsListener } from '../decorators/transactional-events-listener.decorator';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import {
-  OUTBOX_PUBLICATION_SCHEDULER,
-  type OutboxPublicationScheduler,
-} from '../event-publisher/hybrid-event-publisher';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
 import { TransactionalListenerScanner } from './listener-scanner';
@@ -25,14 +20,34 @@ class PaymentCaptured {
 class UnrelatedEvent {}
 
 @Injectable()
-class DecoratedService {
-  @TransactionalEventsListener(OrderPlaced)
-  onOrderPlaced(_event: OrderPlaced): void {}
+@TransactionalEventsHandler(OrderPlaced)
+class OrderPlacedHandler {
+  handle(_event: OrderPlaced): void {}
+}
 
-  @TransactionalEventsListener(PaymentCaptured, { phase: TransactionPhase.BEFORE_COMMIT })
-  onPaymentCaptured(_event: PaymentCaptured): void {}
+@Injectable()
+@TransactionalEventsHandler({
+  events: [PaymentCaptured],
+  phase: TransactionPhase.BEFORE_COMMIT,
+})
+class PaymentCapturedHandler {
+  handle(_event: PaymentCaptured): void {}
+}
 
-  plainMethod(): void {}
+@Injectable()
+@TransactionalEventsHandler({
+  events: [OrderPlaced],
+  phase: TransactionPhase.AFTER_ROLLBACK,
+  fallbackExecution: true,
+})
+class OrderPlacedRollbackHandler {
+  handle(_event: OrderPlaced, _error?: unknown): void {}
+}
+
+@Injectable()
+@TransactionalEventsHandler(OrderPlaced, PaymentCaptured)
+class MultiEventHandler {
+  handle(_event: OrderPlaced | PaymentCaptured): void {}
 }
 
 @Injectable()
@@ -40,17 +55,9 @@ class UndecoratedService {
   doWork(): void {}
 }
 
-@Injectable()
-class AnotherDecoratedService {
-  @TransactionalEventsListener(OrderPlaced, {
-    phase: TransactionPhase.AFTER_ROLLBACK,
-    fallbackExecution: true,
-  })
-  onOrderPlacedRollback(_event: OrderPlaced, _error: unknown): void {}
-}
-
-// Minimal stub — the scanner only needs the dispatcher to have a working
-// `registerListener`; no real TransactionManager interaction is required.
+// Minimal stub — the scanner only needs the dispatcher to have a
+// working `registerListener`; no real TransactionManager interaction
+// is required for these tests.
 const fakeManagerProvider = {
   provide: TransactionManager,
   useValue: {
@@ -88,155 +95,95 @@ describe('TransactionalListenerScanner', () => {
     }
   });
 
-  it('registers a decorated listener method after app init', async () => {
-    await buildModule([DecoratedService]);
+  it('registers a decorated handler class after app init', async () => {
+    await buildModule([OrderPlacedHandler]);
 
-    const decorated = module.get(DecoratedService);
+    const handler = module.get(OrderPlacedHandler);
 
     expect(registerSpy).toHaveBeenCalled();
-    const onOrderPlacedCall = registerSpy.mock.calls.find(
-      ([, methodName]) => methodName === 'onOrderPlaced',
-    );
-    expect(onOrderPlacedCall).toBeDefined();
-    expect(onOrderPlacedCall?.[0]).toBe(decorated);
-    expect(onOrderPlacedCall?.[2]).toMatchObject({
+    const call = registerSpy.mock.calls.find(([inst]) => inst === handler);
+    expect(call).toBeDefined();
+    expect(call?.[1]).toBe('handle');
+    expect(call?.[2]).toMatchObject({
       eventType: OrderPlaced,
       phase: TransactionPhase.AFTER_COMMIT,
+      async: false,
+      fallbackExecution: false,
     });
   });
 
-  it('registers every decorated method on a service that has multiple listeners', async () => {
-    await buildModule([DecoratedService]);
+  it('propagates non-default options (BEFORE_COMMIT)', async () => {
+    await buildModule([PaymentCapturedHandler]);
 
-    const decorated = module.get(DecoratedService);
-    const calls = registerSpy.mock.calls.filter(([inst]) => inst === decorated);
+    const handler = module.get(PaymentCapturedHandler);
+    const call = registerSpy.mock.calls.find(([inst]) => inst === handler);
 
-    const methodNames = calls.map(([, method]) => method as string).sort();
-    expect(methodNames).toEqual(['onOrderPlaced', 'onPaymentCaptured']);
-
-    const paymentCall = calls.find(([, method]) => method === 'onPaymentCaptured');
-    expect(paymentCall?.[2]).toMatchObject({
+    expect(call?.[2]).toMatchObject({
       eventType: PaymentCaptured,
       phase: TransactionPhase.BEFORE_COMMIT,
     });
   });
 
-  it('does not register undecorated methods on a decorated service', async () => {
-    await buildModule([DecoratedService]);
+  it('propagates fallbackExecution and AFTER_ROLLBACK phase', async () => {
+    await buildModule([OrderPlacedRollbackHandler]);
 
-    const decorated = module.get(DecoratedService);
-    const plainCall = registerSpy.mock.calls.find(
-      ([inst, method]) => inst === decorated && method === 'plainMethod',
-    );
-    expect(plainCall).toBeUndefined();
-  });
+    const handler = module.get(OrderPlacedRollbackHandler);
+    const call = registerSpy.mock.calls.find(([inst]) => inst === handler);
 
-  it('does not register any method of a service with no decorated methods', async () => {
-    await buildModule([DecoratedService, UndecoratedService]);
-
-    const undecorated = module.get(UndecoratedService);
-    const call = registerSpy.mock.calls.find(([inst]) => inst === undecorated);
-    expect(call).toBeUndefined();
-  });
-
-  it('picks up listeners across multiple providers', async () => {
-    await buildModule([DecoratedService, AnotherDecoratedService]);
-
-    const decorated = module.get(DecoratedService);
-    const another = module.get(AnotherDecoratedService);
-
-    expect(
-      registerSpy.mock.calls.find(
-        ([inst, method]) => inst === decorated && method === 'onOrderPlaced',
-      ),
-    ).toBeDefined();
-
-    const anotherCall = registerSpy.mock.calls.find(
-      ([inst, method]) => inst === another && method === 'onOrderPlacedRollback',
-    );
-    expect(anotherCall).toBeDefined();
-    expect(anotherCall?.[2]).toMatchObject({
+    expect(call?.[2]).toMatchObject({
       eventType: OrderPlaced,
       phase: TransactionPhase.AFTER_ROLLBACK,
       fallbackExecution: true,
     });
   });
 
-  it('ignores methods decorated for unrelated events (metadata still attaches but no filtering occurs here)', async () => {
-    @Injectable()
-    class UnrelatedListener {
-      @TransactionalEventsListener(UnrelatedEvent)
-      onUnrelated(_event: UnrelatedEvent): void {}
-    }
+  it('registers one entry per event type for multi-event handlers', async () => {
+    await buildModule([MultiEventHandler]);
 
-    await buildModule([UnrelatedListener]);
+    const handler = module.get(MultiEventHandler);
+    const calls = registerSpy.mock.calls.filter(([inst]) => inst === handler);
 
-    const instance = module.get(UnrelatedListener);
-    const call = registerSpy.mock.calls.find(
-      ([inst, method]) => inst === instance && method === 'onUnrelated',
-    );
-    expect(call).toBeDefined();
-    expect(call?.[2]).toMatchObject({ eventType: UnrelatedEvent });
+    expect(calls).toHaveLength(2);
+    const eventTypes = calls.map(([, , metadata]) => (metadata as { eventType: unknown }).eventType);
+    expect(eventTypes).toContain(OrderPlaced);
+    expect(eventTypes).toContain(PaymentCaptured);
   });
 
-  describe('outbox-aware skip logic', () => {
-    @Injectable()
-    class ApplicationModuleService {
-      @ApplicationModuleListener(OrderPlaced)
-      async onOrderPlaced(_event: OrderPlaced): Promise<void> {}
-    }
+  it('does not register providers without the decorator', async () => {
+    await buildModule([OrderPlacedHandler, UndecoratedService]);
+
+    const undecorated = module.get(UndecoratedService);
+    const call = registerSpy.mock.calls.find(([inst]) => inst === undecorated);
+    expect(call).toBeUndefined();
+  });
+
+  it('warns and skips a decorated class that does not expose `handle`', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     @Injectable()
-    class PureTransactionalService {
-      @TransactionalEventsListener(OrderPlaced)
-      onOrderPlaced(_event: OrderPlaced): void {}
+    @TransactionalEventsHandler(UnrelatedEvent)
+    class BrokenHandler {
+      // intentionally no `handle` method
+      doSomething(): void {}
     }
 
-    const fakeOutboxScheduler: OutboxPublicationScheduler = {
-      scheduleForPublication: (): void => undefined,
-    };
+    await buildModule([BrokenHandler]);
 
-    it('registers @ApplicationModuleListener methods in-memory when the outbox scheduler is NOT bound', async () => {
-      await buildModule([ApplicationModuleService]);
+    const broken = module.get(BrokenHandler);
+    const call = registerSpy.mock.calls.find(([inst]) => inst === broken);
+    expect(call).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('BrokenHandler'),
+    );
+  });
 
-      const instance = module.get(ApplicationModuleService);
-      const call = registerSpy.mock.calls.find(
-        ([inst, method]) => inst === instance && method === 'onOrderPlaced',
-      );
-      expect(call).toBeDefined();
-      expect(call?.[2]).toMatchObject({
-        eventType: OrderPlaced,
-        phase: TransactionPhase.AFTER_COMMIT,
-        async: true,
-      });
-    });
+  it('picks up multiple decorated handlers across providers', async () => {
+    await buildModule([OrderPlacedHandler, OrderPlacedRollbackHandler]);
 
-    it('SKIPS @ApplicationModuleListener methods when the outbox scheduler IS bound', async () => {
-      jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    const h1 = module.get(OrderPlacedHandler);
+    const h2 = module.get(OrderPlacedRollbackHandler);
 
-      await buildModule([
-        ApplicationModuleService,
-        { provide: OUTBOX_PUBLICATION_SCHEDULER, useValue: fakeOutboxScheduler },
-      ]);
-
-      const instance = module.get(ApplicationModuleService);
-      const call = registerSpy.mock.calls.find(
-        ([inst, method]) => inst === instance && method === 'onOrderPlaced',
-      );
-      expect(call).toBeUndefined();
-    });
-
-    it('still registers PURE @TransactionalEventsListener methods when the outbox scheduler is bound', async () => {
-      await buildModule([
-        PureTransactionalService,
-        { provide: OUTBOX_PUBLICATION_SCHEDULER, useValue: fakeOutboxScheduler },
-      ]);
-
-      const instance = module.get(PureTransactionalService);
-      const call = registerSpy.mock.calls.find(
-        ([inst, method]) => inst === instance && method === 'onOrderPlaced',
-      );
-      expect(call).toBeDefined();
-    });
+    expect(registerSpy.mock.calls.find(([inst]) => inst === h1)).toBeDefined();
+    expect(registerSpy.mock.calls.find(([inst]) => inst === h2)).toBeDefined();
   });
 });

@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 
 import { GetOrderHandler } from './get-order.handler';
 import { OrderRow } from './order.entity';
-import { OrderProjection } from './order.projection';
+import { OrderCommittedProjection, OrderRollbackProjection } from './order.projection';
 import { OrderRepository } from './order.repository';
 import { PlaceOrderHandler } from './place-order.handler';
 
@@ -39,7 +39,8 @@ export class AppModule {
         OrderRepository,
         PlaceOrderHandler,
         GetOrderHandler,
-        OrderProjection,
+        OrderCommittedProjection,
+        OrderRollbackProjection,
       ],
     };
   }

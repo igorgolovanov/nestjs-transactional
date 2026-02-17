@@ -1,26 +1,50 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  type ITransactionalEventsHandler,
   TransactionPhase,
-  TransactionalEventsListener,
+  TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
 
 import { OrderPlacedEvent } from './order.aggregate';
 
+/**
+ * AFTER_COMMIT handler — the canonical "event is now durable, publish
+ * side-effects" class. Fires only once the surrounding transaction
+ * has actually committed.
+ */
 @Injectable()
-export class OrderProjection {
-  private readonly logger = new Logger(OrderProjection.name);
+@TransactionalEventsHandler(OrderPlacedEvent)
+export class OrderCommittedProjection
+  implements ITransactionalEventsHandler<OrderPlacedEvent>
+{
+  private readonly logger = new Logger(OrderCommittedProjection.name);
 
   committed: string[] = [];
-  rolledBack: string[] = [];
 
-  @TransactionalEventsListener(OrderPlacedEvent)
-  onCommitted(event: OrderPlacedEvent): void {
+  handle(event: OrderPlacedEvent): void {
     this.committed.push(event.orderId);
     this.logger.log(`AFTER_COMMIT — order ${event.orderId} is durable, projecting...`);
   }
+}
 
-  @TransactionalEventsListener(OrderPlacedEvent, { phase: TransactionPhase.AFTER_ROLLBACK })
-  onRolledBack(event: OrderPlacedEvent, error: unknown): void {
+/**
+ * AFTER_ROLLBACK handler — observes the rolled-back emission.
+ * Distinct class because the new class-level API binds one
+ * `@TransactionalEventsHandler` per class (single responsibility).
+ */
+@Injectable()
+@TransactionalEventsHandler({
+  events: [OrderPlacedEvent],
+  phase: TransactionPhase.AFTER_ROLLBACK,
+})
+export class OrderRollbackProjection
+  implements ITransactionalEventsHandler<OrderPlacedEvent>
+{
+  private readonly logger = new Logger(OrderRollbackProjection.name);
+
+  rolledBack: string[] = [];
+
+  handle(event: OrderPlacedEvent, error?: unknown): void {
     this.rolledBack.push(event.orderId);
     this.logger.warn(
       `AFTER_ROLLBACK — order ${event.orderId} NOT persisted; cause: ${(error as Error).message}`,

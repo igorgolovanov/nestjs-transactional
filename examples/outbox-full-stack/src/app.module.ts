@@ -3,10 +3,12 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import {
   CqrsTransactionalModule,
+  OUTBOX_LISTENER_REGISTRAR,
   OUTBOX_PUBLICATION_SCHEDULER,
 } from '@nestjs-transactional/cqrs';
 import {
   OutboxEventPublisher,
+  OutboxListenerRegistry,
   OutboxModule,
   OutboxProcessingModule,
 } from '@nestjs-transactional/outbox-core';
@@ -95,6 +97,12 @@ export class AppModule {
         // token. HybridEventPublisher's @Optional injection picks it up
         // and routes aggregate events through both paths.
         { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
+        // Binds OutboxListenerRegistry under the CQRS package's
+        // registrar token. ApplicationModuleHandlerScanner picks it up
+        // and routes @ApplicationModuleHandler classes to the outbox
+        // for durable delivery. Without this binding the scanner falls
+        // back to in-memory AFTER_COMMIT dispatch.
+        { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
         OrderRepository,
         PlaceOrderHandler,
         ShippingHandlers,

@@ -1,24 +1,35 @@
-export {
-  TRANSACTIONAL_EVENTS_LISTENER_METADATA,
-  TransactionPhase,
-  type TransactionalEventsListenerMetadata,
-  type TransactionalEventsListenerOptions,
-} from './types/transactional-listener.types';
+export { TransactionPhase } from './types/transactional-listener.types';
 
 export {
-  TransactionalEventsListener,
-  getTransactionalEventsListenerMetadata,
-} from './decorators/transactional-events-listener.decorator';
+  TRANSACTIONAL_EVENTS_HANDLER_METADATA,
+  TransactionalEventsHandler,
+  getTransactionalEventsHandlerMetadata,
+  type TransactionalEventsHandlerMetadata,
+  type TransactionalEventsHandlerOptions,
+} from './decorators/transactional-events-handler.decorator';
 
 export {
-  ApplicationModuleListener,
-  type ApplicationModuleListenerOptions,
-  hasOutboxListenerMetadata,
-} from './decorators/application-module-listener.decorator';
+  APPLICATION_MODULE_HANDLER_METADATA,
+  ApplicationModuleHandler,
+  getApplicationModuleHandlerMetadata,
+  type ApplicationModuleHandlerMetadata,
+  type ApplicationModuleHandlerOptions,
+} from './decorators/application-module-handler.decorator';
 
-export { TransactionalEventDispatcher } from './event-dispatcher/event-dispatcher';
+export type { ITransactionalEventsHandler } from './interfaces/transactional-events-handler.interface';
+export type { IApplicationModuleHandler } from './interfaces/application-module-handler.interface';
+
+export {
+  TransactionalEventDispatcher,
+  type DispatcherListenerMetadata,
+} from './event-dispatcher/event-dispatcher';
 
 export { TransactionalListenerScanner } from './handlers/listener-scanner';
+export { ApplicationModuleHandlerScanner } from './handlers/application-module-handler-scanner';
+export {
+  OUTBOX_LISTENER_REGISTRAR,
+  type OutboxListenerRegistrar,
+} from './handlers/outbox-listener-registrar';
 
 export {
   CQRS_HANDLER_WRAPPER_OPTIONS,

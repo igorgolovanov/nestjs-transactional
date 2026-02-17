@@ -5,7 +5,7 @@ import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import { AppModule, createDataSource } from './app.module';
 import { GetOrderQuery } from './get-order.handler';
-import { OrderProjection } from './order.projection';
+import { OrderCommittedProjection, OrderRollbackProjection } from './order.projection';
 import { OrderRepository } from './order.repository';
 import { PlaceOrderCommand } from './place-order.handler';
 
@@ -17,7 +17,8 @@ async function main(): Promise<void> {
 
   const commandBus = app.get(CommandBus);
   const queryBus = app.get(QueryBus);
-  const projection = app.get(OrderProjection);
+  const committed = app.get(OrderCommittedProjection);
+  const rolledBack = app.get(OrderRollbackProjection);
   const repo = app.get(OrderRepository);
 
   console.log('');
@@ -26,7 +27,7 @@ async function main(): Promise<void> {
   console.log('1) CommandBus.execute(PlaceOrderCommand("order-1"))');
   await commandBus.execute(new PlaceOrderCommand('order-1'));
   console.log('   rows in DB:', (await repo.listAll()).map((o) => o.id));
-  console.log('   projection.committed:', projection.committed);
+  console.log('   committed projection:', committed.committed);
 
   console.log('');
   console.log('2) QueryBus.execute(GetOrderQuery("order-1")) — wrapped as read-only tx by default');
@@ -41,8 +42,8 @@ async function main(): Promise<void> {
     console.log('   caught:', (err as Error).message);
   }
   console.log('   rows in DB:', (await repo.listAll()).map((o) => o.id));
-  console.log('   projection.committed:', projection.committed);
-  console.log('   projection.rolledBack:', projection.rolledBack);
+  console.log('   committed projection:', committed.committed);
+  console.log('   rolled back projection:', rolledBack.rolledBack);
 
   await app.close();
   await dataSource.destroy();

@@ -11,7 +11,8 @@ import { TransactionalModule, Transactional } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule, getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
 
-import { TransactionalEventsListener } from '../decorators/transactional-events-listener.decorator';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
+import type { ITransactionalEventsHandler } from '../interfaces/transactional-events-handler.interface';
 
 import { CqrsTransactionalModule } from './cqrs-transactional.module';
 
@@ -117,11 +118,11 @@ class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, void> {
 // --- Listener ---
 
 @Injectable()
-class OrderProjection {
+@TransactionalEventsHandler(OrderPlacedEvent)
+class OrderProjection implements ITransactionalEventsHandler<OrderPlacedEvent> {
   placed: string[] = [];
 
-  @TransactionalEventsListener(OrderPlacedEvent)
-  onPlaced(event: OrderPlacedEvent): void {
+  handle(event: OrderPlacedEvent): void {
     this.placed.push(event.orderId);
   }
 }

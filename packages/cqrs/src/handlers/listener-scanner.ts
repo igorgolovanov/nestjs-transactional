@@ -1,36 +1,30 @@
-import { Inject, Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
-import { DiscoveryService, MetadataScanner } from '@nestjs/core';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { DiscoveryService } from '@nestjs/core';
 
-import { hasOutboxListenerMetadata } from '../decorators/application-module-listener.decorator';
-import { getTransactionalEventsListenerMetadata } from '../decorators/transactional-events-listener.decorator';
+import { getTransactionalEventsHandlerMetadata } from '../decorators/transactional-events-handler.decorator';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import {
-  OUTBOX_PUBLICATION_SCHEDULER,
-  type OutboxPublicationScheduler,
-} from '../event-publisher/hybrid-event-publisher';
 
 /**
- * Bootstrap-time scanner that walks every provider in the running Nest
- * application, finds every method decorated with
- * `@TransactionalEventsListener`, and registers it with the
- * {@link TransactionalEventDispatcher}.
+ * Bootstrap-time scanner that walks every provider in the running
+ * Nest application, finds every class decorated with
+ * `@TransactionalEventsHandler`, and registers its `handle` method
+ * with the {@link TransactionalEventDispatcher} — one registration
+ * per event type listed in the decorator metadata.
  *
- * Outbox integration: when `OUTBOX_PUBLICATION_SCHEDULER` is bound AND
- * a scanned method also carries outbox listener metadata (from
- * `@OutboxEventListener` or the outbox half of
- * `@ApplicationModuleListener`), the in-memory registration is
- * skipped. The outbox's own scanner picks those methods up, so they
- * run exactly once through the durable path. Without the outbox
- * scheduler bound, methods with outbox metadata still get registered
- * in-memory — the `@ApplicationModuleListener` fallback semantics.
+ * Scanning is class-level only. The handler class must expose a
+ * `handle(event): void | Promise<void>` method (enforce this at the
+ * type level by implementing `ITransactionalEventsHandler`).
+ *
+ * `@ApplicationModuleHandler` is NOT processed here —
+ * `ApplicationModuleHandlerScanner` owns it, with smart routing to
+ * the outbox or this dispatcher depending on which provider is bound.
  *
  * Registration happens in `onModuleInit` so all providers have been
- * instantiated by the time the scan runs. Providers with no instance or
- * no metatype (e.g. value providers that Nest has not yet materialised)
- * are skipped silently.
+ * instantiated by the time the scan runs. Providers with no instance
+ * or no metatype are skipped silently.
  *
- * Wired into the application by `CqrsTransactionalModule`. Not exported
- * for direct consumer instantiation.
+ * Wired into the application by `CqrsTransactionalModule`. Not
+ * exported for direct consumer instantiation.
  */
 @Injectable()
 export class TransactionalListenerScanner implements OnModuleInit {
@@ -38,56 +32,44 @@ export class TransactionalListenerScanner implements OnModuleInit {
 
   constructor(
     private readonly discovery: DiscoveryService,
-    private readonly metadataScanner: MetadataScanner,
     private readonly dispatcher: TransactionalEventDispatcher,
-    @Optional()
-    @Inject(OUTBOX_PUBLICATION_SCHEDULER)
-    private readonly outboxScheduler?: OutboxPublicationScheduler,
   ) {}
 
   onModuleInit(): void {
-    const outboxAvailable = this.outboxScheduler !== undefined;
     const providers = this.discovery.getProviders();
 
     for (const wrapper of providers) {
       if (
         wrapper.metatype === null ||
+        typeof wrapper.metatype !== 'function' ||
         wrapper.instance === null ||
         wrapper.instance === undefined
       ) {
         continue;
       }
 
-      const instance: object = wrapper.instance as object;
-      const prototype: object | null = Object.getPrototypeOf(instance) as object | null;
-      if (prototype === null) {
+      const metadata = getTransactionalEventsHandlerMetadata(wrapper.metatype);
+      if (metadata === undefined) {
         continue;
       }
 
-      const methodNames = this.metadataScanner.getAllMethodNames(prototype);
-      const methods = prototype as Record<string, unknown>;
+      const instance: object = wrapper.instance as object;
+      const handleMethod = (instance as Record<string, unknown>).handle;
+      if (typeof handleMethod !== 'function') {
+        const className = (wrapper.metatype as { name?: string }).name ?? 'anonymous';
+        this.logger.warn(
+          `@TransactionalEventsHandler on ${className}: missing \`handle(event)\` method — skipping`,
+        );
+        continue;
+      }
 
-      for (const methodName of methodNames) {
-        const method = methods[methodName];
-        if (typeof method !== 'function') {
-          continue;
-        }
-
-        const metadata = getTransactionalEventsListenerMetadata(method);
-        if (metadata === undefined) {
-          continue;
-        }
-
-        if (outboxAvailable && hasOutboxListenerMetadata(method)) {
-          const ownerName =
-            (wrapper.metatype as { name?: string } | null)?.name ?? 'anonymous';
-          this.logger.debug(
-            `Skipping in-memory registration for ${ownerName}.${methodName} — delivery handled by outbox`,
-          );
-          continue;
-        }
-
-        this.dispatcher.registerListener(instance, methodName, metadata);
+      for (const eventType of metadata.eventTypes) {
+        this.dispatcher.registerListener(instance, 'handle', {
+          eventType,
+          phase: metadata.phase,
+          async: metadata.async,
+          fallbackExecution: metadata.fallbackExecution,
+        });
       }
     }
   }
