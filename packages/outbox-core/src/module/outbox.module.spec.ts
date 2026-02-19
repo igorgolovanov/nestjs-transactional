@@ -11,9 +11,10 @@ import {
 } from '@nestjs-transactional/core';
 
 import { FailedEventPublications } from '../api/failed-event-publications';
-import { OutboxEventListener } from '../decorators/outbox-event-listener.decorator';
+import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
 import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
 import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
+import type { IOutboxEventsHandler } from '../interfaces/outbox-events-handler.interface';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
 import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository';
 import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
@@ -50,12 +51,12 @@ class OrderPlacedEvent {
 }
 
 @Injectable()
-class FlakyListener {
+@OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
+class FlakyListener implements IOutboxEventsHandler<OrderPlacedEvent> {
   invocations: OrderPlacedEvent[] = [];
   failuresRemaining = 0;
 
-  @OutboxEventListener(OrderPlacedEvent, { newTransaction: false })
-  async onOrderPlaced(event: OrderPlacedEvent): Promise<void> {
+  async handle(event: OrderPlacedEvent): Promise<void> {
     this.invocations.push(event);
     if (this.failuresRemaining > 0) {
       this.failuresRemaining--;

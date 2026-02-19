@@ -21,9 +21,11 @@ export interface RegisteredOutboxListener {
 }
 
 /**
- * Registry of `@OutboxEventListener`-annotated methods, keyed by both
- * the listener id (for targeted dispatch / resume) and the event class
- * name (for fan-out when a new event is published).
+ * Registry of `@OutboxEventsHandler`-annotated classes (and other
+ * programmatically-registered listeners such as those routed from
+ * `@ApplicationModuleHandler` via the structural registrar port),
+ * keyed by both the listener id (for targeted dispatch / resume) and
+ * the event class name (for fan-out when a new event is published).
  *
  * Populated at application bootstrap by the scanner (upcoming Phase 5
  * iteration). Stateless beyond the two index maps.

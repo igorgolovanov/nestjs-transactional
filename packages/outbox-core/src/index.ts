@@ -15,7 +15,9 @@ export * from './registry/event-publication-registry';
 export * from './registry/listener-registry';
 export * from './registry/outbox-listener-scanner';
 
-export * from './decorators/outbox-event-listener.decorator';
+export * from './decorators/outbox-events-handler.decorator';
+
+export type { IOutboxEventsHandler } from './interfaces/outbox-events-handler.interface';
 
 export * from './dispatcher/outbox-event-publisher';
 export * from './dispatcher/event-publication-processor';
