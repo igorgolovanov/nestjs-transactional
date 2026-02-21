@@ -9,9 +9,11 @@ Accepted — 2026-04-24.
 Through Phase 3 the monorepo's self-described scope was
 "Spring Framework-style declarative transaction management for
 NestJS", with `@nestjs-transactional/cqrs` providing phase-aware
-dispatching via `@TransactionalEventsListener`
-(`BEFORE_COMMIT`, `AFTER_COMMIT`, `AFTER_ROLLBACK`,
-`AFTER_COMPLETION`). That covers most of Spring Framework core.
+dispatching (`BEFORE_COMMIT`, `AFTER_COMMIT`, `AFTER_ROLLBACK`,
+`AFTER_COMPLETION`) via what was then
+`@TransactionalEventsListener` and is now
+`@TransactionalEventsHandler` (class-level — see ADR-014).
+That covers most of Spring Framework core.
 It does **not** cover what Spring Modulith 2.x ships on top:
 
 - A persistent **Event Publication Registry**, so event
@@ -26,9 +28,11 @@ It does **not** cover what Spring Modulith 2.x ships on top:
   (space-efficient), `ARCHIVE` (move to cold table).
 - **Testing utilities** — `PublishedEvents` and
   `AssertablePublishedEvents` as first-class assertion helpers.
-- A composite shortcut decorator — `@ApplicationModuleListener`
-  — that combines "new transaction, after commit, durable"
-  into a single annotation.
+- A composite shortcut decorator — originally planned as
+  `@ApplicationModuleListener` and shipped as the class-level
+  `@ApplicationModuleHandler` (see ADR-014) — that combines
+  "new transaction, after commit, durable" into a single
+  annotation.
 
 The gap matters. The classic failure mode that `@Transactional`
 is supposed to make impossible — "business data committed,
@@ -57,12 +61,13 @@ scope (Phase 7):
 - `HybridEventPublisher` replaces `TransactionalEventPublisher`
   as the default strategy wired into `EventPublisher` by
   `CqrsTransactionalModule`.
-- `@ApplicationModuleListener` is a composite decorator in
-  cqrs — persistent when the outbox is wired, in-memory fallback
-  otherwise.
-- `TransactionalListenerScanner` skips in-memory registration
-  for methods covered by the outbox, preventing double
-  invocation.
+- `@ApplicationModuleHandler` is a class-level decorator in
+  cqrs — persistent when the outbox registrar is bound,
+  in-memory fallback otherwise (see ADR-014 for the shape
+  change from a composite-metadata design to a smart scanner).
+- `ApplicationModuleHandlerScanner` owns the routing decision,
+  so there is no overlap with `TransactionalListenerScanner`
+  and no skip-logic is needed.
 
 The repository positioning updates from "Spring Framework
 equivalent" to "Spring Modulith equivalent" (see CLAUDE.md).
@@ -107,8 +112,8 @@ rest of the library.
   inside the same library that handles transactions. One mental
   model.
 - Clear, documented migration path from in-memory
-  `@TransactionalEventsListener` to persistent
-  `@OutboxEventListener` / `@ApplicationModuleListener`. See
+  `@TransactionalEventsHandler` to persistent
+  `@OutboxEventsHandler` / `@ApplicationModuleHandler`. See
   `docs/guides/migrating-to-outbox.md`.
 - Feature parity with Spring Modulith for users coming from the
   JVM. Same mental model, same operator tools, same testing
@@ -128,14 +133,14 @@ rest of the library.
   release event now touches four to five packages instead of
   three.
 - The public API surface of the monorepo grows. `OutboxModule`,
-  `OutboxTypeOrmModule`, `@OutboxEventListener`,
-  `@ApplicationModuleListener`, `PublishedEvents`,
+  `OutboxTypeOrmModule`, `@OutboxEventsHandler`,
+  `@ApplicationModuleHandler`, `PublishedEvents`,
   `AssertablePublishedEvents`, completion modes, etc. — more
   things to keep stable under the 0.x → 1.0 progression and to
   document.
-- Users who were happy with in-memory phase-aware listeners now
+- Users who were happy with in-memory phase-aware handlers now
   have to make an explicit decision — "do I want the outbox?" —
-  when wiring their application. `@ApplicationModuleListener`
+  when wiring their application. `@ApplicationModuleHandler`
   is designed to defer that decision: write the decorator,
   enable the outbox later by a single wiring change.
 

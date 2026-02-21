@@ -6,9 +6,10 @@ End-to-end example of
 `@nestjs-transactional/cqrs`: a command handler places an order,
 `aggregate.commit()` fans the emitted event into both the in-memory
 dispatcher AND the outbox, the worker polls Postgres, invokes the
-persistent `@ApplicationModuleListener`, and marks the publication
-`COMPLETED`. A second command with `shouldFail=true` demonstrates that
-a rolled-back transaction leaves no publication row behind.
+persistent `@ApplicationModuleHandler` class, and marks the
+publication `COMPLETED`. A second command with `shouldFail=true`
+demonstrates that a rolled-back transaction leaves no publication row
+behind.
 
 ## Requirements
 
@@ -55,16 +56,21 @@ Expected output (abbreviated):
   - `CqrsModule.forRoot()` + `CqrsTransactionalModule.forRoot()`
   - Provider binding `OUTBOX_PUBLICATION_SCHEDULER → OutboxEventPublisher` —
     the one line that turns `HybridEventPublisher` into a dual-path router.
+  - Provider binding `OUTBOX_LISTENER_REGISTRAR → OutboxListenerRegistry` —
+    the one line that tells `ApplicationModuleHandlerScanner` to route
+    `@ApplicationModuleHandler` classes to the outbox instead of the
+    in-memory dispatcher.
 
 - [`place-order.handler.ts`](src/place-order.handler.ts) — a normal
   `@CommandHandler` wrapped in `@Transactional()`. `order.commit()`
   emits `OrderPlacedEvent`.
 
 - [`shipping.handler.ts`](src/shipping.handler.ts) — a persistent
-  listener using `@ApplicationModuleListener`. When the outbox is
-  wired (as here), delivery goes through the worker; without it, the
-  same decorator runs in-memory as an `AFTER_COMMIT` listener. Same
-  source code, two delivery modes.
+  handler class annotated with `@ApplicationModuleHandler` and
+  implementing `IApplicationModuleHandler<OrderPlacedEvent>`. When
+  the outbox registrar is bound (as here), delivery goes through the
+  worker; without the binding, the same decorator runs in-memory as
+  an `AFTER_COMMIT` handler. Same source code, two delivery modes.
 
 ## Schema management
 

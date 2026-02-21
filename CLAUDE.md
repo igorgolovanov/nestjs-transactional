@@ -17,10 +17,10 @@ growing set of npm packages organised by concern.
   `@nestjs/typeorm`.
 
 - **@nestjs-transactional/cqrs** — integration with `@nestjs/cqrs`: runtime
-  wrappers for CommandHandler/QueryHandler/EventHandler, the
-  `@TransactionalEventsListener` decorator with Spring-like phases
+  wrappers for CommandHandler/QueryHandler/EventHandler, class-level
+  `@TransactionalEventsHandler` decorator with Spring-like phases
   (BEFORE_COMMIT, AFTER_COMMIT, AFTER_ROLLBACK, AFTER_COMPLETION),
-  `HybridEventPublisher` + `@ApplicationModuleListener` that bridge to
+  `HybridEventPublisher` + `@ApplicationModuleHandler` that bridge to
   the outbox when wired, and an EventPublisher override that integrates
   with AggregateRoot.
 
@@ -69,7 +69,7 @@ for NestJS applications, not just Spring Framework core.
 
 **Spring Modulith features (partially covered, expansion planned):**
 - Event Publication Registry with persistent log — outbox-core (Phase 5)
-- `@ApplicationModuleListener` shortcut — cqrs integration (Phase 7)
+- `@ApplicationModuleHandler` shortcut — cqrs integration (Phase 7)
 - Failed / Incomplete / Completed publications API — outbox-core (Phase 5)
 - Staleness monitor — outbox-core (Phase 5)
 - Republish on restart — outbox-core (Phase 5)
@@ -141,11 +141,12 @@ nestjs-transactional-monorepo/
 │   │
 │   ├── cqrs/                          # @nestjs-transactional/cqrs
 │   │   ├── src/
-│   │   │   ├── decorators/            # @TransactionalEventsListener
-│   │   │   ├── types/                 # TransactionPhase, metadata
+│   │   │   ├── decorators/            # @TransactionalEventsHandler, @ApplicationModuleHandler
+│   │   │   ├── interfaces/            # ITransactionalEventsHandler, IApplicationModuleHandler
+│   │   │   ├── types/                 # TransactionPhase
 │   │   │   ├── event-dispatcher/      # TransactionalEventDispatcher
-│   │   │   ├── event-publisher/       # TransactionalEventPublisher (+ adapter)
-│   │   │   ├── handlers/              # CqrsHandlerWrapper, bootstrap, scanner
+│   │   │   ├── event-publisher/       # TransactionalEventPublisher + HybridEventPublisher
+│   │   │   ├── handlers/              # CqrsHandlerWrapper, listener scanner, application module scanner
 │   │   │   ├── module/                # CqrsTransactionalModule
 │   │   │   └── index.ts
 │   │   └── ...
@@ -210,12 +211,13 @@ Design Decisions section below:
 - **ADR-005**: Method wrapping strategy — `docs/adr/005-method-wrapping-strategy.md`
 - **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md`
 - **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md`
+- **ADR-014**: Class-level handler API redesign — `docs/adr/014-handler-api-redesign.md`
 
 Planned (not yet written):
 
 - **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md`
 - **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md`
-- **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md`
+- **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md` *(the design was absorbed into ADR-014 — see Supersedes note there)*
 
 Process: every significant architectural decision gets a new ADR numbered n+1.
 The discussion is captured; the status is one of accepted / rejected /
@@ -287,8 +289,9 @@ Users coming from Spring should feel at home.
 
 ### 5. Spring @TransactionalEventListener for CQRS
 
-The cqrs package ships a `@TransactionalEventsListener` decorator, equivalent
-to Spring's `@TransactionalEventListener`:
+The cqrs package ships a class-level `@TransactionalEventsHandler`
+decorator, equivalent to Spring's `@TransactionalEventListener` and
+modelled on `@nestjs/cqrs`'s `@EventsHandler` ergonomics:
 
 - **BEFORE_COMMIT**: invoked before commit; an error rolls the transaction
   back
@@ -299,6 +302,10 @@ to Spring's `@TransactionalEventListener`:
 This solves the classic problem of "event published, but the transaction was
 rolled back". With AFTER_COMMIT this cannot happen — the listener only runs
 once the commit has succeeded.
+
+Handler classes implement `ITransactionalEventsHandler<T>` and expose
+a single `handle(event)` method. See ADR-014 for the rationale behind
+the class-level shape.
 
 ### 6. AggregateRoot integration
 
@@ -460,7 +467,7 @@ layout with obvious names.
 ### DD-009: Implement full Event Publication Registry (Spring Modulith parity)
 
 **Context**: Scope reassessment after detailed comparison with Spring
-Modulith 2.0.5. Our existing `@TransactionalEventsListener` provides
+Modulith 2.0.5. Our existing `@TransactionalEventsHandler` provides
 phase-based dispatching (like Spring Framework core) but lacks the
 persistent event log, retry, recovery, and delivery guarantees that
 Spring Modulith provides for production systems.
@@ -475,13 +482,13 @@ Spring Modulith provides for production systems.
 
 **Decision**: Implement full Event Publication Registry equivalent as
 separate `outbox-core` + `outbox-typeorm` packages. Integration with cqrs
-via `HybridEventPublisher` and the `@ApplicationModuleListener` decorator.
+via `HybridEventPublisher` and the `@ApplicationModuleHandler` decorator.
 
 **Consequences**:
 - Significant scope expansion (~3 weeks of work).
 - Production-ready delivery guarantees.
-- Clear migration path from in-memory `@TransactionalEventsListener` to
-  persistent `@OutboxEventListener`.
+- Clear migration path from in-memory `@TransactionalEventsHandler` to
+  persistent `@OutboxEventsHandler`.
 - Larger surface area to maintain.
 
 ### DD-010: Split outbox into core + persistence packages
@@ -515,16 +522,19 @@ existing behavior.
   invalidation, metrics).
 - Make users choose per listener. Rejected: usability nightmare.
 
-**Decision**: `HybridEventPublisher` delegates to both paths. Listeners
-annotated with `@OutboxEventListener` metadata are automatically SKIPPED
-by the in-memory dispatcher (so there is no double invocation). Listeners
-annotated only with `@TransactionalEventsListener` continue running
-in-memory as before.
+**Decision**: `HybridEventPublisher` delegates to both paths —
+`TransactionalEventDispatcher` (for `@TransactionalEventsHandler`
+classes) and, when the `OUTBOX_PUBLICATION_SCHEDULER` token is bound,
+`OutboxEventPublisher.scheduleForPublication` (for durable delivery).
+`@ApplicationModuleHandler` is routed by a separate smart scanner
+(see DD-013 and ADR-014) — the old "two metadata keys + skip logic"
+approach from the original design has been removed.
 
-**Consequences**: Seamless coexistence. Slight cognitive load: developers
-must understand which decorator provides which guarantees.
+**Consequences**: Seamless coexistence. Developers must understand
+which decorator provides which guarantees — see "Delivery guarantees
+at a glance" in `packages/cqrs/README.md`.
 
-### DD-012: @ApplicationModuleListener as smart default
+### DD-012: @ApplicationModuleHandler as smart default
 
 **Context**: Spring Modulith's `@ApplicationModuleListener` is the
 recommended default for cross-module integration. It combines
@@ -532,21 +542,59 @@ AFTER_COMMIT, async execution, a new transaction, and persistence. Users
 should not need to manually compose 3–4 decorators for the common case.
 
 **Alternatives considered**:
-- Only provide `@OutboxEventListener`, let users compose with
+- Only provide `@OutboxEventsHandler`, let users compose with
   `@Transactional` when needed. Rejected: does not match Spring Modulith
   DX.
 - Make it a composite decorator that works without the outbox. Done
   partially (see Decision below).
 
-**Decision**: `@ApplicationModuleListener` is a composite decorator in the
-cqrs package. When the outbox is configured — it provides full persistent
-delivery. Without the outbox — it falls back to
-`@TransactionalEventsListener({ phase: AFTER_COMMIT, async: true })` +
-`@Transactional({ propagation: REQUIRES_NEW })` semantics. Behavior in
-both modes is documented explicitly.
+**Decision**: `@ApplicationModuleHandler` is a standalone class-level
+decorator in the cqrs package. A dedicated
+`ApplicationModuleHandlerScanner` decides the delivery path at
+bootstrap by inspecting the `OUTBOX_LISTENER_REGISTRAR` DI token: when
+bound, registers with the outbox registry (durable,
+at-least-once, retried). When unbound, registers with
+`TransactionalEventDispatcher` as `AFTER_COMMIT` + `async: true`,
+wrapped in a fresh transaction. Behavior in both modes is documented
+explicitly.
 
 **Consequences**: Matches Spring Modulith DX. Behavior differs based on
 config — must be clearly documented to avoid surprises.
+
+### DD-013: Class-level handler API aligned with `@nestjs/cqrs`
+
+**Context**: The original listener decorators were method-level —
+annotate any method with `@TransactionalEventsListener(EventType)` and
+it becomes a handler. That diverged from `@nestjs/cqrs`'s class-level
+`@EventsHandler` / `@CommandHandler` / `@QueryHandler` convention, tied
+listener ids to method names (breaking on rename), and left the handler
+method signature unconstrained at the type level.
+
+**Alternatives considered**:
+- Extend method-level decorators with `Type[]` support for multi-event
+  handlers. Rejected: still asymmetric with `@nestjs/cqrs`.
+- Dual API (class-level + method-level). Rejected: two ways to do the
+  same thing doubles maintenance and confuses users.
+- Keep method-level with deprecation warnings. Rejected: pre-release,
+  no users, no cost to a clean break.
+
+**Decision**: Class-level only —
+`@TransactionalEventsHandler(Event1, Event2, ...)`,
+`@OutboxEventsHandler(Event1, Event2, ...)`,
+`@ApplicationModuleHandler(Event1, Event2, ...)`. Each decorator also
+accepts a long-form options object. Handler classes implement
+`ITransactionalEventsHandler<T>` / `IOutboxEventsHandler<T>` /
+`IApplicationModuleHandler<T>` and expose a single `handle(event)`
+method. Listener ids are composed as `${baseId}#${EventName}` (baseId
+defaults to the class name, can be overridden via `options.id`) — a
+method rename inside a handler class no longer invalidates stored
+publications.
+
+**Consequences**: Mental-model symmetry with `@nestjs/cqrs`. Enforced
+single-responsibility per handler class (a class handles one
+cross-module integration concern). Breaking change vs. any pre-release
+snapshot; migration is mechanical but required before upgrading past
+this point. See ADR-014 for the full design rationale.
 
 ---
 
@@ -669,19 +717,42 @@ export class TypeOrmOrderRepository implements OrderRepository {
 ### Public API
 
 ```typescript
-// Decorators
-TransactionalEventsListener<T>(eventType: Type<T>, options?: {
+// Handler decorators (class-level only — see ADR-014)
+TransactionalEventsHandler(...events: Type[]): ClassDecorator
+TransactionalEventsHandler(options: {
+  events: Type[],
   phase?: TransactionPhase,           // default AFTER_COMMIT
-  fallbackExecution?: boolean,        // default false
   async?: boolean,                    // default false
-}): MethodDecorator
+  fallbackExecution?: boolean,        // default false
+}): ClassDecorator
+
+ApplicationModuleHandler(...events: Type[]): ClassDecorator
+ApplicationModuleHandler(options: {
+  events: Type[],
+  id?: string,                        // stable listener id base
+}): ClassDecorator
+
+// Interfaces (implement these on your handler class for type safety)
+interface ITransactionalEventsHandler<T> { handle(event: T): Promise<void> | void; }
+interface IApplicationModuleHandler<T> { handle(event: T): Promise<void> | void; }
 
 // Enums
 TransactionPhase: BEFORE_COMMIT | AFTER_COMMIT | AFTER_ROLLBACK | AFTER_COMPLETION
 
+// Structural port for outbox-backed delivery of @ApplicationModuleHandler
+OUTBOX_LISTENER_REGISTRAR: symbol (DI token)
+interface OutboxListenerRegistrar {
+  register(listener: { id: string; eventType: string; invoke: (event: unknown) => Promise<void> }): void;
+}
+
+// Structural port for outbox-backed aggregate event routing (HybridEventPublisher)
+OUTBOX_PUBLICATION_SCHEDULER: symbol (DI token)
+interface OutboxPublicationScheduler { scheduleForPublication(event: unknown): void; }
+
 // Services (rarely used directly by consumers)
-TransactionalEventPublisher: class — EventPublisher replacement, installed via override
-TransactionalEventDispatcher: class — internal routing
+TransactionalEventPublisher: class — EventPublisher replacement
+HybridEventPublisher: class — installed by default, routes to dispatcher + optional outbox
+TransactionalEventDispatcher: class — internal event routing
 
 // Module
 CqrsTransactionalModule.forRoot(options?: {
@@ -705,13 +776,27 @@ carries `@Transactional()` metadata, `execute` is wrapped in
 default (unless `defaultQueryOptions` disables that).
 
 **EventPublisher override**: the `EventPublisher` from `@nestjs/cqrs` is
-replaced with our adapter. When `AggregateRoot.commit()` calls `publishAll`,
-events flow through `TransactionalEventPublisher`, which registers them on
-the current transaction as hooks.
+replaced with `TransactionalEventPublisherAdapter` backed by
+`HybridEventPublisher`. When `AggregateRoot.commit()` calls `publishAll`,
+events flow through the hybrid publisher which routes them to (1) the
+in-memory `TransactionalEventDispatcher` and (2) when the
+`OUTBOX_PUBLICATION_SCHEDULER` token is bound, also to
+`OutboxEventPublisher.scheduleForPublication`.
+
+**Scanner wiring**:
+- `TransactionalListenerScanner` walks providers for classes with
+  `@TransactionalEventsHandler` metadata, registers `instance.handle`
+  with the dispatcher once per event type listed.
+- `ApplicationModuleHandlerScanner` walks providers for classes with
+  `@ApplicationModuleHandler` metadata. Route is decided at bootstrap
+  by whether `OUTBOX_LISTENER_REGISTRAR` is bound: registrar present
+  → register with the outbox registry in `REQUIRES_NEW`; registrar
+  absent → register with the dispatcher as AFTER_COMMIT + async in a
+  fresh transaction.
 
 **Event dispatching**:
 - Publish OUTSIDE a transaction:
-  - listeners with `fallbackExecution: true` are invoked directly
+  - handlers with `fallbackExecution: true` are invoked directly
   - others are ignored (with a warning in the log)
 - Publish INSIDE a transaction:
   - BEFORE_COMMIT: registered in beforeCommitHooks (an error rolls back)
@@ -863,15 +948,16 @@ export class TransactionAdapterNotFoundError extends TransactionError {
   method so that publication entries are committed atomically with the
   business data. (Exception: tests with the outbox disabled may call
   `publish` directly.)
-- **DO NOT rename handler methods carelessly once the outbox is in use**
-  — the method name is part of the listener ID. Renaming it makes
-  existing publications in the database unresolvable. Use an explicit
-  `options.id` in `@OutboxEventListener` for stability:
-  `@OutboxEventListener(SomeEvent, { id: 'stable-listener-id' })`.
-- **DO NOT mix `@TransactionalEventsListener` and `@OutboxEventListener`
-  on the same method without understanding the consequences** — in most
-  cases use `@ApplicationModuleListener` (the smart default) or commit
-  to exactly one of the two.
+- **DO NOT rename handler classes carelessly once the outbox is in use**
+  — the class name is part of the listener ID
+  (`${ClassName}#${EventName}`). Renaming it makes existing publications
+  in the database unresolvable. Use an explicit `options.id` for
+  stability:
+  `@OutboxEventsHandler({ events: [SomeEvent], id: 'stable-listener-id' })`.
+- **DO NOT write separate classes for `@TransactionalEventsHandler` and
+  `@OutboxEventsHandler` on the same event without understanding the
+  double-invocation risk** — in most cases use `@ApplicationModuleHandler`
+  (the smart default) or commit to exactly one of the two.
 - **DO NOT apply the `event_publication` schema in production without a
   migration** — auto schema initialization is development-only.
   Production requires an explicit migration step.
@@ -1023,9 +1109,14 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 
 ### Phase 3: @nestjs-transactional/cqrs (done)
 - TransactionPhase enum, metadata types
-- @TransactionalEventsListener decorator
+- Class-level `@TransactionalEventsHandler` + `@ApplicationModuleHandler`
+  decorators with `I*Handler` interfaces (see ADR-014)
 - TransactionalEventDispatcher (with phase routing)
-- TransactionalListenerScanner (auto-registration)
+- TransactionalListenerScanner (auto-registration for
+  `@TransactionalEventsHandler` classes)
+- ApplicationModuleHandlerScanner (smart outbox/in-memory routing for
+  `@ApplicationModuleHandler` via the `OUTBOX_LISTENER_REGISTRAR`
+  structural port)
 - CqrsHandlerWrapper (handler decoration at bootstrap)
 - CqrsTransactionalBootstrap (OnApplicationBootstrap)
 - TransactionalEventPublisher + Adapter (override of the @nestjs/cqrs
@@ -1048,7 +1139,8 @@ Core infrastructure for the Event Publication Registry:
 - `EventTypeRegistry` for deserialization
 - `EventPublicationRepository` SPI
 - `EventPublicationRegistry` — central lifecycle coordinator
-- `OutboxListenerRegistry` and the `@OutboxEventListener` decorator
+- `OutboxListenerRegistry` and the class-level `@OutboxEventsHandler`
+  decorator (see ADR-014)
 - `OutboxEventPublisher` — high-level API
 - `EventPublicationProcessor` — async worker
 - `StalenessMonitor` — detects stuck publications
@@ -1075,9 +1167,10 @@ Changes to the existing cqrs package:
 - `HybridEventPublisher` — delegates to both the in-memory dispatcher and
   the outbox
 - `TransactionalEventPublisherAdapter` updated to use `HybridEventPublisher`
-- `TransactionalListenerScanner` updated to skip `@OutboxEventListener`
-  methods (prevents double invocation)
-- `@ApplicationModuleListener` composite decorator (smart default)
+- `ApplicationModuleHandlerScanner` — smart router for
+  `@ApplicationModuleHandler` classes; routes to outbox when
+  `OUTBOX_LISTENER_REGISTRAR` is bound, falls back to dispatcher otherwise
+- `@ApplicationModuleHandler` composite decorator (smart default)
 - `OutboxEventPublisher.scheduleForPublication` for a sync publish API
   with batched writes
 - `CqrsTransactionalModule` options extended for outbox config
@@ -1095,7 +1188,7 @@ In outbox-core (`/testing` subpath) and cqrs (`/testing` subpath):
 - `docs/architecture/outbox-pattern.md`
 - `docs/architecture/outbox-integration-with-cqrs.md`
 - ADR-006 through ADR-009 (and ADR-010 from Phase 7)
-- Migration guide: `@TransactionalEventsListener` → `@OutboxEventListener`
+- Migration guide: `@TransactionalEventsHandler` → `@OutboxEventsHandler`
 - Full working example in `examples/outbox-full-stack/`
 - CI updates for new packages
 - Changesets for version bumps
@@ -1172,8 +1265,8 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-24 (Phase 9, Iteration 9.1 — comprehensive
-outbox documentation).
+**Last updated**: 2026-04-24 (Phase 9, Iteration 9.2 — class-level
+handler API redesign, ADR-014).
 
 ### Completed
 
@@ -1205,13 +1298,22 @@ outbox documentation).
   single beforeCommit flush hook),
   `HybridEventPublisher` with `@Optional()` outbox scheduler via
   `OUTBOX_PUBLICATION_SCHEDULER` structural token,
-  `@ApplicationModuleListener` composite decorator (shared
-  `Symbol.for('@nestjs-transactional/outbox-event-listener-metadata')`
-  key), `TransactionalListenerScanner` skip-logic when outbox
-  scheduler is bound.
+  `@ApplicationModuleHandler` class-level decorator with the
+  dedicated `ApplicationModuleHandlerScanner` that routes to
+  outbox/dispatcher based on `OUTBOX_LISTENER_REGISTRAR` binding.
 - Phase 8: Testing utilities — `PublishedEvents`,
   `AssertablePublishedEvents`, `PublishedEventsAssertionError`
   exported via `/testing` subpath of outbox-core. 15 unit tests.
+- Handler API redesign (ADR-014, DD-013) — migrated all three
+  listener decorators from method-level to class-level, matching
+  `@nestjs/cqrs` conventions. `@TransactionalEventsListener` →
+  `@TransactionalEventsHandler`, `@OutboxEventListener` →
+  `@OutboxEventsHandler`, `@ApplicationModuleListener` →
+  `@ApplicationModuleHandler`. Listener id format changed from
+  `${ClassName}.${methodName}` to `${baseId}#${EventName}`.
+  Type-safety enforced via `I*Handler` interfaces. Smart
+  `ApplicationModuleHandlerScanner` replaces the old
+  skip-logic-by-metadata pattern.
 
 ### In Progress
 
@@ -1222,6 +1324,13 @@ outbox documentation).
   `docs/guides/migrating-to-outbox.md`,
   `examples/outbox-full-stack/`, updated root README with
   roadmap and outbox packages, updated CLAUDE.md.
+  Iteration 9.2 shipped: ADR-014 (class-level handler API
+  redesign), migrated `@TransactionalEventsListener` →
+  `@TransactionalEventsHandler`, `@OutboxEventListener` →
+  `@OutboxEventsHandler`, `@ApplicationModuleListener` →
+  `@ApplicationModuleHandler`, `ApplicationModuleHandlerScanner`
+  smart fallback, updated READMEs, architecture docs, migration
+  guide, examples.
 
 ### Blocked / Awaiting
 
@@ -1230,12 +1339,13 @@ outbox documentation).
 
 ### Next
 
-- Phase 9 iteration 9.2: release automation for the outbox
+- Phase 9 iteration 9.3: release automation for the outbox
   packages — changeset entries, CI matrix tweaks if needed,
   first 0.1.0-alpha release.
 - ADR-008 (event serialization), ADR-009 (listener id
-  stability), ADR-010 (hybrid event publishing) — when the
-  related design decisions need more room than the DD section.
+  stability) — when the related design decisions need more room
+  than the DD section. ADR-010 (hybrid event publishing)
+  superseded by ADR-014, no longer planned.
 - Future phases (not scheduled): outbox-kafka, outbox-rabbitmq,
   outbox-prisma, outbox-mongodb, OpenTelemetry integration,
   ESM dual packaging.
@@ -1246,7 +1356,8 @@ outbox documentation).
   (DD-009)
 - Outbox split into core + typeorm packages (DD-010)
 - Hybrid event publishing chosen over replacement (DD-011)
-- `@ApplicationModuleListener` as smart default (DD-012)
+- `@ApplicationModuleHandler` as smart default (DD-012)
+- Class-level handler API aligned with `@nestjs/cqrs` (DD-013, ADR-014)
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 

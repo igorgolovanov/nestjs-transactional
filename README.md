@@ -18,7 +18,7 @@ retry, recovery, and at-least-once delivery semantics.
 | --- | --- | --- |
 | [`@nestjs-transactional/core`](packages/core) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/core.svg)](https://www.npmjs.com/package/@nestjs-transactional/core) | AsyncLocalStorage context, `TransactionManager`, `@Transactional` decorator, adapter port |
 | [`@nestjs-transactional/typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/typeorm.svg)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | TypeORM adapter, `getCurrentEntityManager`, multi-datasource support |
-| [`@nestjs-transactional/cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/cqrs.svg)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsListener`, `@ApplicationModuleListener`, aggregate events |
+| [`@nestjs-transactional/cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/cqrs.svg)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsHandler`, `@ApplicationModuleHandler`, aggregate events |
 | [`@nestjs-transactional/outbox-core`](packages/outbox-core) | *(unreleased, alpha)* | Persistent Event Publication Registry — lifecycle states, async worker, staleness monitor, startup recovery, operator APIs |
 | [`@nestjs-transactional/outbox-typeorm`](packages/outbox-typeorm) | *(unreleased, alpha)* | TypeORM persistence backend for the outbox — `event_publication` table, `FOR UPDATE SKIP LOCKED`, migration, dev-time auto-init |
 
@@ -50,9 +50,10 @@ export class OrderService {
 - **Rollback rules** via `rollbackFor` / `noRollbackFor`.
 - **Multi-datasource** as a first-class feature —
   `@Transactional({ adapterInstance: 'billing' })`.
-- **Phase-aware event listeners** via
-  `@TransactionalEventsListener`: `BEFORE_COMMIT`, `AFTER_COMMIT`,
-  `AFTER_ROLLBACK`, `AFTER_COMPLETION`.
+- **Phase-aware class-level event handlers** via
+  `@TransactionalEventsHandler`: `BEFORE_COMMIT`, `AFTER_COMMIT`,
+  `AFTER_ROLLBACK`, `AFTER_COMPLETION`. Matches `@nestjs/cqrs`
+  conventions — see ADR-014.
 - **AggregateRoot integration** — `order.commit()` attaches
   events as hooks on the current transaction; no more "event
   published, transaction rolled back" races.
@@ -60,8 +61,8 @@ export class OrderService {
   publications commit atomically with business writes; a
   background worker delivers them at-least-once with automatic
   retry, staleness detection, and startup recovery.
-- **`@ApplicationModuleListener` as smart default** —
-  Spring-Modulith-equivalent composite decorator. Durable via
+- **`@ApplicationModuleHandler` as smart default** —
+  Spring-Modulith-equivalent class-level decorator. Durable via
   the outbox when wired, in-memory fallback otherwise. Same
   source code, two delivery modes, chosen by module wiring.
 
@@ -141,9 +142,11 @@ export class AppModule {}
 
 ```ts
 @Injectable()
-export class InventoryHandlers {
-  @ApplicationModuleListener(OrderPlacedEvent)
-  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+@ApplicationModuleHandler(OrderPlacedEvent)
+export class InventoryReservationHandler
+  implements IApplicationModuleHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
     // Durable. Runs in its own REQUIRES_NEW transaction after
     // the publishing tx commits. Retries on failure. Resumes
     // after a process restart.
@@ -162,7 +165,7 @@ export class InventoryHandlers {
 | 4 — Examples & CI | ✅ done | Three runnable examples, GitHub Actions, coverage reports |
 | 5 — `@nestjs-transactional/outbox-core` | ✅ done (alpha) | Types, SPI, registry, publisher, processor, staleness monitor, startup recovery, operator APIs, in-memory repo, NestJS modules |
 | 6 — `@nestjs-transactional/outbox-typeorm` | ✅ done (alpha) | Entity, repository, migration, `SchemaInitializer`, `OutboxTypeOrmModule` |
-| 7 — CQRS ↔ outbox integration | ✅ done (alpha) | `HybridEventPublisher`, `@ApplicationModuleListener`, scanner skip logic |
+| 7 — CQRS ↔ outbox integration | ✅ done (alpha) | `HybridEventPublisher`, `@ApplicationModuleHandler`, `ApplicationModuleHandlerScanner` with outbox/in-memory routing |
 | 8 — Testing utilities | ✅ done (alpha) | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
 | 9 — Documentation & release | 🟡 in progress | Architecture docs, ADRs, migration guide, full-stack example, first 0.x release |
 | *(future)* | 🗓 not scheduled | outbox-kafka, outbox-rabbitmq, outbox-prisma, outbox-mongodb, OpenTelemetry, ESM dual packaging |
@@ -176,12 +179,13 @@ Four self-contained runnable examples under [`examples/`](examples/):
 - [`examples/multi-datasource`](examples/multi-datasource) —
   `@Transactional` routing to two independent DataSources.
 - [`examples/cqrs-full-stack`](examples/cqrs-full-stack) — full
-  flow: aggregate → command handler → `AFTER_COMMIT` listener →
-  `AFTER_ROLLBACK` listener. In-memory dispatch.
+  flow: aggregate → command handler → `AFTER_COMMIT`
+  `@TransactionalEventsHandler` class → `AFTER_ROLLBACK`
+  `@TransactionalEventsHandler` class. In-memory dispatch.
 - [`examples/outbox-full-stack`](examples/outbox-full-stack) —
   end-to-end outbox: aggregate → command handler → publication
-  row → worker → durable listener. Real Postgres via
-  `docker-compose`.
+  row → worker → durable `@ApplicationModuleHandler` class.
+  Real Postgres via `docker-compose`.
 
 ```bash
 pnpm -C examples/basic-usage start
@@ -197,13 +201,13 @@ pnpm -C examples/basic-usage start
 - **Architecture overview**:
   - [`docs/architecture/core-design.md`](docs/architecture/core-design.md) — core transaction infrastructure.
   - [`docs/architecture/outbox-pattern.md`](docs/architecture/outbox-pattern.md) — the outbox pattern, lifecycle, performance.
-  - [`docs/architecture/outbox-integration-with-cqrs.md`](docs/architecture/outbox-integration-with-cqrs.md) — `HybridEventPublisher`, `@ApplicationModuleListener`, listener flavours.
+  - [`docs/architecture/outbox-integration-with-cqrs.md`](docs/architecture/outbox-integration-with-cqrs.md) — `HybridEventPublisher`, `@ApplicationModuleHandler`, handler flavours.
 - **Architecture Decision Records**: [`docs/adr/`](docs/adr/) —
   ADR-005 (method wrapping), ADR-006 (outbox rationale),
-  ADR-007 (outbox architecture).
+  ADR-007 (outbox architecture), ADR-014 (class-level handler API).
 - **Guides**: [`docs/guides/migrating-to-outbox.md`](docs/guides/migrating-to-outbox.md)
   — step-by-step migration from
-  `@TransactionalEventsListener` to durable delivery.
+  `@TransactionalEventsHandler` to durable delivery.
 - **Repository conventions** and onboarding notes:
   [`CLAUDE.md`](CLAUDE.md).
 
