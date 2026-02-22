@@ -10,9 +10,9 @@ import { DiscoveryService } from '@nestjs/core';
 import { PropagationMode, TransactionManager } from '@nestjs-transactional/core';
 
 import {
-  type ApplicationModuleHandlerMetadata,
-  getApplicationModuleHandlerMetadata,
-} from '../decorators/application-module-handler.decorator';
+  type IntegrationEventsHandlerMetadata,
+  getIntegrationEventsHandlerMetadata,
+} from '../decorators/integration-events-handler.decorator';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
@@ -24,7 +24,7 @@ import {
 type HandlerMethod = (event: unknown) => unknown;
 
 /**
- * Bootstrap-time scanner for `@ApplicationModuleHandler`-annotated
+ * Bootstrap-time scanner for `@IntegrationEventsHandler`-annotated
  * classes. Decides at startup which delivery path to wire based on
  * whether an {@link OutboxListenerRegistrar} is bound:
  *
@@ -44,8 +44,8 @@ type HandlerMethod = (event: unknown) => unknown;
  * Consumer code is identical either way; only module wiring decides.
  */
 @Injectable()
-export class ApplicationModuleHandlerScanner implements OnModuleInit {
-  private readonly logger = new Logger(ApplicationModuleHandlerScanner.name);
+export class IntegrationEventsHandlerScanner implements OnModuleInit {
+  private readonly logger = new Logger(IntegrationEventsHandlerScanner.name);
 
   constructor(
     private readonly discovery: DiscoveryService,
@@ -69,7 +69,7 @@ export class ApplicationModuleHandlerScanner implements OnModuleInit {
         continue;
       }
 
-      const metadata = getApplicationModuleHandlerMetadata(wrapper.metatype);
+      const metadata = getIntegrationEventsHandlerMetadata(wrapper.metatype);
       if (metadata === undefined) {
         continue;
       }
@@ -79,7 +79,7 @@ export class ApplicationModuleHandlerScanner implements OnModuleInit {
       if (typeof rawHandle !== 'function') {
         const className = (wrapper.metatype as { name?: string }).name ?? 'anonymous';
         this.logger.warn(
-          `@ApplicationModuleHandler on ${className}: missing \`handle(event)\` method — skipping`,
+          `@IntegrationEventsHandler on ${className}: missing \`handle(event)\` method — skipping`,
         );
         continue;
       }
@@ -96,7 +96,7 @@ export class ApplicationModuleHandlerScanner implements OnModuleInit {
 
   private registerToOutbox(
     instance: object,
-    metadata: ApplicationModuleHandlerMetadata,
+    metadata: IntegrationEventsHandlerMetadata,
     boundHandle: HandlerMethod,
     registrar: OutboxListenerRegistrar,
   ): void {
@@ -124,7 +124,7 @@ export class ApplicationModuleHandlerScanner implements OnModuleInit {
 
   private registerToDispatcher(
     instance: object,
-    metadata: ApplicationModuleHandlerMetadata,
+    metadata: IntegrationEventsHandlerMetadata,
     boundHandle: HandlerMethod,
   ): void {
     const manager = this.manager;

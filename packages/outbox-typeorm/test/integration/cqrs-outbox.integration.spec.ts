@@ -10,9 +10,9 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
-  ApplicationModuleHandler,
+  IntegrationEventsHandler,
   CqrsTransactionalModule,
-  type IApplicationModuleHandler,
+  type IIntegrationEventsHandler,
   type ITransactionalEventsHandler,
   OUTBOX_LISTENER_REGISTRAR,
   OUTBOX_PUBLICATION_SCHEDULER,
@@ -106,18 +106,18 @@ class PersistentInventoryHandlers implements IOutboxEventsHandler<OrderPlacedEve
 }
 
 /**
- * Handler using the composite `@ApplicationModuleHandler`. With the
+ * Handler using the composite `@IntegrationEventsHandler`. With the
  * outbox bound, delivery MUST go exclusively through the outbox path
  * — the smart scanner routes straight to the registrar instead of
  * registering with the in-memory dispatcher. Exactly one invocation
  * per published event.
  */
 @Injectable()
-@ApplicationModuleHandler({
+@IntegrationEventsHandler({
   events: [OrderPlacedEvent],
-  id: 'ApplicationModule.stable-id',
+  id: 'IntegrationModule.stable-id',
 })
-class ApplicationModuleHandlers implements IApplicationModuleHandler<OrderPlacedEvent> {
+class IntegrationEventsHandlers implements IIntegrationEventsHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
   async handle(event: OrderPlacedEvent): Promise<void> {
@@ -127,7 +127,7 @@ class ApplicationModuleHandlers implements IApplicationModuleHandler<OrderPlaced
 
 // The module that wires CqrsTransactionalModule + OutboxTypeOrmModule
 // + OutboxModule together, with the two structural bindings that
-// turn the hybrid publisher + application-module scanner into a
+// turn the hybrid publisher + integration-events scanner into a
 // dual-path router.
 @Module({
   providers: [
@@ -138,8 +138,8 @@ class ApplicationModuleHandlers implements IApplicationModuleHandler<OrderPlaced
       useExisting: OutboxEventPublisher,
     },
     // Binds OutboxListenerRegistry under the CQRS package's registrar
-    // token so ApplicationModuleHandlerScanner routes
-    // @ApplicationModuleHandler classes through the outbox.
+    // token so IntegrationEventsHandlerScanner routes
+    // @IntegrationEventsHandler classes through the outbox.
     {
       provide: OUTBOX_LISTENER_REGISTRAR,
       useExisting: OutboxListenerRegistry,
@@ -179,7 +179,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
         PlaceOrderHandler,
         InMemoryInventoryHandlers,
         PersistentInventoryHandlers,
-        ApplicationModuleHandlers,
+        IntegrationEventsHandlers,
       ],
     }).compile();
     await app.init();
@@ -244,11 +244,11 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
     }
   });
 
-  it('@ApplicationModuleHandler: outbox is bound → delivers EXACTLY ONCE via the outbox, skipping the in-memory fallback', async () => {
+  it('@IntegrationEventsHandler: outbox is bound → delivers EXACTLY ONCE via the outbox, skipping the in-memory fallback', async () => {
     const app = await buildApp();
     try {
       const commandBus = app.get(CommandBus);
-      const appModuleListener = app.get(ApplicationModuleHandlers);
+      const integrationListener = app.get(IntegrationEventsHandlers);
       const processor = app.get(EventPublicationProcessor);
 
       await commandBus.execute(new PlaceOrderCommand('order-am-1'));
@@ -258,15 +258,15 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
       // routed this handler to the outbox instead of registering
       // it with the in-memory dispatcher because the registrar is
       // bound.
-      expect(appModuleListener.received).toHaveLength(0);
+      expect(integrationListener.received).toHaveLength(0);
 
       // The publication row is present and the stable listener id
-      // matches the explicit one we gave to @ApplicationModuleHandler
+      // matches the explicit one we gave to @IntegrationEventsHandler
       // (suffixed with `#OrderPlacedEvent` per the scanner's id
       // composition rule).
       const rows = await ctx.dataSource.getRepository(EventPublicationEntity).find();
       const amRow = rows.find(
-        (r) => r.listenerId === 'ApplicationModule.stable-id#OrderPlacedEvent',
+        (r) => r.listenerId === 'IntegrationModule.stable-id#OrderPlacedEvent',
       );
       expect(amRow).toBeDefined();
       expect(amRow!.status).toBe(PublicationStatus.PUBLISHED);
@@ -274,8 +274,8 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
       await processor.processBatch();
 
       // Exactly one delivery, via the outbox path.
-      expect(appModuleListener.received).toHaveLength(1);
-      expect(appModuleListener.received[0]!.orderId).toBe('order-am-1');
+      expect(integrationListener.received).toHaveLength(1);
+      expect(integrationListener.received[0]!.orderId).toBe('order-am-1');
     } finally {
       await app.close();
     }

@@ -15,8 +15,8 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
  * `handle(event): void | Promise<void>` method (enforce this at the
  * type level by implementing `ITransactionalEventsHandler`).
  *
- * `@ApplicationModuleHandler` is NOT processed here —
- * `ApplicationModuleHandlerScanner` owns it, with smart routing to
+ * `@IntegrationEventsHandler` is NOT processed here —
+ * `IntegrationEventsHandlerScanner` owns it, with smart routing to
  * the outbox or this dispatcher depending on which provider is bound.
  *
  * Registration happens in `onModuleInit` so all providers have been

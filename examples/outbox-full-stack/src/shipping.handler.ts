@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  ApplicationModuleHandler,
-  type IApplicationModuleHandler,
+  IntegrationEventsHandler,
+  type IIntegrationEventsHandler,
 } from '@nestjs-transactional/cqrs';
 
 import { OrderPlacedEvent } from './order.aggregate';
 
 /**
- * Persistent cross-module handler. `@ApplicationModuleHandler` routes
+ * Persistent cross-module handler. `@IntegrationEventsHandler` routes
  * to the outbox when the `OUTBOX_LISTENER_REGISTRAR` token is bound
  * (as wired by `OutboxModule` in this example). The worker picks up
  * the publication row after the publishing transaction has
@@ -19,8 +19,8 @@ import { OrderPlacedEvent } from './order.aggregate';
  * delivery modes selected by module wiring.
  */
 @Injectable()
-@ApplicationModuleHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
-export class ShippingHandlers implements IApplicationModuleHandler<OrderPlacedEvent> {
+@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
+export class ShippingHandlers implements IIntegrationEventsHandler<OrderPlacedEvent> {
   private readonly logger = new Logger(ShippingHandlers.name);
 
   handled: string[] = [];

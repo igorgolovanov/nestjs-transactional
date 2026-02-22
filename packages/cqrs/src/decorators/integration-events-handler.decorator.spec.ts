@@ -1,10 +1,10 @@
-import type { IApplicationModuleHandler } from '../interfaces/application-module-handler.interface';
+import type { IIntegrationEventsHandler } from '../interfaces/integration-events-handler.interface';
 
 import {
-  APPLICATION_MODULE_HANDLER_METADATA,
-  ApplicationModuleHandler,
-  getApplicationModuleHandlerMetadata,
-} from './application-module-handler.decorator';
+  INTEGRATION_EVENTS_HANDLER_METADATA,
+  IntegrationEventsHandler,
+  getIntegrationEventsHandlerMetadata,
+} from './integration-events-handler.decorator';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}
@@ -14,39 +14,39 @@ class OrderCancelledEvent {
   constructor(readonly orderId: string) {}
 }
 
-describe('@ApplicationModuleHandler', () => {
+describe('@IntegrationEventsHandler', () => {
   describe('rest-params short form', () => {
     it('writes metadata with a single event type and no id', () => {
-      @ApplicationModuleHandler(OrderPlacedEvent)
-      class Handler implements IApplicationModuleHandler<OrderPlacedEvent> {
+      @IntegrationEventsHandler(OrderPlacedEvent)
+      class Handler implements IIntegrationEventsHandler<OrderPlacedEvent> {
         async handle(_event: OrderPlacedEvent): Promise<void> {}
       }
 
-      const metadata = getApplicationModuleHandlerMetadata(Handler);
+      const metadata = getIntegrationEventsHandlerMetadata(Handler);
       expect(metadata).toBeDefined();
       expect(metadata?.eventTypes).toEqual([OrderPlacedEvent]);
       expect(metadata?.id).toBeUndefined();
     });
 
     it('accepts multiple event types', () => {
-      @ApplicationModuleHandler(OrderPlacedEvent, OrderCancelledEvent)
-      class Handler implements IApplicationModuleHandler<OrderPlacedEvent | OrderCancelledEvent> {
+      @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
+      class Handler implements IIntegrationEventsHandler<OrderPlacedEvent | OrderCancelledEvent> {
         async handle(_event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {}
       }
 
-      const metadata = getApplicationModuleHandlerMetadata(Handler);
+      const metadata = getIntegrationEventsHandlerMetadata(Handler);
       expect(metadata?.eventTypes).toEqual([OrderPlacedEvent, OrderCancelledEvent]);
     });
   });
 
   describe('options long form', () => {
     it('preserves the explicit id', () => {
-      @ApplicationModuleHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
-      class Handler implements IApplicationModuleHandler<OrderPlacedEvent> {
+      @IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
+      class Handler implements IIntegrationEventsHandler<OrderPlacedEvent> {
         async handle(_event: OrderPlacedEvent): Promise<void> {}
       }
 
-      const metadata = getApplicationModuleHandlerMetadata(Handler);
+      const metadata = getIntegrationEventsHandlerMetadata(Handler);
       expect(metadata?.id).toBe('Shipping.createShipment');
       expect(metadata?.eventTypes).toEqual([OrderPlacedEvent]);
     });
@@ -54,11 +54,11 @@ describe('@ApplicationModuleHandler', () => {
 
   describe('validation', () => {
     it('throws when called with no event types', () => {
-      expect(() => ApplicationModuleHandler()).toThrow(/at least one event type/);
+      expect(() => IntegrationEventsHandler()).toThrow(/at least one event type/);
     });
 
     it('throws when called with an empty events array', () => {
-      expect(() => ApplicationModuleHandler({ events: [] })).toThrow(
+      expect(() => IntegrationEventsHandler({ events: [] })).toThrow(
         /at least one event type/,
       );
     });
@@ -67,14 +67,14 @@ describe('@ApplicationModuleHandler', () => {
   describe('metadata key', () => {
     it('is a unique (fresh) Symbol, not shared with outbox-core', () => {
       // Symbol (not Symbol.for) — unique per process identity.
-      expect(APPLICATION_MODULE_HANDLER_METADATA.description).toBe(
-        'APPLICATION_MODULE_HANDLER_METADATA',
+      expect(INTEGRATION_EVENTS_HANDLER_METADATA.description).toBe(
+        'INTEGRATION_EVENTS_HANDLER_METADATA',
       );
     });
   });
 
-  it('getApplicationModuleHandlerMetadata returns undefined for undecorated classes', () => {
+  it('getIntegrationEventsHandlerMetadata returns undefined for undecorated classes', () => {
     class PlainClass {}
-    expect(getApplicationModuleHandlerMetadata(PlainClass)).toBeUndefined();
+    expect(getIntegrationEventsHandlerMetadata(PlainClass)).toBeUndefined();
   });
 });

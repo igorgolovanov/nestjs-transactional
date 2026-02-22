@@ -11,15 +11,15 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { ApplicationModuleHandler } from '../decorators/application-module-handler.decorator';
+import { IntegrationEventsHandler } from '../decorators/integration-events-handler.decorator';
 import {
   type DispatcherListenerMetadata,
   TransactionalEventDispatcher,
 } from '../event-dispatcher/event-dispatcher';
-import type { IApplicationModuleHandler } from '../interfaces/application-module-handler.interface';
+import type { IIntegrationEventsHandler } from '../interfaces/integration-events-handler.interface';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
-import { ApplicationModuleHandlerScanner } from './application-module-handler-scanner';
+import { IntegrationEventsHandlerScanner } from './integration-events-handler-scanner';
 import {
   OUTBOX_LISTENER_REGISTRAR,
   type OutboxListenerRegistrar,
@@ -61,8 +61,8 @@ class OrderCancelledEvent {
 }
 
 @Injectable()
-@ApplicationModuleHandler(OrderPlacedEvent)
-class ShippingHandler implements IApplicationModuleHandler<OrderPlacedEvent> {
+@IntegrationEventsHandler(OrderPlacedEvent)
+class ShippingHandler implements IIntegrationEventsHandler<OrderPlacedEvent> {
   invocations: OrderPlacedEvent[] = [];
   async handle(event: OrderPlacedEvent): Promise<void> {
     this.invocations.push(event);
@@ -70,15 +70,15 @@ class ShippingHandler implements IApplicationModuleHandler<OrderPlacedEvent> {
 }
 
 @Injectable()
-@ApplicationModuleHandler({ events: [OrderPlacedEvent], id: 'shipping.stable-id' })
-class ShippingHandlerWithId implements IApplicationModuleHandler<OrderPlacedEvent> {
+@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'shipping.stable-id' })
+class ShippingHandlerWithId implements IIntegrationEventsHandler<OrderPlacedEvent> {
   async handle(_event: OrderPlacedEvent): Promise<void> {}
 }
 
 @Injectable()
-@ApplicationModuleHandler(OrderPlacedEvent, OrderCancelledEvent)
+@IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 class MultiEventHandler
-  implements IApplicationModuleHandler<OrderPlacedEvent | OrderCancelledEvent>
+  implements IIntegrationEventsHandler<OrderPlacedEvent | OrderCancelledEvent>
 {
   async handle(_event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {}
 }
@@ -89,7 +89,7 @@ interface DispatcherRegisterCall {
   metadata: DispatcherListenerMetadata;
 }
 
-describe('ApplicationModuleHandlerScanner', () => {
+describe('IntegrationEventsHandlerScanner', () => {
   let module: TestingModule | undefined;
   let adapter: FakeAdapter;
   let transactionManager: TransactionManager;
@@ -121,7 +121,7 @@ describe('ApplicationModuleHandlerScanner', () => {
     const providers: unknown[] = [
       { provide: TransactionManager, useValue: transactionManager },
       { provide: TransactionalEventDispatcher, useValue: realDispatcher },
-      ApplicationModuleHandlerScanner,
+      IntegrationEventsHandlerScanner,
       ...options.extraProviders,
     ];
     if (options.withRegistrar !== undefined) {
@@ -250,7 +250,7 @@ describe('ApplicationModuleHandlerScanner', () => {
     const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     @Injectable()
-    @ApplicationModuleHandler(OrderPlacedEvent)
+    @IntegrationEventsHandler(OrderPlacedEvent)
     class BrokenHandler {
       doSomething(): void {}
     }

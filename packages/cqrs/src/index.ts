@@ -9,15 +9,15 @@ export {
 } from './decorators/transactional-events-handler.decorator';
 
 export {
-  APPLICATION_MODULE_HANDLER_METADATA,
-  ApplicationModuleHandler,
-  getApplicationModuleHandlerMetadata,
-  type ApplicationModuleHandlerMetadata,
-  type ApplicationModuleHandlerOptions,
-} from './decorators/application-module-handler.decorator';
+  INTEGRATION_EVENTS_HANDLER_METADATA,
+  IntegrationEventsHandler,
+  getIntegrationEventsHandlerMetadata,
+  type IntegrationEventsHandlerMetadata,
+  type IntegrationEventsHandlerOptions,
+} from './decorators/integration-events-handler.decorator';
 
 export type { ITransactionalEventsHandler } from './interfaces/transactional-events-handler.interface';
-export type { IApplicationModuleHandler } from './interfaces/application-module-handler.interface';
+export type { IIntegrationEventsHandler } from './interfaces/integration-events-handler.interface';
 
 export {
   TransactionalEventDispatcher,
@@ -25,7 +25,7 @@ export {
 } from './event-dispatcher/event-dispatcher';
 
 export { TransactionalListenerScanner } from './handlers/listener-scanner';
-export { ApplicationModuleHandlerScanner } from './handlers/application-module-handler-scanner';
+export { IntegrationEventsHandlerScanner } from './handlers/integration-events-handler-scanner';
 export {
   OUTBOX_LISTENER_REGISTRAR,
   type OutboxListenerRegistrar,

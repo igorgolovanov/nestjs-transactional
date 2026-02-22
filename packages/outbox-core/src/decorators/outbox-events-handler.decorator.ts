@@ -8,7 +8,7 @@ import { type Type } from '@nestjs/common';
  *
  * Fresh `Symbol` (not `Symbol.for`) — this metadata is read only by
  * outbox-core's own `OutboxListenerScanner`. Cross-package sharing is
- * not required because `@ApplicationModuleHandler` in the cqrs
+ * not required because `@IntegrationEventsHandler` in the cqrs
  * package uses the `OUTBOX_LISTENER_REGISTRAR` structural port, not
  * metadata introspection, to route handlers to the outbox.
  */
@@ -58,7 +58,7 @@ export interface OutboxEventsHandlerMetadata {
  * Distinct from `@TransactionalEventsHandler` (cqrs package), which
  * is in-memory and phase-based: `@OutboxEventsHandler` is
  * persistent, always after-commit, and supports retry / recovery on
- * restart. Also distinct from `@ApplicationModuleHandler`, which
+ * restart. Also distinct from `@IntegrationEventsHandler`, which
  * switches between durable and in-memory delivery based on module
  * wiring — this decorator ALWAYS routes to the outbox (and will
  * fail bootstrap without an outbox registry).

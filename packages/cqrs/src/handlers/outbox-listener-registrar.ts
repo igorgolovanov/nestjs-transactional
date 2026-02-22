@@ -32,7 +32,7 @@ export interface OutboxListenerRegistrar {
 
 /**
  * DI token for the optional {@link OutboxListenerRegistrar} injected
- * into `ApplicationModuleHandlerScanner`. When unbound, the scanner
+ * into `IntegrationEventsHandlerScanner`. When unbound, the scanner
  * falls back to in-memory registration via
  * {@link TransactionalEventDispatcher}.
  */
