@@ -1,5 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
+import {
+  EVENT_EXTERNALIZER,
+  type EventExternalizer,
+} from '../externalization/event-externalizer';
 import { EventPublicationRegistry } from '../registry/event-publication-registry';
 import { OutboxListenerRegistry } from '../registry/listener-registry';
 import type { EventPublication } from '../types/event-publication';
@@ -34,6 +38,9 @@ export class EventPublicationProcessor {
     private readonly registry: EventPublicationRegistry,
     private readonly listenerRegistry: OutboxListenerRegistry,
     private readonly options: EventPublicationProcessorOptions,
+    @Optional()
+    @Inject(EVENT_EXTERNALIZER)
+    private readonly externalizer?: EventExternalizer,
   ) {}
 
   /** Start the periodic polling loop. Idempotent. */
@@ -115,7 +122,13 @@ export class EventPublicationProcessor {
 
       try {
         const event = this.registry.deserialize(publication);
+        // Local listener invocation runs first so cheap, in-process
+        // failures fail fast before we touch a broker (DD-019).
         await listener.invoke(event);
+        // Externalization is optional and gated by the registry
+        // resolution wired in 11.2 — `tryExternalize` is a no-op until
+        // ExternalizationRegistry lookup lands.
+        await this.tryExternalize(event, publication);
         await this.registry.markCompleted(publication.id, this.options.completionMode);
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
@@ -131,6 +144,31 @@ export class EventPublicationProcessor {
         err instanceof Error ? err.stack : String(err),
       );
     }
+  }
+
+  /**
+   * Externalize the event after the local listener has succeeded.
+   *
+   * Phase 11.1 stub: returns immediately when no externalizer is bound
+   * AND when no `ExternalizationRegistry` resolution exists yet.
+   * Phase 11.2 will look up the publication's `ExternalizationMetadata`
+   * via the registry and invoke the bound externalizer when both are
+   * present. Implemented as a separate method so the call site in
+   * `processOne` already exercises the full success / failure path
+   * (any rejection from the externalizer surfaces to the outer try /
+   * catch and marks the publication FAILED — DD-019).
+   */
+  private tryExternalize(
+    _event: unknown,
+    _publication: EventPublication,
+  ): Promise<void> {
+    // Phase 11.1 stub: returns a resolved Promise unconditionally.
+    // Resolution against `ExternalizationRegistry` lands in Phase 11.2;
+    // until then we never invoke the externalizer even when one is
+    // bound. The call site in `processOne` already awaits the result,
+    // so the success / failure surface area matches the eventual
+    // implementation — only the body changes.
+    return Promise.resolve();
   }
 
   private chunk<T>(arr: T[], size: number): T[][] {
