@@ -20,7 +20,7 @@ growing set of npm packages organised by concern.
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
   `@TransactionalEventsHandler` decorator with Spring-like phases
   (BEFORE_COMMIT, AFTER_COMMIT, AFTER_ROLLBACK, AFTER_COMPLETION),
-  `HybridEventPublisher` + `@ApplicationModuleHandler` that bridge to
+  `HybridEventPublisher` + `@IntegrationEventsHandler` that bridge to
   the outbox when wired, and an EventPublisher override that integrates
   with AggregateRoot.
 
@@ -36,10 +36,17 @@ growing set of npm packages organised by concern.
   `FOR UPDATE SKIP LOCKED`, shipped migration, development-time
   `SchemaInitializer`, and `OutboxTypeOrmModule` for wiring.
 
+### Planned (Phase 11)
+
+- **@nestjs-transactional/outbox-microservices** — event externalization
+  to message brokers (Kafka, RabbitMQ, NATS, JMS, gRPC, ...) via the
+  `@nestjs/microservices` `ClientProxy` abstraction. Reuses the
+  outbox reliability machinery (retry, recovery, staleness monitor)
+  for at-least-once durable delivery to external systems. One package
+  covers every transport that `@nestjs/microservices` already supports.
+
 ### Future (not scheduled)
 
-- **@nestjs-transactional/outbox-kafka** — event externalization to Kafka
-- **@nestjs-transactional/outbox-rabbitmq** — RabbitMQ externalization
 - **@nestjs-transactional/outbox-prisma** — Prisma persistence backend
 - **@nestjs-transactional/outbox-mongodb** — MongoDB persistence backend
 - **@nestjs-transactional/testing** — integration testing utilities
@@ -69,13 +76,16 @@ for NestJS applications, not just Spring Framework core.
 
 **Spring Modulith features (partially covered, expansion planned):**
 - Event Publication Registry with persistent log — outbox-core (Phase 5)
-- `@ApplicationModuleHandler` shortcut — cqrs integration (Phase 7)
+- `@IntegrationEventsHandler` shortcut — cqrs integration (Phase 7)
 - Failed / Incomplete / Completed publications API — outbox-core (Phase 5)
 - Staleness monitor — outbox-core (Phase 5)
 - Republish on restart — outbox-core (Phase 5)
 - Completion modes (UPDATE / DELETE / ARCHIVE) — outbox-core (Phase 5)
 - `PublishedEvents` test utility — outbox-core `/testing` (Phase 8)
-- Event externalization to brokers — future (not scheduled)
+- Event externalization to brokers — planned (Phase 11), via the
+  `@nestjs/microservices` `ClientProxy` abstraction in a single
+  `outbox-microservices` package (one package covers all transports;
+  see DD-016)
 
 **Explicitly out of scope:**
 - Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)
@@ -141,12 +151,12 @@ nestjs-transactional-monorepo/
 │   │
 │   ├── cqrs/                          # @nestjs-transactional/cqrs
 │   │   ├── src/
-│   │   │   ├── decorators/            # @TransactionalEventsHandler, @ApplicationModuleHandler
-│   │   │   ├── interfaces/            # ITransactionalEventsHandler, IApplicationModuleHandler
+│   │   │   ├── decorators/            # @TransactionalEventsHandler, @IntegrationEventsHandler
+│   │   │   ├── interfaces/            # ITransactionalEventsHandler, IIntegrationEventsHandler
 │   │   │   ├── types/                 # TransactionPhase
 │   │   │   ├── event-dispatcher/      # TransactionalEventDispatcher
 │   │   │   ├── event-publisher/       # TransactionalEventPublisher + HybridEventPublisher
-│   │   │   ├── handlers/              # CqrsHandlerWrapper, listener scanner, application module scanner
+│   │   │   ├── handlers/              # CqrsHandlerWrapper, listener scanner, integration events scanner
 │   │   │   ├── module/                # CqrsTransactionalModule
 │   │   │   └── index.ts
 │   │   └── ...
@@ -218,6 +228,7 @@ Planned (not yet written):
 - **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md`
 - **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md`
 - **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md` *(the design was absorbed into ADR-014 — see Supersedes note there)*
+- **ADR-015**: Event externalization architecture — `docs/adr/015-event-externalization.md` *(Phase 11)*
 
 Process: every significant architectural decision gets a new ADR numbered n+1.
 The discussion is captured; the status is one of accepted / rejected /
@@ -482,7 +493,7 @@ Spring Modulith provides for production systems.
 
 **Decision**: Implement full Event Publication Registry equivalent as
 separate `outbox-core` + `outbox-typeorm` packages. Integration with cqrs
-via `HybridEventPublisher` and the `@ApplicationModuleHandler` decorator.
+via `HybridEventPublisher` and the `@IntegrationEventsHandler` decorator.
 
 **Consequences**:
 - Significant scope expansion (~3 weeks of work).
@@ -526,7 +537,7 @@ existing behavior.
 `TransactionalEventDispatcher` (for `@TransactionalEventsHandler`
 classes) and, when the `OUTBOX_PUBLICATION_SCHEDULER` token is bound,
 `OutboxEventPublisher.scheduleForPublication` (for durable delivery).
-`@ApplicationModuleHandler` is routed by a separate smart scanner
+`@IntegrationEventsHandler` is routed by a separate smart scanner
 (see DD-013 and ADR-014) — the old "two metadata keys + skip logic"
 approach from the original design has been removed.
 
@@ -534,7 +545,7 @@ approach from the original design has been removed.
 which decorator provides which guarantees — see "Delivery guarantees
 at a glance" in `packages/cqrs/README.md`.
 
-### DD-012: @ApplicationModuleHandler as smart default
+### DD-012: @IntegrationEventsHandler as smart default
 
 **Context**: Spring Modulith's `@ApplicationModuleListener` is the
 recommended default for cross-module integration. It combines
@@ -548,9 +559,9 @@ should not need to manually compose 3–4 decorators for the common case.
 - Make it a composite decorator that works without the outbox. Done
   partially (see Decision below).
 
-**Decision**: `@ApplicationModuleHandler` is a standalone class-level
+**Decision**: `@IntegrationEventsHandler` is a standalone class-level
 decorator in the cqrs package. A dedicated
-`ApplicationModuleHandlerScanner` decides the delivery path at
+`IntegrationEventsHandlerScanner` decides the delivery path at
 bootstrap by inspecting the `OUTBOX_LISTENER_REGISTRAR` DI token: when
 bound, registers with the outbox registry (durable,
 at-least-once, retried). When unbound, registers with
@@ -581,10 +592,10 @@ method signature unconstrained at the type level.
 **Decision**: Class-level only —
 `@TransactionalEventsHandler(Event1, Event2, ...)`,
 `@OutboxEventsHandler(Event1, Event2, ...)`,
-`@ApplicationModuleHandler(Event1, Event2, ...)`. Each decorator also
+`@IntegrationEventsHandler(Event1, Event2, ...)`. Each decorator also
 accepts a long-form options object. Handler classes implement
 `ITransactionalEventsHandler<T>` / `IOutboxEventsHandler<T>` /
-`IApplicationModuleHandler<T>` and expose a single `handle(event)`
+`IIntegrationEventsHandler<T>` and expose a single `handle(event)`
 method. Listener ids are composed as `${baseId}#${EventName}` (baseId
 defaults to the class name, can be overridden via `options.id`) — a
 method rename inside a handler class no longer invalidates stored
@@ -595,6 +606,155 @@ single-responsibility per handler class (a class handles one
 cross-module integration concern). Breaking change vs. any pre-release
 snapshot; migration is mechanical but required before upgrading past
 this point. See ADR-014 for the full design rationale.
+
+### DD-016: Implement event externalization (Phase 11)
+
+**Context**: Spring Modulith provides `@Externalized` for routing events
+to external message brokers (Kafka, RabbitMQ, JMS, AMQP, ...). Our
+existing scope (Phases 5–9) covers internal eventing through the outbox
+but does not bridge events to external systems. Production deployments
+with microservice architectures need durable, retryable cross-process
+delivery — without this, `@nestjs-transactional` falls short of the
+production use cases Spring Modulith targets.
+
+**Alternatives considered**:
+- Separate per-broker packages (`outbox-kafka`, `outbox-rabbitmq`,
+  `outbox-nats`). Rejected: code duplication, more packages to version
+  and maintain, fragmented user experience.
+- Spring Modulith-style `EventExternalizationConfiguration` builder API.
+  Rejected: not idiomatic NestJS — DI + decorator composition is the
+  conventional pattern.
+- Native broker libraries (`kafkajs`, `amqplib`) directly, bypassing
+  `ClientProxy`. Rejected: forces us to manage transport-specific
+  connection lifecycle, retries, and serialization for each broker;
+  `@nestjs/microservices` already solves this.
+
+**Decision**: Externalization is a first-class feature, implemented as:
+- An optional `EventExternalizer` SPI added to `outbox-core`.
+- A new `@nestjs-transactional/outbox-microservices` package that
+  provides one `EventExternalizer` implementation backed by
+  `@nestjs/microservices` `ClientProxy` — covering every transport
+  `@nestjs/microservices` supports (Kafka, RabbitMQ, NATS, JMS, gRPC,
+  custom).
+
+**Consequences**:
+- One externalization package replaces planned per-broker variants —
+  fewer packages to maintain, one mental model for users.
+- Reliability (retry, recovery, staleness monitor) inherited from
+  `outbox-core`.
+- Naturally composes with the existing NestJS `ClientsModule` pattern
+  (see DD-017).
+- Future native (broker-specific) implementations can register under the
+  same SPI if fine-grained control is needed later.
+
+### DD-017: Reuse `ClientsModule` for `ClientProxy` registration
+
+**Context**: Most consumers of `outbox-microservices` already register
+`ClientProxy` instances via `ClientsModule.register()` /
+`registerAsync()` for other reasons (consuming inbound messages,
+emitting events outside the outbox, RPC). Re-registering the same proxy
+through our module would duplicate connection pools and create two
+competing patterns for the same concept.
+
+**Alternatives considered**:
+- Provide a parallel registration API inside
+  `OutboxMicroservicesModule.forRoot()`. Rejected: duplication, two
+  mental models for the same concept, two connection pools.
+- Hybrid (support both registering through our module and reusing
+  existing). Rejected: ambiguity about which path takes precedence and
+  more configuration surface.
+- Auto-detection (pick the only `ClientProxy` from the DI context if
+  exactly one is bound). Rejected for the first version: explicit better
+  than implicit; auto-detection breaks once a second client appears.
+
+**Decision**: `OutboxMicroservicesModule.forRoot({ defaultClient: TOKEN })`
+accepts the DI token of an existing `ClientProxy` registered by the user
+via standard `@nestjs/microservices` `ClientsModule`. The package does
+not register any clients itself.
+
+**Consequences**:
+- Less boilerplate for users with an existing `ClientsModule` setup.
+- Standard testing patterns continue to work (`overrideProvider`,
+  `registerAsync` with `ConfigService`).
+- Documentation must explicitly list `ClientsModule` registration as a
+  prerequisite.
+- Multiple clients (one per broker) supported through `ClientsModule`'s
+  own multi-registration pattern; per-event client selection is a
+  follow-up iteration.
+
+### DD-018: `EventExternalizer` SPI as a structural port
+
+**Context**: `outbox-core` should not import a specific externalization
+implementation at compile time, since externalization is optional and
+may have multiple backends. We need an abstraction that supports the
+same `@Optional()` injection pattern already used for
+`OUTBOX_LISTENER_REGISTRAR` and `OUTBOX_PUBLICATION_SCHEDULER`.
+
+**Alternatives considered**:
+- Dynamic `require()` at runtime to load the externalization package if
+  installed. Rejected: breaks bundlers (webpack, esbuild, Vite), creates
+  hidden dependencies, awkward error handling, non-idiomatic for NestJS
+  DI.
+- Hard compile-time dependency on a concrete implementation. Rejected:
+  forces every `outbox-core` user to install `@nestjs/microservices`
+  even when they only need internal eventing.
+
+**Decision**: `outbox-core` defines an `EventExternalizer` interface
+and an `EVENT_EXTERNALIZER` DI token (Symbol). Concrete implementations
+(e.g. `MicroservicesEventExternalizer`) register themselves under this
+token via `useClass` or `useExisting`. `EventPublicationProcessor`
+injects it with `@Optional()` — when no externalizer is bound, the
+outbox runs in internal-only mode.
+
+**Consequences**:
+- Consistent with the existing structural-port pattern
+  (`OUTBOX_LISTENER_REGISTRAR` per DD-012,
+  `OUTBOX_PUBLICATION_SCHEDULER` per DD-011).
+- Externalization is genuinely optional; the outbox works without it.
+- Easy to add alternative externalizer implementations (native Kafka,
+  native AMQP, custom transports) without touching `outbox-core`.
+- Bundler-friendly: no dynamic require, no hidden module resolution.
+
+### DD-019: Atomicity unit and execution order for hybrid delivery
+
+**Context**: A single event may have local handlers
+(`@TransactionalEventsHandler` / `@OutboxEventsHandler` /
+`@IntegrationEventsHandler`) AND an `@Externalized` mapping. We must
+define what happens when local delivery succeeds but external publish
+fails (or vice versa) — without a clear atomicity contract,
+partial-success states leak into user code as surprising bugs.
+
+**Alternatives considered**:
+- Track partial success per channel (separate publication entries for
+  local and external delivery). Rejected: significantly increases
+  publication-row volume and processing complexity for marginal benefit.
+- External-first, local handlers second. Rejected: errors in local
+  handlers are usually faster and cheaper to detect than broker-side
+  failures; failing fast on local errors avoids needless broker traffic.
+- Multi-row publication (one row per delivery target). Rejected:
+  overcomplicated model, harder operator APIs, marginal benefit over
+  single-unit semantics.
+
+**Decision**:
+- **Single unit atomicity**: one publication row covers ALL deliveries
+  for the event. The row's status (`COMPLETED`, `FAILED`) reflects the
+  whole unit — either every channel succeeded, or the row is retried.
+- **Execution order**: local handlers run first, externalization runs
+  after.
+- **Idempotency requirement**: handlers and broker consumers must be
+  idempotent — the at-least-once guarantee inherent to retry means a
+  handler may run more than once if a later step in the same publication
+  fails.
+
+**Consequences**:
+- Simple mental model for users: one event = one publication row.
+- Clear documentation requirement around idempotency for both local
+  handlers and downstream consumers of externalized events.
+- Possible double execution of a local handler if externalization fails
+  after a successful local handler run — acceptable trade-off given
+  idempotency is already required for at-least-once semantics.
+- Operator APIs (`FailedEventPublications`, `IncompleteEventPublications`)
+  work uniformly across local-only, external-only, and hybrid setups.
 
 ---
 
@@ -726,20 +886,20 @@ TransactionalEventsHandler(options: {
   fallbackExecution?: boolean,        // default false
 }): ClassDecorator
 
-ApplicationModuleHandler(...events: Type[]): ClassDecorator
-ApplicationModuleHandler(options: {
+IntegrationEventsHandler(...events: Type[]): ClassDecorator
+IntegrationEventsHandler(options: {
   events: Type[],
   id?: string,                        // stable listener id base
 }): ClassDecorator
 
 // Interfaces (implement these on your handler class for type safety)
 interface ITransactionalEventsHandler<T> { handle(event: T): Promise<void> | void; }
-interface IApplicationModuleHandler<T> { handle(event: T): Promise<void> | void; }
+interface IIntegrationEventsHandler<T> { handle(event: T): Promise<void> | void; }
 
 // Enums
 TransactionPhase: BEFORE_COMMIT | AFTER_COMMIT | AFTER_ROLLBACK | AFTER_COMPLETION
 
-// Structural port for outbox-backed delivery of @ApplicationModuleHandler
+// Structural port for outbox-backed delivery of @IntegrationEventsHandler
 OUTBOX_LISTENER_REGISTRAR: symbol (DI token)
 interface OutboxListenerRegistrar {
   register(listener: { id: string; eventType: string; invoke: (event: unknown) => Promise<void> }): void;
@@ -787,8 +947,8 @@ in-memory `TransactionalEventDispatcher` and (2) when the
 - `TransactionalListenerScanner` walks providers for classes with
   `@TransactionalEventsHandler` metadata, registers `instance.handle`
   with the dispatcher once per event type listed.
-- `ApplicationModuleHandlerScanner` walks providers for classes with
-  `@ApplicationModuleHandler` metadata. Route is decided at bootstrap
+- `IntegrationEventsHandlerScanner` walks providers for classes with
+  `@IntegrationEventsHandler` metadata. Route is decided at bootstrap
   by whether `OUTBOX_LISTENER_REGISTRAR` is bound: registrar present
   → register with the outbox registry in `REQUIRES_NEW`; registrar
   absent → register with the dispatcher as AFTER_COMMIT + async in a
@@ -956,11 +1116,24 @@ export class TransactionAdapterNotFoundError extends TransactionError {
   `@OutboxEventsHandler({ events: [SomeEvent], id: 'stable-listener-id' })`.
 - **DO NOT write separate classes for `@TransactionalEventsHandler` and
   `@OutboxEventsHandler` on the same event without understanding the
-  double-invocation risk** — in most cases use `@ApplicationModuleHandler`
+  double-invocation risk** — in most cases use `@IntegrationEventsHandler`
   (the smart default) or commit to exactly one of the two.
 - **DO NOT apply the `event_publication` schema in production without a
   migration** — auto schema initialization is development-only.
   Production requires an explicit migration step.
+- **DO NOT use dynamic `require()` for optional cross-package
+  dependencies** — express the dependency through a DI token (structural
+  port) consumed with `@Optional()` injection. Dynamic require breaks
+  bundlers (webpack, esbuild, Vite), creates hidden module-resolution
+  failures, and is non-idiomatic for NestJS DI. Existing examples:
+  `OUTBOX_LISTENER_REGISTRAR` (DD-012), `OUTBOX_PUBLICATION_SCHEDULER`
+  (DD-011), and the upcoming `EVENT_EXTERNALIZER` (DD-018).
+- **DO NOT register `ClientProxy` instances inside
+  `OutboxMicroservicesModule` (Phase 11)** — reuse the user's existing
+  `@nestjs/microservices` `ClientsModule` registration via the
+  `defaultClient` token (DD-017). Duplicating registration creates
+  parallel connection pools and a second mental model for the same
+  concept.
 
 ---
 
@@ -1109,13 +1282,13 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 
 ### Phase 3: @nestjs-transactional/cqrs (done)
 - TransactionPhase enum, metadata types
-- Class-level `@TransactionalEventsHandler` + `@ApplicationModuleHandler`
+- Class-level `@TransactionalEventsHandler` + `@IntegrationEventsHandler`
   decorators with `I*Handler` interfaces (see ADR-014)
 - TransactionalEventDispatcher (with phase routing)
 - TransactionalListenerScanner (auto-registration for
   `@TransactionalEventsHandler` classes)
-- ApplicationModuleHandlerScanner (smart outbox/in-memory routing for
-  `@ApplicationModuleHandler` via the `OUTBOX_LISTENER_REGISTRAR`
+- IntegrationEventsHandlerScanner (smart outbox/in-memory routing for
+  `@IntegrationEventsHandler` via the `OUTBOX_LISTENER_REGISTRAR`
   structural port)
 - CqrsHandlerWrapper (handler decoration at bootstrap)
 - CqrsTransactionalBootstrap (OnApplicationBootstrap)
@@ -1167,10 +1340,10 @@ Changes to the existing cqrs package:
 - `HybridEventPublisher` — delegates to both the in-memory dispatcher and
   the outbox
 - `TransactionalEventPublisherAdapter` updated to use `HybridEventPublisher`
-- `ApplicationModuleHandlerScanner` — smart router for
-  `@ApplicationModuleHandler` classes; routes to outbox when
+- `IntegrationEventsHandlerScanner` — smart router for
+  `@IntegrationEventsHandler` classes; routes to outbox when
   `OUTBOX_LISTENER_REGISTRAR` is bound, falls back to dispatcher otherwise
-- `@ApplicationModuleHandler` composite decorator (smart default)
+- `@IntegrationEventsHandler` composite decorator (smart default)
 - `OutboxEventPublisher.scheduleForPublication` for a sync publish API
   with batched writes
 - `CqrsTransactionalModule` options extended for outbox config
@@ -1194,10 +1367,55 @@ In outbox-core (`/testing` subpath) and cqrs (`/testing` subpath):
 - Changesets for version bumps
 - Update main README with the expanded roadmap
 
+### Phase 11: Event externalization (planned)
+
+Spring Modulith `@Externalized` parity — durable, retryable delivery
+to external message brokers via `@nestjs/microservices` `ClientProxy`
+(DD-016, DD-017, DD-018, DD-019). See ADR-015 (planned) for the full
+design rationale.
+
+**11.1: `EventExternalizer` SPI in outbox-core**
+- `ExternalizationMetadata` interface (event type → routing target)
+- `EventExternalizer` interface
+- `EVENT_EXTERNALIZER` DI token (structural port — DD-018)
+- Integration in `EventPublicationProcessor` — invoke externalizer
+  after local handlers, before marking the publication `COMPLETED`
+  (execution order per DD-019)
+
+**11.2: `@Externalized` decorator and registry**
+- `@Externalized` class decorator with options (target, key extractor,
+  payload mapper)
+- `ExternalizationRegistry` service — keyed by event class name
+- Integration with `EventTypeRegistry` for resolution at processor time
+
+**11.3: `@nestjs-transactional/outbox-microservices` package**
+- `MicroservicesEventExternalizer` — implements the SPI via
+  `ClientProxy.emit()`
+- `OutboxMicroservicesModule.forRoot({ defaultClient })` reuses an
+  existing `ClientProxy` from the user's `ClientsModule` (DD-017) —
+  the package does not register clients itself
+- Validation on bootstrap: every event with an `@Externalized` mapping
+  has a resolvable client token
+
+**11.4: Integration testing**
+- Tests with `testcontainers-node` (Kafka and/or RabbitMQ)
+- E2E test: full flow from `@Transactional` method through outbox to
+  external broker, including retry on broker failure and recovery on
+  restart
+- Verify single-unit atomicity and idempotency contract (DD-019)
+
+**11.5: Documentation and rename sweep**
+- ADR-015 — event externalization architecture
+- `docs/architecture/event-externalization.md`
+- README for `outbox-microservices` package, Spring Modulith mapping
+  note (`@Externalized` parity)
+- Working example in `examples/outbox-externalization/`
+- Absorbs the deferred Phase B work from Iteration 10:
+  sweep remaining `@ApplicationModuleHandler` references across docs
+  (READMEs, ADR-014, architecture docs, migration guide, examples)
+
 ### Future phases (not scheduled)
 
-- **@nestjs-transactional/outbox-kafka**: event externalization to Kafka
-- **@nestjs-transactional/outbox-rabbitmq**: RabbitMQ externalization
 - **@nestjs-transactional/outbox-prisma**: Prisma persistence backend
 - **@nestjs-transactional/outbox-mongodb**: MongoDB persistence backend
 - **OpenTelemetry integration**: tracing across transaction and event
@@ -1265,8 +1483,10 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-24 (Phase 9, Iteration 9.2 — class-level
-handler API redesign, ADR-014).
+**Last updated**: 2026-04-25 (Phase 11, Iteration 11.0 — preparation
+for event externalization: DD-016 through DD-019, Phase 11 roadmap,
+ADR-015 entry, completion of `@ApplicationModuleHandler` →
+`@IntegrationEventsHandler` rename sweep in this file).
 
 ### Completed
 
@@ -1298,39 +1518,54 @@ handler API redesign, ADR-014).
   single beforeCommit flush hook),
   `HybridEventPublisher` with `@Optional()` outbox scheduler via
   `OUTBOX_PUBLICATION_SCHEDULER` structural token,
-  `@ApplicationModuleHandler` class-level decorator with the
-  dedicated `ApplicationModuleHandlerScanner` that routes to
+  `@IntegrationEventsHandler` class-level decorator with the
+  dedicated `IntegrationEventsHandlerScanner` that routes to
   outbox/dispatcher based on `OUTBOX_LISTENER_REGISTRAR` binding.
 - Phase 8: Testing utilities — `PublishedEvents`,
   `AssertablePublishedEvents`, `PublishedEventsAssertionError`
   exported via `/testing` subpath of outbox-core. 15 unit tests.
-- Handler API redesign (ADR-014, DD-013) — migrated all three
-  listener decorators from method-level to class-level, matching
-  `@nestjs/cqrs` conventions. `@TransactionalEventsListener` →
-  `@TransactionalEventsHandler`, `@OutboxEventListener` →
-  `@OutboxEventsHandler`, `@ApplicationModuleListener` →
-  `@ApplicationModuleHandler`. Listener id format changed from
-  `${ClassName}.${methodName}` to `${baseId}#${EventName}`.
-  Type-safety enforced via `I*Handler` interfaces. Smart
-  `ApplicationModuleHandlerScanner` replaces the old
-  skip-logic-by-metadata pattern.
+- Phase 9: Documentation & release (Iterations 9.1, 9.2 shipped;
+  Iteration 9.3 — release automation — pending under "Next") —
+  ADR-006 (outbox rationale), ADR-007 (outbox architecture),
+  ADR-014 (class-level handler API), `docs/architecture/outbox-pattern.md`,
+  `docs/architecture/outbox-integration-with-cqrs.md`,
+  `docs/guides/migrating-to-outbox.md`, `examples/outbox-full-stack/`,
+  updated root README with roadmap and outbox packages, updated
+  READMEs and migration guide for the class-level handler API.
+- Phase 10: Class-level handler API + naming refinement (ADR-014,
+  DD-013) — completed in two passes:
+  - First pass (Iteration 9.2): migrated all three listener
+    decorators from method-level to class-level, matching
+    `@nestjs/cqrs` conventions. `@TransactionalEventsListener` →
+    `@TransactionalEventsHandler`, `@OutboxEventListener` →
+    `@OutboxEventsHandler`, `@ApplicationModuleListener` →
+    `@ApplicationModuleHandler`. Listener id format changed from
+    `${ClassName}.${methodName}` to `${baseId}#${EventName}`.
+    Type-safety enforced via `I*Handler` interfaces. Smart scanner
+    replaces the old skip-logic-by-metadata pattern.
+  - Second pass (naming refinement): `@ApplicationModuleHandler` →
+    `@IntegrationEventsHandler`, `IApplicationModuleHandler` →
+    `IIntegrationEventsHandler`, `ApplicationModuleHandlerScanner` →
+    `IntegrationEventsHandlerScanner`. Rationale: align with
+    DDD/microservices terminology; Spring's "Application Module"
+    overlaps with NestJS `@Module()` (a DI concept), causing
+    confusion. JSDoc carries an explicit Spring Modulith mapping
+    note (`@ApplicationModuleListener` → `@IntegrationEventsHandler`).
+    Source-code rename completed; documentation rename across
+    READMEs / ADR-014 / architecture docs / migration guide /
+    examples is absorbed into Phase 11.5.
 
 ### In Progress
 
-- **Phase 9: Documentation & release** —
-  Iteration 9.1 shipped: ADR-006 (outbox rationale), ADR-007
-  (outbox architecture), `docs/architecture/outbox-pattern.md`,
-  `docs/architecture/outbox-integration-with-cqrs.md`,
-  `docs/guides/migrating-to-outbox.md`,
-  `examples/outbox-full-stack/`, updated root README with
-  roadmap and outbox packages, updated CLAUDE.md.
-  Iteration 9.2 shipped: ADR-014 (class-level handler API
-  redesign), migrated `@TransactionalEventsListener` →
-  `@TransactionalEventsHandler`, `@OutboxEventListener` →
-  `@OutboxEventsHandler`, `@ApplicationModuleListener` →
-  `@ApplicationModuleHandler`, `ApplicationModuleHandlerScanner`
-  smart fallback, updated READMEs, architecture docs, migration
-  guide, examples.
+- **Phase 11, Iteration 11.0 (preparation)** — CLAUDE.md update
+  ahead of event externalization work. Adds DD-016 through DD-019
+  (externalization design), the Phase 11 roadmap with sub-phases
+  11.1–11.5, the planned ADR-015 entry, and the
+  `@ApplicationModuleHandler` → `@IntegrationEventsHandler` rename
+  sweep across this file (Variant B — single-file atomic update;
+  doc-wide rename across READMEs / ADRs / architecture docs is
+  absorbed into Phase 11.5). No source-code changes in this
+  iteration.
 
 ### Blocked / Awaiting
 
@@ -1342,13 +1577,27 @@ handler API redesign, ADR-014).
 - Phase 9 iteration 9.3: release automation for the outbox
   packages — changeset entries, CI matrix tweaks if needed,
   first 0.1.0-alpha release.
+- Phase 11.1: `EventExternalizer` SPI in `outbox-core` —
+  `ExternalizationMetadata`, `EventExternalizer` interface,
+  `EVENT_EXTERNALIZER` DI token (structural port), integration in
+  `EventPublicationProcessor`.
+- Phase 11.2: `@Externalized` decorator and `ExternalizationRegistry`.
+- Phase 11.3: `@nestjs-transactional/outbox-microservices` package —
+  `MicroservicesEventExternalizer` over `ClientProxy`,
+  `OutboxMicroservicesModule.forRoot({ defaultClient })`.
+- Phase 11.4: integration tests with `testcontainers-node`
+  (Kafka and/or RabbitMQ), end-to-end retry / recovery / idempotency.
+- Phase 11.5: ADR-015, architecture docs, README, working example,
+  doc-wide `@ApplicationModuleHandler` → `@IntegrationEventsHandler`
+  sweep (deferred from Iteration 10).
 - ADR-008 (event serialization), ADR-009 (listener id
   stability) — when the related design decisions need more room
   than the DD section. ADR-010 (hybrid event publishing)
   superseded by ADR-014, no longer planned.
-- Future phases (not scheduled): outbox-kafka, outbox-rabbitmq,
-  outbox-prisma, outbox-mongodb, OpenTelemetry integration,
-  ESM dual packaging.
+- Future phases (not scheduled): outbox-prisma, outbox-mongodb,
+  OpenTelemetry integration, ESM dual packaging. (`outbox-kafka` /
+  `outbox-rabbitmq` removed — superseded by the single
+  `outbox-microservices` package per DD-016.)
 
 ### Key recent decisions
 
@@ -1356,8 +1605,18 @@ handler API redesign, ADR-014).
   (DD-009)
 - Outbox split into core + typeorm packages (DD-010)
 - Hybrid event publishing chosen over replacement (DD-011)
-- `@ApplicationModuleHandler` as smart default (DD-012)
+- `@IntegrationEventsHandler` as smart default (DD-012)
 - Class-level handler API aligned with `@nestjs/cqrs` (DD-013, ADR-014)
+- Event externalization implemented as Phase 11 first-class scope, via
+  the `@nestjs/microservices` `ClientProxy` abstraction in a single
+  `outbox-microservices` package (DD-016)
+- Reuse user's existing `ClientsModule` registration (DD-017) instead
+  of duplicating client setup
+- `EventExternalizer` SPI as a structural port via `EVENT_EXTERNALIZER`
+  DI token + `@Optional()` injection (DD-018)
+- Single-unit atomicity for hybrid (local + external) delivery, with
+  local-first execution order and an explicit idempotency contract
+  (DD-019)
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 
