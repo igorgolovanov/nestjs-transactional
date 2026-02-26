@@ -158,6 +158,80 @@ Renaming the class without supplying an explicit `id` breaks delivery
 for every stored publication under the old id — set `options.id` when
 you want stability across renames.
 
+## Externalization (advanced)
+
+> **Status:** SPI is in place; an `EventExternalizer` implementation
+> for `@nestjs/microservices` `ClientProxy` ships separately as
+> `@nestjs-transactional/outbox-microservices` (Phase 11.3, planned).
+> Without an externalizer bound, `@Externalized` mappings are recorded
+> but never delivered to a broker — local outbox listeners still run.
+
+`@Externalized` marks an event class for delivery to an external
+message broker (Kafka topic, RabbitMQ exchange, NATS subject, ...) in
+addition to local outbox listeners. The processor invokes the bound
+`EventExternalizer` AFTER the local listener has succeeded — single
+unit atomicity (DD-019): if either step fails, the publication is
+recorded as `FAILED` and can be resubmitted via `FailedEventPublications`.
+
+```typescript
+import { Externalized } from '@nestjs-transactional/outbox-core';
+
+@Externalized<OrderPlacedEvent>({
+  target: 'orders.placed',                       // broker-side destination
+  routingKey: (e) => e.tenantId,                 // optional, brokers that support it
+  headers: (e) => ({ 'x-tenant': e.tenantId }),  // static record OR callback
+  client: 'KAFKA_CLIENT',                        // optional ClientProxy token
+})
+export class OrderPlacedEvent {
+  constructor(
+    readonly orderId: string,
+    readonly tenantId: string,
+  ) {}
+}
+```
+
+Bind a concrete externalizer under the `EVENT_EXTERNALIZER` token —
+this is normally done by an extension package (`outbox-microservices`).
+Custom implementations can register the same way:
+
+```typescript
+import { EVENT_EXTERNALIZER, type EventExternalizer } from '@nestjs-transactional/outbox-core';
+
+@Module({
+  providers: [
+    {
+      provide: EVENT_EXTERNALIZER,
+      useClass: MyCustomExternalizer, // implements EventExternalizer
+    },
+  ],
+})
+export class MyAppModule {}
+```
+
+The processor only invokes the externalizer when BOTH a binding under
+`EVENT_EXTERNALIZER` exists AND the event class carries an
+`@Externalized` mapping — keep one without the other if you only need
+half the contract (e.g. metadata-only mappings during a rollout, or a
+generic externalizer that resolves targets some other way). Inspect
+the resolved mapping at runtime via `ExternalizationRegistry`:
+
+```typescript
+import { ExternalizationRegistry } from '@nestjs-transactional/outbox-core';
+
+@Injectable()
+export class MyDiagnostics {
+  constructor(private readonly externalization: ExternalizationRegistry) {}
+
+  isExternalized(typeName: string): boolean {
+    return this.externalization.has(typeName);
+  }
+}
+```
+
+Errors raised by the externalizer are wrapped in `ExternalizationError`
+(carrying `eventType`, `target`, and the underlying cause) and surface
+on the publication's `failureReason` for operator visibility.
+
 ## Testing utilities
 
 Exported via the `/testing` subpath for assertions about which events

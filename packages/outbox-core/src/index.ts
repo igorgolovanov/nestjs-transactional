@@ -27,6 +27,19 @@ export type { ExternalizationMetadata } from './externalization/types';
 export type { EventExternalizer } from './externalization/event-externalizer';
 export { EVENT_EXTERNALIZER } from './externalization/event-externalizer';
 export { ExternalizationError } from './externalization/errors';
+export {
+  Externalized,
+  getExternalizedMetadata,
+  EXTERNALIZED_METADATA,
+} from './externalization/externalized.decorator';
+export type {
+  ExternalizedOptions,
+  ExternalizedMetadata,
+} from './externalization/externalized.decorator';
+export {
+  ExternalizationRegistry,
+  EXTERNALIZATION_REGISTRY,
+} from './externalization/externalization-registry';
 
 export * from './recovery/staleness-monitor';
 

@@ -1,9 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
+import { ExternalizationError } from '../externalization/errors';
 import {
   EVENT_EXTERNALIZER,
   type EventExternalizer,
 } from '../externalization/event-externalizer';
+import { ExternalizationRegistry } from '../externalization/externalization-registry';
 import { EventPublicationRegistry } from '../registry/event-publication-registry';
 import { OutboxListenerRegistry } from '../registry/listener-registry';
 import type { EventPublication } from '../types/event-publication';
@@ -41,6 +43,8 @@ export class EventPublicationProcessor {
     @Optional()
     @Inject(EVENT_EXTERNALIZER)
     private readonly externalizer?: EventExternalizer,
+    @Optional()
+    private readonly externalizationRegistry?: ExternalizationRegistry,
   ) {}
 
   /** Start the periodic polling loop. Idempotent. */
@@ -149,26 +153,51 @@ export class EventPublicationProcessor {
   /**
    * Externalize the event after the local listener has succeeded.
    *
-   * Phase 11.1 stub: returns immediately when no externalizer is bound
-   * AND when no `ExternalizationRegistry` resolution exists yet.
-   * Phase 11.2 will look up the publication's `ExternalizationMetadata`
-   * via the registry and invoke the bound externalizer when both are
-   * present. Implemented as a separate method so the call site in
-   * `processOne` already exercises the full success / failure path
-   * (any rejection from the externalizer surfaces to the outer try /
-   * catch and marks the publication FAILED — DD-019).
+   * Returns immediately (no-op) when:
+   * - no {@link EventExternalizer} is bound (DD-018 — externalization
+   *   is optional);
+   * - no {@link ExternalizationRegistry} is bound (defensive — the
+   *   `OutboxModule` always provides one, but direct `new`
+   *   instantiation in tests may omit it);
+   * - the event type carries no `@Externalized` mapping.
+   *
+   * Otherwise resolves the per-publication {@link ExternalizationMetadata}
+   * from the registry and invokes the externalizer. Any rejection is
+   * wrapped in {@link ExternalizationError} and re-thrown so the outer
+   * try / catch in `processOne` records the publication as `FAILED`,
+   * which preserves the single-unit atomicity contract from DD-019.
    */
-  private tryExternalize(
-    _event: unknown,
-    _publication: EventPublication,
+  private async tryExternalize(
+    event: unknown,
+    publication: EventPublication,
   ): Promise<void> {
-    // Phase 11.1 stub: returns a resolved Promise unconditionally.
-    // Resolution against `ExternalizationRegistry` lands in Phase 11.2;
-    // until then we never invoke the externalizer even when one is
-    // bound. The call site in `processOne` already awaits the result,
-    // so the success / failure surface area matches the eventual
-    // implementation — only the body changes.
-    return Promise.resolve();
+    if (this.externalizer === undefined || this.externalizationRegistry === undefined) {
+      return;
+    }
+
+    const metadata = this.externalizationRegistry.buildMetadata(
+      publication.eventType,
+      event,
+    );
+    if (metadata === undefined) {
+      return;
+    }
+
+    try {
+      await this.externalizer.externalize(event, metadata);
+      this.logger.debug(
+        `Externalized ${publication.eventType} → ${metadata.target}`,
+      );
+    } catch (err) {
+      const cause = err instanceof Error ? err : undefined;
+      const message = err instanceof Error ? err.message : String(err);
+      throw new ExternalizationError(
+        `Externalization failed for ${publication.eventType}: ${message}`,
+        publication.eventType,
+        metadata.target,
+        cause,
+      );
+    }
   }
 
   private chunk<T>(arr: T[], size: number): T[][] {

@@ -22,6 +22,7 @@ import {
   EVENT_EXTERNALIZER,
   type EventExternalizer,
 } from '../externalization/event-externalizer';
+import { ExternalizationRegistry } from '../externalization/externalization-registry';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
 import {
   OUTBOX_RECOVERY_OPTIONS,
@@ -126,6 +127,7 @@ const EXPORTS: NonNullable<DynamicModule['exports']> = [
   CompletedEventPublications,
   EventPublicationProcessor,
   StalenessMonitor,
+  ExternalizationRegistry,
 ];
 
 function resolveProcessorOptions(
@@ -205,6 +207,7 @@ export class OutboxModule {
       EventPublicationRegistry,
       OutboxEventPublisher,
       OutboxListenerScanner,
+      ExternalizationRegistry,
       { provide: OUTBOX_PROCESSOR_OPTIONS, useValue: processorOptions },
       {
         provide: EventPublicationProcessor,
@@ -212,13 +215,22 @@ export class OutboxModule {
           registry: EventPublicationRegistry,
           listeners: OutboxListenerRegistry,
           opts: EventPublicationProcessorOptions,
-          externalizer?: EventExternalizer,
-        ) => new EventPublicationProcessor(registry, listeners, opts, externalizer),
+          externalizer: EventExternalizer | undefined,
+          externalizationRegistry: ExternalizationRegistry,
+        ) =>
+          new EventPublicationProcessor(
+            registry,
+            listeners,
+            opts,
+            externalizer,
+            externalizationRegistry,
+          ),
         inject: [
           EventPublicationRegistry,
           OutboxListenerRegistry,
           OUTBOX_PROCESSOR_OPTIONS,
           { token: EVENT_EXTERNALIZER, optional: true },
+          ExternalizationRegistry,
         ],
       },
       { provide: OUTBOX_STALENESS_CONFIG, useValue: stalenessConfig },
@@ -279,6 +291,7 @@ export class OutboxModule {
       EventPublicationRegistry,
       OutboxEventPublisher,
       OutboxListenerScanner,
+      ExternalizationRegistry,
       {
         provide: OUTBOX_PROCESSOR_OPTIONS,
         useFactory: (opts: OutboxModuleAsyncFactoryResult): EventPublicationProcessorOptions =>
@@ -291,13 +304,22 @@ export class OutboxModule {
           registry: EventPublicationRegistry,
           listeners: OutboxListenerRegistry,
           opts: EventPublicationProcessorOptions,
-          externalizer?: EventExternalizer,
-        ) => new EventPublicationProcessor(registry, listeners, opts, externalizer),
+          externalizer: EventExternalizer | undefined,
+          externalizationRegistry: ExternalizationRegistry,
+        ) =>
+          new EventPublicationProcessor(
+            registry,
+            listeners,
+            opts,
+            externalizer,
+            externalizationRegistry,
+          ),
         inject: [
           EventPublicationRegistry,
           OutboxListenerRegistry,
           OUTBOX_PROCESSOR_OPTIONS,
           { token: EVENT_EXTERNALIZER, optional: true },
+          ExternalizationRegistry,
         ],
       },
       {
