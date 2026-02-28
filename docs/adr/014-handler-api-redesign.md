@@ -8,6 +8,20 @@
   ADR-006 (outbox pattern rationale),
   ADR-007 (outbox architecture: core + typeorm split)
 
+> **Note (Phase 10 naming refinement, 2026-04-25):** The class-level
+> decorator named `@ApplicationModuleHandler` in this ADR was later
+> renamed to **`@IntegrationEventsHandler`** (interface
+> `IIntegrationEventsHandler`, scanner
+> `IntegrationEventsHandlerScanner`) to align with DDD/microservices
+> terminology and avoid collision with NestJS `@Module()` semantics.
+> The original ADR text below intentionally preserves the names that
+> were correct at the time it was accepted; treat occurrences of
+> `@ApplicationModuleHandler` / `IApplicationModuleHandler` /
+> `ApplicationModuleHandlerScanner` in the body as historical record,
+> map them to their current names when consulting the codebase. See
+> CLAUDE.md DD-013 / "Phase 10: Class-level handler API + naming
+> refinement" for the second-pass rationale.
+
 ## Context
 
 Until this ADR, the listener decorators in both `@nestjs-transactional/cqrs`

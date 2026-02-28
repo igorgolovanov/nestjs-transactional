@@ -30,7 +30,7 @@ It does **not** cover what Spring Modulith 2.x ships on top:
   `AssertablePublishedEvents` as first-class assertion helpers.
 - A composite shortcut decorator — originally planned as
   `@ApplicationModuleListener` and shipped as the class-level
-  `@ApplicationModuleHandler` (see ADR-014) — that combines
+  `@IntegrationEventsHandler` (see ADR-014) — that combines
   "new transaction, after commit, durable" into a single
   annotation.
 
@@ -61,11 +61,11 @@ scope (Phase 7):
 - `HybridEventPublisher` replaces `TransactionalEventPublisher`
   as the default strategy wired into `EventPublisher` by
   `CqrsTransactionalModule`.
-- `@ApplicationModuleHandler` is a class-level decorator in
+- `@IntegrationEventsHandler` is a class-level decorator in
   cqrs — persistent when the outbox registrar is bound,
   in-memory fallback otherwise (see ADR-014 for the shape
   change from a composite-metadata design to a smart scanner).
-- `ApplicationModuleHandlerScanner` owns the routing decision,
+- `IntegrationEventsHandlerScanner` owns the routing decision,
   so there is no overlap with `TransactionalListenerScanner`
   and no skip-logic is needed.
 
@@ -113,7 +113,7 @@ rest of the library.
   model.
 - Clear, documented migration path from in-memory
   `@TransactionalEventsHandler` to persistent
-  `@OutboxEventsHandler` / `@ApplicationModuleHandler`. See
+  `@OutboxEventsHandler` / `@IntegrationEventsHandler`. See
   `docs/guides/migrating-to-outbox.md`.
 - Feature parity with Spring Modulith for users coming from the
   JVM. Same mental model, same operator tools, same testing
@@ -134,13 +134,13 @@ rest of the library.
   three.
 - The public API surface of the monorepo grows. `OutboxModule`,
   `OutboxTypeOrmModule`, `@OutboxEventsHandler`,
-  `@ApplicationModuleHandler`, `PublishedEvents`,
+  `@IntegrationEventsHandler`, `PublishedEvents`,
   `AssertablePublishedEvents`, completion modes, etc. — more
   things to keep stable under the 0.x → 1.0 progression and to
   document.
 - Users who were happy with in-memory phase-aware handlers now
   have to make an explicit decision — "do I want the outbox?" —
-  when wiring their application. `@ApplicationModuleHandler`
+  when wiring their application. `@IntegrationEventsHandler`
   is designed to defer that decision: write the decorator,
   enable the outbox later by a single wiring change.
 

@@ -154,7 +154,7 @@ inspiration for this package. The feature set maps one-to-one:
 | Spring Modulith | `@nestjs-transactional/outbox-*` |
 | --- | --- |
 | `EventPublicationRegistry` | `EventPublicationRegistry` |
-| `@ApplicationModuleListener` | `@ApplicationModuleHandler` (cqrs, class-level — see ADR-014) |
+| `@ApplicationModuleListener` | `@IntegrationEventsHandler` (cqrs, class-level — see ADR-014) |
 | `EventPublicationRepository` SPI | `EventPublicationRepository` SPI |
 | JDBC persistence module | `outbox-typeorm` |
 | `CompletedEventPublications` | `CompletedEventPublications` |
@@ -238,7 +238,7 @@ poll entirely.
 - …you are writing a **library or internal plugin** where installing
   a Postgres table would be surprising to the user.
 
-### Use `@ApplicationModuleHandler` as the default…
+### Use `@IntegrationEventsHandler` as the default…
 
 - …for most **cross-module cross-boundary** integration handlers
   in a NestJS application. The decorator picks the right path

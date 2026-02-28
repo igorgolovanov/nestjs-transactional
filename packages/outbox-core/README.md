@@ -160,11 +160,20 @@ you want stability across renames.
 
 ## Externalization (advanced)
 
-> **Status:** SPI is in place; an `EventExternalizer` implementation
-> for `@nestjs/microservices` `ClientProxy` ships separately as
-> `@nestjs-transactional/outbox-microservices` (Phase 11.3, planned).
-> Without an externalizer bound, `@Externalized` mappings are recorded
-> but never delivered to a broker — local outbox listeners still run.
+> **Status:** SPI shipped (Phase 11.1–11.2). The
+> `@nestjs/microservices` `ClientProxy`-backed `EventExternalizer`
+> implementation ships as a separate package —
+> [`@nestjs-transactional/outbox-microservices`](../outbox-microservices)
+> (Phase 11.3). Without an externalizer bound, `@Externalized`
+> mappings are recorded but never delivered to a broker — local
+> outbox listeners still run.
+>
+> Architecture and design rationale:
+> [ADR-015](../../docs/adr/015-event-externalization-architecture.md),
+> [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md).
+> Reliability caveat for the `@nestjs/microservices`-backed
+> implementation:
+> [ADR-016](../../docs/adr/016-externalization-reliability-semantics.md).
 
 `@Externalized` marks an event class for delivery to an external
 message broker (Kafka topic, RabbitMQ exchange, NATS subject, ...) in

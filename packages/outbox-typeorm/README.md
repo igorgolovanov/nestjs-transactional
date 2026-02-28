@@ -283,12 +283,12 @@ When the application uses `@nestjs/cqrs` aggregates, bind
 `HybridEventPublisher` (wired by `CqrsTransactionalModule.forRoot()`)
 then routes every `aggregate.commit()` through both the in-memory
 phase-aware dispatcher AND the outbox, and
-`ApplicationModuleHandlerScanner` routes
-`@ApplicationModuleHandler` classes through the outbox worker.
+`IntegrationEventsHandlerScanner` routes
+`@IntegrationEventsHandler` classes through the outbox worker.
 See [`../cqrs/README.md#outbox-integration`](../cqrs/README.md#outbox-integration)
 for the full wiring recipe and the trade-offs between
 `@TransactionalEventsHandler`, `@OutboxEventsHandler`, and
-`@ApplicationModuleHandler`.
+`@IntegrationEventsHandler`.
 
 ## Testing
 
