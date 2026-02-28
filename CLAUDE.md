@@ -222,6 +222,7 @@ Design Decisions section below:
 - **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md`
 - **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md`
 - **ADR-014**: Class-level handler API redesign — `docs/adr/014-handler-api-redesign.md`
+- **ADR-016**: Externalization reliability semantics with `@nestjs/microservices` — `docs/adr/016-externalization-reliability-semantics.md`
 
 Planned (not yet written):
 
@@ -1397,12 +1398,49 @@ design rationale.
 - Validation on bootstrap: every event with an `@Externalized` mapping
   has a resolvable client token
 
-**11.4: Integration testing**
-- Tests with `testcontainers-node` (Kafka and/or RabbitMQ)
-- E2E test: full flow from `@Transactional` method through outbox to
-  external broker, including retry on broker failure and recovery on
-  restart
-- Verify single-unit atomicity and idempotency contract (DD-019)
+**11.4: Integration testing — outcome: ADR-016 reliability finding**
+
+Original plan: tests with `testcontainers-node` (Kafka and/or
+RabbitMQ), E2E full flow from `@Transactional` method through outbox
+to external broker, retry-on-broker-failure verification, single-unit
+atomicity / idempotency contract (DD-019).
+
+What actually shipped: the testcontainers approach was abandoned
+after the investigation surfaced
+[ADR-016](docs/adr/016-externalization-reliability-semantics.md) —
+`@nestjs/microservices` `ClientProxy.emit()` does not propagate
+broker-side delivery failures. With an unreachable broker, `emit()`
+resolves successfully and the outbox publication finalises as
+`COMPLETED` regardless of whether the message landed. That makes the
+"broker unreachable → publication FAILED" reliability test
+unreachable from this layer, and the happy-path test offers limited
+value when its success signal cannot distinguish "broker received
+the message" from "proxy queued it locally and dropped it".
+
+In place of the integration tests we shipped:
+
+- Removal of the testcontainers / kafkajs / amqplib /
+  amqp-connection-manager dev-deps and the `test:integration` script
+  from `outbox-microservices` (the deps did not earn their weight
+  given the finding).
+- A new `microservices-event-externalizer-silent-success.spec.ts`
+  unit spec that pins the silent-success contract (resolved
+  Observable → resolved `externalize()` Promise) so future regressions
+  surface as behavioral diffs.
+- ADR-016 itself, recording the finding, the alternatives weighed,
+  and three production mitigation strategies.
+- A prominent "Reliability semantics" section near the top of
+  `packages/outbox-microservices/README.md` so users see the
+  limitation before adopting.
+
+The `outbox-core` reliability machinery (retry, recovery, staleness
+monitor, `FailedEventPublications.resubmit`) still triggers for any
+publication that the externalizer DOES report as failed — the
+limitation only applies to broker-side silent failures the proxy
+does not surface. Future broker-aware externalizers (Phase 12+,
+unscheduled) plugging into the same `EVENT_EXTERNALIZER` SPI from
+DD-018 can offer stricter guarantees without breaking existing
+users.
 
 **11.5: Documentation and rename sweep**
 - ADR-015 — event externalization architecture
@@ -1483,10 +1521,10 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-25 (Phase 11, Iteration 11.0 — preparation
-for event externalization: DD-016 through DD-019, Phase 11 roadmap,
-ADR-015 entry, completion of `@ApplicationModuleHandler` →
-`@IntegrationEventsHandler` rename sweep in this file).
+**Last updated**: 2026-04-25 (Phase 11, Iterations 11.0–11.4
+shipped; 11.4 closed with ADR-016 documenting the silent-success
+limitation of `@nestjs/microservices` `ClientProxy.emit()` instead
+of the originally-planned testcontainers integration tests).
 
 ### Completed
 
@@ -1554,18 +1592,39 @@ ADR-015 entry, completion of `@ApplicationModuleHandler` →
     Source-code rename completed; documentation rename across
     READMEs / ADR-014 / architecture docs / migration guide /
     examples is absorbed into Phase 11.5.
-
-### In Progress
-
-- **Phase 11, Iteration 11.0 (preparation)** — CLAUDE.md update
-  ahead of event externalization work. Adds DD-016 through DD-019
-  (externalization design), the Phase 11 roadmap with sub-phases
-  11.1–11.5, the planned ADR-015 entry, and the
-  `@ApplicationModuleHandler` → `@IntegrationEventsHandler` rename
-  sweep across this file (Variant B — single-file atomic update;
-  doc-wide rename across READMEs / ADRs / architecture docs is
-  absorbed into Phase 11.5). No source-code changes in this
-  iteration.
+- Phase 11.0 (preparation): CLAUDE.md updates for event
+  externalization — DD-016..19, ADR-015 entry, Phase 11 roadmap.
+- Phase 11.1: `EventExternalizer` SPI in `outbox-core` —
+  `ExternalizationMetadata` interface, `EventExternalizer` interface,
+  `EVENT_EXTERNALIZER` DI token, `ExternalizationError` extending
+  `OutboxError`, optional `@Inject(EVENT_EXTERNALIZER)` injection
+  into `EventPublicationProcessor` with `tryExternalize` stub.
+- Phase 11.2: `@Externalized` decorator + `ExternalizationRegistry`
+  — class-level decorator with typed `<TEvent>` callbacks for
+  `routingKey` / `headers`, registry that scans `EventTypeRegistry`
+  at module init, `tryExternalize` stub replaced with the real
+  resolution + invocation path (DD-019 ordering, `ExternalizationError`
+  wrapping). Backward-compat 5-arg `EventPublicationProcessor`
+  constructor.
+- Phase 11.3: `@nestjs-transactional/outbox-microservices` package —
+  `MicroservicesEventExternalizer` over `@nestjs/microservices`
+  `ClientProxy`, `OutboxMicroservicesModule.forRoot` /
+  `forRootAsync`, reuse of user's `ClientsModule` registration
+  (DD-017), bootstrap validation of `defaultClient`, per-event
+  `client` override via `@Externalized`. 20 unit + module tests with
+  mocked `ClientProxy`.
+- Phase 11.4: instead of the originally-planned testcontainers
+  integration tests, shipped ADR-016 documenting the silent-success
+  reliability limitation discovered in
+  `@nestjs/microservices` `ClientProxy.emit()`. Removed the
+  testcontainers / kafkajs / amqplib / amqp-connection-manager
+  dev-deps and `test:integration` script. Added a
+  `microservices-event-externalizer-silent-success.spec.ts` unit
+  spec pinning the contract. Prominent README section in
+  `outbox-microservices` lists three production mitigation
+  strategies. Future broker-aware externalizers can register under
+  the same `EVENT_EXTERNALIZER` SPI (DD-018) for stricter
+  guarantees.
 
 ### Blocked / Awaiting
 
@@ -1574,27 +1633,24 @@ ADR-015 entry, completion of `@ApplicationModuleHandler` →
 
 ### Next
 
+- Phase 11.5: comprehensive documentation pass — ADR-015 (event
+  externalization architecture), `docs/architecture/event-externalization.md`,
+  `outbox-microservices` package README polish, working example in
+  `examples/outbox-externalization/`. Absorbs the deferred
+  doc-wide `@ApplicationModuleHandler` → `@IntegrationEventsHandler`
+  sweep (Phase B from Iteration 10) across READMEs / ADR-014 /
+  architecture docs / migration guide / examples.
 - Phase 9 iteration 9.3: release automation for the outbox
   packages — changeset entries, CI matrix tweaks if needed,
   first 0.1.0-alpha release.
-- Phase 11.1: `EventExternalizer` SPI in `outbox-core` —
-  `ExternalizationMetadata`, `EventExternalizer` interface,
-  `EVENT_EXTERNALIZER` DI token (structural port), integration in
-  `EventPublicationProcessor`.
-- Phase 11.2: `@Externalized` decorator and `ExternalizationRegistry`.
-- Phase 11.3: `@nestjs-transactional/outbox-microservices` package —
-  `MicroservicesEventExternalizer` over `ClientProxy`,
-  `OutboxMicroservicesModule.forRoot({ defaultClient })`.
-- Phase 11.4: integration tests with `testcontainers-node`
-  (Kafka and/or RabbitMQ), end-to-end retry / recovery / idempotency.
-- Phase 11.5: ADR-015, architecture docs, README, working example,
-  doc-wide `@ApplicationModuleHandler` → `@IntegrationEventsHandler`
-  sweep (deferred from Iteration 10).
 - ADR-008 (event serialization), ADR-009 (listener id
   stability) — when the related design decisions need more room
   than the DD section. ADR-010 (hybrid event publishing)
   superseded by ADR-014, no longer planned.
-- Future phases (not scheduled): outbox-prisma, outbox-mongodb,
+- Future phases (not scheduled): broker-aware externalizers
+  (native `kafkajs` / native `amqplib` / native `nats` adapters
+  registered under the `EVENT_EXTERNALIZER` SPI for stricter delivery
+  guarantees per ADR-016), outbox-prisma, outbox-mongodb,
   OpenTelemetry integration, ESM dual packaging. (`outbox-kafka` /
   `outbox-rabbitmq` removed — superseded by the single
   `outbox-microservices` package per DD-016.)
@@ -1617,6 +1673,12 @@ ADR-015 entry, completion of `@ApplicationModuleHandler` →
 - Single-unit atomicity for hybrid (local + external) delivery, with
   local-first execution order and an explicit idempotency contract
   (DD-019)
+- Externalization reliability semantics with `@nestjs/microservices`
+  `ClientProxy.emit()` accepted with documented limitation
+  (ADR-016) — silent broker-side failures are not detectable at the
+  externalizer layer; production users have three documented
+  mitigation strategies, and broker-aware externalizers under the
+  same SPI remain a future option
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 
