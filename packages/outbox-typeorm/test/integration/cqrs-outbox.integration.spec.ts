@@ -1,9 +1,8 @@
-import { Injectable, Logger, Module } from '@nestjs/common';
+import { Global, Injectable, Logger, Module } from '@nestjs/common';
 import {
   AggregateRoot,
   CommandBus,
   CommandHandler,
-  CqrsModule,
   EventPublisher,
   type ICommandHandler,
 } from '@nestjs/cqrs';
@@ -129,6 +128,12 @@ class IntegrationEventsHandlers implements IIntegrationEventsHandler<OrderPlaced
 // + OutboxModule together, with the two structural bindings that
 // turn the hybrid publisher + integration-events scanner into a
 // dual-path router.
+// `@Global()` + explicit `exports` are required: HybridEventPublisher
+// (in CqrsTransactionalModule) injects OUTBOX_PUBLICATION_SCHEDULER
+// and IntegrationEventsHandlerScanner injects OUTBOX_LISTENER_REGISTRAR.
+// Without `@Global()` the bridge's providers are scoped to
+// OutboxCqrsBridge alone and the cqrs module cannot resolve them.
+@Global()
 @Module({
   providers: [
     // Binds OutboxEventPublisher under the CQRS package's scheduler
@@ -145,6 +150,7 @@ class IntegrationEventsHandlers implements IIntegrationEventsHandler<OrderPlaced
       useExisting: OutboxListenerRegistry,
     },
   ],
+  exports: [OUTBOX_PUBLICATION_SCHEDULER, OUTBOX_LISTENER_REGISTRAR],
 })
 class OutboxCqrsBridge {}
 
@@ -171,7 +177,11 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
           eventTypes: [OrderPlacedEvent],
           repository: typeOrmEventPublicationRepositoryProvider,
         }),
-        CqrsModule.forRoot(),
+        // NOTE: CqrsModule is intentionally NOT imported alongside
+        // CqrsTransactionalModule. CqrsTransactionalModule imports
+        // CqrsModule internally and overrides the EventPublisher DI
+        // token; a duplicate import shadows the override and aggregate
+        // events bypass the dispatcher (CLAUDE.md convention #6).
         CqrsTransactionalModule.forRoot(),
         OutboxCqrsBridge,
       ],
@@ -222,23 +232,30 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
       // In-memory listener fired at AFTER_COMMIT — already delivered.
       expect(inMemoryListener.received.map((e) => e.orderId)).toEqual(['order-1']);
 
-      // Outbox: publication row committed with PUBLISHED status, but
-      // the persistent listener has not run yet — the processor
-      // hasn't polled.
-      const rows = await ctx.dataSource.getRepository(EventPublicationEntity).find();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]!.status).toBe(PublicationStatus.PUBLISHED);
+      // Outbox: a row per durable listener subscribed to OrderPlacedEvent
+      // is committed as PUBLISHED. Both `PersistentInventoryHandlers`
+      // (`@OutboxEventsHandler`) and `IntegrationEventsHandlers`
+      // (`@IntegrationEventsHandler` smart-routed to the outbox via the
+      // bridge module) get their own rows. Neither listener has fired
+      // yet — the processor has not polled.
+      const persistentListenerId = 'PersistentInventoryHandlers#OrderPlacedEvent';
+      const allRows = await ctx.dataSource.getRepository(EventPublicationEntity).find();
+      expect(allRows.map((r) => r.listenerId).sort()).toEqual([
+        'IntegrationModule.stable-id#OrderPlacedEvent',
+        persistentListenerId,
+      ]);
+      expect(allRows.every((r) => r.status === PublicationStatus.PUBLISHED)).toBe(true);
       expect(persistentListener.received).toHaveLength(0);
 
       // Drive one processor batch — delivers the event to the
-      // persistent listener and marks the publication COMPLETED.
+      // persistent listener and marks ITS publication COMPLETED.
       await processor.processBatch();
 
       expect(persistentListener.received.map((e) => e.orderId)).toEqual(['order-1']);
-      const updated = await ctx.dataSource
+      const persistentRow = await ctx.dataSource
         .getRepository(EventPublicationEntity)
-        .findOneOrFail({ where: { id: rows[0]!.id } });
-      expect(updated.status).toBe(PublicationStatus.COMPLETED);
+        .findOneOrFail({ where: { listenerId: persistentListenerId } });
+      expect(persistentRow.status).toBe(PublicationStatus.COMPLETED);
     } finally {
       await app.close();
     }
