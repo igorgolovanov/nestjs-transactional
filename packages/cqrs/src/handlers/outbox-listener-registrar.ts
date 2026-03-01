@@ -1,10 +1,10 @@
 /**
  * Minimal structural contract for an outbox listener registrar,
  * declared here (and injected via {@link OUTBOX_LISTENER_REGISTRAR})
- * rather than imported from `@nestjs-transactional/outbox-core`
+ * rather than imported from `@nestjs-transactional/outbox`
  * directly — keeps the cqrs package usable without the outbox stack.
  *
- * `@nestjs-transactional/outbox-core`'s `OutboxListenerRegistry`
+ * `@nestjs-transactional/outbox`'s `OutboxListenerRegistry`
  * satisfies this interface structurally (its `register` method
  * accepts exactly this shape). Wire the token in the host application
  * when the outbox is enabled:
@@ -18,7 +18,7 @@
  * ]
  * ```
  *
- * `OutboxModule` from outbox-core binds this automatically once
+ * `OutboxModule` from outbox binds this automatically once
  * wired — consumers who construct the registry manually need to
  * declare the binding themselves.
  */

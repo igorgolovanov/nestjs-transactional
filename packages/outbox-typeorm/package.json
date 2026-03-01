@@ -1,7 +1,7 @@
 {
   "name": "@nestjs-transactional/outbox-typeorm",
   "version": "0.0.0",
-  "description": "TypeORM persistence backend for @nestjs-transactional/outbox-core — event_publication table, FOR UPDATE SKIP LOCKED worker safety",
+  "description": "TypeORM persistence backend for @nestjs-transactional/outbox — event_publication table, FOR UPDATE SKIP LOCKED worker safety",
   "license": "MIT",
   "author": "Igor Golovanov",
   "repository": {
@@ -54,7 +54,7 @@
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",
-    "@nestjs-transactional/outbox-core": "workspace:^",
+    "@nestjs-transactional/outbox": "workspace:^",
     "@nestjs-transactional/typeorm": "workspace:^",
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
@@ -66,7 +66,7 @@
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
     "@nestjs-transactional/cqrs": "workspace:*",
-    "@nestjs-transactional/outbox-core": "workspace:*",
+    "@nestjs-transactional/outbox": "workspace:*",
     "@nestjs-transactional/typeorm": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

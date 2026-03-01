@@ -10,7 +10,7 @@ import type { ExternalizationMetadata } from './types';
  * covers every transport that NestJS already supports (Kafka,
  * RabbitMQ, NATS, JMS, gRPC, custom). Future native (broker-specific)
  * adapters can register under the same {@link EVENT_EXTERNALIZER}
- * token without touching `outbox-core`.
+ * token without touching `outbox`.
  *
  * `EventPublicationProcessor` invokes `externalize()` AFTER the local
  * outbox listener has succeeded for the publication and BEFORE the

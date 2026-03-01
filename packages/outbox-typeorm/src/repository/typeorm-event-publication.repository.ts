@@ -10,7 +10,7 @@ import {
   type FindFailedOptions,
   type NewEventPublication,
   type UpdateStatusOptions,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import { getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 import {
   In,

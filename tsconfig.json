@@ -5,7 +5,7 @@
     { "path": "./packages/core/tsconfig.build.json" },
     { "path": "./packages/typeorm/tsconfig.build.json" },
     { "path": "./packages/cqrs/tsconfig.build.json" },
-    { "path": "./packages/outbox-core/tsconfig.build.json" },
+    { "path": "./packages/outbox/tsconfig.build.json" },
     { "path": "./packages/outbox-typeorm/tsconfig.build.json" },
     { "path": "./packages/outbox-microservices/tsconfig.build.json" }
   ]

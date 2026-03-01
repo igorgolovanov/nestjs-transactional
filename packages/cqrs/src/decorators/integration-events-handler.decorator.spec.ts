@@ -65,7 +65,7 @@ describe('@IntegrationEventsHandler', () => {
   });
 
   describe('metadata key', () => {
-    it('is a unique (fresh) Symbol, not shared with outbox-core', () => {
+    it('is a unique (fresh) Symbol, not shared with outbox', () => {
       // Symbol (not Symbol.for) — unique per process identity.
       expect(INTEGRATION_EVENTS_HANDLER_METADATA.description).toBe(
         'INTEGRATION_EVENTS_HANDLER_METADATA',

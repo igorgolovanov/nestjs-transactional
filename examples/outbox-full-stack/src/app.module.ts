@@ -10,7 +10,7 @@ import {
   OutboxListenerRegistry,
   OutboxModule,
   OutboxProcessingModule,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import {
   EventPublicationArchiveEntity,
   EventPublicationEntity,

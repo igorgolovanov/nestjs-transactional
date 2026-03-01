@@ -1,5 +1,5 @@
 {
-  "name": "@nestjs-transactional/outbox-core",
+  "name": "@nestjs-transactional/outbox",
   "version": "0.0.0",
   "description": "Persistent Event Publication Registry for @nestjs-transactional — Spring Modulith equivalent (ORM-agnostic core)",
   "license": "MIT",
@@ -7,12 +7,12 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
-    "directory": "packages/outbox-core"
+    "directory": "packages/outbox"
   },
   "bugs": {
     "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
   },
-  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/outbox-core#readme",
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/outbox#readme",
   "keywords": [
     "nestjs",
     "outbox",

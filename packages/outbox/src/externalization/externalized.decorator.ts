@@ -5,7 +5,7 @@ import 'reflect-metadata';
  * classes decorated with {@link Externalized}.
  *
  * Fresh `Symbol` (not `Symbol.for`) — externalization metadata is read
- * only by `ExternalizationRegistry` inside outbox-core; cross-package
+ * only by `ExternalizationRegistry` inside outbox; cross-package
  * sharing is not required.
  */
 export const EXTERNALIZED_METADATA = Symbol('EXTERNALIZED_METADATA');

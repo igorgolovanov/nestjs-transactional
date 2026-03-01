@@ -185,9 +185,9 @@ importers:
       '@nestjs-transactional/cqrs':
         specifier: workspace:*
         version: link:../../packages/cqrs
-      '@nestjs-transactional/outbox-core':
+      '@nestjs-transactional/outbox':
         specifier: workspace:*
-        version: link:../../packages/outbox-core
+        version: link:../../packages/outbox
       '@nestjs-transactional/outbox-typeorm':
         specifier: workspace:*
         version: link:../../packages/outbox-typeorm
@@ -261,9 +261,9 @@ importers:
       '@nestjs-transactional/core':
         specifier: workspace:*
         version: link:../core
-      '@nestjs-transactional/outbox-core':
+      '@nestjs-transactional/outbox':
         specifier: workspace:*
-        version: link:../outbox-core
+        version: link:../outbox
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -280,7 +280,7 @@ importers:
         specifier: ^7.8.1
         version: 7.8.2
 
-  packages/outbox-core:
+  packages/outbox:
     devDependencies:
       '@nestjs-transactional/core':
         specifier: workspace:*
@@ -318,9 +318,9 @@ importers:
       '@nestjs-transactional/core':
         specifier: workspace:*
         version: link:../core
-      '@nestjs-transactional/outbox-core':
+      '@nestjs-transactional/outbox':
         specifier: workspace:*
-        version: link:../outbox-core
+        version: link:../outbox
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -360,9 +360,9 @@ importers:
       '@nestjs-transactional/cqrs':
         specifier: workspace:*
         version: link:../cqrs
-      '@nestjs-transactional/outbox-core':
+      '@nestjs-transactional/outbox':
         specifier: workspace:*
-        version: link:../outbox-core
+        version: link:../outbox
       '@nestjs-transactional/typeorm':
         specifier: workspace:*
         version: link:../typeorm

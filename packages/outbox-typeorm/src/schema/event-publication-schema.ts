@@ -1,4 +1,4 @@
-import { PublicationStatus } from '@nestjs-transactional/outbox-core';
+import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { Table, TableIndex, type QueryRunner } from 'typeorm';
 
 /**

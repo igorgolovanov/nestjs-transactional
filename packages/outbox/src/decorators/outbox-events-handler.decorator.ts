@@ -7,7 +7,7 @@ import { type Type } from '@nestjs/common';
  * stored on classes decorated with {@link OutboxEventsHandler}.
  *
  * Fresh `Symbol` (not `Symbol.for`) — this metadata is read only by
- * outbox-core's own `OutboxListenerScanner`. Cross-package sharing is
+ * outbox's own `OutboxListenerScanner`. Cross-package sharing is
  * not required because `@IntegrationEventsHandler` in the cqrs
  * package uses the `OUTBOX_LISTENER_REGISTRAR` structural port, not
  * metadata introspection, to route handlers to the outbox.

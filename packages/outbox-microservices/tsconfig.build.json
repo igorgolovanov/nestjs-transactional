@@ -16,5 +16,5 @@
     "node_modules",
     "coverage"
   ],
-  "references": [{ "path": "../outbox-core/tsconfig.build.json" }]
+  "references": [{ "path": "../outbox/tsconfig.build.json" }]
 }

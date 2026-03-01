@@ -1,7 +1,7 @@
 {
   "name": "@nestjs-transactional/outbox-microservices",
   "version": "0.0.0",
-  "description": "Event externalization for @nestjs-transactional/outbox-core via @nestjs/microservices ClientProxy — Spring Modulith @Externalized parity",
+  "description": "Event externalization for @nestjs-transactional/outbox via @nestjs/microservices ClientProxy — Spring Modulith @Externalized parity",
   "license": "MIT",
   "author": "Igor Golovanov",
   "repository": {
@@ -55,7 +55,7 @@
     "lint": "eslint \"src/**/*.ts\""
   },
   "peerDependencies": {
-    "@nestjs-transactional/outbox-core": "workspace:^",
+    "@nestjs-transactional/outbox": "workspace:^",
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
     "@nestjs/microservices": "^10.0.0 || ^11.0.0",
@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
-    "@nestjs-transactional/outbox-core": "workspace:*",
+    "@nestjs-transactional/outbox": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/microservices": "^11.0.0",

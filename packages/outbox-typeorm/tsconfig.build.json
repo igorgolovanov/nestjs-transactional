@@ -19,6 +19,6 @@
   "references": [
     { "path": "../core/tsconfig.build.json" },
     { "path": "../typeorm/tsconfig.build.json" },
-    { "path": "../outbox-core/tsconfig.build.json" }
+    { "path": "../outbox/tsconfig.build.json" }
   ]
 }
