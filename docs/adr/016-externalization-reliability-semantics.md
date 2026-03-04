@@ -10,6 +10,12 @@
   - DD-018 (`EventExternalizer` SPI as a structural port)
   - DD-019 (single-unit atomicity and execution order)
 
+> **Note (Phase 12 package rename, 2026-04-26):** Where this ADR refers
+> to `outbox-core`'s reliability machinery (retry, recovery, staleness
+> monitor, etc.), that package was renamed to `@nestjs-transactional/outbox`
+> in Phase 12. Body references updated inline; the documented reliability
+> limitation and the three mitigation strategies are unchanged.
+
 ## Context
 
 Phase 11.4 set out to add real-broker integration tests to
@@ -157,7 +163,7 @@ prominently for production users. Specifically:
   prominent placement of the reliability section is the mitigation;
   if user feedback shows it is still missed, we may consider
   emitting a warning at bootstrap.
-- The `outbox-core` reliability machinery (retry, recovery,
+- The `outbox` reliability machinery (retry, recovery,
   staleness monitor, `FailedEventPublications.resubmit`) only runs
   when a publication is actually marked `FAILED`. Silent broker
   failures bypass it — the publication shows `COMPLETED` and is

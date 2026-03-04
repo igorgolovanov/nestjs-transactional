@@ -1,8 +1,15 @@
-# ADR-007: Outbox architecture — split between `outbox-core` and `outbox-typeorm`
+# ADR-007: Outbox architecture — split between `outbox` and `outbox-typeorm`
 
 ## Status
 
 Accepted — 2026-04-24.
+
+> **Note (Phase 12 package rename, 2026-04-26):** The abstract package
+> was originally named `@nestjs-transactional/outbox-core` and was
+> renamed to `@nestjs-transactional/outbox` in Phase 12. The structural
+> "core + persistence" split this ADR establishes is unchanged — only
+> the abstract package's npm name moved. Body references updated inline;
+> the title was rewritten to use the current name.
 
 ## Context
 
@@ -35,7 +42,7 @@ implements the port. Users pick the adapters they need.
 Split the outbox into two packages, mirroring the existing
 core + adapter shape:
 
-- `@nestjs-transactional/outbox-core` — ORM-agnostic. Ships the
+- `@nestjs-transactional/outbox` — ORM-agnostic. Ships the
   types, lifecycle states, the `EventPublicationRepository` SPI,
   the event publication registry, the listener registry and
   scanner, the `OutboxEventPublisher`, the async
@@ -56,14 +63,14 @@ core + adapter shape:
   and a shared schema-factory used by both the migration and a
   development-time `SchemaInitializer`, plus the
   `OutboxTypeOrmModule` that binds the repository to a
-  DataSource. Depends on `outbox-core`, `core`, and `typeorm`.
+  DataSource. Depends on `outbox`, `core`, and `typeorm`.
 
 The split follows the same rules the rest of the monorepo lives
 under (CLAUDE.md § "Architectural Principles"):
 
-- `outbox-core` does not import TypeORM or any other ORM.
+- `outbox` does not import TypeORM or any other ORM.
 - `outbox-typeorm` does not import `@nestjs/cqrs`.
-- `outbox-core` defines the port (`EventPublicationRepository`);
+- `outbox` defines the port (`EventPublicationRepository`);
   adapter packages implement it. Adding a new adapter touches
   exactly one SPI.
 
@@ -96,10 +103,10 @@ indirection.
 - Adding a new persistence backend is a well-scoped one-package
   PR: implement `EventPublicationRepository`, ship a Nest
   module that binds it to the token, write integration tests.
-  No changes required in `outbox-core`.
+  No changes required in `outbox`.
 - Users can use the outbox with any database supported by a
   future adapter. The core package is stable regardless.
-- `outbox-core` is testable without Docker — the
+- `outbox` is testable without Docker — the
   `InMemoryEventPublicationRepository` exercises every code
   path of the SPI.
 - The package layout tells the story at a glance. A user who
@@ -113,9 +120,9 @@ indirection.
   README.
 - Peer-dep graph gets slightly more complicated:
   `outbox-typeorm` peer-depends on `@nestjs-transactional/core`,
-  `@nestjs-transactional/typeorm`, `@nestjs-transactional/outbox-core`,
+  `@nestjs-transactional/typeorm`, `@nestjs-transactional/outbox`,
   `typeorm`, and `@nestjs/typeorm`. All standard. Release churn
-  on `outbox-core` requires a matching `outbox-typeorm` release.
+  on `outbox` requires a matching `outbox-typeorm` release.
 - Two READMEs, two changelogs, two npm pages. Mitigated by
   cross-linking and by the documentation in `docs/architecture/`.
 
@@ -123,7 +130,7 @@ indirection.
 
 - Extension points are codified. Any future backend
   (`outbox-prisma`, `outbox-mongodb`, `outbox-kafka`) is a new
-  package that depends on `outbox-core` and nothing else from the
+  package that depends on `outbox` and nothing else from the
   persistence side. Kafka externalization in particular is a
   clean fit: it would implement the SPI to write to a Kafka
   topic instead of a SQL table — the registry, processor, and
@@ -133,7 +140,7 @@ indirection.
 
 The `EventPublicationRepository` interface is the contract every
 backend implements. The in-memory reference implementation
-(`InMemoryEventPublicationRepository` in `outbox-core/testing`)
+(`InMemoryEventPublicationRepository` in `outbox/testing`)
 is both the test double and the executable reference for what
 each method must do:
 
@@ -164,5 +171,5 @@ and the rest of the library runs unchanged.
 
 - [ADR-006 — Outbox pattern rationale](006-outbox-pattern.md)
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
-- [`@nestjs-transactional/outbox-core` README](../../packages/outbox-core/README.md)
+- [`@nestjs-transactional/outbox` README](../../packages/outbox/README.md)
 - [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)

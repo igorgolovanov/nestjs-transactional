@@ -4,7 +4,7 @@
 > retryable delivery of outbox events to external message brokers via
 > the `@nestjs/microservices` `ClientProxy` abstraction.
 
-`MicroservicesEventExternalizer` plugs into `@nestjs-transactional/outbox-core`
+`MicroservicesEventExternalizer` plugs into `@nestjs-transactional/outbox`
 as the concrete `EventExternalizer` implementation and reuses the
 existing `ClientsModule` registration in your application — one
 package covers every transport `@nestjs/microservices` already
@@ -28,7 +28,7 @@ supports (Kafka, RabbitMQ, NATS, JMS, gRPC, custom).
 This package is the NestJS analogue of Spring Modulith's
 `@Externalized` plus its four broker-specific artefacts
 (`spring-modulith-events-kafka`, `-amqp`, `-jms`, `-messaging`)
-collapsed into one. `@Externalized` (in `outbox-core`) lifts directly
+collapsed into one. `@Externalized` (in `outbox`) lifts directly
 from Spring's annotation; the broker setup moves from a Spring
 auto-configuration to the user's own `ClientsModule.register()`.
 Function-based `routingKey` and `headers` callbacks replace SpEL
@@ -60,7 +60,7 @@ Concretely, this means:
   message ever reached a broker.
 - The same applies to RabbitMQ in default fire-and-forget mode and to
   any other transport `@nestjs/microservices` supports.
-- Silent broker failures bypass the outbox-core retry / staleness /
+- Silent broker failures bypass the outbox retry / staleness /
   resubmit machinery: there is nothing to retry, because as far as
   this layer is concerned delivery succeeded.
 
@@ -94,14 +94,14 @@ has the full sequence diagram and the failure-mode table.
 
 3. **Wait for the broker-aware externalizer iteration** when neither
    of the above is feasible. The
-   [`EVENT_EXTERNALIZER` SPI](../outbox-core/src/externalization/event-externalizer.ts)
+   [`EVENT_EXTERNALIZER` SPI](../outbox/src/externalization/event-externalizer.ts)
    is stable; native adapters will plug into the same place without
    client-side changes.
 
 ## Installation
 
 ```bash
-pnpm add @nestjs-transactional/outbox-microservices @nestjs-transactional/outbox-core @nestjs/microservices
+pnpm add @nestjs-transactional/outbox-microservices @nestjs-transactional/outbox @nestjs/microservices
 ```
 
 `@nestjs-transactional/core`, `@nestjs/common`, `@nestjs/core`,
@@ -144,7 +144,7 @@ connection pool, no second mental model.
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { Externalized, OutboxModule } from '@nestjs-transactional/outbox-core';
+import { Externalized, OutboxModule } from '@nestjs-transactional/outbox';
 import { OutboxMicroservicesModule } from '@nestjs-transactional/outbox-microservices';
 
 @Externalized<OrderPlacedEvent>({

@@ -3,7 +3,7 @@
 This guide walks through upgrading an application that today
 relies on `@nestjs-transactional/cqrs`'s in-memory
 `@TransactionalEventsHandler` to the durable outbox-backed
-delivery path (`@nestjs-transactional/outbox-core` plus a
+delivery path (`@nestjs-transactional/outbox` plus a
 backend package such as `@nestjs-transactional/outbox-typeorm`).
 
 No behavioural breaking changes — every existing
@@ -46,7 +46,7 @@ update.
 ## Step 1 — install the packages
 
 ```bash
-pnpm add @nestjs-transactional/outbox-core \
+pnpm add @nestjs-transactional/outbox \
          @nestjs-transactional/outbox-typeorm
 ```
 
@@ -129,7 +129,7 @@ import {
   OutboxListenerRegistry,
   OutboxModule,
   OutboxProcessingModule,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import {
   OutboxTypeOrmModule,
   typeOrmEventPublicationRepositoryProvider,
@@ -180,7 +180,7 @@ survives a restart. The aliasing Provider forwards the
 implementation provided by `OutboxTypeOrmModule`.
 
 The two `provide:` lines wire the cqrs-side structural ports to
-outbox-core's concrete services:
+outbox's concrete services:
 
 - `OUTBOX_PUBLICATION_SCHEDULER` makes `HybridEventPublisher`
   route `AggregateRoot.commit()` events into the outbox for
@@ -299,7 +299,7 @@ them on `OnApplicationShutdown` — no manual hooks required.
 
 ## Step 7 — test the migration
 
-The outbox-core `/testing` subpath exposes
+The outbox `/testing` subpath exposes
 `PublishedEvents` and `AssertablePublishedEvents` for
 Spring-Modulith-style assertions:
 
@@ -307,7 +307,7 @@ Spring-Modulith-style assertions:
 import {
   PublishedEvents,
   AssertablePublishedEvents,
-} from '@nestjs-transactional/outbox-core/testing';
+} from '@nestjs-transactional/outbox/testing';
 
 // Register both as providers in your test module.
 // Then in your test:

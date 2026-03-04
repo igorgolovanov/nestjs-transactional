@@ -28,7 +28,7 @@ externalization story for their application.
                        └────────────────────┬─────────────────────────┘
                                             │
                                             ▼
-┌────────────────────── outbox-core ─────────────────────────────────┐
+┌────────────────────── outbox ─────────────────────────────────┐
 │                                                                    │
 │  OutboxEventPublisher.publish()                                    │
 │    │                                                               │
@@ -79,7 +79,7 @@ without changing the rest of the flow.
 
 ## Components
 
-### `EventExternalizer` (SPI, in `outbox-core`)
+### `EventExternalizer` (SPI, in `outbox`)
 
 Interface: `externalize(event: unknown, metadata: ExternalizationMetadata): Promise<void>`.
 
@@ -226,7 +226,7 @@ reports success and the message is never delivered.
 `MicroservicesEventExternalizer` faithfully wraps that contract: an
 Observable that completes without error becomes a resolved
 `externalize()` Promise, the processor finalises the publication as
-`COMPLETED`, and the outbox-core retry / staleness machinery does not
+`COMPLETED`, and the outbox retry / staleness machinery does not
 fire because there is nothing to detect from at this layer.
 
 This is an architectural concern, not an implementation bug. Three
@@ -257,7 +257,7 @@ event-class layer:
 |---------------------------------------------------|-----------------------------------------------------------------------|
 | `@Externalized("kafka::orders.placed")`           | `@Externalized({ target: 'orders.placed' })`                          |
 | `@Externalized("amqp::exchange.events::#{tenant}")` | `@Externalized({ target: 'exchange.events', routingKey: (e) => e.tenantId })` |
-| `EventExternalizer` (Spring's interface)          | `EventExternalizer` (`outbox-core`)                                   |
+| `EventExternalizer` (Spring's interface)          | `EventExternalizer` (`outbox`)                                   |
 | `EventExternalizationConfiguration` builder       | `OutboxMicroservicesModule.forRoot` + per-event `@Externalized`       |
 | `spring-modulith-events-kafka` artefact           | one transport of `outbox-microservices`                               |
 | `spring-modulith-events-amqp` artefact            | one transport of `outbox-microservices`                               |
@@ -291,7 +291,7 @@ In addition to the reliability semantics covered above:
   would conflict with the single-unit atomicity contract from
   DD-019.
 
-- **Schema evolution.** `outbox-core`'s `EventTypeRegistry` is the
+- **Schema evolution.** `outbox`'s `EventTypeRegistry` is the
   canonical source of truth for event class identity; renaming an
   `@Externalized` event class without supplying a stable id breaks
   the listener id encoding. Externalization itself does not add new
@@ -301,7 +301,7 @@ In addition to the reliability semantics covered above:
 
 - [ADR-015](../adr/015-event-externalization-architecture.md) — design rationale.
 - [ADR-016](../adr/016-externalization-reliability-semantics.md) — reliability semantics, mitigations, future work.
-- `packages/outbox-core/src/externalization/` — SPI, decorator, registry, errors.
+- `packages/outbox/src/externalization/` — SPI, decorator, registry, errors.
 - `packages/outbox-microservices/` — `ClientProxy`-backed externalizer + module.
 - [`docs/architecture/outbox-pattern.md`](outbox-pattern.md) — outbox foundations this layer builds on.
 - [`docs/architecture/outbox-integration-with-cqrs.md`](outbox-integration-with-cqrs.md) — `@nestjs/cqrs` interplay (in-memory + outbox routing).

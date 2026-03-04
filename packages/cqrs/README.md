@@ -31,7 +31,7 @@ phases without forking `@nestjs/cqrs` (see ADR-003).
   override. Routes aggregate events through the in-memory dispatcher
   AND, when an outbox scheduler is bound to the
   `OUTBOX_PUBLICATION_SCHEDULER` token, also through
-  `@nestjs-transactional/outbox-core` for durable delivery. Without
+  `@nestjs-transactional/outbox` for durable delivery. Without
   the outbox binding, behaves identically to
   `TransactionalEventPublisher`.
 - **`CqrsHandlerWrapper` + `CqrsTransactionalBootstrap`** — bootstrap-time
@@ -284,7 +284,7 @@ import {
   OutboxEventPublisher,
   OutboxListenerRegistry,
   OutboxModule,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import {
   CqrsTransactionalModule,
   OUTBOX_LISTENER_REGISTRAR,
@@ -333,7 +333,7 @@ business change landed".
   non-durable. Use for side effects that are OK to lose on a crash
   between commit and invocation (metrics, cache invalidation,
   enrichment of in-memory state).
-- **`@OutboxEventsHandler`** *(from outbox-core)* — durable,
+- **`@OutboxEventsHandler`** *(from outbox)* — durable,
   retry-on-failure, resumable-across-restart, delivered by a worker.
   Use for integration with external systems, email sends, billing
   events, or any side effect where at-least-once delivery matters.

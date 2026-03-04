@@ -1,7 +1,7 @@
 # outbox-full-stack
 
 End-to-end example of
-`@nestjs-transactional/outbox-core` +
+`@nestjs-transactional/outbox` +
 `@nestjs-transactional/outbox-typeorm` +
 `@nestjs-transactional/cqrs`: a command handler places an order,
 `aggregate.commit()` fans the emitted event into both the in-memory

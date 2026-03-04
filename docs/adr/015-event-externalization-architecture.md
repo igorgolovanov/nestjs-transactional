@@ -12,10 +12,15 @@
   - DD-018 (`EventExternalizer` SPI as a structural port)
   - DD-019 (atomicity and ordering for hybrid delivery)
 
+> **Note (Phase 12 package rename, 2026-04-26):** The package referred to
+> as `@nestjs-transactional/outbox-core` in this ADR's original text was
+> renamed to `@nestjs-transactional/outbox` in Phase 12. Body references
+> have been updated inline; the externalization architecture is unchanged.
+
 ## Context
 
 After completing Phases 5–9 (outbox infrastructure with
-`@nestjs-transactional/outbox-core` and
+`@nestjs-transactional/outbox` and
 `@nestjs-transactional/outbox-typeorm`), the gap to Spring Modulith
 parity was external event publishing to message brokers — Kafka,
 RabbitMQ, NATS, JMS, gRPC, etc. Spring Modulith ships `@Externalized`
@@ -46,7 +51,7 @@ pattern was supposed to prevent.
 Externalization is a first-class feature of the monorepo, implemented
 as five composable pieces:
 
-### 1. `EventExternalizer` SPI in `outbox-core` (DD-018)
+### 1. `EventExternalizer` SPI in `outbox` (DD-018)
 
 - `EventExternalizer` interface — `externalize(event, metadata): Promise<void>`.
 - `EVENT_EXTERNALIZER` DI token (Symbol) for optional binding.
@@ -55,7 +60,7 @@ as five composable pieces:
 - Structural port pattern, matching `OUTBOX_LISTENER_REGISTRAR`
   (DD-012) and `OUTBOX_PUBLICATION_SCHEDULER` (DD-011).
 
-### 2. `@Externalized` + `ExternalizationRegistry` in `outbox-core`
+### 2. `@Externalized` + `ExternalizationRegistry` in `outbox`
 
 - `@Externalized` class decorator marks an event for externalization
   with `target`, optional `client`, optional `routingKey(event)`,
@@ -155,7 +160,7 @@ Rejected:
   typically need; one mental model, one set of release notes.
 - Reuses the standard NestJS `ClientsModule` pattern — there are
   no new module-wiring conventions to learn.
-- Reliability machinery from `outbox-core` (retry, recovery,
+- Reliability machinery from `outbox` (retry, recovery,
   staleness monitor, operator APIs) applies uniformly to local
   and externalised delivery without duplication.
 - Function-based `routingKey` / `headers` leverage the TypeScript
@@ -195,7 +200,7 @@ unreachable broker or a transport in default fire-and-forget mode,
 
 The externalization layer cannot detect a silent broker-side failure
 from this signal alone — there is nothing to detect from. The
-`outbox-core` retry / staleness / `FailedEventPublications.resubmit`
+`outbox` retry / staleness / `FailedEventPublications.resubmit`
 machinery only fires when the externalizer returns an error, which
 in this configuration it does not.
 
@@ -219,8 +224,8 @@ documented in ADR-016 and in the package README:
 
 | Spring Modulith                                | Here                                                                  |
 |------------------------------------------------|-----------------------------------------------------------------------|
-| `@Externalized`                                | `@Externalized` (`outbox-core`)                                       |
-| `EventExternalizer` (Spring's interface)       | `EventExternalizer` (`outbox-core`, structurally similar)             |
+| `@Externalized`                                | `@Externalized` (`outbox`)                                       |
+| `EventExternalizer` (Spring's interface)       | `EventExternalizer` (`outbox`, structurally similar)             |
 | `spring-modulith-events-kafka`                 | one transport of `outbox-microservices`                               |
 | `spring-modulith-events-amqp`                  | one transport of `outbox-microservices`                               |
 | `spring-modulith-events-jms`                   | one transport of `outbox-microservices`                               |
@@ -238,9 +243,9 @@ from a Spring auto-configuration to the user's `ClientsModule`.
 
 ## References
 
-- `packages/outbox-core/src/externalization/event-externalizer.ts`
-- `packages/outbox-core/src/externalization/externalized.decorator.ts`
-- `packages/outbox-core/src/externalization/externalization-registry.ts`
+- `packages/outbox/src/externalization/event-externalizer.ts`
+- `packages/outbox/src/externalization/externalized.decorator.ts`
+- `packages/outbox/src/externalization/externalization-registry.ts`
 - `packages/outbox-microservices/src/externalizer/microservices-event-externalizer.ts`
 - `packages/outbox-microservices/src/module/outbox-microservices.module.ts`
 - `docs/architecture/event-externalization.md`
