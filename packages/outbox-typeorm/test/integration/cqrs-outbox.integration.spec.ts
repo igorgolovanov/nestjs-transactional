@@ -174,9 +174,9 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
           dataSource: ctx.dataSource,
         }),
         OutboxModule.forRoot({
-          eventTypes: [OrderPlacedEvent],
           repository: typeOrmEventPublicationRepositoryProvider,
         }),
+        OutboxModule.forFeature([OrderPlacedEvent]),
         // NOTE: CqrsModule is intentionally NOT imported alongside
         // CqrsTransactionalModule. CqrsTransactionalModule imports
         // CqrsModule internally and overrides the EventPublisher DI

@@ -51,7 +51,10 @@ Expected output (abbreviated):
   - `TransactionalModule.forRoot({ isGlobal: true })`
   - `TypeOrmTransactionalModule.forFeature({ dataSource })`
   - `OutboxTypeOrmModule.forFeature({ dataSource })`
-  - `OutboxModule.forRoot({ eventTypes, repository: typeOrmEventPublicationRepositoryProvider, republishOnStartup: true, ... })`
+  - `OutboxModule.forRoot({ repository: typeOrmEventPublicationRepositoryProvider, republishOnStartup: true, ... })`
+  - `OutboxModule.forFeature([OrderPlacedEvent])` — registers the event
+    classes the outbox should know about (per-module pattern, matches
+    `TypeOrmModule.forFeature(...)` ergonomics).
   - `OutboxProcessingModule` — starts the worker in the same process
   - `CqrsModule.forRoot()` + `CqrsTransactionalModule.forRoot()`
   - Provider binding `OUTBOX_PUBLICATION_SCHEDULER → OutboxEventPublisher` —

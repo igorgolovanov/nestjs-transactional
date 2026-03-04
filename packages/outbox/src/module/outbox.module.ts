@@ -63,8 +63,6 @@ export interface OutboxModuleOptions {
   readonly startupBatchSize?: number;
   /** Convenience shortcut — also fills `processor.completionMode`. Default: `UPDATE`. */
   readonly completionMode?: CompletionMode;
-  /** Event classes pre-registered on `EventTypeRegistry` at bootstrap. */
-  readonly eventTypes?: Type<object>[];
   /** Full Provider for the `EVENT_SERIALIZER` token. Defaults to the JSON impl. */
   readonly serializer?: Provider;
   /**
@@ -88,7 +86,6 @@ export interface OutboxModuleAsyncFactoryResult {
   readonly republishOnStartup?: boolean;
   readonly startupBatchSize?: number;
   readonly completionMode?: CompletionMode;
-  readonly eventTypes?: Type<object>[];
 }
 
 /**
@@ -184,13 +181,7 @@ export class OutboxModule {
     const providers: Provider[] = [
       {
         provide: EVENT_TYPE_REGISTRY,
-        useFactory: (): EventTypeRegistry => {
-          const registry = new EventTypeRegistry();
-          if (options.eventTypes) {
-            registry.registerAll(options.eventTypes);
-          }
-          return registry;
-        },
+        useFactory: (): EventTypeRegistry => new EventTypeRegistry(),
       },
       { provide: EventTypeRegistry, useExisting: EVENT_TYPE_REGISTRY },
       options.serializer ?? {
@@ -256,6 +247,58 @@ export class OutboxModule {
     };
   }
 
+  /**
+   * Register event classes that the outbox should know about — typed
+   * inputs to `EventTypeRegistry` so the JSON serializer can revive
+   * stored payloads back into class instances, and so externalization
+   * mappings (`@Externalized`) can be picked up by the registry scan.
+   *
+   * Modelled on `TypeOrmModule.forFeature(...)`: each feature module
+   * imports `OutboxModule.forFeature([Event1, Event2, ...])` to declare
+   * the events it owns. Multiple `forFeature` calls across the module
+   * tree contribute cumulatively to the singleton `EventTypeRegistry`
+   * provided by `forRoot` / `forRootAsync`.
+   *
+   * Each event class can only be registered once. A duplicate
+   * registration — whether inside one `forFeature` call or across
+   * several — throws at bootstrap with the offending class name.
+   *
+   * Empty arrays are accepted as a no-op (matches
+   * `TypeOrmModule.forFeature([])`).
+   *
+   * The returned module is NOT global. Feature registrations don't need
+   * cross-module visibility because they only push into the
+   * `EventTypeRegistry` singleton; the registry itself is exported by
+   * the global `forRoot` module.
+   */
+  static forFeature(eventTypes: Type<object>[]): DynamicModule {
+    // Symbol() (not Symbol.for) — each forFeature call gets a unique
+    // token so multiple imports in the same or different modules don't
+    // collide. The token has no consumer; the factory runs eagerly
+    // (singleton scope) for its side effect: registering the listed
+    // event types with EventTypeRegistry. By the time any
+    // `onModuleInit` hook runs (Phase 3 of NestJS bootstrap), every
+    // forFeature factory has already executed, so the registry is
+    // fully populated when ExternalizationRegistry scans it.
+    const featureToken = Symbol('OUTBOX_FEATURE_REGISTRATION');
+
+    return {
+      module: OutboxModule,
+      providers: [
+        {
+          provide: featureToken,
+          useFactory: (registry: EventTypeRegistry): true => {
+            for (const eventType of eventTypes) {
+              registry.register(eventType);
+            }
+            return true;
+          },
+          inject: [EVENT_TYPE_REGISTRY],
+        },
+      ],
+    };
+  }
+
   static forRootAsync(options: OutboxModuleAsyncOptions): DynamicModule {
     const asyncOptionsProvider: FactoryProvider = {
       provide: ASYNC_OPTIONS_TOKEN,
@@ -267,14 +310,7 @@ export class OutboxModule {
       asyncOptionsProvider,
       {
         provide: EVENT_TYPE_REGISTRY,
-        useFactory: (opts: OutboxModuleAsyncFactoryResult): EventTypeRegistry => {
-          const registry = new EventTypeRegistry();
-          if (opts.eventTypes) {
-            registry.registerAll(opts.eventTypes);
-          }
-          return registry;
-        },
-        inject: [ASYNC_OPTIONS_TOKEN],
+        useFactory: (): EventTypeRegistry => new EventTypeRegistry(),
       },
       { provide: EventTypeRegistry, useExisting: EVENT_TYPE_REGISTRY },
       options.serializer ?? {

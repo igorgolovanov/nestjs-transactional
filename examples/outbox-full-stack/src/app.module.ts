@@ -104,12 +104,16 @@ export class AppModule {
           schemaInitialization: { enabled: false },
         }),
         OutboxModule.forRoot({
-          eventTypes: [OrderPlacedEvent],
           repository: typeOrmEventPublicationRepositoryProvider,
           republishOnStartup: true,
           processor: { pollingInterval: 500, batchSize: 50 },
           staleness: { processing: 30_000, monitorInterval: 60_000 },
         }),
+        // In a real app, each feature module would import
+        // `OutboxModule.forFeature(...)` for the events it owns. This
+        // example keeps a single module for clarity — see the README
+        // for the recommended modular pattern.
+        OutboxModule.forFeature([OrderPlacedEvent]),
         // In a real deployment, only the worker process imports
         // `OutboxProcessingModule`. In a one-process example we start
         // the worker in the same application so the demo runs end to

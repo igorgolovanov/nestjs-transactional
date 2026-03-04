@@ -124,10 +124,12 @@ pnpm add @nestjs-transactional/core \
     TypeOrmTransactionalModule.forFeature({ dataSource }),
     OutboxTypeOrmModule.forFeature({ dataSource }),
     OutboxModule.forRoot({
-      eventTypes: [OrderPlacedEvent],
       repository: typeOrmEventPublicationRepositoryProvider,
       republishOnStartup: true,
     }),
+    // Each feature module imports OutboxModule.forFeature([...]) for the
+    // event classes it owns — matches TypeOrmModule.forFeature() ergonomics.
+    OutboxModule.forFeature([OrderPlacedEvent]),
     OutboxProcessingModule, // worker processes only
     CqrsModule.forRoot(),
     CqrsTransactionalModule.forRoot(),

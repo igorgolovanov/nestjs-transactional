@@ -72,9 +72,9 @@ const OUTBOX_TYPEORM_DATA_SOURCE = Symbol('OUTBOX_TYPEORM_DATA_SOURCE');
  *     TypeOrmTransactionalModule.forFeature({ dataSource }),
  *     OutboxTypeOrmModule.forFeature({ dataSource }),
  *     OutboxModule.forRoot({
- *       eventTypes: [OrderPlacedEvent],
  *       repository: typeOrmEventPublicationRepositoryProvider,
  *     }),
+ *     OutboxModule.forFeature([OrderPlacedEvent]),
  *     OutboxProcessingModule, // only in worker processes
  *   ],
  * })

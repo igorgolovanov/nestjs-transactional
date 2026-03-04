@@ -124,14 +124,18 @@ const dataSource = new DataSource({
     //    aliasing Provider so outbox does NOT install its
     //    InMemory default.
     OutboxModule.forRoot({
-      eventTypes: [OrderPlacedEvent],
       repository: typeOrmEventPublicationRepositoryProvider,
       republishOnStartup: true,
       processor: { pollingInterval: 1000, batchSize: 100 },
       staleness: { processing: 60_000, monitorInterval: 30_000 },
     }),
 
-    // 5. Only in worker processes — starts the processor and
+    // 5. Register the event classes the outbox should know about.
+    //    Each feature module would normally call forFeature() for the
+    //    events it owns; this single-module example collapses them.
+    OutboxModule.forFeature([OrderPlacedEvent]),
+
+    // 6. Only in worker processes — starts the processor and
     //    staleness monitor on bootstrap. API-only apps that just
     //    publish events should NOT import this.
     OutboxProcessingModule,
