@@ -227,6 +227,7 @@ Design Decisions section below:
 - **ADR-014**: Class-level handler API redesign — `docs/adr/014-handler-api-redesign.md`
 - **ADR-015**: Event externalization architecture — `docs/adr/015-event-externalization-architecture.md`
 - **ADR-016**: Externalization reliability semantics with `@nestjs/microservices` — `docs/adr/016-externalization-reliability-semantics.md`
+- **ADR-018**: Multi-adapter architecture (dataSource-name-keyed registration) — `docs/adr/018-multi-adapter-architecture.md`
 
 Planned (not yet written):
 
@@ -760,6 +761,156 @@ partial-success states leak into user code as surprising bugs.
 - Operator APIs (`FailedEventPublications`, `IncompleteEventPublications`)
   work uniformly across local-only, external-only, and hybrid setups.
 
+### DD-020: Multi-adapter through dataSource-name identifier
+
+**Context**: Phase 14 introduces support for multiple `DataSource`s
+(possibly across different ORMs) in a single process — modular
+monolith, audit-store split, ORM migration scenarios. We need a way
+to distinguish adapter *instances* in DI without conflating the ORM
+type and the database identity.
+
+**Alternatives considered**:
+- Adapter type (e.g. `'typeorm'`, `'prisma'`) as identifier. Rejected:
+  cannot represent two TypeORM-backed dataSources (the most common
+  multi-adapter case).
+- Composite identifier (e.g. `'typeorm:billing'`). Rejected: forces
+  users to think in our internal taxonomy ("which adapter
+  implementation") rather than their domain ("which database").
+
+**Decision**: dataSource name is the primary identifier across every
+package. Default `'default'` preserves single-adapter ergonomics.
+Tokens are deterministically derived from the dataSource name —
+e.g. `getTransactionManagerToken('billing')` → a stable string used
+in `@Inject(...)`. Matches `@nestjs/typeorm`'s
+`getRepositoryToken(Entity, dataSource)` /
+`getDataSourceToken(name)` conventions.
+
+**Consequences**: Token utilities live in
+`@nestjs-transactional/core` so all packages produce identical token
+strings. Single-adapter users see no change. See ADR-018 for the
+full design rationale.
+
+### DD-021: Adapter constructor accepts dataSource name
+
+**Context**: With multi-adapter support, a package must know which
+specific dataSource its adapter is bound to. The current shape
+(adapter as singleton, dataSource looked up via registry) does not
+generalise to "two TypeORM dataSources, two adapter instances".
+
+**Alternatives considered**:
+- Adapter as singleton, dataSource passed per call. Rejected: forces
+  every caller to know the dataSource, defeats the encapsulation
+  purpose of having an adapter at all.
+- Adapter accepts a `DataSource` instance directly (the actual
+  TypeORM `DataSource` object). Rejected: couples the adapter
+  constructor to TypeORM's class shape, breaks the cross-ORM
+  contract — Prisma's "dataSource" is not the same shape as
+  TypeORM's.
+
+**Decision**: Adapter constructor accepts a string dataSource name.
+`new TransactionalTypeOrmAdapter('billing')`. The adapter resolves
+the actual ORM-specific resource (the TypeORM `DataSource` instance,
+the Prisma client, etc.) internally — typically via DI tokens
+derived from the dataSource name.
+
+**Consequences**: Multiple adapter instances of the same class are
+first-class. Adapter packages must follow a consistent constructor
+contract `(dataSource: string)`, making it easier to author new
+adapters. See ADR-018.
+
+### DD-022: Inject decorators accept a dataSource parameter
+
+**Context**: Token-based DI works (`@Inject(getTransactionManagerToken('billing'))`
+is valid), but it is verbose and not discoverable in IDE autocomplete.
+Users coming from `@nestjs/typeorm` expect an
+`@InjectXxx(dataSource?)` shorthand.
+
+**Alternatives considered**:
+- Token-based `@Inject` only. Rejected: poor discoverability,
+  inconsistent with `@nestjs/typeorm`'s `@InjectRepository` /
+  `@InjectDataSource`.
+- Mandatory dataSource argument. Rejected: breaks single-adapter
+  ergonomics — every consumer would have to type `'default'`.
+
+**Decision**: Provide
+`@InjectTransactionManager(dataSource?)`,
+`@InjectOutboxPublisher(dataSource?)`,
+`@InjectEventPublicationRepository(dataSource?)`,
+etc. Default argument is `'default'`. They are thin wrappers over
+`@Inject(token)` where `token = getXxxToken(dataSource)`.
+
+**Consequences**: Idiomatic NestJS DX. Single-adapter consumers
+write `@InjectTransactionManager()` exactly as they would have
+written `@Inject(TransactionManager)` before — no token strings in
+user code.
+
+### DD-023: Independent transaction contexts per dataSource
+
+**Context**: Each dataSource adapter needs its own
+`AsyncLocalStorage` so that "is there an active transaction *for
+billing*?" can be answered without confusing it with "is there an
+active transaction *for inventory*?". Crossing a dataSource boundary
+must not silently enrol the second adapter into the first
+adapter's transaction — that would imply distributed-transaction
+semantics we do not provide.
+
+**Alternatives considered**:
+- Shared `AsyncLocalStorage` keyed by dataSource. Rejected: works in
+  principle, but invites accidental cross-store coupling — a future
+  bug could read the "wrong" context. Per-adapter ALS is
+  intrinsically isolated.
+- XA / 2PC across dataSources. Rejected — see ADR-018 "Alternatives
+  considered" for the full reasoning. Briefly: poor Node.js driver
+  support, divergent semantics across stores, operational cost of
+  XA-aware infrastructure unjustified for the patterns this ADR
+  targets.
+
+**Decision**: Each dataSource has its own `AsyncLocalStorage`
+instance. Cross-dataSource calls inside a single async stack
+create *separate* transactions per dataSource. Distributed
+transactions are explicitly NOT supported.
+
+**Consequences**: Cross-dataSource consistency is an
+*application-level* concern. The recommended pattern is "write to
+dataSource A, publish a durable event, consume the event on
+dataSource B" — i.e. the outbox stack is the consistency boundary
+between dataSources. Documented prominently in the migration
+guide. The single-unit atomicity contract from DD-019 applies to
+each dataSource independently.
+
+### DD-024: Smart `OutboxEventPublisher` facade
+
+**Context**: With multiple outbox stacks (one per dataSource),
+naively-injected `OutboxEventPublisher` becomes ambiguous — which
+one? Forcing every call site to inject and select would cripple
+single-adapter ergonomics.
+
+**Alternatives considered**:
+- Multiple injection tokens, no facade. Rejected: every business
+  service that publishes events grows a per-dataSource constructor
+  parameter. Punishes single-adapter users with no benefit.
+- Auto-detection only, no override. Rejected: breaks down at the
+  edges (no active transaction, two dataSources active at once via
+  nested `@Transactional`, bootstrap code, tests).
+
+**Decision**: A facade `OutboxEventPublisher` (the default-injected
+publisher) inspects the active per-dataSource transaction context
+and routes the event to the corresponding underlying publisher.
+Explicit override is supported via a second argument:
+
+```ts
+this.publisher.publish(event);                            // implicit
+this.publisher.publish(event, { dataSource: 'billing' }); // explicit
+```
+
+When no transaction is active and no explicit override is given,
+the facade falls back to `'default'`.
+
+**Consequences**: Single import works for both single-adapter and
+multi-adapter consumers. The facade is a small piece of composition
+on top of the per-dataSource publishers; it does not introduce new
+state. See ADR-018 point 8.
+
 ---
 
 ## Core Package (@nestjs-transactional/core)
@@ -794,6 +945,22 @@ TransactionContext: class (static methods)
 // Module
 TransactionalModule.forRoot(options): DynamicModule
 TransactionalModule.forRootAsync(options): DynamicModule
+
+// Multi-adapter — Phase 14, planned. Surface listed here so consumers
+// can see the shape that will land. Single-adapter users continue to
+// inject `TransactionManager` by class as today; the dataSource
+// argument defaults to 'default' everywhere.
+getTransactionManagerToken(dataSource?: string): string
+getOutboxPublisherToken(dataSource?: string): string
+getEventPublicationRepositoryToken(dataSource?: string): string
+getEventTypeRegistryToken(dataSource?: string): string
+getEventPublicationProcessorToken(dataSource?: string): string
+getStalenessMonitorToken(dataSource?: string): string
+
+InjectTransactionManager(dataSource?: string): ParameterDecorator
+InjectOutboxPublisher(dataSource?: string): ParameterDecorator
+InjectEventPublicationRepository(dataSource?: string): ParameterDecorator
+// ... siblings for every component above
 
 // Interceptor (usually wired via TransactionalModule; exported for manual binding)
 TransactionalInterceptor: class implements NestInterceptor
@@ -1481,13 +1648,257 @@ users.
   limitation in action ("stop the broker, observe COMPLETED").
 - Verified-running end-to-end against the docker-compose stack.
 
+### Phase 14: Multi-adapter architecture (planned)
+
+Spring-on-NestJS support for multiple `DataSource`s — same ORM with
+different DBs (`billing` + `inventory` + `main`), different ORMs
+side-by-side (TypeORM + Prisma + Mongoose), or distinct outbox
+stacks per bounded-context module. See ADR-018 for the design
+rationale and DD-020..DD-024 for the design decisions.
+
+**14.0: Preparation (this iteration)**
+- ADR-018 — multi-adapter architecture
+- DD-020..DD-024 added to CLAUDE.md
+- Phase 14 sub-phases sequenced
+- Migration impact and breaking-change list documented
+- No code changes
+
+**14.1: Token utilities and inject decorators (foundation)**
+- `getTransactionManagerToken(dataSource?: string): string` and
+  siblings (`getOutboxPublisherToken`,
+  `getEventPublicationRepositoryToken`,
+  `getEventTypeRegistryToken`, `getStalenessMonitorToken`,
+  `getEventPublicationProcessorToken`, etc.)
+- Inject decorators: `@InjectTransactionManager(dataSource?)`,
+  `@InjectOutboxPublisher(dataSource?)`, etc. — thin wrappers over
+  `@Inject(token)` for IDE discoverability
+- Unit tests for token shape stability
+
+**14.2: Core multi-adapter (`@nestjs-transactional/core`)**
+- `TransactionalModule.forRoot({ adapter, dataSource? })` accepts
+  an `adapter` instance and an optional `dataSource` name; default
+  `'default'`
+- `TransactionContext` per-dataSource ALS instances (DD-023)
+- `TransactionManager` registered under
+  `getTransactionManagerToken(dataSource)`
+- `@Transactional({ dataSource })` option propagated through
+  interceptor + methods bootstrap (ADR-005 wrappers stay; they read
+  the dataSource off the metadata)
+- Backward-compat layer for the `'default'` path so single-adapter
+  users see no change
+
+**14.3: Outbox multi-adapter (`@nestjs-transactional/outbox`)**
+- `OutboxModule.forRoot({ ..., dataSource? })` and
+  `OutboxModule.forFeature(events, { dataSource? })` register every
+  outbox provider under dataSource-derived tokens
+- `EventTypeRegistry` per dataSource — registrations don't bleed
+  across dataSources (a `'billing'` event type cannot be picked up
+  by an `'inventory'` deserializer)
+- `OutboxEventPublisher` smart facade implementing DD-024 (detect
+  active dataSource context, route accordingly, explicit override)
+- `EventPublicationProcessor` and `StalenessMonitor` bound per
+  dataSource
+
+**14.4: TypeORM adapter migration (`@nestjs-transactional/typeorm`)**
+- `TransactionalTypeOrmAdapter` constructor accepts a dataSource
+  name (DD-021); resolves the actual TypeORM `DataSource` via DI
+  using the dataSource name as the lookup key
+- `getCurrentEntityManager(dataSource?: string)` defaults to
+  `'default'`
+- `TypeOrmTransactionalModule.forFeature({ dataSource, ... })`
+  unchanged in surface but renames `instanceName` → `dataSource`
+  for consistency
+
+**14.5: Outbox-typeorm migration (`@nestjs-transactional/outbox-typeorm`)**
+- `typeOrmEventPublicationRepositoryProvider` becomes a factory
+  parameterised by dataSource name
+- `OutboxTypeOrmModule.forFeature({ dataSource?, ... })` registers
+  the repository under `getEventPublicationRepositoryToken(dataSource)`
+- Schema initializer scopes per-dataSource (one
+  `event_publication` table per dataSource by default; override
+  available)
+
+**14.6: Outbox-microservices migration**
+  (`@nestjs-transactional/outbox-microservices`)
+- `MicroservicesEventExternalizer` registered per dataSource so
+  externalization can be wired independently per outbox stack
+- `OutboxMicroservicesModule.forRoot({ defaultClient, dataSource? })`
+
+**14.7: CQRS adapter migration (`@nestjs-transactional/cqrs`)**
+- `CqrsTransactionalModule.forRoot({ dataSource? })`
+- `IntegrationEventsHandlerScanner` resolves the right outbox
+  registrar based on the handler's class — open question: do
+  handlers carry their own `dataSource` option, or inherit from the
+  module they're declared in? Default plan: handler-level option,
+  inherits if absent.
+- `HybridEventPublisher` wraps the smart facade so AggregateRoot
+  events route correctly in multi-adapter mode
+
+**14.8: Examples and documentation**
+- New `examples/multi-adapter-typeorm/` — two TypeORM dataSources,
+  separate outboxes, durable cross-DB integration via events
+- (Stretch) `examples/multi-adapter-mixed/` — TypeORM + a stub
+  second adapter, demonstrating the cross-ORM contract once a
+  second adapter package exists
+- Update existing examples (`outbox-full-stack`, `cqrs-full-stack`,
+  etc.) to use the explicit `dataSource: 'default'` form once and
+  then leave it implicit, so users can see the default-vs-explicit
+  contrast
+- Migration guide section: "Single adapter → multi-adapter" —
+  step-by-step path
+- Per-package README updates with multi-adapter examples
+- ADR-018 cross-linked from architecture docs
+
+**14.9: Final verification**
+- All builds, type-check, lint, unit, integration green
+- Coverage holds across packages
+- Single-adapter examples remain ergonomic (no `'default'` strings
+  in user code)
+- Multi-adapter example end-to-end against real Postgres
+
 ### Future phases (not scheduled)
 
 - **@nestjs-transactional/outbox-prisma**: Prisma persistence backend
+  (would slot into Phase 14's adapter contract)
 - **@nestjs-transactional/outbox-mongodb**: MongoDB persistence backend
 - **OpenTelemetry integration**: tracing across transaction and event
   boundaries
 - **ESM dual packaging**: ESM export support
+
+---
+
+## Migration to multi-adapter
+
+This section enumerates the file-level impact and the breaking
+changes that Phase 14 will introduce. Captured during 14.0 so the
+implementation phases (14.1–14.9) can be sequenced without
+re-discovering the surface.
+
+### Files / modules affected
+
+**`packages/core`**
+- `TransactionalModule.forRoot` — accepts `{ adapter, dataSource? }`;
+  `forRootAsync` accepts the async equivalent.
+- `TransactionContext` — per-dataSource `AsyncLocalStorage` instances
+  (DD-023). Currently a single ALS keyed by adapter+instance composite
+  string; refactor to a registry of ALS instances keyed by dataSource
+  name.
+- `TransactionManager` — registered under
+  `getTransactionManagerToken(dataSource)`, no longer a class-token
+  singleton.
+- `AdapterRegistry` — likely subsumed by per-dataSource provider
+  registration; if still needed, gains a dataSource axis.
+- New: token utilities (`getTransactionManagerToken`, ...) and inject
+  decorators (`@InjectTransactionManager`, ...) — Phase 14.1.
+
+**`packages/typeorm`**
+- `TransactionalTypeOrmAdapter` — constructor takes a dataSource
+  name (DD-021); resolves the actual TypeORM `DataSource` via DI.
+- `TypeOrmTransactionalModule.forFeature` — `instanceName` field
+  renamed to `dataSource` for cross-package consistency.
+- `getCurrentEntityManager(dataSource?: string, fallback?)` —
+  default `'default'`.
+
+**`packages/cqrs`**
+- `CqrsTransactionalModule.forRoot({ dataSource? })`.
+- `CqrsHandlerWrapper` (and the bootstrap that runs it) reads
+  `@Transactional({ dataSource })` metadata off handler classes and
+  resolves the matching `TransactionManager` via the new tokens.
+- `IntegrationEventsHandlerScanner` — handler-level `dataSource`
+  option; defaults to `'default'`. Inheritance from the declaring
+  module is *not* supported in v1 — handlers state their dataSource
+  if non-default.
+- `HybridEventPublisher` — wraps the smart facade
+  `OutboxEventPublisher` (DD-024) so AggregateRoot events route
+  correctly in multi-adapter mode.
+
+**`packages/outbox`**
+- `OutboxModule.forRoot({ ..., dataSource? })` and
+  `OutboxModule.forFeature(events, { dataSource? })` — every provider
+  goes under dataSource-derived tokens.
+- `EventTypeRegistry` — one per dataSource. Cross-dataSource
+  registration is forbidden; duplicate detection scoped per
+  dataSource.
+- `OutboxEventPublisher` — facade implementing DD-024 (active-context
+  detection + explicit override + `'default'` fallback).
+- `OutboxEventPublisher` per dataSource — internal class behind the
+  facade; not exported by name in user code.
+- `EventPublicationRegistry`, `EventPublicationProcessor`,
+  `StalenessMonitor`, `StartupRecoveryService` — instantiated per
+  dataSource.
+- `OutboxProcessingModule` — accepts `{ dataSource? }`; multi-adapter
+  worker processes import it once per dataSource they own.
+- Operator APIs (`Failed/Incomplete/CompletedEventPublications`) —
+  per dataSource.
+
+**`packages/outbox-typeorm`**
+- `typeOrmEventPublicationRepositoryProvider` — factory parameterised
+  by dataSource name.
+- `OutboxTypeOrmModule.forFeature({ dataSource?, ... })` — registers
+  the repository under
+  `getEventPublicationRepositoryToken(dataSource)`.
+- `SchemaInitializer` and migration — scoped per dataSource (one
+  `event_publication` table per dataSource by default).
+- Entities (`EventPublicationEntity`,
+  `EventPublicationArchiveEntity`) unchanged at the schema level.
+
+**`packages/outbox-microservices`**
+- `MicroservicesEventExternalizer` — registered per dataSource so
+  externalization can be wired independently per outbox stack.
+- `OutboxMicroservicesModule.forRoot({ defaultClient, dataSource? })`.
+
+**`examples/*`**
+- Every example module updated to the new `forRoot({ adapter,
+  dataSource })` shape. Single-adapter examples lean on default
+  `'default'` and stay short.
+- New `examples/multi-adapter-typeorm/` (Phase 14.8) — two TypeORM
+  dataSources, separate outboxes, durable cross-DB integration.
+
+**Tests**
+- All test fixtures using the current `TransactionalModule.forRoot`
+  / `OutboxModule.forRoot` / `OutboxTypeOrmModule.forFeature` shape
+  migrate to the new option layout.
+- New unit tests for the token utilities, the per-dataSource ALS
+  isolation, the smart facade routing, and the `'default'` fallback
+  behavior.
+
+### Breaking changes (cumulative across Phase 14)
+
+Acceptable because no package has shipped a stable release yet.
+
+1. `TransactionalModule.forRoot` signature changes: now expects
+   `{ adapter, dataSource?, ... }` where `adapter` is an instance
+   produced by an adapter package
+   (`new TransactionalTypeOrmAdapter('billing')`). Replaces today's
+   per-module config of `adapters: [...]`.
+2. `@Transactional` decorator gains a `dataSource` option.
+   `@Transactional({ dataSource: 'billing' })`. Default unchanged.
+3. `OutboxModule.forRoot` and `OutboxModule.forFeature` accept a
+   `dataSource` option.
+4. `OutboxTypeOrmModule.forFeature` accepts a `dataSource` option.
+   Repository provider registration uses dataSource-derived tokens
+   instead of the current single-token shape.
+5. `CqrsTransactionalModule.forRoot` accepts a `dataSource` option.
+6. `OutboxMicroservicesModule.forRoot` accepts a `dataSource` option.
+7. `getCurrentEntityManager(dataSource?: string, fallback?)` —
+   parameter renamed from `instanceName` to `dataSource`. Same
+   semantics; the rename is for cross-package consistency.
+8. `TypeOrmTransactionalModule.forFeature` — `instanceName` field
+   renamed to `dataSource`. Same semantics.
+9. New inject decorators (`@InjectTransactionManager`, etc.) ship.
+   Strictly additive — `@Inject(TransactionManager)` (class token)
+   continues to work for the default dataSource via a class-token
+   alias.
+10. Token names ship as a public API (DD-020). Stable strings
+    derived from dataSource name; once shipped, changing the token
+    format is itself breaking.
+
+Single-adapter ergonomics stay clean — every new option defaults to
+`'default'`. A user with one DB and no `dataSource:` argument
+anywhere sees no source-code change beyond the constructor-as-
+adapter shape (`new TransactionalTypeOrmAdapter()`). The
+constructor-shape change is the one item that touches every
+single-adapter consumer.
 
 ---
 
@@ -1799,3 +2210,23 @@ READMEs / architecture docs / migration guide / examples).
    Do NOT pass `eventTypes` to `forRoot` — that field was removed in
    Phase 13. Move event registrations to the feature modules that
    own the event classes.
+
+10. **Multi-adapter naming: dataSource name is the primary
+    identifier across every package; default is `'default'`.** Tokens
+    are deterministically derived via the `getXxxToken(dataSource)`
+    helpers exported from `@nestjs-transactional/core`. The convention
+    is `'{Component}{DataSource}'` (PascalCase, dataSource
+    capitalised — e.g. `'BillingTransactionManager'`,
+    `'DefaultOutboxEventPublisher'`); dataSource `'default'` produces
+    the `'Default…'` prefix. Inject decorators
+    (`@InjectTransactionManager(dataSource?)`,
+    `@InjectOutboxPublisher(dataSource?)`, etc.) accept the same
+    optional dataSource argument with the same default. Adapter
+    constructors take a dataSource name
+    (`new TransactionalTypeOrmAdapter('billing')`); each dataSource
+    has its own `AsyncLocalStorage` so cross-dataSource calls do not
+    silently enrol into a sibling transaction (DD-023). Distributed
+    transactions across dataSources are explicitly NOT supported —
+    cross-dataSource consistency goes through the outbox, see
+    ADR-018. Phase 14 lands the implementation; Phase 14.0 is the
+    documentation-only preparation iteration.
