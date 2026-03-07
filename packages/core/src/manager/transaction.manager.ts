@@ -92,8 +92,9 @@ export class TransactionManager {
    * only the Map slot at `instanceName` is swapped as propagation requires.
    */
   async run<T>(options: ExtendedTransactionOptions, fn: () => Promise<T>): Promise<T> {
-    const adapterName = options.adapter ?? this.registry.getDefaultAdapterName();
-    const instanceName = options.adapterInstance ?? this.registry.getDefaultInstanceName();
+    // dataSource takes precedence over adapter/adapterInstance (DD-020).
+    // Resolved up front so the rest of run() works in a single shape.
+    const { adapterName, instanceName } = this.resolveAdapterIdentifiers(options);
     const propagation = options.propagation ?? PropagationMode.REQUIRED;
     const key = TransactionManager.contextKey(adapterName, instanceName);
 
@@ -175,6 +176,33 @@ export class TransactionManager {
    */
   private static contextKey(adapterName: string, instanceName: string): string {
     return `${adapterName}:${instanceName}`;
+  }
+
+  /**
+   * Translate the user-facing options into the internal `(adapterName,
+   * instanceName)` pair used to build the active-transaction Map key.
+   *
+   * Resolution order (DD-020):
+   * 1. `options.dataSource` set: lookup the unique adapter via the
+   *    registry by dataSource name. The dataSource name becomes the
+   *    `instanceName`; the registry hands back the adapter type.
+   * 2. Else: legacy path — `options.adapter` / `options.adapterInstance`
+   *    fall back to the registry's defaults.
+   */
+  private resolveAdapterIdentifiers(options: ExtendedTransactionOptions): {
+    adapterName: string;
+    instanceName: string;
+  } {
+    if (options.dataSource !== undefined) {
+      return {
+        adapterName: this.registry.getAdapterNameByDataSource(options.dataSource),
+        instanceName: options.dataSource,
+      };
+    }
+    return {
+      adapterName: options.adapter ?? this.registry.getDefaultAdapterName(),
+      instanceName: options.adapterInstance ?? this.registry.getDefaultInstanceName(),
+    };
   }
 
   /**

@@ -9,6 +9,7 @@ import {
 import { APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
 
 import { TransactionalMethodsBootstrap } from '../bootstrap/transactional-methods.bootstrap';
+import { TransactionContextView } from '../context/transaction-context-view';
 import { TransactionalInterceptor } from '../interceptor/transactional.interceptor';
 import {
   ADAPTER_REGISTRY,
@@ -20,6 +21,12 @@ import {
   TRANSACTION_OBSERVERS,
   type TransactionObserver,
 } from '../observability/transaction-observer';
+import {
+  getTransactionContextToken,
+  getTransactionManagerToken,
+  getTransactionalAdapterToken,
+} from '../tokens/token-utils';
+import type { TransactionAdapter } from '../types/transaction-adapter';
 
 /**
  * Options accepted by {@link TransactionalModule.forRoot}.
@@ -49,9 +56,27 @@ export interface TransactionalModuleOptions {
   readonly registerMethodsBootstrap?: boolean;
 
   /**
-   * Adapters to register with {@link AdapterRegistry} at module init time.
-   * The first entry becomes the default unless a later entry is passed with
-   * `isDefault: true` via a manual registration.
+   * Single adapter shorthand (DD-021). Registers the adapter under
+   * `(adapter.name, adapter.dataSourceName)` and exposes per-dataSource
+   * DI tokens (`getTransactionalAdapterToken`,
+   * `getTransactionContextToken`, `getTransactionManagerToken`).
+   *
+   * Recommended for the common single-adapter case. For multi-adapter
+   * setups, list every adapter in {@link adapters} — this module
+   * supports a single `forRoot()` call only (NestJS provider
+   * deduplication makes multi-`forRoot()` infeasible without
+   * coordination state we deliberately do not maintain).
+   */
+  readonly adapter?: TransactionAdapter;
+
+  /**
+   * Multiple adapters as full {@link AdapterRegistration} entries, for
+   * advanced multi-adapter setups. The first entry becomes the default
+   * unless a later entry is passed with `isDefault: true` via a manual
+   * registration.
+   *
+   * For multi-adapter, register every adapter through this single
+   * array — multi-`forRoot()` calls are not supported.
    */
   readonly adapters?: readonly AdapterRegistration[];
 
@@ -71,6 +96,18 @@ export interface TransactionalModuleOptions {
  * known at module definition time.
  */
 export interface TransactionalModuleAsyncFactoryResult {
+  /**
+   * Single adapter shorthand — equivalent to the {@link adapters} array
+   * but lets the factory return one adapter directly. See
+   * {@link TransactionalModuleOptions.adapter} for semantics.
+   *
+   * Per-dataSource DI tokens (`getTransactionalAdapterToken` etc.) are
+   * NOT registered for `forRootAsync` because the dataSource name is
+   * only known after the async factory runs, while NestJS provider
+   * tokens must be declared statically. Use synchronous
+   * `forRoot({ adapter })` if per-dataSource tokens are required.
+   */
+  readonly adapter?: TransactionAdapter;
   readonly adapters?: readonly AdapterRegistration[];
   readonly observers?: readonly TransactionObserver[];
 }
@@ -123,12 +160,14 @@ export class TransactionalModule {
    * ```
    */
   static forRoot(options: TransactionalModuleOptions = {}): DynamicModule {
+    const registrations = resolveRegistrations(options);
     const providers: Provider[] = [
       {
         provide: ADAPTER_REGISTRY,
-        useFactory: (): AdapterRegistry => buildRegistry(options.adapters ?? []),
+        useFactory: (): AdapterRegistry => buildRegistry(registrations),
       },
       TransactionManager,
+      ...buildPerDataSourceProviders(registrations),
     ];
 
     if (options.observers !== undefined) {
@@ -154,7 +193,11 @@ export class TransactionalModule {
       global: options.isGlobal ?? false,
       imports: [DiscoveryModule],
       providers,
-      exports: [TransactionManager, ADAPTER_REGISTRY],
+      exports: [
+        TransactionManager,
+        ADAPTER_REGISTRY,
+        ...buildPerDataSourceExports(registrations),
+      ],
     };
   }
 
@@ -183,7 +226,7 @@ export class TransactionalModule {
     const registryProvider: FactoryProvider = {
       provide: ADAPTER_REGISTRY,
       useFactory: (opts: TransactionalModuleAsyncFactoryResult): AdapterRegistry =>
-        buildRegistry(opts.adapters ?? []),
+        buildRegistry(resolveRegistrations(opts)),
       inject: [ASYNC_OPTIONS_TOKEN],
     };
 
@@ -228,4 +271,78 @@ function buildRegistry(adapters: readonly AdapterRegistration[]): AdapterRegistr
     registry.register(adapter);
   }
   return registry;
+}
+
+/**
+ * Resolve user-facing options (`adapter` | `adapters`) into the canonical
+ * `AdapterRegistration[]` shape. The single `adapter` shortcut derives
+ * `(adapterName, instanceName)` from the adapter's own properties
+ * (`adapter.name`, `adapter.dataSourceName`) — the user does not need
+ * to repeat them.
+ *
+ * Both options can be provided together; the single-form entry is
+ * appended to the array. Duplicate dataSource names across the
+ * combined list are surfaced at registry-resolution time, not here.
+ */
+function resolveRegistrations(
+  options: { readonly adapter?: TransactionAdapter; readonly adapters?: readonly AdapterRegistration[] },
+): readonly AdapterRegistration[] {
+  const fromArray = options.adapters ?? [];
+  if (options.adapter === undefined) {
+    return fromArray;
+  }
+  const single: AdapterRegistration = {
+    adapterName: options.adapter.name,
+    instanceName: options.adapter.dataSourceName,
+    adapter: options.adapter,
+  };
+  return [...fromArray, single];
+}
+
+/**
+ * Per-dataSource DI providers for ADR-018's token-based access pattern.
+ * For each registered adapter:
+ * - `getTransactionalAdapterToken(dataSource)` resolves to the adapter
+ *   instance directly.
+ * - `getTransactionContextToken(dataSource)` resolves to a
+ *   {@link TransactionContextView} pre-bound to the dataSource.
+ * - `getTransactionManagerToken(dataSource)` aliases the singleton
+ *   `TransactionManager` via `useExisting`. Per-call dataSource
+ *   selection still goes through `manager.run({ dataSource })` —
+ *   this token exists for symmetry with `@nestjs/typeorm`'s
+ *   per-dataSource injection pattern (DD-022).
+ */
+function buildPerDataSourceProviders(
+  registrations: readonly AdapterRegistration[],
+): Provider[] {
+  const providers: Provider[] = [];
+  for (const reg of registrations) {
+    const ds = reg.instanceName;
+    providers.push({
+      provide: getTransactionalAdapterToken(ds),
+      useValue: reg.adapter,
+    });
+    providers.push({
+      provide: getTransactionContextToken(ds),
+      useValue: new TransactionContextView(ds),
+    });
+    providers.push({
+      provide: getTransactionManagerToken(ds),
+      useExisting: TransactionManager,
+    });
+  }
+  return providers;
+}
+
+function buildPerDataSourceExports(
+  registrations: readonly AdapterRegistration[],
+): InjectionToken[] {
+  const exports: InjectionToken[] = [];
+  for (const reg of registrations) {
+    const ds = reg.instanceName;
+    exports.push(getTransactionalAdapterToken(ds));
+    exports.push(getTransactionContextToken(ds));
+    exports.push(getTransactionManagerToken(ds));
+  }
+  return exports;
 }

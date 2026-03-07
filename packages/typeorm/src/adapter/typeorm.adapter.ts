@@ -43,6 +43,15 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
     readonly instanceName: string,
   ) {}
 
+  /**
+   * Public dataSource name (DD-021). For TypeORM the dataSource name
+   * IS the adapter instance name — the constructor's `instanceName`
+   * argument is the single user-supplied identifier.
+   */
+  get dataSourceName(): string {
+    return this.instanceName;
+  }
+
   async runInTransaction<T>(
     options: TransactionOptions,
     fn: (handle: TypeOrmTransactionHandle) => Promise<T>,

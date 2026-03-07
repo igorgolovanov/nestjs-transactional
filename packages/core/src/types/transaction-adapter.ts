@@ -24,6 +24,19 @@ export interface TransactionAdapter<THandle extends TransactionHandle = Transact
   readonly name: string;
 
   /**
+   * Public dataSource name this adapter instance is bound to (DD-021).
+   * The single string identifier the multi-adapter API thinks in —
+   * `'default'`, `'billing'`, `'inventory'`, etc. Provided by the adapter
+   * (typically through its constructor) so consumers do not need to
+   * track adapter type and instance name separately.
+   *
+   * For backwards compatibility this is also the value used as the
+   * `instanceName` slot in {@link AdapterRegistration} when the adapter
+   * is auto-registered via `TransactionalModule.forRoot({ adapter })`.
+   */
+  readonly dataSourceName: string;
+
+  /**
    * Execute `fn` inside a new transaction. The callback receives an opaque
    * handle whose runtime type is the adapter-specific `THandle`.
    *

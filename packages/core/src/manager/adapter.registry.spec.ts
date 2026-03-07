@@ -3,9 +3,10 @@ import type { TransactionAdapter } from '../types/transaction-adapter';
 
 import { AdapterRegistry, type AdapterRegistration } from './adapter.registry';
 
-function makeAdapter(name = 'mock'): TransactionAdapter {
+function makeAdapter(name = 'mock', dataSourceName = 'default'): TransactionAdapter {
   return {
     name,
+    dataSourceName,
     runInTransaction: jest.fn(),
     runInSavepoint: jest.fn(),
   };
