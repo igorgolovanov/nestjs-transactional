@@ -332,6 +332,68 @@ add a thin discoverable surface on top.
   (`new TransactionalXxxAdapter(dataSource: string)`), making it
   easier to author new adapters.
 
+## Adapter pattern conventions
+
+Confirmed during Phase 14.4 audit and codified here as guidance for
+future ORM adapters (`@nestjs-transactional/prisma`,
+`@nestjs-transactional/mongoose`, etc.):
+
+- **Adapters receive the concrete native connection directly.**
+  TypeORM's adapter takes a `DataSource` instance (or a thunk
+  resolving to one); a Prisma adapter would take a `PrismaClient`;
+  a Mongoose adapter would take a `Connection`. The user already
+  has these — usually instantiated from their own `forRoot` config
+  via `@nestjs/typeorm`, `nestjs-prisma`, etc. — and passes the
+  instance through. The adapter does NOT lazily resolve the
+  connection via DI tokens (`getDataSourceToken`, etc.); the
+  resolution path is the user's, kept transparent.
+- **The adapter is created at module-config time**, bound to the
+  connection at construction. `TypeOrmTransactionalModule.forFeature`
+  builds a `TypeOrmTransactionAdapter(dataSource, dataSourceName)` in
+  its provider factory; future ORM modules follow the same shape
+  (`PrismaTransactionalModule.forFeature({ prisma, dataSourceName })`,
+  `MongooseTransactionalModule.forFeature({ connection, dataSourceName })`).
+- **The dataSource identifier is a string flowing through every
+  consumer.** The adapter exposes it as `dataSourceName`; the user
+  passes it via `@Transactional({ dataSource })`,
+  `getCurrentEntityManager(dataSource)`, and the per-DS inject
+  decorators. The same string must round-trip cleanly across
+  decorator → manager → registry → adapter → helper.
+
+This pattern keeps adapter packages thin: they wrap the native
+connection's transaction primitive (`DataSource.transaction`,
+`prisma.$transaction`, `connection.transaction`, ...) and translate
+to the core's `runInTransaction` / `runInSavepoint` callback shape.
+No DI token wiring, no provider-graph gymnastics inside the adapter.
+
+## Vocabulary asymmetry
+
+The codebase uses two distinct terms depending on context:
+
+- **`dataSource`** — when the surrounding interface only needs the
+  string identifier. Examples: `@Transactional({ dataSource })`,
+  `OutboxModule.forFeature(events, { dataSource })`,
+  `manager.run({ dataSource })`. This is the primary user-facing
+  spelling.
+- **`dataSourceName`** — when the surrounding interface ALSO holds
+  the connection instance and the two would collide on the same
+  field name. Examples: `TransactionalAdapter.dataSourceName`
+  (instance property; the adapter also owns the connection),
+  `TypeOrmTransactionalOptions.dataSourceName` (the options object
+  also has `dataSource: DataSource | factory` for the connection).
+
+The asymmetry is deliberate and stable. Renaming one to match the
+other would either:
+- collapse `dataSourceName` → `dataSource` and clobber the
+  connection field (breaks every existing typeorm consumer), or
+- promote `dataSource` → `dataSourceName` everywhere (verbose and
+  inconsistent with NestJS conventions like `@nestjs/typeorm`'s
+  `getDataSourceToken(dataSource: string)` parameter naming).
+
+A future major-version cleanup may revisit; for now the two names
+read naturally in their respective contexts and a single sentence
+of doc (this section) prevents new-contributor confusion.
+
 ## Migration
 
 The Phase 14 implementation roadmap (CLAUDE.md) sequences the
