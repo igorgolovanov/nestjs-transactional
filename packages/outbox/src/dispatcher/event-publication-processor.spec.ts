@@ -17,8 +17,8 @@ import { InMemoryEventPublicationRepository } from '../testing/in-memory-reposit
 import { CompletionMode } from '../types/completion-mode';
 import { PublicationStatus } from '../types/publication-status';
 
+import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
 import { EventPublicationProcessor } from './event-publication-processor';
-import { OutboxEventPublisher } from './outbox-event-publisher';
 import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
@@ -31,6 +31,7 @@ interface FakeHandle extends TransactionHandle {
 
 class FakeAdapter implements TransactionAdapter<FakeHandle> {
   readonly name = 'in-memory';
+  readonly dataSourceName = 'default';
 
   async runInTransaction<T>(
     _options: TransactionOptions,
@@ -56,7 +57,7 @@ describe('EventPublicationProcessor', () => {
   let manager: TransactionManager;
   let repo: InMemoryEventPublicationRepository;
   let listenerRegistry: OutboxListenerRegistry;
-  let publisher: OutboxEventPublisher;
+  let publisher: DataSourceOutboxPublisher;
   let processor: EventPublicationProcessor;
   let invocations: unknown[];
 
@@ -86,7 +87,11 @@ describe('EventPublicationProcessor', () => {
       new JsonEventSerializer(eventTypes),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new OutboxEventPublisher(publicationRegistry, listenerRegistry, manager);
+    publisher = new DataSourceOutboxPublisher(
+      'default',
+      publicationRegistry,
+      listenerRegistry,
+    );
     processor = new EventPublicationProcessor(publicationRegistry, listenerRegistry, options);
     invocations = [];
   });

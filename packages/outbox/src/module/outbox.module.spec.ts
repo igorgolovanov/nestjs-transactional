@@ -29,6 +29,7 @@ interface FakeHandle extends TransactionHandle {
 
 class FakeAdapter implements TransactionAdapter<FakeHandle> {
   readonly name = 'in-memory';
+  readonly dataSourceName = 'default';
 
   async runInTransaction<T>(
     _options: TransactionOptions,
