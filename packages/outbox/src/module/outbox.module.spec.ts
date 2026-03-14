@@ -93,6 +93,7 @@ describe('OutboxModule (integration)', () => {
   }
 
   beforeEach(() => {
+    OutboxModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

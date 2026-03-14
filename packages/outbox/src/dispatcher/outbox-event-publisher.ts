@@ -1,6 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 
 import { EventTypeRegistry } from '../serialization/event-type-registry';
+import {
+  getEventTypeRegistryToken,
+  getOutboxPublisherToken,
+} from '../tokens/token-utils';
 import { OutboxError } from '../types/errors';
 
 import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
@@ -55,24 +60,55 @@ export interface OutboxPublishOptions {
  * `OutboxEventPublisher` and receive routing semantics consistent
  * with the registered event-type ownership.
  */
+/** @internal — DI token carrying the live Map of registered dataSources. */
+export const OUTBOX_DATA_SOURCE_NAMES = Symbol('OUTBOX_DATA_SOURCE_NAMES');
+
+/** @internal — Read-only view of the shared registration list. */
+export type OutboxDataSourceNames = ReadonlySet<string> | { keys(): IterableIterator<string> };
+
 @Injectable()
-export class OutboxEventPublisher {
+export class OutboxEventPublisher implements OnModuleInit {
   private readonly logger = new Logger(OutboxEventPublisher.name);
+  private readonly publishers = new Map<string, DataSourceOutboxPublisher>();
+  private readonly eventTypeRegistries = new Map<string, EventTypeRegistry>();
 
   constructor(
+    private readonly moduleRef: ModuleRef,
     /**
-     * Map of `dataSource → DataSourceOutboxPublisher`. Built at
-     * module-config time by `OutboxModule.forRoot` (Q3.A —
-     * module-build-time configuration). Read-only — facade does no
-     * mutation.
+     * Live reference to {@link OutboxModule.registrations} (passed via
+     * `useValue` so its `keys()` enumeration sees every dataSource
+     * registered across all `forRoot` calls — `useValue` captures the
+     * Map by reference, so later forRoot pushes are visible at
+     * `OnModuleInit` time).
      */
-    private readonly publishers: ReadonlyMap<string, DataSourceOutboxPublisher>,
-    /**
-     * Map of `dataSource → EventTypeRegistry`. Used to resolve event
-     * class → dataSource via `registry.has(event.constructor.name)`.
-     */
-    private readonly eventTypeRegistries: ReadonlyMap<string, EventTypeRegistry>,
+    @Inject(OUTBOX_DATA_SOURCE_NAMES)
+    private readonly dataSourceNames: OutboxDataSourceNames,
   ) {}
+
+  /**
+   * Late-bind per-DS publishers and event-type registries via
+   * `ModuleRef`. Lifecycle hook chosen because it fires AFTER every
+   * provider has been instantiated — by then every per-DS publisher
+   * exists and is resolvable, regardless of the order in which the
+   * facade's `forRoot` and per-DS `forRoot`s appear in the import
+   * tree.
+   */
+  onModuleInit(): void {
+    for (const ds of this.dataSourceNames.keys()) {
+      this.publishers.set(
+        ds,
+        this.moduleRef.get<DataSourceOutboxPublisher>(getOutboxPublisherToken(ds), {
+          strict: false,
+        }),
+      );
+      this.eventTypeRegistries.set(
+        ds,
+        this.moduleRef.get<EventTypeRegistry>(getEventTypeRegistryToken(ds), {
+          strict: false,
+        }),
+      );
+    }
+  }
 
   /**
    * Publish a single event. Routing per the class JSDoc:
@@ -181,7 +217,7 @@ export class OutboxEventPublisher {
     if (publisher === undefined) {
       throw new OutboxError(
         `No outbox configured for dataSource '${dataSource}'. ` +
-          `Add a matching entry to OutboxModule.forRoot({ dataSources: [...] }).`,
+          `Add 'OutboxModule.forRoot({ dataSource: '${dataSource}' })' to the module imports.`,
       );
     }
     return publisher;

@@ -62,6 +62,10 @@ function transactionalModule(): ReturnType<typeof TransactionalModule.forRoot> {
 describe('OutboxModule.forFeature', () => {
   let module: TestingModule | undefined;
 
+  beforeEach(() => {
+    OutboxModule.resetForTesting();
+  });
+
   afterEach(async () => {
     await module?.close();
     module = undefined;
