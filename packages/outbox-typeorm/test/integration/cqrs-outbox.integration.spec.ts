@@ -174,7 +174,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
           dataSource: ctx.dataSource,
         }),
         OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider,
+          repository: typeOrmEventPublicationRepositoryProvider(),
         }),
         OutboxModule.forFeature([OrderPlacedEvent]),
         // NOTE: CqrsModule is intentionally NOT imported alongside
@@ -208,6 +208,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
   });
 
   beforeEach(async () => {
+    OutboxModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

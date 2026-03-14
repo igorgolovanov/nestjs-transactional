@@ -61,3 +61,35 @@ export async function stopPostgresContainer(ctx: PostgresTestContext): Promise<v
   }
   await ctx.container.stop();
 }
+
+/**
+ * Create a second database inside the running Postgres container and
+ * return an initialised {@link DataSource} pointing at it. Mirror of
+ * the helper in `packages/typeorm/test/setup-testcontainers.ts` — used
+ * by Phase 14.5 multi-dataSource integration tests so two logically
+ * independent DataSources can share one container.
+ *
+ * Caller is responsible for destroying the returned DataSource before
+ * `stopPostgresContainer` is called.
+ */
+export async function createAdditionalDatabase(
+  ctx: PostgresTestContext,
+  databaseName: string,
+  options: Pick<StartPostgresOptions, 'entities' | 'synchronize'> = {},
+): Promise<DataSource> {
+  await ctx.dataSource.query(`CREATE DATABASE ${databaseName}`);
+
+  const secondary = new DataSource({
+    type: 'postgres',
+    host: ctx.container.getHost(),
+    port: ctx.container.getPort(),
+    username: ctx.container.getUsername(),
+    password: ctx.container.getPassword(),
+    database: databaseName,
+    entities: options.entities,
+    synchronize: options.synchronize ?? false,
+    logging: false,
+  });
+  await secondary.initialize();
+  return secondary;
+}
