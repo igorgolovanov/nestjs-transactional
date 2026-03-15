@@ -78,6 +78,28 @@ export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
  * })
  * export class AppModule {}
  * ```
+ *
+ * **Multi-dataSource setups** (Phase 14.7): the cqrs runtime is
+ * dataSource-agnostic by design. There is exactly one
+ * `CqrsTransactionalModule.forRoot()` per application regardless of
+ * how many dataSources are configured — multi-DS routing emerges
+ * from the structural-port wiring, not from a per-DS module instance.
+ *
+ * Wire {@link OUTBOX_PUBLICATION_SCHEDULER} and
+ * {@link OUTBOX_LISTENER_REGISTRAR} to the outbox stack you want
+ * cqrs to delegate to (`useExisting: OutboxEventPublisher` /
+ * `useExisting: OutboxListenerRegistry`). Apps with multiple outbox
+ * stacks (one `OutboxModule.forRoot()` per dataSource — ADR-019)
+ * choose which one cqrs bridges to via the `useExisting` target.
+ *
+ * Known limitation in multi-DS deployments: the in-memory
+ * dispatcher's hook-attachment goes through
+ * `TransactionManager.registerBeforeCommit` / `registerAfterCommit`,
+ * which target the first-active transaction on the current async
+ * context (non-deterministic across simultaneously-active
+ * cross-dataSource transactions). For cross-DS event handling
+ * prefer the outbox path — see CLAUDE.md "Known Limitations
+ * (Phase 14)".
  */
 @Module({})
 export class CqrsTransactionalModule {

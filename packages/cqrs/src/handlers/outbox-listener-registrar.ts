@@ -21,6 +21,16 @@
  * `OutboxModule` from outbox binds this automatically once
  * wired — consumers who construct the registry manually need to
  * declare the binding themselves.
+ *
+ * **Multi-dataSource (Phase 14.7).** `OutboxListenerRegistry` is
+ * registered per-dataSource (one per `OutboxModule.forRoot()` —
+ * ADR-019). For multi-DS deployments with non-default-DS handlers,
+ * resolve the per-DS registry token explicitly and bridge it via
+ * `useExisting: getOutboxListenerRegistryToken('billing')` (or
+ * similar). The default-DS registry remains aliased under the
+ * `OutboxListenerRegistry` class token. See CLAUDE.md "Known
+ * Limitations (Phase 14)" — the bundled scanner gap (Phase 14.3.1
+ * follow-up) covers automating this.
  */
 export interface OutboxListenerRegistrar {
   register(listener: {

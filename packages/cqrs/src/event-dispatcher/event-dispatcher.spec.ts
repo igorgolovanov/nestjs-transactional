@@ -35,6 +35,7 @@ interface FakeRollback extends FakeCommit {
 
 class FakeAdapter implements TransactionAdapter<FakeHandle> {
   readonly name = 'in-memory';
+  readonly dataSourceName = 'default';
   committedTransactions: FakeCommit[] = [];
   rolledBackTransactions: FakeRollback[] = [];
 

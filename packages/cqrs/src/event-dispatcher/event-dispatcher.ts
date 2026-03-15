@@ -61,6 +61,21 @@ interface RegisteredListener {
  * - `async: true` listeners are fire-and-forget via `queueMicrotask`:
  *   their failures are logged but never reach the enclosing
  *   transaction, even in BEFORE_COMMIT phase.
+ *
+ * **Multi-dataSource note (Phase 14.7).** Hook attachment goes
+ * through `TransactionManager.registerBeforeCommit` /
+ * `registerAfterCommit` etc., which target the FIRST active
+ * transaction on the current async context. With cross-dataSource
+ * simultaneous transactions (one per dataSource) the handler may
+ * fire on a transaction it doesn't conceptually belong to. This is
+ * acceptable for single-dataSource apps (the only scenario where
+ * the cqrs in-memory dispatcher is exercised today) and for handlers
+ * that don't care about a specific dataSource. For cross-DS event
+ * routing prefer the outbox path (`@OutboxEventsHandler` /
+ * `@IntegrationEventsHandler` with the outbox bound) — outbox
+ * routing is per-dataSource by event registration (Phase 14.3.2). A
+ * dataSource-aware dispatcher path is part of the planned Phase
+ * 14.3.1 follow-up; see CLAUDE.md "Known Limitations (Phase 14)".
  */
 @Injectable()
 export class TransactionalEventDispatcher {
