@@ -209,6 +209,25 @@ rejects the publication with a clear `ExternalizationError` — the row
 is recorded as `FAILED` and the operator can fix the configuration
 and resubmit.
 
+## Multi-dataSource setups
+
+This package needs no special configuration when the application
+runs with multiple `OutboxModule.forRoot()` calls (one per
+dataSource — ADR-019 multi-forRoot pattern). A single
+`MicroservicesEventExternalizer` instance covers every dataSource;
+per-DS processors all dispatch through it. Per-broker routing is
+already handled by the per-event `client` parameter shown in
+[*Multiple clients*](#multiple-clients) above — `@Externalized` is
+dataSource-agnostic by design (an event class that lives in the
+`'billing'` dataSource via `OutboxModule.forFeature([Event], { dataSource: 'billing' })`
+still uses the same `client:` token resolution as a default-DS
+event). See [`@nestjs-transactional/outbox` README](../outbox/README.md)
+for the multi-`forRoot` pattern.
+
+The module is registered as `@Global()` so the bound
+`EVENT_EXTERNALIZER` is visible to `OutboxModule`'s sibling-imported
+per-DS processors without an explicit import chain.
+
 ## Async configuration
 
 For `defaultClient` that must be resolved from a `ConfigService`:

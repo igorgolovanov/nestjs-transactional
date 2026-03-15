@@ -53,6 +53,21 @@ export interface OutboxMicroservicesAsyncOptions extends Pick<ModuleMetadata, 'i
  * up through its `@Optional()` injection (DD-018). Both the SPI
  * binding and the concrete class are exported so consumers can inject
  * either.
+ *
+ * **Multi-dataSource setups**: a single externalizer covers every
+ * dataSource. Per-broker routing — when different events should land
+ * on different transports — happens via the per-event
+ * `@Externalized({ client })` parameter (Phase 11.3), not via a
+ * dataSource-keyed externalizer Map. See `outbox` README for the
+ * multi-`OutboxModule.forRoot()` pattern (ADR-019); each per-DS
+ * processor injects this same externalizer via `EVENT_EXTERNALIZER`.
+ *
+ * The module is registered as `@Global()` (since Phase 14.6) so the
+ * `EVENT_EXTERNALIZER` binding is visible to `OutboxModule`'s
+ * sibling-imported per-DS processors without an explicit import
+ * chain. Pre-Phase-14.6 the module was non-global, which silently
+ * broke the documented usage pattern in multi-module trees — fixed
+ * in Phase 14.6 verification work.
  */
 @Module({})
 export class OutboxMicroservicesModule {
@@ -65,6 +80,7 @@ export class OutboxMicroservicesModule {
 
     return {
       module: OutboxMicroservicesModule,
+      global: true,
       providers,
       exports: [EVENT_EXTERNALIZER, MicroservicesEventExternalizer],
     };
@@ -83,6 +99,7 @@ export class OutboxMicroservicesModule {
 
     return {
       module: OutboxMicroservicesModule,
+      global: true,
       imports: options.imports ?? [],
       providers,
       exports: [EVENT_EXTERNALIZER, MicroservicesEventExternalizer],
