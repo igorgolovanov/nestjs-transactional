@@ -27,6 +27,25 @@
 > for no functional benefit. Section 7 below has been rewritten to
 > describe what we ship; CLAUDE.md DD-023 carries the same revision.
 
+> **Note (Phase 14.3.2 module-registration shape, 2026-04-27):**
+> Point 3 ("Per-dataSource provider registration") shows
+> `TransactionalModule.forRoot` taking a single `{ adapter,
+> dataSource }` per call and is silent on the analogous
+> `OutboxModule.forRoot` shape. Phase 14.3 originally shipped an
+> array API (`OutboxModule.forRoot({ dataSources: [...] })`) that
+> deviated from the per-call pattern. Phase 14.3.2 reworked
+> `OutboxModule` to the multi-`forRoot` shape: each call registers
+> one dataSource's outbox stack; cross-call coordination of
+> singletons (smart facade, processing bundle, listener scanner)
+> happens through static class storage modelled on
+> `@nestjs/typeorm`'s `EntitiesMetadataStorage`. Full design
+> rationale and mechanism in
+> [ADR-019](./019-outbox-multi-forroot-pattern.md). Phase 14.10
+> applies the same pattern to `TransactionalModule.forRoot`,
+> closing the asymmetry that Phase 14.2 Q1.B (single
+> `forRoot` call with an `adapters: [...]` array) introduced
+> relative to the `OutboxModule` rework.
+
 ## Context
 
 The current architecture supports a single transactional adapter
