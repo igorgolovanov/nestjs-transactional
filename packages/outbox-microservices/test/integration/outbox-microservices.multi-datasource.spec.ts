@@ -179,6 +179,7 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
 
   beforeEach(async () => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
 
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
@@ -195,24 +196,10 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: true,
-          adapters: [
-            {
-              adapterName: 'in-memory',
-              instanceName: 'default',
-              adapter: new NamedFakeAdapter('default'),
-            },
-            {
-              adapterName: 'in-memory',
-              instanceName: 'billing',
-              adapter: new NamedFakeAdapter('billing'),
-            },
-            {
-              adapterName: 'in-memory',
-              instanceName: 'inventory',
-              adapter: new NamedFakeAdapter('inventory'),
-            },
-          ],
+          adapter: new NamedFakeAdapter('default'),
         }),
+        TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('billing') }),
+        TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('inventory') }),
 
         // Three outbox stacks — Phase 14.3.2 multi-forRoot.
         OutboxModule.forRoot({}),

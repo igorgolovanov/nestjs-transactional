@@ -151,6 +151,7 @@ describe('CqrsTransactionalModule (E2E: TypeORM + CQRS + Transactional)', () => 
   let module: TestingModule;
 
   beforeEach(async () => {
+    TransactionalModule.resetForTesting();
     ds = await createSqlJsDataSource();
   });
 

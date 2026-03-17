@@ -49,6 +49,7 @@ describe('OutboxProcessingModule', () => {
 
   beforeEach(async () => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
 
     module = await Test.createTestingModule({
@@ -57,9 +58,7 @@ describe('OutboxProcessingModule', () => {
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
-          adapters: [
-            { adapterName: 'in-memory', instanceName: 'default', adapter: new FakeAdapter() },
-          ],
+          adapter: new FakeAdapter(),
         }),
         OutboxModule.forRoot({
           staleness: { processing: 60_000, monitorInterval: 120_000 },

@@ -80,7 +80,7 @@ describe('OutboxModule (integration)', () => {
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
         }),
         OutboxModule.forRoot({
           ...outboxOptions,
@@ -94,6 +94,7 @@ describe('OutboxModule (integration)', () => {
 
   beforeEach(() => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -198,7 +199,7 @@ describe('OutboxModule (integration)', () => {
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
         }),
         OutboxModule.forRootAsync({
           useFactory: async () => {

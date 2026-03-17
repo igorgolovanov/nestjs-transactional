@@ -113,7 +113,7 @@ describe('Externalization end-to-end (OutboxModule + mock externalizer)', () => 
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
         }),
         ExternalizerBridgeModule.forValue(externalizer),
         OutboxModule.forRoot({}),
@@ -126,6 +126,7 @@ describe('Externalization end-to-end (OutboxModule + mock externalizer)', () => 
 
   beforeEach(() => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -242,6 +243,7 @@ describe('Externalization end-to-end (OutboxModule without an externalizer)', ()
 
   beforeEach(() => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -260,7 +262,7 @@ describe('Externalization end-to-end (OutboxModule without an externalizer)', ()
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
         }),
         OutboxModule.forRoot({}),
         OutboxModule.forFeature([OrderPlacedEvent]),

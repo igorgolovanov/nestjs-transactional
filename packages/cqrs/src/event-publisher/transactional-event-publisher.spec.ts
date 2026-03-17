@@ -172,7 +172,7 @@ const buildModule = async (adapter: FakeAdapter): Promise<TestingModule> => {
     imports: [
       TransactionalModule.forRoot({
         isGlobal: true,
-        adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+        adapter,
         registerInterceptor: false,
       }),
       CqrsModule.forRoot(),
@@ -217,6 +217,7 @@ describe('TransactionalEventPublisher (integration with AggregateRoot)', () => {
   let rollbackHandler: OrderRollbackHandler;
 
   beforeEach(async () => {
+    TransactionalModule.resetForTesting();
     adapter = new FakeAdapter();
     module = await buildModule(adapter);
     commandBus = module.get(CommandBus);

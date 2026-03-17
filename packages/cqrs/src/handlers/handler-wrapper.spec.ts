@@ -190,7 +190,7 @@ const buildModule = async (
     imports: [
       TransactionalModule.forRoot({
         isGlobal: true,
-        adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+        adapter,
         registerInterceptor: false,
       }),
       CqrsModule.forRoot(),
@@ -218,6 +218,10 @@ const buildModule = async (
 describe('CqrsHandlerWrapper (integration with @nestjs/cqrs)', () => {
   let adapter: FakeAdapter;
   let module: TestingModule;
+
+  beforeEach(() => {
+    TransactionalModule.resetForTesting();
+  });
 
   afterEach(async () => {
     auditHandleResolve = null;

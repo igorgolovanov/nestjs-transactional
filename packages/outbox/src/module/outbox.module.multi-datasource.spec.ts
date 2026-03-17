@@ -105,6 +105,7 @@ describe('OutboxModule multi-forRoot (integration, in-memory)', () => {
 
   beforeEach(async () => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -120,24 +121,10 @@ describe('OutboxModule multi-forRoot (integration, in-memory)', () => {
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: true,
-          adapters: [
-            {
-              adapterName: 'in-memory',
-              instanceName: 'default',
-              adapter: new NamedFakeAdapter('default'),
-            },
-            {
-              adapterName: 'in-memory',
-              instanceName: 'billing',
-              adapter: new NamedFakeAdapter('billing'),
-            },
-            {
-              adapterName: 'in-memory',
-              instanceName: 'inventory',
-              adapter: new NamedFakeAdapter('inventory'),
-            },
-          ],
+          adapter: new NamedFakeAdapter('default'),
         }),
+        TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('billing') }),
+        TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('inventory') }),
 
         // Three separate forRoot calls — one per dataSource.
         OutboxModule.forRoot({}),
@@ -359,6 +346,7 @@ describe('OutboxModule.forRoot — duplicate-dataSource detection', () => {
 describe('OutboxModule.forRoot — registration order independence', () => {
   beforeEach(() => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
   });
 
   it('default-DS aliases work when default forRoot is registered AFTER a non-default forRoot', async () => {
@@ -371,15 +359,9 @@ describe('OutboxModule.forRoot — registration order independence', () => {
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
-          adapters: [
-            { adapterName: 'in-memory', instanceName: 'default', adapter },
-            {
-              adapterName: 'in-memory',
-              instanceName: 'billing',
-              adapter: billingAdapter,
-            },
-          ],
+          adapter,
         }),
+        TransactionalModule.forRoot({ adapter: billingAdapter }),
         // billing first — exercises the path where the singletons (facade,
         // bundle, scanner) are registered by a non-default forRoot.
         OutboxModule.forRoot({ dataSource: 'billing' }),

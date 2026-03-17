@@ -24,6 +24,7 @@ describe('TypeOrmTransactionalModule.forFeature', () => {
   let ds: DataSource;
 
   beforeEach(async () => {
+    TransactionalModule.resetForTesting();
     ds = await createSqlJsDataSource();
   });
 

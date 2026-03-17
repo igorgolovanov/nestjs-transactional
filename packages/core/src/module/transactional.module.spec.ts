@@ -41,6 +41,10 @@ class UserController {
 }
 
 describe('TransactionalModule (integration)', () => {
+  beforeEach(() => {
+    TransactionalModule.resetForTesting();
+  });
+
   describe('forRoot — full NestApplication with APP_INTERCEPTOR', () => {
     let adapter: InMemoryTransactionAdapter;
     let nestApp: INestApplication;
@@ -51,7 +55,7 @@ describe('TransactionalModule (integration)', () => {
       const moduleRef = await Test.createTestingModule({
         imports: [
           TransactionalModule.forRoot({
-            adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+            adapter,
           }),
         ],
         controllers: [UserController],
@@ -95,7 +99,7 @@ describe('TransactionalModule (integration)', () => {
       const moduleRef = await Test.createTestingModule({
         imports: [
           TransactionalModule.forRoot({
-            adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+            adapter,
           }),
         ],
       }).compile();
@@ -111,19 +115,20 @@ describe('TransactionalModule (integration)', () => {
     });
 
     it('registers multiple adapters with the first becoming the default', async () => {
-      const primary = new InMemoryTransactionAdapter();
-      const billing = new InMemoryTransactionAdapter();
+      const primary = new InMemoryTransactionAdapter('primary');
+      const billing = new InMemoryTransactionAdapter('billing');
 
       const moduleRef = await Test.createTestingModule({
         imports: [
-          TransactionalModule.forRoot({
-            adapters: [
-              { adapterName: 'in-memory', instanceName: 'primary', adapter: primary },
-              { adapterName: 'in-memory', instanceName: 'billing', adapter: billing },
-            ],
-          }),
+          TransactionalModule.forRoot({ adapter: primary }),
+          TransactionalModule.forRoot({ adapter: billing }),
         ],
       }).compile();
+      // forRoot() returns DynamicModule but the per-DS factory side
+      // effects (AdapterRegistry.register) only fire when NestJS
+      // resolves the per-DS adapter tokens. moduleRef.init() forces
+      // eager resolution of all providers.
+      await moduleRef.init();
 
       const registry = moduleRef.get<AdapterRegistry>(ADAPTER_REGISTRY);
       const manager = moduleRef.get(TransactionManager);
@@ -150,7 +155,7 @@ describe('TransactionalModule (integration)', () => {
       const moduleRef = await Test.createTestingModule({
         imports: [
           TransactionalModule.forRoot({
-            adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+            adapter,
             observers: [observer],
           }),
         ],
@@ -171,7 +176,7 @@ describe('TransactionalModule (integration)', () => {
         imports: [
           TransactionalModule.forRoot({
             registerInterceptor: false,
-            adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+            adapter,
           }),
         ],
       }).compile();
@@ -186,19 +191,17 @@ describe('TransactionalModule (integration)', () => {
   });
 
   describe('forRootAsync', () => {
-    it('receives adapters from the async factory', async () => {
+    it('receives the adapter from the async factory', async () => {
       const adapter = new InMemoryTransactionAdapter();
 
       const moduleRef = await Test.createTestingModule({
         imports: [
           TransactionalModule.forRootAsync({
-            useFactory: () =>
-              Promise.resolve({
-                adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
-              }),
+            useFactory: () => Promise.resolve({ adapter }),
           }),
         ],
       }).compile();
+      await moduleRef.init();
 
       const manager = moduleRef.get(TransactionManager);
       await manager.run({}, async () => {});
@@ -215,13 +218,11 @@ describe('TransactionalModule (integration)', () => {
       const moduleRef = await Test.createTestingModule({
         imports: [
           TransactionalModule.forRootAsync({
-            useFactory: () => ({
-              adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
-              observers: [observer],
-            }),
+            useFactory: () => ({ adapter, observers: [observer] }),
           }),
         ],
       }).compile();
+      await moduleRef.init();
 
       const manager = moduleRef.get(TransactionManager);
       await manager.run({}, async () => {});
@@ -233,10 +234,9 @@ describe('TransactionalModule (integration)', () => {
 
     it('supports injecting providers from an imported module into the factory', async () => {
       const CONFIG_TOKEN = 'CONFIG';
-      const adapter = new InMemoryTransactionAdapter();
 
       @Module({
-        providers: [{ provide: CONFIG_TOKEN, useValue: { instanceName: 'primary' } }],
+        providers: [{ provide: CONFIG_TOKEN, useValue: { dataSourceName: 'primary' } }],
         exports: [CONFIG_TOKEN],
       })
       class ConfigModule {}
@@ -247,14 +247,13 @@ describe('TransactionalModule (integration)', () => {
             imports: [ConfigModule],
             inject: [CONFIG_TOKEN],
             useFactory: (...args: never[]) => {
-              const [cfg] = args as unknown as [{ instanceName: string }];
-              return {
-                adapters: [{ adapterName: 'in-memory', instanceName: cfg.instanceName, adapter }],
-              };
+              const [cfg] = args as unknown as [{ dataSourceName: string }];
+              return { adapter: new InMemoryTransactionAdapter(cfg.dataSourceName) };
             },
           }),
         ],
       }).compile();
+      await moduleRef.init();
 
       const registry = moduleRef.get<AdapterRegistry>(ADAPTER_REGISTRY);
       expect(registry.getDefaultInstanceName()).toBe('primary');

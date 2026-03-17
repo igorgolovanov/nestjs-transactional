@@ -64,6 +64,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
   });
 
   beforeEach(async () => {
+    TransactionalModule.resetForTesting();
     await ctx.dataSource.getRepository(TestUser).clear();
   });
 
