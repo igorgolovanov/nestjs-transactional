@@ -72,7 +72,6 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
         }),
         TypeOrmTransactionalModule.forFeature({
           dataSource: ctx.dataSource,
-          instanceName: 'default',
           isDefault: true,
         }),
         OutboxTypeOrmModule.forFeature({

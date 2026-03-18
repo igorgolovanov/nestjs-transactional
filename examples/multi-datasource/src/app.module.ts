@@ -36,7 +36,7 @@ export class AppModule {
         // The first forFeature becomes the default adapter (instance name 'default').
         TypeOrmTransactionalModule.forFeature({ dataSource: primary }),
         TypeOrmTransactionalModule.forFeature({
-          instanceName: 'billing',
+          dataSourceName: 'billing',
           dataSource: billing,
         }),
       ],

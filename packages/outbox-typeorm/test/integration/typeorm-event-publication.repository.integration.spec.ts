@@ -60,7 +60,6 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
         }),
         TypeOrmTransactionalModule.forFeature({
           dataSource: ctx.dataSource,
-          instanceName: 'default',
           isDefault: true,
         }),
       ],

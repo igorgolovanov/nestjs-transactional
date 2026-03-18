@@ -148,12 +148,11 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
             // accompanying "writes go to primary" test was silently
             // failing because UserService.save hardcoded a 'default'
             // lookup. Closing that verification gap here.
-            instanceName: 'default',
             isDefault: true,
           }),
           TypeOrmTransactionalModule.forFeature({
             dataSource: billingDs,
-            instanceName: 'billing',
+            dataSourceName: 'billing',
           }),
         ],
         providers: [UserService, BillingService],
@@ -208,13 +207,13 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     });
 
     // ----------------------------------------------------------------
-    // Phase 14.2 / 14.4 syntax: `manager.run({ dataSource: '...' })`
-    // routes through `AdapterRegistry.getByDataSource(name)` to find
-    // the adapter registered under the matching `instanceName`. These
+    // Phase 14.2 syntax: `manager.run({ dataSource: '...' })` routes
+    // through `AdapterRegistry.getByDataSource(name)` to find the
+    // adapter registered under the matching dataSource name. These
     // tests close the verification gap left by Phase 14.2 — no
     // existing test exercised the new option against a real Postgres
-    // adapter. Setup is reused from the legacy describe-block above
-    // (instanceName: 'primary' / 'billing').
+    // adapter. Setup uses the same registrations declared above
+    // (`'default'` and `'billing'`).
     // ----------------------------------------------------------------
 
     it('routes writes to billing using Phase 14.2 syntax `manager.run({ dataSource })`', async () => {
@@ -297,103 +296,6 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
         'billing-committed',
       ]);
       expect(await ctx.dataSource.getRepository(TestUser).count()).toBe(0);
-    });
-  });
-
-  describe('multi-datasource: dataSourceName field (Phase 14.4 alias)', () => {
-    let billingDs: DataSource;
-    let moduleRef: TestingModule;
-    let manager: TransactionManager;
-    let billingService: BillingService;
-
-    beforeAll(async () => {
-      billingDs = await createAdditionalDatabase(ctx, 'billing_alias_test', {
-        entities: [TestUser],
-        synchronize: true,
-      });
-
-      // Identical setup to the previous describe-block but uses the
-      // new `dataSourceName` field instead of `instanceName`. Verifies
-      // the Phase 14.4 alias contract: `dataSourceName` is the
-      // canonical field, `instanceName` keeps working as a deprecated
-      // alias, and the same identifier flows through every consumer.
-      moduleRef = await Test.createTestingModule({
-        imports: [
-          TransactionalModule.forRoot({ isGlobal: true }),
-          TypeOrmTransactionalModule.forFeature({
-            dataSource: ctx.dataSource,
-            dataSourceName: 'primary',
-            isDefault: true,
-          }),
-          TypeOrmTransactionalModule.forFeature({
-            dataSource: billingDs,
-            dataSourceName: 'billing',
-          }),
-        ],
-        providers: [BillingService],
-      }).compile();
-      await moduleRef.init();
-
-      manager = moduleRef.get(TransactionManager);
-      billingService = moduleRef.get(BillingService);
-    });
-
-    afterAll(async () => {
-      await moduleRef.close();
-      await billingDs.destroy();
-    });
-
-    beforeEach(async () => {
-      await ctx.dataSource.getRepository(TestUser).clear();
-      await billingDs.getRepository(TestUser).clear();
-    });
-
-    it('registers adapters under the dataSourceName values', () => {
-      const registry = moduleRef.get<AdapterRegistry>(ADAPTER_REGISTRY);
-      expect(registry.get('typeorm', 'primary')).toBeDefined();
-      expect(registry.get('typeorm', 'billing')).toBeDefined();
-      expect(registry.getByDataSource('billing').dataSourceName).toBe('billing');
-    });
-
-    it('routes Phase 14.2 `manager.run({ dataSource })` through dataSourceName-registered adapters', async () => {
-      await manager.run({ dataSource: 'billing' }, async () => {
-        await billingService.save('billed-via-dataSourceName');
-      });
-
-      expect((await billingDs.getRepository(TestUser).find()).map((u) => u.name)).toEqual([
-        'billed-via-dataSourceName',
-      ]);
-    });
-
-    it('dataSourceName takes precedence when both fields are set on the same call', async () => {
-      // Override-conflict scenario: instanceName='ignored' and
-      // dataSourceName='billing'. The latter wins; registration
-      // happens under 'billing'.
-      const altDs = await createAdditionalDatabase(ctx, 'precedence_test', {
-        entities: [TestUser],
-        synchronize: true,
-      });
-      try {
-        const altModule = await Test.createTestingModule({
-          imports: [
-            TransactionalModule.forRoot({ isGlobal: true }),
-            TypeOrmTransactionalModule.forFeature({
-              dataSource: altDs,
-              instanceName: 'ignored',
-              dataSourceName: 'wins',
-            }),
-          ],
-        }).compile();
-        await altModule.init();
-
-        const registry = altModule.get<AdapterRegistry>(ADAPTER_REGISTRY);
-        expect(registry.get('typeorm', 'wins')).toBeDefined();
-        expect(() => registry.get('typeorm', 'ignored')).toThrow();
-
-        await altModule.close();
-      } finally {
-        await altDs.destroy();
-      }
     });
   });
 
