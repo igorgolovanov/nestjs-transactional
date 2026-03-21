@@ -11,15 +11,15 @@ import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
   IntegrationEventsHandler,
   CqrsTransactionalModule,
-  type IIntegrationEventsHandler,
-  type ITransactionalEventsHandler,
+  type IIntegrationEventHandler,
+  type ITransactionalEventHandler,
   OUTBOX_LISTENER_REGISTRAR,
   OUTBOX_PUBLICATION_SCHEDULER,
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
 import {
   EventPublicationProcessor,
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventPublisher,
   OutboxEventsHandler,
   OutboxListenerRegistry,
@@ -82,7 +82,7 @@ class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, void> {
  */
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
-class InMemoryInventoryHandlers implements ITransactionalEventsHandler<OrderPlacedEvent> {
+class InMemoryInventoryHandlers implements ITransactionalEventHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
   handle(event: OrderPlacedEvent): void {
@@ -96,7 +96,7 @@ class InMemoryInventoryHandlers implements ITransactionalEventsHandler<OrderPlac
  */
 @Injectable()
 @OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
-class PersistentInventoryHandlers implements IOutboxEventsHandler<OrderPlacedEvent> {
+class PersistentInventoryHandlers implements IOutboxEventHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
   async handle(event: OrderPlacedEvent): Promise<void> {
@@ -116,7 +116,7 @@ class PersistentInventoryHandlers implements IOutboxEventsHandler<OrderPlacedEve
   events: [OrderPlacedEvent],
   id: 'IntegrationModule.stable-id',
 })
-class IntegrationEventsHandlers implements IIntegrationEventsHandler<OrderPlacedEvent> {
+class IntegrationEventsHandlers implements IIntegrationEventHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
   async handle(event: OrderPlacedEvent): Promise<void> {

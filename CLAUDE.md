@@ -155,7 +155,7 @@ nestjs-transactional-monorepo/
 │   ├── cqrs/                          # @nestjs-transactional/cqrs
 │   │   ├── src/
 │   │   │   ├── decorators/            # @TransactionalEventsHandler, @IntegrationEventsHandler
-│   │   │   ├── interfaces/            # ITransactionalEventsHandler, IIntegrationEventsHandler
+│   │   │   ├── interfaces/            # ITransactionalEventHandler, IIntegrationEventHandler
 │   │   │   ├── types/                 # TransactionPhase
 │   │   │   ├── event-dispatcher/      # TransactionalEventDispatcher
 │   │   │   ├── event-publisher/       # TransactionalEventPublisher + HybridEventPublisher
@@ -320,7 +320,7 @@ This solves the classic problem of "event published, but the transaction was
 rolled back". With AFTER_COMMIT this cannot happen — the listener only runs
 once the commit has succeeded.
 
-Handler classes implement `ITransactionalEventsHandler<T>` and expose
+Handler classes implement `ITransactionalEventHandler<T>` and expose
 a single `handle(event)` method. See ADR-014 for the rationale behind
 the class-level shape.
 
@@ -619,8 +619,8 @@ method signature unconstrained at the type level.
 `@OutboxEventsHandler(Event1, Event2, ...)`,
 `@IntegrationEventsHandler(Event1, Event2, ...)`. Each decorator also
 accepts a long-form options object. Handler classes implement
-`ITransactionalEventsHandler<T>` / `IOutboxEventsHandler<T>` /
-`IIntegrationEventsHandler<T>` and expose a single `handle(event)`
+`ITransactionalEventHandler<T>` / `IOutboxEventHandler<T>` /
+`IIntegrationEventHandler<T>` and expose a single `handle(event)`
 method. Listener ids are composed as `${baseId}#${EventName}` (baseId
 defaults to the class name, can be overridden via `options.id`) — a
 method rename inside a handler class no longer invalidates stored
@@ -1090,8 +1090,8 @@ IntegrationEventsHandler(options: {
 }): ClassDecorator
 
 // Interfaces (implement these on your handler class for type safety)
-interface ITransactionalEventsHandler<T> { handle(event: T): Promise<void> | void; }
-interface IIntegrationEventsHandler<T> { handle(event: T): Promise<void> | void; }
+interface ITransactionalEventHandler<T> { handle(event: T): Promise<void> | void; }
+interface IIntegrationEventHandler<T> { handle(event: T): Promise<void> | void; }
 
 // Enums
 TransactionPhase: BEFORE_COMMIT | AFTER_COMMIT | AFTER_ROLLBACK | AFTER_COMPLETION
@@ -1663,7 +1663,7 @@ users.
   `IApplicationModuleHandler` / `ApplicationModuleHandlerScanner`
   reference across READMEs, architecture docs, migration guide,
   and examples renamed to `@IntegrationEventsHandler` /
-  `IIntegrationEventsHandler` / `IntegrationEventsHandlerScanner`.
+  `IIntegrationEventHandler` / `IntegrationEventsHandlerScanner`.
   ADR-014 keeps its body intact as historical record but gains a
   top note pointing at the second-pass rename.
 
@@ -2238,7 +2238,7 @@ require verification of both commits before closure).
     replaces the old skip-logic-by-metadata pattern.
   - Second pass (naming refinement): `@ApplicationModuleHandler` →
     `@IntegrationEventsHandler`, `IApplicationModuleHandler` →
-    `IIntegrationEventsHandler`, `ApplicationModuleHandlerScanner` →
+    `IIntegrationEventHandler`, `ApplicationModuleHandlerScanner` →
     `IntegrationEventsHandlerScanner`. Rationale: align with
     DDD/microservices terminology; Spring's "Application Module"
     overlaps with NestJS `@Module()` (a DI concept), causing
@@ -2293,7 +2293,7 @@ require verification of both commits before closure).
   from Iteration 10 completed — `@ApplicationModuleHandler` /
   `IApplicationModuleHandler` / `ApplicationModuleHandlerScanner`
   replaced by `@IntegrationEventsHandler` /
-  `IIntegrationEventsHandler` /
+  `IIntegrationEventHandler` /
   `IntegrationEventsHandlerScanner` across READMEs (root,
   cqrs, outbox-typeorm, outbox-full-stack), architecture docs,
   migration guide, and ADR-006. ADR-014 keeps its accepted-text

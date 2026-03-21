@@ -125,14 +125,14 @@ entries across OutboxModule.forFeature() calls.
 ```typescript
 import { Injectable } from '@nestjs/common';
 import {
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventsHandler,
 } from '@nestjs-transactional/outbox';
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent)
 export class InventoryReservationHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent>
+  implements IOutboxEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     // Runs inside a fresh REQUIRES_NEW transaction, only after the

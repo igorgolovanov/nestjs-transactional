@@ -16,8 +16,8 @@ export {
   type IntegrationEventsHandlerOptions,
 } from './decorators/integration-events-handler.decorator';
 
-export type { ITransactionalEventsHandler } from './interfaces/transactional-events-handler.interface';
-export type { IIntegrationEventsHandler } from './interfaces/integration-events-handler.interface';
+export type { ITransactionalEventHandler } from './interfaces/transactional-event-handler.interface';
+export type { IIntegrationEventHandler } from './interfaces/integration-event-handler.interface';
 
 export {
   TransactionalEventDispatcher,

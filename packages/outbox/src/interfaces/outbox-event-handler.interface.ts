@@ -11,14 +11,14 @@
  *
  * Mirrors the ergonomics of `IEventHandler` from `@nestjs/cqrs` —
  * `any` as the default generic parameter is deliberate so that
- * `implements IOutboxEventsHandler` without a type argument still
+ * `implements IOutboxEventHandler` without a type argument still
  * type-checks against any concrete event shape.
  *
  * @example
  * ```ts
  * @OutboxEventsHandler(OrderPlacedEvent)
  * export class InventoryReservationHandler
- *   implements IOutboxEventsHandler<OrderPlacedEvent>
+ *   implements IOutboxEventHandler<OrderPlacedEvent>
  * {
  *   async handle(event: OrderPlacedEvent): Promise<void> {
  *     // durable, at-least-once, retried on failure
@@ -27,6 +27,6 @@
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface IOutboxEventsHandler<T = any> {
+export interface IOutboxEventHandler<T = any> {
   handle(event: T): Promise<void>;
 }

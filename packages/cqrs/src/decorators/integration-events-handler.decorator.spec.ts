@@ -1,4 +1,4 @@
-import type { IIntegrationEventsHandler } from '../interfaces/integration-events-handler.interface';
+import type { IIntegrationEventHandler } from '../interfaces/integration-event-handler.interface';
 
 import {
   INTEGRATION_EVENTS_HANDLER_METADATA,
@@ -18,7 +18,7 @@ describe('@IntegrationEventsHandler', () => {
   describe('rest-params short form', () => {
     it('writes metadata with a single event type and no id', () => {
       @IntegrationEventsHandler(OrderPlacedEvent)
-      class Handler implements IIntegrationEventsHandler<OrderPlacedEvent> {
+      class Handler implements IIntegrationEventHandler<OrderPlacedEvent> {
         async handle(_event: OrderPlacedEvent): Promise<void> {}
       }
 
@@ -30,7 +30,7 @@ describe('@IntegrationEventsHandler', () => {
 
     it('accepts multiple event types', () => {
       @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
-      class Handler implements IIntegrationEventsHandler<OrderPlacedEvent | OrderCancelledEvent> {
+      class Handler implements IIntegrationEventHandler<OrderPlacedEvent | OrderCancelledEvent> {
         async handle(_event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {}
       }
 
@@ -42,7 +42,7 @@ describe('@IntegrationEventsHandler', () => {
   describe('options long form', () => {
     it('preserves the explicit id', () => {
       @IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
-      class Handler implements IIntegrationEventsHandler<OrderPlacedEvent> {
+      class Handler implements IIntegrationEventHandler<OrderPlacedEvent> {
         async handle(_event: OrderPlacedEvent): Promise<void> {}
       }
 

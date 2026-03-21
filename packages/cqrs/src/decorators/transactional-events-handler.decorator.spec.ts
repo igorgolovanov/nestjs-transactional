@@ -1,4 +1,4 @@
-import type { ITransactionalEventsHandler } from '../interfaces/transactional-events-handler.interface';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
 import {
@@ -19,7 +19,7 @@ describe('@TransactionalEventsHandler', () => {
   describe('rest-params short form', () => {
     it('writes metadata onto the decorated class with a single event type', () => {
       @TransactionalEventsHandler(OrderPlaced)
-      class Handler implements ITransactionalEventsHandler<OrderPlaced> {
+      class Handler implements ITransactionalEventHandler<OrderPlaced> {
         handle(_event: OrderPlaced): void {}
       }
 
@@ -33,7 +33,7 @@ describe('@TransactionalEventsHandler', () => {
 
     it('accepts multiple event types', () => {
       @TransactionalEventsHandler(OrderPlaced, PaymentCaptured)
-      class Handler implements ITransactionalEventsHandler<OrderPlaced | PaymentCaptured> {
+      class Handler implements ITransactionalEventHandler<OrderPlaced | PaymentCaptured> {
         handle(_event: OrderPlaced | PaymentCaptured): void {}
       }
 
@@ -43,7 +43,7 @@ describe('@TransactionalEventsHandler', () => {
 
     it('is readable via the exported metadata key', () => {
       @TransactionalEventsHandler(OrderPlaced)
-      class Handler implements ITransactionalEventsHandler<OrderPlaced> {
+      class Handler implements ITransactionalEventHandler<OrderPlaced> {
         handle(_event: OrderPlaced): void {}
       }
 
@@ -55,7 +55,7 @@ describe('@TransactionalEventsHandler', () => {
   describe('options long form', () => {
     it('accepts { events } with defaults', () => {
       @TransactionalEventsHandler({ events: [OrderPlaced] })
-      class Handler implements ITransactionalEventsHandler<OrderPlaced> {
+      class Handler implements ITransactionalEventHandler<OrderPlaced> {
         handle(_event: OrderPlaced): void {}
       }
 
@@ -75,7 +75,7 @@ describe('@TransactionalEventsHandler', () => {
         async: true,
         fallbackExecution: true,
       })
-      class Handler implements ITransactionalEventsHandler<OrderPlaced | PaymentCaptured> {
+      class Handler implements ITransactionalEventHandler<OrderPlaced | PaymentCaptured> {
         handle(_event: OrderPlaced | PaymentCaptured): void {}
       }
 
@@ -98,7 +98,7 @@ describe('@TransactionalEventsHandler', () => {
 
       for (const phase of phases) {
         @TransactionalEventsHandler({ events: [OrderPlaced], phase })
-        class Handler implements ITransactionalEventsHandler<OrderPlaced> {
+        class Handler implements ITransactionalEventHandler<OrderPlaced> {
           handle(_event: OrderPlaced): void {}
         }
 
@@ -127,12 +127,12 @@ describe('@TransactionalEventsHandler', () => {
 
     it('distinct decorations produce distinct metadata (no cross-contamination)', () => {
       @TransactionalEventsHandler(OrderPlaced)
-      class HandlerA implements ITransactionalEventsHandler<OrderPlaced> {
+      class HandlerA implements ITransactionalEventHandler<OrderPlaced> {
         handle(_event: OrderPlaced): void {}
       }
 
       @TransactionalEventsHandler(PaymentCaptured)
-      class HandlerB implements ITransactionalEventsHandler<PaymentCaptured> {
+      class HandlerB implements ITransactionalEventHandler<PaymentCaptured> {
         handle(_event: PaymentCaptured): void {}
       }
 

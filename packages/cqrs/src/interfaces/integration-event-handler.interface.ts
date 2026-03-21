@@ -10,7 +10,7 @@
  * established DDD/microservices term for the role this decorator
  * plays.
  *
- * Shape is identical to {@link ITransactionalEventsHandler}; the two
+ * Shape is identical to {@link ITransactionalEventHandler}; the two
  * interfaces exist separately as marker types so code can
  * discriminate by intent (cross-module integration handler vs.
  * intra-module transactional listener) even though both share the
@@ -20,7 +20,7 @@
  * ```ts
  * @IntegrationEventsHandler(OrderPlacedEvent)
  * export class InventoryReservationHandler
- *   implements IIntegrationEventsHandler<OrderPlacedEvent>
+ *   implements IIntegrationEventHandler<OrderPlacedEvent>
  * {
  *   async handle(event: OrderPlacedEvent): Promise<void> {
  *     // durable when the outbox is wired, in-memory AFTER_COMMIT
@@ -30,6 +30,6 @@
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface IIntegrationEventsHandler<T = any> {
+export interface IIntegrationEventHandler<T = any> {
   handle(event: T): Promise<void> | void;
 }

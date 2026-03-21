@@ -70,7 +70,7 @@ Expected output (abbreviated):
 
 - [`shipping.handler.ts`](src/shipping.handler.ts) — a persistent
   handler class annotated with `@IntegrationEventsHandler` and
-  implementing `IIntegrationEventsHandler<OrderPlacedEvent>`. When
+  implementing `IIntegrationEventHandler<OrderPlacedEvent>`. When
   the outbox registrar is bound (as here), delivery goes through the
   worker; without the binding, the same decorator runs in-memory as
   an `AFTER_COMMIT` handler. Same source code, two delivery modes.

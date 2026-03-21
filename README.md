@@ -147,7 +147,7 @@ export class AppModule {}
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent)
 export class InventoryReservationHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     // Durable. Runs in its own REQUIRES_NEW transaction after

@@ -3,7 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
   FailedEventPublications,
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventPublisher,
   OutboxEventsHandler,
   OutboxModule,
@@ -31,7 +31,7 @@ class OrderPlacedEvent {
 
 @Injectable()
 @OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
-class OrderListener implements IOutboxEventsHandler<OrderPlacedEvent> {
+class OrderListener implements IOutboxEventHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
   failuresRemaining = 0;
 

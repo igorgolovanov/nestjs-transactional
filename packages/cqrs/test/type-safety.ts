@@ -21,8 +21,8 @@
 
 import {
   IntegrationEventsHandler,
-  type IIntegrationEventsHandler,
-  type ITransactionalEventsHandler,
+  type IIntegrationEventHandler,
+  type ITransactionalEventHandler,
   TransactionPhase,
   TransactionalEventsHandler,
 } from '../src';
@@ -41,7 +41,7 @@ class OrderCancelledEvent {
 
 // 1. Short form with one event, sync handle returning void.
 @TransactionalEventsHandler(OrderPlacedEvent)
-export class SyncVoidHandler implements ITransactionalEventsHandler<OrderPlacedEvent> {
+export class SyncVoidHandler implements ITransactionalEventHandler<OrderPlacedEvent> {
   handle(event: OrderPlacedEvent): void {
     void event;
   }
@@ -50,7 +50,7 @@ export class SyncVoidHandler implements ITransactionalEventsHandler<OrderPlacedE
 // 2. Short form with multiple events, async handle returning Promise<void>.
 @TransactionalEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 export class MultiEventAsyncHandler
-  implements ITransactionalEventsHandler<OrderPlacedEvent | OrderCancelledEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent | OrderCancelledEvent>
 {
   async handle(event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {
     void event;
@@ -66,7 +66,7 @@ export class MultiEventAsyncHandler
   fallbackExecution: true,
 })
 export class FullyConfiguredHandler
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   handle(event: OrderPlacedEvent): void {
     void event;
@@ -83,7 +83,7 @@ export class FullyConfiguredHandler
   phase: TransactionPhase.AFTER_ROLLBACK,
 })
 export class RollbackHandlerWithError
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   handle(event: OrderPlacedEvent, error?: unknown): void {
     void event;
@@ -93,7 +93,7 @@ export class RollbackHandlerWithError
 
 // 5. @IntegrationEventsHandler short form.
 @IntegrationEventsHandler(OrderPlacedEvent)
-export class CrossModuleHandler implements IIntegrationEventsHandler<OrderPlacedEvent> {
+export class CrossModuleHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
   async handle(event: OrderPlacedEvent): Promise<void> {
     void event;
   }
@@ -101,7 +101,7 @@ export class CrossModuleHandler implements IIntegrationEventsHandler<OrderPlaced
 
 // 6. @IntegrationEventsHandler long form with stable id.
 @IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'stable-id' })
-export class StableIdHandler implements IIntegrationEventsHandler<OrderPlacedEvent> {
+export class StableIdHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
   handle(event: OrderPlacedEvent): void {
     void event;
   }
@@ -116,11 +116,11 @@ export class StableIdHandler implements IIntegrationEventsHandler<OrderPlacedEve
 // N1. Missing `handle` method.
 // @ts-expect-error — `implements` requires a `handle` method.
 export class MissingHandleHandler
-  implements ITransactionalEventsHandler<OrderPlacedEvent> {}
+  implements ITransactionalEventHandler<OrderPlacedEvent> {}
 
 // N2. `handle` returning a non-void, non-Promise type.
 export class WrongReturnTypeHandler
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   // @ts-expect-error — handle must return void | Promise<void>, not string.
   handle(event: OrderPlacedEvent): string {
@@ -129,9 +129,9 @@ export class WrongReturnTypeHandler
   }
 }
 
-// N3. `IIntegrationEventsHandler` with a non-void-returning handle.
+// N3. `IIntegrationEventHandler` with a non-void-returning handle.
 export class WrongReturnTypeIntegrationEventsHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent>
 {
   // @ts-expect-error — handle must return void | Promise<void>, not number.
   handle(event: OrderPlacedEvent): number {

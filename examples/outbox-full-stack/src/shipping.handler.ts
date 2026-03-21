@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   IntegrationEventsHandler,
-  type IIntegrationEventsHandler,
+  type IIntegrationEventHandler,
 } from '@nestjs-transactional/cqrs';
 
 import { OrderPlacedEvent } from './order.aggregate';
@@ -20,7 +20,7 @@ import { OrderPlacedEvent } from './order.aggregate';
  */
 @Injectable()
 @IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
-export class ShippingHandlers implements IIntegrationEventsHandler<OrderPlacedEvent> {
+export class ShippingHandlers implements IIntegrationEventHandler<OrderPlacedEvent> {
   private readonly logger = new Logger(ShippingHandlers.name);
 
   handled: string[] = [];

@@ -65,7 +65,7 @@ export interface IntegrationEventsHandlerMetadata {
  * ```ts
  * @IntegrationEventsHandler(OrderPlacedEvent)
  * export class InventoryReservationHandler
- *   implements IIntegrationEventsHandler<OrderPlacedEvent>
+ *   implements IIntegrationEventHandler<OrderPlacedEvent>
  * {
  *   async handle(event: OrderPlacedEvent): Promise<void> { ... }
  * }

@@ -62,7 +62,7 @@ export interface TransactionalEventsHandlerMetadata {
 /**
  * Mark a class as a transactional event handler. The class must
  * expose a `handle(event): void | Promise<void>` method (enforce this
- * at the type level by implementing {@link ITransactionalEventsHandler}).
+ * at the type level by implementing {@link ITransactionalEventHandler}).
  *
  * Two forms:
  *

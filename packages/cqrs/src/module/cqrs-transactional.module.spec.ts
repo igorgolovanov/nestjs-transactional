@@ -12,7 +12,7 @@ import { TypeOrmTransactionalModule, getCurrentEntityManager } from '@nestjs-tra
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
 
 import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
-import type { ITransactionalEventsHandler } from '../interfaces/transactional-events-handler.interface';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
 
 import { CqrsTransactionalModule } from './cqrs-transactional.module';
 
@@ -119,7 +119,7 @@ class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, void> {
 
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
-class OrderProjection implements ITransactionalEventsHandler<OrderPlacedEvent> {
+class OrderProjection implements ITransactionalEventHandler<OrderPlacedEvent> {
   placed: string[] = [];
 
   handle(event: OrderPlacedEvent): void {

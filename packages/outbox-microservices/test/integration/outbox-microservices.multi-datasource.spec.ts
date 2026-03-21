@@ -14,7 +14,7 @@ import {
   type EventPublicationRepository,
   EventPublicationProcessor,
   Externalized,
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventPublisher,
   OutboxEventsHandler,
   OutboxListenerRegistry,
@@ -94,7 +94,7 @@ class InternalOnlyEvent {
 
 @Injectable()
 @OutboxEventsHandler({ events: [BillingEvent], newTransaction: false })
-class BillingListener implements IOutboxEventsHandler<BillingEvent> {
+class BillingListener implements IOutboxEventHandler<BillingEvent> {
   invocations: BillingEvent[] = [];
   async handle(event: BillingEvent): Promise<void> {
     this.invocations.push(event);
@@ -103,7 +103,7 @@ class BillingListener implements IOutboxEventsHandler<BillingEvent> {
 
 @Injectable()
 @OutboxEventsHandler({ events: [InventoryEvent], newTransaction: false })
-class InventoryListener implements IOutboxEventsHandler<InventoryEvent> {
+class InventoryListener implements IOutboxEventHandler<InventoryEvent> {
   invocations: InventoryEvent[] = [];
   async handle(event: InventoryEvent): Promise<void> {
     this.invocations.push(event);
@@ -112,7 +112,7 @@ class InventoryListener implements IOutboxEventsHandler<InventoryEvent> {
 
 @Injectable()
 @OutboxEventsHandler({ events: [InternalOnlyEvent], newTransaction: false })
-class InternalListener implements IOutboxEventsHandler<InternalOnlyEvent> {
+class InternalListener implements IOutboxEventHandler<InternalOnlyEvent> {
   invocations: InternalOnlyEvent[] = [];
   async handle(event: InternalOnlyEvent): Promise<void> {
     this.invocations.push(event);
@@ -424,7 +424,7 @@ function registerOutboxListenerOnDataSource<E extends object>(
   module: TestingModule,
   dataSource: string,
   eventClass: new (...args: never[]) => E,
-  listenerClass: new (...args: never[]) => IOutboxEventsHandler<E>,
+  listenerClass: new (...args: never[]) => IOutboxEventHandler<E>,
 ): void {
   const registry = module.get<OutboxListenerRegistry>(
     getOutboxListenerRegistryToken(dataSource),

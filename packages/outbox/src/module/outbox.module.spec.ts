@@ -14,7 +14,7 @@ import { FailedEventPublications } from '../api/failed-event-publications';
 import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
 import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
 import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
-import type { IOutboxEventsHandler } from '../interfaces/outbox-events-handler.interface';
+import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
 import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository';
 import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
@@ -53,7 +53,7 @@ class OrderPlacedEvent {
 
 @Injectable()
 @OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
-class FlakyListener implements IOutboxEventsHandler<OrderPlacedEvent> {
+class FlakyListener implements IOutboxEventHandler<OrderPlacedEvent> {
   invocations: OrderPlacedEvent[] = [];
   failuresRemaining = 0;
 

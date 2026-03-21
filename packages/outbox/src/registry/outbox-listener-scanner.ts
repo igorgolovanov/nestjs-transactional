@@ -17,7 +17,7 @@ type OutboxListenerMethod = (event: unknown) => Promise<void>;
  *
  * Scanning is class-level only. The handler class must expose a
  * `handle(event): Promise<void>` method (enforce this at the type
- * level by implementing `IOutboxEventsHandler`).
+ * level by implementing `IOutboxEventHandler`).
  *
  * Each registered entry carries a pre-bound `invoke` closure that
  * applies `REQUIRES_NEW` transaction semantics when

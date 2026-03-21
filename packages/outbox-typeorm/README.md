@@ -185,14 +185,14 @@ failure mode.
 ```typescript
 import { Injectable } from '@nestjs/common';
 import {
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventsHandler,
 } from '@nestjs-transactional/outbox';
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent)
 export class InventoryReservationHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent>
+  implements IOutboxEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     // Runs in a fresh REQUIRES_NEW transaction after the publishing
