@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Global, Injectable, Module, type Provider } from '@nestjs/common';
 import {
   ADAPTER_REGISTRY,
   type AdapterRegistry,
@@ -21,6 +21,23 @@ import {
   stopPostgresContainer,
 } from '../setup-testcontainers';
 import { TestUser } from '../shared/test-user.entity';
+
+/**
+ * Stand-in for `TypeOrmModule.forRoot(...)` — registers the
+ * `getDataSourceToken(name)` providers in a `@Global()` module
+ * so child modules (notably `TypeOrmTransactionalModule`) can
+ * resolve them. In a real app `@nestjs/typeorm` already provides
+ * this global visibility.
+ */
+function buildFakeTypeOrmModule(providers: Provider[]): unknown {
+  @Global()
+  @Module({
+    providers,
+    exports: providers.map((p) => (typeof p === 'object' && 'provide' in p ? p.provide : p)),
+  })
+  class FakeTypeOrmModule {}
+  return FakeTypeOrmModule;
+}
 
 @Injectable()
 class UserService {
@@ -65,6 +82,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
     await ctx.dataSource.getRepository(TestUser).clear();
   });
 
@@ -74,18 +92,23 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     let userService: UserService;
 
     beforeAll(async () => {
+      // Reset static state before this describe builds its module.
+      // Each top-level `describe` is its own ownership boundary;
+      // sibling describes do NOT share infrastructure singletons.
+      TransactionalModule.resetForTesting();
+      TypeOrmTransactionalModule.resetForTesting();
+
       moduleRef = await Test.createTestingModule({
         imports: [
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          buildFakeTypeOrmModule([
+            { provide: getDataSourceToken(), useValue: ctx.dataSource },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ]) as any,
           TransactionalModule.forRoot({ isGlobal: true }),
-          TypeOrmTransactionalModule.forFeature({
-            dataSource: ctx.dataSource,
-            isDefault: true,
-          }),
+          TypeOrmTransactionalModule.forRoot({ isDefault: true }),
         ],
-        providers: [
-          UserService,
-          { provide: getDataSourceToken(), useValue: ctx.dataSource },
-        ],
+        providers: [UserService],
       }).compile();
       await moduleRef.init();
 
@@ -130,6 +153,9 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     let billingService: BillingService;
 
     beforeAll(async () => {
+      TransactionalModule.resetForTesting();
+      TypeOrmTransactionalModule.resetForTesting();
+
       billingDs = await createAdditionalDatabase(ctx, 'billing_test', {
         entities: [TestUser],
         synchronize: true,
@@ -137,23 +163,20 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
       moduleRef = await Test.createTestingModule({
         imports: [
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          buildFakeTypeOrmModule([
+            { provide: getDataSourceToken(), useValue: ctx.dataSource },
+            { provide: getDataSourceToken('billing'), useValue: billingDs },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ]) as any,
           TransactionalModule.forRoot({ isGlobal: true }),
-          TypeOrmTransactionalModule.forFeature({
-            dataSource: ctx.dataSource,
-            // Registered as 'default' (instead of the historical
-            // 'primary') so the helper-level default — what
-            // `getCurrentEntityManager()` looks up when called with
-            // no argument — aligns with the registry-level default.
-            // Pre-Phase-14.4 the registration was 'primary' and the
-            // accompanying "writes go to primary" test was silently
-            // failing because UserService.save hardcoded a 'default'
-            // lookup. Closing that verification gap here.
-            isDefault: true,
-          }),
-          TypeOrmTransactionalModule.forFeature({
-            dataSource: billingDs,
-            dataSourceName: 'billing',
-          }),
+          // Default DS — bound to ctx.dataSource via the
+          // `getDataSourceToken()` provider above. Marked as the
+          // registry default so `getCurrentEntityManager()` (no arg)
+          // resolves to it; the prior test's `UserService.save` uses
+          // that exact lookup.
+          TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+          TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
         ],
         providers: [UserService, BillingService],
       }).compile();
@@ -209,11 +232,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     // ----------------------------------------------------------------
     // Phase 14.2 syntax: `manager.run({ dataSource: '...' })` routes
     // through `AdapterRegistry.getByDataSource(name)` to find the
-    // adapter registered under the matching dataSource name. These
-    // tests close the verification gap left by Phase 14.2 — no
-    // existing test exercised the new option against a real Postgres
-    // adapter. Setup uses the same registrations declared above
-    // (`'default'` and `'billing'`).
+    // adapter registered under the matching dataSource name.
     // ----------------------------------------------------------------
 
     it('routes writes to billing using Phase 14.2 syntax `manager.run({ dataSource })`', async () => {
@@ -230,8 +249,6 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
     it('legacy `adapterInstance` and Phase 14.2 `dataSource` options are interchangeable', async () => {
       // Same logical operation, two equivalent ways to spell it.
-      // Both must produce identical results — they're aliases through
-      // the same AdapterRegistry lookup.
       await manager.run({ adapterInstance: 'billing' }, async () => {
         await billingService.save('legacy-syntax');
       });
@@ -246,10 +263,6 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     });
 
     it('keeps cross-dataSource transactions isolated when nested', async () => {
-      // Verifies the Phase 14.2 cross-DS simultaneous guarantee
-      // applies end-to-end against real Postgres — billing and
-      // default transactions live in the same async stack but write
-      // to different databases, both commit independently.
       await manager.run({ dataSource: 'billing' }, async () => {
         await billingService.save('outer-billing');
 
@@ -304,12 +317,19 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     let svc: UserServiceWithFallback;
 
     beforeAll(async () => {
+      TransactionalModule.resetForTesting();
+      TypeOrmTransactionalModule.resetForTesting();
+
       moduleRef = await Test.createTestingModule({
-        imports: [TransactionalModule.forRoot({ isGlobal: true })],
-        providers: [
-          UserServiceWithFallback,
-          { provide: getDataSourceToken(), useValue: ctx.dataSource },
+        imports: [
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          buildFakeTypeOrmModule([
+            { provide: getDataSourceToken(), useValue: ctx.dataSource },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ]) as any,
+          TransactionalModule.forRoot({ isGlobal: true }),
         ],
+        providers: [UserServiceWithFallback],
       }).compile();
       await moduleRef.init();
 
