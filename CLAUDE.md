@@ -1857,12 +1857,93 @@ Distinct from core's `AdapterRegistration.instanceName` field
 `TypeOrmTransactionAdapter`'s constructor parameter named
 `instanceName` (adapter-internal, also unchanged).
 
-**14.12: outbox-typeorm `adapterInstance` removal (planned)**
+**14.12: outbox-typeorm `adapterInstance` removal (shipped 2026-04-29, bundled into 14.21)**
 
-Mirror cleanup for `outbox-typeorm`. The `OutboxTypeOrmModule.forFeature`
-options carry an `adapterInstance` deprecated alias next to the
-canonical `dataSourceName` (same shape as the typeorm package
-pre-Phase-14.11). One-phase carry-over closes here.
+Mirror cleanup for `outbox-typeorm`. Originally scheduled as a
+standalone phase, bundled into Phase 14.21 since that phase was
+already touching the options interface. The `adapterInstance`
+deprecated alias and the `dataSourceName` field were both removed —
+both replaced by the unified `dataSource` string identifier. The
+two integration tests that verified the deprecated-alias precedence
+behaviour were deleted (no longer expressible).
+
+**14.21: OutboxTypeOrmModule reshape (shipped 2026-04-29)**
+
+Phase 14.20's `TypeOrmTransactionalModule.forRoot` pattern applied
+to the `outbox-typeorm` package for API consistency.
+
+API change (BREAKING, pre-release acceptable):
+
+- `OutboxTypeOrmModule.forFeature({ dataSource: DataSource | factory, dataSourceName?, adapterInstance? })`
+  → `OutboxTypeOrmModule.forRoot({ dataSource?: string, schemaInitialization?, isGlobal? })`.
+  The actual `DataSource` is now resolved from DI via
+  `getDataSourceToken(name)` — same convention `@nestjs/typeorm`
+  uses for `@InjectRepository(E, dataSource)`. Multi-DS deployments
+  call `forRoot` once per dataSource, mirroring Phase 14.20.
+- `forRootAsync` introduced for async-config use cases. The
+  `dataSource` name is statically declared in the async options
+  object; only `schemaInitialization` is async-resolved through the
+  factory (per-DS provider tokens require synchronous name
+  resolution).
+- **Phase 14.12 bundled** — the deprecated `adapterInstance` alias
+  and the `dataSourceName` option field both removed (replaced by
+  the unified `dataSource` string identifier). Closes the alias
+  cleanup chain that Phase 14.10/14.11 began.
+
+Architecture preserved:
+
+- `typeOrmEventPublicationRepositoryProvider` (the bridge function
+  returning an `useExisting` Provider) preserved with **enhanced
+  JSDoc** explaining its purpose. The bridge exists because
+  `OutboxModule.forRoot` ALWAYS registers something under the
+  per-DS repository token (defaults to
+  `InMemoryEventPublicationRepository`); `OutboxTypeOrmModule.forRoot`
+  cannot register under the same `@Global()` token without a NestJS
+  DI conflict. The bridge's `useExisting` aliases the official
+  per-DS token to a private typeorm-side token. Audit considered
+  removing the bridge but rejected on test-migration burden grounds
+  (14+ outbox unit tests rely on `OutboxModule.forRoot({})`
+  defaulting to in-memory).
+- `TypeOrmEventPublicationRepository` constructor unchanged
+  (`(dataSource: DataSource, dataSourceName = 'default')`). The
+  module factory passes both arguments after resolving the
+  DataSource from DI.
+- `SchemaInitializer` per-DS lifecycle preserved (zero behavioural
+  change) — module factory just resolves DataSource via DI instead
+  of from the option.
+
+Atomicity invariant verified end-to-end with a dedicated
+`atomicity.integration.spec.ts` regression net (3 tests against
+real Postgres):
+
+- Successful `@Transactional` commits BOTH business row AND
+  `event_publication` row in one transaction.
+- Rollback in `@Transactional` discards BOTH rows together.
+- Multiple `@Transactional` methods run independently — each tx is
+  its own atomic unit.
+
+Two parallel transactional mechanisms reach the SAME active
+`EntityManager` through `TransactionContext`:
+
+1. Phase 14.20 patched `Repository.prototype.manager` getter on
+   `@InjectRepository` business Repositories.
+2. `TypeOrmEventPublicationRepository`'s explicit
+   `getCurrentEntityManager(dataSourceName, fallback)` call.
+
+Both routes converge on the same EM. Phase 14.21 doesn't change
+this contract, but the integration test pins it explicitly.
+
+Tests: 31 outbox-typeorm integration tests (was 33, minus 2
+deprecated-alias-precedence tests) + 3 new atomicity tests = 34
+total, all passing against real Postgres.
+
+Cross-package consumers (3 outbox-typeorm integration specs +
+1 example) migrated mechanically. Cqrs package does not consume
+`OutboxTypeOrmModule` directly.
+
+ADR-018 carries a Phase 14.21 addendum documenting the
+architectural finding (bridge function preservation rationale)
+and the three options weighed during audit.
 
 **14.20: Transparent transactional repositories (shipped 2026-04-29)**
 
@@ -2324,7 +2405,20 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-29 (Phase 14.20 transparent transactional
+**Last updated**: 2026-04-29 (Phase 14.21 OutboxTypeOrmModule
+reshape shipped — `forFeature` renamed to `forRoot`, options shape
+changed to `{ dataSource?: string }`, DataSource resolved via DI.
+Phase 14.12 deprecated-alias cleanup bundled. `typeOrmEventPublicationRepositoryProvider`
+preserved with enhanced JSDoc explaining its cross-module aliasing
+role (architectural finding from audit: removing it would require
+dropping `OutboxModule.forRoot`'s in-memory default and migrating
+14+ outbox unit tests). New `atomicity.integration.spec.ts`
+regression net pins the dual-mechanism (Phase 14.20 patches +
+outbox repo's `getCurrentEntityManager`) atomicity contract end-
+to-end against real Postgres. ADR-018 carries Phase 14.21
+addendum.
+
+Earlier 2026-04-29 (Phase 14.20 transparent transactional
 repositories shipped — `TypeOrmTransactionalModule.forFeature`
 renamed to `forRoot` with `{ dataSource?: string }` shape, DataSource
 resolved via `@nestjs/typeorm`'s `getDataSourceToken`. Three prototype
@@ -2470,6 +2564,23 @@ require verification of both commits before closure).
   migration guide, and ADR-006. ADR-014 keeps its accepted-text
   body intact and gains a top note pointing at the second-pass
   rename.
+- Phase 14.21 (OutboxTypeOrmModule reshape): mirrors Phase 14.20
+  pattern. `OutboxTypeOrmModule.forFeature` renamed to `forRoot`;
+  options shape `{ dataSource?: string }` (DataSource resolved via
+  `@nestjs/typeorm`'s `getDataSourceToken`). `forRootAsync` added.
+  `typeOrmEventPublicationRepositoryProvider` bridge function
+  preserved (architectural finding: removing it would require
+  dropping `OutboxModule.forRoot`'s in-memory default and
+  migrating 14+ outbox unit tests; trade-off rejected). Phase
+  14.12 cleanup bundled — `adapterInstance` deprecated alias and
+  `dataSourceName` option field both removed (replaced by unified
+  `dataSource` string identifier). Atomicity invariant verified
+  end-to-end via dedicated `atomicity.integration.spec.ts` (3
+  tests, real Postgres) — two parallel mechanisms (Phase 14.20
+  patches on business Repository + outbox repo's explicit
+  `getCurrentEntityManager`) converge on the same active EM
+  through `TransactionContext`. 34 outbox-typeorm integration
+  tests passing. ADR-018 carries Phase 14.21 addendum.
 - Phase 14.20 (transparent transactional repositories): three
   prototype patches and per-instance DataSource patches in
   `@nestjs-transactional/typeorm` make `@InjectRepository`
@@ -2554,6 +2665,20 @@ require verification of both commits before closure).
   would silently break Repository instances constructed under
   the patched setter). Two documented limitations: direct
   `EntityManager.save()` and `BaseEntity` static methods.
+- Phase 14.21 OutboxTypeOrmModule reshape mirrors Phase 14.20
+  pattern (forFeature → forRoot, DataSource via DI). Bridge
+  function `typeOrmEventPublicationRepositoryProvider`
+  preserved — architectural finding from audit: `OutboxModule.forRoot`
+  ALWAYS registers under per-DS repository token (default
+  in-memory), so `OutboxTypeOrmModule.forRoot` cannot register
+  under the same `@Global()` token directly. The bridge's
+  `useExisting` aliases the official token to a private
+  typeorm-side token. Removing the bridge would require dropping
+  the in-memory default and migrating 14+ outbox unit tests;
+  rejected on burden grounds. Phase 14 pragmatism-over-purity
+  pattern continues. Atomicity verified via dual-mechanism
+  (Phase 14.20 patches + outbox repo's `getCurrentEntityManager`)
+  with dedicated regression spec.
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 

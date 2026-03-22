@@ -97,11 +97,12 @@ export class AppModule {
       imports: [
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-        OutboxTypeOrmModule.forFeature({
-          dataSource,
+        OutboxTypeOrmModule.forRoot({
           // Explicitly off because the example already uses
           // `synchronize: true` on the DataSource. Production would
           // disable synchronize and enable auto-init only in dev.
+          // Phase 14.21: dataSource is resolved from DI via
+          // `getDataSourceToken()` — no instance argument needed.
           schemaInitialization: { enabled: false },
         }),
         OutboxModule.forRoot({
