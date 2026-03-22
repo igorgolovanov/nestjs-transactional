@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
+import { Global, Module, type Provider } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { Test, type TestingModule } from '@nestjs/testing';
 import {
   TransactionManager,
   TransactionalModule,
 } from '@nestjs-transactional/core';
 import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import { Test, type TestingModule } from '@nestjs/testing';
 
 import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
 import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
@@ -16,6 +18,22 @@ import {
   startPostgresContainer,
   stopPostgresContainer,
 } from '../setup-testcontainers';
+
+/**
+ * Phase 14.20: `TypeOrmTransactionalModule.forRoot` resolves the
+ * actual TypeORM `DataSource` via DI. For unit/integration tests
+ * we provide that token via a `@Global()` fixture (in production
+ * `TypeOrmModule.forRoot(...)` does this).
+ */
+function buildFakeTypeOrmModule(providers: Provider[]): unknown {
+  @Global()
+  @Module({
+    providers,
+    exports: providers.map((p) => (typeof p === 'object' && 'provide' in p ? p.provide : p)),
+  })
+  class FakeTypeOrmModule {}
+  return FakeTypeOrmModule;
+}
 
 function seedInput(overrides: {
   listenerId?: string;
@@ -46,6 +64,7 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
 
   beforeAll(async () => {
     TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
     ctx = await startPostgresContainer({
       entities: [EventPublicationEntity, EventPublicationArchiveEntity],
       synchronize: true,
@@ -53,15 +72,17 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
 
     module = await Test.createTestingModule({
       imports: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildFakeTypeOrmModule([
+          { provide: getDataSourceToken(), useValue: ctx.dataSource },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]) as any,
         TransactionalModule.forRoot({
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
         }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: ctx.dataSource,
-          isDefault: true,
-        }),
+        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
       ],
     }).compile();
     await module.init();

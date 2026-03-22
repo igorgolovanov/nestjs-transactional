@@ -78,13 +78,17 @@ pnpm add @nestjs-transactional/core @nestjs-transactional/typeorm
 ```ts
 // app.module.ts
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
 @Module({
   imports: [
+    TypeOrmModule.forRoot({ /* your TypeORM config */ }),
+    TypeOrmModule.forFeature([OrderRow]),
+
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forFeature({ dataSource: myDataSource }),
+    TypeOrmTransactionalModule.forRoot(),
   ],
   providers: [OrderService],
 })
@@ -92,17 +96,24 @@ export class AppModule {}
 ```
 
 ```ts
-// order.service.ts
+// order.service.ts — Phase 14.20 transparent transactional Repositories.
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import { getCurrentEntityManager } from '@nestjs-transactional/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class OrderService {
+  constructor(
+    @InjectRepository(OrderRow)
+    private readonly orderRepo: Repository<OrderRow>,
+  ) {}
+
   @Transactional()
   async placeOrder(id: string): Promise<void> {
-    const em = getCurrentEntityManager('default');
-    await em.save(OrderRow, { id, status: 'placed' });
+    // `orderRepo.save(...)` automatically dispatches through the
+    // active transaction — no `getCurrentEntityManager` boilerplate.
+    await this.orderRepo.save({ id, status: 'placed' });
   }
 }
 ```
@@ -121,7 +132,7 @@ pnpm add @nestjs-transactional/core \
 @Module({
   imports: [
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forFeature({ dataSource }),
+    TypeOrmTransactionalModule.forRoot(),
     OutboxTypeOrmModule.forFeature({ dataSource }),
     OutboxModule.forRoot({
       repository: typeOrmEventPublicationRepositoryProvider,

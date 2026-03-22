@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
@@ -12,6 +13,22 @@ import {
   PublicationStatus,
 } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+
+/**
+ * Phase 14.20: stand-in for `TypeOrmModule.forRoot(...)` —
+ * registers the `getDataSourceToken()` provider in a `@Global()`
+ * module so the new `TypeOrmTransactionalModule.forRoot` factory
+ * can resolve the DataSource from DI.
+ */
+function buildFakeTypeOrmModule(providers: Provider[]): unknown {
+  @Global()
+  @Module({
+    providers,
+    exports: providers.map((p) => (typeof p === 'object' && 'provide' in p ? p.provide : p)),
+  })
+  class FakeTypeOrmModule {}
+  return FakeTypeOrmModule;
+}
 
 import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
 import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
@@ -62,6 +79,11 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
   ): Promise<TestingModule> {
     const app = await Test.createTestingModule({
       imports: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildFakeTypeOrmModule([
+          { provide: getDataSourceToken(), useValue: ctx.dataSource },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]) as any,
         TransactionalModule.forRoot({
           isGlobal: true,
           // Interceptor would need an HTTP adapter; skip for a plain
@@ -70,10 +92,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
           registerInterceptor: false,
           registerMethodsBootstrap: true,
         }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: ctx.dataSource,
-          isDefault: true,
-        }),
+        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
         OutboxTypeOrmModule.forFeature({
           dataSource: ctx.dataSource,
         }),
@@ -103,6 +122,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
   beforeEach(async () => {
     OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -212,7 +232,14 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
     // restart we drop the static `OutboxModule.registrations` Map
     // — within a single process the second `buildApp` would
     // otherwise hit the duplicate-dataSource guard.
+    // Phase 14.20: also reset TransactionalModule + TypeOrmTransactionalModule
+    // for the same reason — the multi-forRoot dedup pattern applies
+    // to the core module too (one infrastructure registration per
+    // process), and the typeorm forRoot must be able to remark the
+    // DataSource as managed for the restarted module.
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
     const secondApp = await buildApp({ republishOnStartup: true });
     try {
       const afterBootstrap = await ctx.dataSource

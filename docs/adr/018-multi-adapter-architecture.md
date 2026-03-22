@@ -80,6 +80,116 @@
 > the `forRoot` signature change in past tense; item 8 reflects
 > Phase 14.11's alias removal.
 
+> **Note (Phase 14.20 transparent transactional repositories,
+> 2026-04-29):** The original ADR-018 anticipated a future feature
+> where `@InjectRepository` Repositories automatically dispatch
+> through the active `@Transactional()` scope without users having
+> to call `getCurrentEntityManager()`. Phase 14.20 ships that
+> feature in `@nestjs-transactional/typeorm` via Repository /
+> EntityManager / DataSource prototype patching, modelled on the
+> `typeorm-transactional` library pattern (~166K weekly npm
+> downloads). The architectural addition is summarised here so
+> future readers can place it in the multi-adapter timeline.
+>
+> **What changes**
+>
+> 1. `TypeOrmTransactionalModule.forFeature` was renamed to
+>    `forRoot` and the options shape changed: `{ dataSource: DataSource | factory }`
+>    became `{ dataSource?: string }`. The actual `DataSource` is
+>    resolved from DI under `getDataSourceToken(dataSource)` —
+>    the same convention `@nestjs/typeorm` uses for
+>    `@InjectRepository(Entity, dataSource)`. Multi-DS deployments
+>    call `forRoot` once per dataSource, mirroring Phase 14.10's
+>    `TransactionalModule` and Phase 14.3.2's `OutboxModule`.
+>
+> 2. Three patches install at module-load time (idempotent
+>    install-once flags inside each patch module):
+>    - `Repository.prototype.manager` — getter/setter pair. The
+>      setter intercepts the `Repository` constructor's
+>      `this.manager = manager` and stashes the value under a
+>      hidden `Symbol.for(...)` key; the getter consults
+>      `TransactionContext.getActiveTransactionByDataSource(name)`
+>      and returns the active transactional `EntityManager` when
+>      one exists for this Repository's dataSource. Because every
+>      TypeORM `Repository` method is `this.manager.<method>(target, ...)`
+>      under the hood, this single getter patch covers all 30+
+>      Repository operations (save, find, query, count, sum,
+>      createQueryBuilder, etc.).
+>    - `EntityManager.prototype.getRepository` — wrapper that
+>      stamps the freshly-resolved Repository with the same hidden
+>      key, pointing at the calling EntityManager. Makes
+>      `@InjectEntityManager() em.getRepository(E).save(...)`
+>      transactional.
+>    - `Repository.prototype.extend` — wrapper preserving the
+>      stamp on extended (custom) repository classes.
+>
+>    Plus per-instance patches on each managed `DataSource`
+>    (`manager` getter, `query`, `createQueryBuilder` — to inject
+>    the active QueryRunner). The `manager` patch is per-instance
+>    because TypeORM sets `this.manager` as an own-property in
+>    the `DataSource` constructor; a prototype-level getter would
+>    be shadowed.
+>
+> 3. **Module-load activation, not factory-time**: the patches
+>    are applied as a side effect of importing
+>    `typeorm-transactional.module.ts`. Reason: NestJS resolves
+>    providers in dependency order. A `useFactory` provider that
+>    calls `dataSource.getRepository(Entity)` (e.g. `@InjectRepository`'s
+>    internal factory) may run BEFORE
+>    `TypeOrmTransactionalModule.forRoot`'s factory if it has no
+>    DI dependency on the latter. A Repository constructed before
+>    patches are installed gets its `this.manager = manager`
+>    assignment as an own-property, which permanently shadows the
+>    prototype getter. Module-load activation guarantees patches
+>    are installed before any DI factory observes
+>    `Repository.prototype`.
+>
+> 4. **Install-once, no revert**: prototype patches stay installed
+>    for the process lifetime. `TypeOrmTransactionalModule.resetForTesting`
+>    drops the managed-DataSource WeakSet (so cached repositories
+>    fall through to autocommit) but does not delete the prototype
+>    getter — deletion would silently break Repository instances
+>    constructed under the patched setter (those have no own-
+>    property `manager`; deletion leaves `repo.manager` as
+>    `undefined`). Tests that need full isolation destroy and
+>    recreate the `DataSource` between cases (the typical pattern).
+>
+> 5. **Cross-DS isolation preserved (DD-023)**: a Repository
+>    bound to dataSource A inside a `@Transactional({ dataSource: 'B' })`
+>    method autocommits — its `manager` getter looks up active
+>    transaction for dataSource A, finds none, and falls back to
+>    its captured original manager. Distributed transactions
+>    across dataSources remain unsupported; cross-DS atomicity
+>    routes through the outbox.
+>
+> 6. **Documented limitations**:
+>    - `@InjectEntityManager() em.save(Entity, ...)` direct call
+>      is NOT transactional. The patched
+>      `EntityManager.prototype.getRepository` covers
+>      `em.getRepository(E).save(...)`, but
+>      `EntityManager.prototype.save` itself is not patched (would
+>      require ~14 method patches with recursion-avoidance logic
+>      and a meaningful expansion of the patch surface). The
+>      escape hatch is `getCurrentEntityManager()`, or simply
+>      using a Repository.
+>    - `BaseEntity` static methods (`User.save(...)` etc.) are
+>      NOT supported. The `BaseEntity.useDataSource(...)` API
+>      stores a captured DataSource reference that bypasses our
+>      patches. Repository pattern is the recommended idiom.
+>
+> Phase 14.20 verified end-to-end against real Postgres via
+> testcontainers (33 integration tests covering single-DS
+> happy/rollback/autocommit, `@InjectEntityManager`
+> `em.getRepository(E).save(...)` Q1 Option A coverage proof,
+> `@InjectDataSource` ds.manager.save(), REQUIRES_NEW propagation,
+> Repository.extend() patterns, and 8 cross-DS scenarios proving
+> DD-023 isolation semantics under transparent dispatch).
+>
+> Cross-package consumers (cqrs, outbox-typeorm) and example apps
+> were migrated mechanically — same `forFeature → forRoot` rename
+> plus `getDataSourceToken()` provider registration to satisfy
+> the new DI-resolution contract.
+
 ## Context
 
 The current architecture supports a single transactional adapter

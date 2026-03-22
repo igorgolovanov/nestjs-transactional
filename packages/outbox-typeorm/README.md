@@ -108,10 +108,12 @@ const dataSource = new DataSource({
     //    downstream modules can see TransactionManager.
     TransactionalModule.forRoot({ isGlobal: true }),
 
-    // 2. TypeORM adapter registration — binds `dataSource` under
-    //    the `default` instance name so @Transactional can target
-    //    it.
-    TypeOrmTransactionalModule.forFeature({ dataSource, isDefault: true }),
+    // 2. TypeORM adapter registration. Phase 14.20: `forRoot`
+    //    resolves the actual DataSource via @nestjs/typeorm's
+    //    `getDataSourceToken(name)` — so `TypeOrmModule.forRoot(...)`
+    //    must be imported above this. Activates transparent
+    //    transactional Repository dispatch.
+    TypeOrmTransactionalModule.forRoot({ isDefault: true }),
 
     // 3. TypeORM persistence backend for the outbox. Registers the
     //    TypeOrm repository class token and SchemaInitializer.

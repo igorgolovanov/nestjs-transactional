@@ -1,4 +1,5 @@
 import { type DynamicModule, Module } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
@@ -27,7 +28,7 @@ export class AppModule {
       module: AppModule,
       imports: [
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forFeature({ dataSource }),
+        TypeOrmTransactionalModule.forRoot(),
         // Do NOT import @nestjs/cqrs's CqrsModule directly here —
         // CqrsTransactionalModule imports it internally and overrides
         // EventPublisher. Importing CqrsModule separately shadows the
@@ -35,6 +36,10 @@ export class AppModule {
         CqrsTransactionalModule.forRoot(),
       ],
       providers: [
+        // Phase 14.20: typeorm forRoot resolves the DataSource via
+        // `getDataSourceToken()`. Provide it explicitly here; in a
+        // real app `TypeOrmModule.forRoot(...)` registers it.
+        { provide: getDataSourceToken(), useValue: dataSource },
         { provide: DataSource, useValue: dataSource },
         OrderRepository,
         PlaceOrderHandler,
