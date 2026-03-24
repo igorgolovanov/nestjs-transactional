@@ -2212,79 +2212,77 @@ unaffected by these limitations.
 
 ### Decorator-driven handler registration in multi-DS deployments
 
-Four code paths share the same root issue: they read the active
-"current" registry / transaction by class token / first-element
-iteration, which resolves to the default dataSource only.
+Phase 14.3.1 splits the original four-code-path scanner gap into
+two architectural categories that need different solutions:
 
-1. **`@OutboxEventsHandler` decorator + multi-DS routing.**
-   `OutboxListenerScanner` injects `OutboxListenerRegistry` by
-   class token, aliased only to the `'default'` dataSource's
-   registry. Every annotated class registers with the default-DS
-   registry regardless of which dataSource owns the events. In a
-   multi-DS deployment, events published to a non-default
-   dataSource land in that dataSource's `event_publication`
-   table but have no listeners registered to drive their
-   delivery — the publication remains `PUBLISHED` indefinitely.
-2. **`@TransactionalEventsHandler` decorator + multi-DS dispatch.**
+- **Category A (outbox-routed)** — `@OutboxEventsHandler` and
+  `@IntegrationEventsHandler` outbox path. Both walk per-dataSource
+  `EventTypeRegistry` instances to resolve which dataSource owns each
+  decorated event class, then register with the matching per-DS
+  `OutboxListenerRegistry`. **Resolved in Phase 14.3.1 Commit 1.**
+- **Category B (cqrs in-memory dispatcher)** — `@TransactionalEventsHandler`
+  and `@IntegrationEventsHandler` dispatcher fallback path. The cqrs
+  in-memory dispatcher does not depend on per-DS event-type
+  registries — fix uses an explicit `dataSource?` decorator option
+  + per-DS hook attachment via
+  `TransactionContext.getActiveTransactionByDataSource`. **Pending
+  in Phase 14.3.1 Commit 2.**
+
+#### Category A — RESOLVED (Phase 14.3.1 Commit 1)
+
+`OutboxListenerScanner` (outbox) refactored to inject `ModuleRef` +
+`OUTBOX_DATA_SOURCE_NAMES`, walks per-DS `EventTypeRegistry`
+instances, resolves owning DS per handler's event classes (via the
+new `resolveDataSourceByEventTypeName` helper), and registers with
+the matching per-DS `OutboxListenerRegistry`. Same helper powers
+`OutboxEventPublisher.resolveDataSource`.
+
+`IntegrationEventsHandlerScanner` (cqrs) outbox path: source
+unchanged — Phase 14.7 decoupling preserved. The structural-port
+binding `OUTBOX_LISTENER_REGISTRAR` is now auto-bound by
+`OutboxModule.forRoot` to a new `MultiDsOutboxListenerRegistrar`
+(in the outbox package). Cross-package token identity via
+`Symbol.for(...)` so neither package imports the other.
+Auto-binding removes a footgun — single-DS users see identical
+behaviour (smart registrar finds the only DS and routes), multi-DS
+users get correct per-DS routing for free.
+
+Edge cases (handler events spanning multiple DSes, unregistered
+events, ambiguous registrations) throw at scanner bootstrap with
+actionable error messages — uniform policy with
+`OutboxEventPublisher.resolveDataSource`.
+
+#### Category B — PENDING (Phase 14.3.1 Commit 2)
+
+1. **`@TransactionalEventsHandler` decorator + multi-DS dispatch.**
    `TransactionalEventDispatcher` attaches phase hooks via
    `TransactionManager.registerBeforeCommit` /
    `registerAfterCommit` etc., which target the FIRST active
    transaction on the current async context. With cross-DS
    simultaneous transactions, the handler may fire on a
    transaction it does not conceptually belong to.
-3. **`@IntegrationEventsHandler` decorator + multi-DS routing.**
-   `IntegrationEventsHandlerScanner` injects a single
-   `OutboxListenerRegistrar` (resolves to default-DS via the
-   `useExisting: OutboxListenerRegistry` bridge). Multi-DS apps
-   wanting non-default-DS persistent integration handlers face
-   the same registration gap as (1).
-4. **In-memory listener-scanner side of (2).** The cqrs
+2. **In-memory listener-scanner side of (1).** The cqrs
    `TransactionalListenerScanner` walks providers and registers
    them with the single `TransactionalEventDispatcher`. The
    scanner itself is single-instance, but the dispatch-time
    "first active transaction" resolution is the latent issue —
-   the same root cause as (2).
+   the same root cause as (1).
+3. **`@IntegrationEventsHandler` dispatcher fallback path** —
+   when the outbox is not bound, falls back to the cqrs in-memory
+   dispatcher and inherits the same gap.
 
-**Workaround until Phase 14.3.1 (bundled fix for all four):**
-
-Manual per-DS listener registration with the dataSource-aware
-token utility:
-
-```ts
-import {
-  composeListenerId,
-  getOutboxListenerRegistryToken,
-} from '@nestjs-transactional/outbox';
-
-const billingRegistry = app.get(
-  getOutboxListenerRegistryToken('billing'),
-);
-billingRegistry.register({
-  id: composeListenerId('BillingListener', BillingEvent),
-  eventType: BillingEvent.name,
-  invoke: async (event) => { /* ... */ },
-});
-```
+**Workaround until Phase 14.3.1 Commit 2 lands** (Category B only;
+Category A is auto-routed):
 
 For cross-DS in-memory event handling, prefer the outbox path
 (`@OutboxEventsHandler` / `@IntegrationEventsHandler` with the
-outbox bound) — outbox routing is per-dataSource by event-class
-registration (Phase 14.3.2), so this gap doesn't bite as long as
-listener registration is manual.
+outbox bound) — those are now correctly per-DS-routed. The
+in-memory `@TransactionalEventsHandler` remains effectively
+single-DS until Commit 2 adds the `dataSource?` decorator option.
 
-Programmatic registration is a supported usage pattern by design
-— scanners are convenience layers, not the only binding mechanism.
-
-**Fix:** Phase 14.3.1 (see Roadmap) — bundled scope across the
-three scanners (`OutboxListenerScanner`,
-`TransactionalListenerScanner`,
-`IntegrationEventsHandlerScanner`) plus the dispatcher's
-hook-attachment path. Single architectural pattern (derive
-dataSource from each event class's per-DS `EventTypeRegistry`
-registration; scanners then register with the matching per-DS
-registry; dispatcher pushes hooks onto the matching dataSource's
-active-transaction directly, bypassing
-`registerBeforeCommit`'s "first active" semantics).
+Programmatic registration of in-memory listeners on a specific
+DS is also a supported pattern — scanners are convenience
+layers, not the only binding mechanism.
 
 ### Phase 14.20 transparent transactional repositories — escape-hatch
 patterns
@@ -2405,7 +2403,28 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-29 (Phase 14.21 OutboxTypeOrmModule
+**Last updated**: 2026-04-29 (Phase 14.3.1 Commit 1 — Category A
+scanner gaps resolved. `OutboxListenerScanner` refactored to walk
+per-DS `EventTypeRegistry` instances (via new
+`resolveDataSourceByEventTypeName` helper) and route handlers to
+the matching per-DS `OutboxListenerRegistry`. Cross-package
+`MultiDsOutboxListenerRegistrar` introduced in outbox; auto-bound
+to cqrs's `OUTBOX_LISTENER_REGISTRAR` structural port via
+`Symbol.for(...)` token sharing — cqrs source unchanged
+(Phase 14.7 decoupling preserved). Auto-binding eliminates a
+multi-DS footgun: single-DS users see identical behaviour;
+multi-DS users get correct per-DS routing automatically without
+manual registry binding. Helper extraction also refactors
+`OutboxEventPublisher.resolveDataSource` for symmetry —
+publish-side and listener-registration sides share one routing
+policy. Edge cases (zero-DS / multi-DS / cross-DS-spanning
+handlers) throw at scanner bootstrap with actionable messages.
+Bridge-module `useExisting: OutboxListenerRegistry` bindings
+across specs and examples removed where now redundant. 281 outbox
++ 68 cqrs + 31 outbox-microservices unit tests passing. Category B
+(cqrs in-memory dispatcher per-DS hooks) pending in Commit 2.
+
+Earlier 2026-04-29 (Phase 14.21 OutboxTypeOrmModule
 reshape shipped — `forFeature` renamed to `forRoot`, options shape
 changed to `{ dataSource?: string }`, DataSource resolved via DI.
 Phase 14.12 deprecated-alias cleanup bundled. `typeOrmEventPublicationRepositoryProvider`

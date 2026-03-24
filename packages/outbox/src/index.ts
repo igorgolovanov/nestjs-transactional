@@ -7,12 +7,14 @@ export * from './types/errors';
 
 export * from './serialization/event-serializer';
 export * from './serialization/event-type-registry';
+export * from './serialization/event-type-resolver';
 export * from './serialization/json-event-serializer';
 
 export * from './repository/event-publication-repository';
 
 export * from './registry/event-publication-registry';
 export * from './registry/listener-registry';
+export * from './registry/multi-ds-listener-registrar';
 export * from './registry/outbox-listener-scanner';
 
 export * from './decorators/outbox-events-handler.decorator';

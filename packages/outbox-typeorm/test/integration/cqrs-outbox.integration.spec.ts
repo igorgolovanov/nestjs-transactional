@@ -14,7 +14,6 @@ import {
   CqrsTransactionalModule,
   type IIntegrationEventHandler,
   type ITransactionalEventHandler,
-  OUTBOX_LISTENER_REGISTRAR,
   OUTBOX_PUBLICATION_SCHEDULER,
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
@@ -23,7 +22,6 @@ import {
   type IOutboxEventHandler,
   OutboxEventPublisher,
   OutboxEventsHandler,
-  OutboxListenerRegistry,
   OutboxModule,
   PublicationStatus,
 } from '@nestjs-transactional/outbox';
@@ -141,12 +139,13 @@ class IntegrationEventsHandlers implements IIntegrationEventHandler<OrderPlacedE
 }
 
 // The module that wires CqrsTransactionalModule + OutboxTypeOrmModule
-// + OutboxModule together, with the two structural bindings that
-// turn the hybrid publisher + integration-events scanner into a
-// dual-path router.
+// + OutboxModule together. Only the publisher-side structural binding
+// is required — `OUTBOX_LISTENER_REGISTRAR` is auto-bound by
+// `OutboxModule.forRoot` to `MultiDsOutboxListenerRegistrar`
+// (Phase 14.3.1).
+//
 // `@Global()` + explicit `exports` are required: HybridEventPublisher
-// (in CqrsTransactionalModule) injects OUTBOX_PUBLICATION_SCHEDULER
-// and IntegrationEventsHandlerScanner injects OUTBOX_LISTENER_REGISTRAR.
+// (in CqrsTransactionalModule) injects OUTBOX_PUBLICATION_SCHEDULER.
 // Without `@Global()` the bridge's providers are scoped to
 // OutboxCqrsBridge alone and the cqrs module cannot resolve them.
 @Global()
@@ -158,15 +157,8 @@ class IntegrationEventsHandlers implements IIntegrationEventHandler<OrderPlacedE
       provide: OUTBOX_PUBLICATION_SCHEDULER,
       useExisting: OutboxEventPublisher,
     },
-    // Binds OutboxListenerRegistry under the CQRS package's registrar
-    // token so IntegrationEventsHandlerScanner routes
-    // @IntegrationEventsHandler classes through the outbox.
-    {
-      provide: OUTBOX_LISTENER_REGISTRAR,
-      useExisting: OutboxListenerRegistry,
-    },
   ],
-  exports: [OUTBOX_PUBLICATION_SCHEDULER, OUTBOX_LISTENER_REGISTRAR],
+  exports: [OUTBOX_PUBLICATION_SCHEDULER],
 })
 class OutboxCqrsBridge {}
 

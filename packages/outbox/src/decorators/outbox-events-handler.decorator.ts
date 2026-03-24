@@ -81,6 +81,14 @@ export interface OutboxEventsHandlerMetadata {
  * `Reflect.defineMetadata`. The actual registration happens at
  * application bootstrap via `OutboxListenerScanner`.
  *
+ * **Multi-dataSource (Phase 14.3.1).** The scanner walks every
+ * per-dataSource `EventTypeRegistry` and routes the handler to the
+ * `OutboxListenerRegistry` whose dataSource owns the decorated
+ * events — automatic, no decorator option required. A handler
+ * subscribing to events spanning multiple dataSources is rejected
+ * at bootstrap with an actionable message; handlers must be
+ * dataSource-scoped.
+ *
  * @throws {Error} If no event types are supplied.
  */
 export function OutboxEventsHandler(...events: Type[]): ClassDecorator;
