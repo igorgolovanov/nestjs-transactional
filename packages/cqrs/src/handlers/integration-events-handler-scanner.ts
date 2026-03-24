@@ -146,6 +146,7 @@ export class IntegrationEventsHandlerScanner implements OnModuleInit {
         phase: TransactionPhase.AFTER_COMMIT,
         async: true,
         fallbackExecution: false,
+        dataSource: metadata.dataSource,
       });
     }
   }

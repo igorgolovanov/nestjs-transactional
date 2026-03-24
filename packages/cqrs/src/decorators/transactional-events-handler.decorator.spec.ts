@@ -65,6 +65,7 @@ describe('@TransactionalEventsHandler', () => {
         phase: TransactionPhase.AFTER_COMMIT,
         async: false,
         fallbackExecution: false,
+        dataSource: 'default',
       });
     });
 
@@ -74,6 +75,7 @@ describe('@TransactionalEventsHandler', () => {
         phase: TransactionPhase.BEFORE_COMMIT,
         async: true,
         fallbackExecution: true,
+        dataSource: 'billing',
       })
       class Handler implements ITransactionalEventHandler<OrderPlaced | PaymentCaptured> {
         handle(_event: OrderPlaced | PaymentCaptured): void {}
@@ -85,7 +87,17 @@ describe('@TransactionalEventsHandler', () => {
         phase: TransactionPhase.BEFORE_COMMIT,
         async: true,
         fallbackExecution: true,
+        dataSource: 'billing',
       });
+    });
+
+    it('defaults dataSource to "default" when omitted', () => {
+      @TransactionalEventsHandler({ events: [OrderPlaced] })
+      class Handler implements ITransactionalEventHandler<OrderPlaced> {
+        handle(_event: OrderPlaced): void {}
+      }
+
+      expect(getTransactionalEventsHandlerMetadata(Handler)?.dataSource).toBe('default');
     });
 
     it('accepts each phase independently', () => {

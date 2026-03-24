@@ -69,6 +69,7 @@ export class TransactionalListenerScanner implements OnModuleInit {
           phase: metadata.phase,
           async: metadata.async,
           fallbackExecution: metadata.fallbackExecution,
+          dataSource: metadata.dataSource,
         });
       }
     }
