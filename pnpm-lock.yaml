@@ -149,6 +149,73 @@ importers:
         specifier: ^5.5.4
         version: 5.9.3
 
+  examples/basic-typeorm-outbox:
+    dependencies:
+      '@nestjs-transactional/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@nestjs-transactional/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      '@nestjs-transactional/outbox-typeorm':
+        specifier: workspace:*
+        version: link:../../packages/outbox-typeorm
+      '@nestjs-transactional/typeorm':
+        specifier: workspace:*
+        version: link:../../packages/typeorm
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: ^11.0.0
+        version: 11.0.1(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.28(pg@8.20.0)(sql.js@1.14.1))
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+      typeorm:
+        specifier: ^0.3.25
+        version: 0.3.28(pg@8.20.0)(sql.js@1.14.1)
+    devDependencies:
+      '@nestjs/testing':
+        specifier: ^11.0.0
+        version: 11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.19)
+      '@testcontainers/postgresql':
+        specifier: ^10.13.0
+        version: 10.28.0
+      '@types/jest':
+        specifier: ^29.5.12
+        version: 29.5.14
+      '@types/node':
+        specifier: ^20.17.0
+        version: 20.19.39
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@20.19.39)
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.1.3
+      testcontainers:
+        specifier: ^10.13.0
+        version: 10.28.0
+      ts-jest:
+        specifier: ^29.1.4
+        version: 29.4.9(@babel/core@7.29.0)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.0))(jest-util@29.7.0)(jest@29.7.0(@types/node@20.19.39))(typescript@5.9.3)
+      typescript:
+        specifier: ^5.5.4
+        version: 5.9.3
+
   examples/cqrs-full-stack:
     dependencies:
       '@nestjs-transactional/core':
@@ -1148,6 +1215,9 @@ packages:
 
   '@types/node@20.19.39':
     resolution: {integrity: sha512-orrrD74MBUyK8jOAD/r0+lfa1I2MO6I+vAkmAWzMYbCcgrN4lCrmK52gRFQq/JRxfYPfonkr4b0jcY7Olqdqbw==}
+
+  '@types/pg@8.20.0':
+    resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
 
   '@types/sql.js@1.4.11':
     resolution: {integrity: sha512-QXIx38p2ZThJaK9vP5ZdqdlRe1FG9I8SmCZOS7FHfB/2qPAjZwkL7/vlfPg6N/oWHuuOaGg/P/IRwfP2W0kWVQ==}
@@ -4656,6 +4726,12 @@ snapshots:
   '@types/node@20.19.39':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/pg@8.20.0':
+    dependencies:
+      '@types/node': 20.19.39
+      pg-protocol: 1.13.0
+      pg-types: 2.2.0
 
   '@types/sql.js@1.4.11':
     dependencies:
