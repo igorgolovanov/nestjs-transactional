@@ -1,9 +1,10 @@
 import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
-import { CommandBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import { AppModule } from './app.module';
+import { GetNotifiedOrdersQuery } from './get-notified-orders.query';
 import { NotificationHandler } from './notification.handler';
 import { PlaceOrderCommand } from './place-order.handler';
 
@@ -13,6 +14,7 @@ async function main(): Promise<void> {
   });
 
   const commandBus = app.get(CommandBus);
+  const queryBus = app.get(QueryBus);
   const notifications = app.get(NotificationHandler);
 
   console.log('=== basic-cqrs ===');
@@ -29,6 +31,12 @@ async function main(): Promise<void> {
   }
   console.log('   notified (still):', notifications.notified);
   console.log('   expected: o-2 is NOT in the list — AFTER_COMMIT skipped on rollback');
+
+  console.log('3) GetNotifiedOrdersQuery — auto-wrapped in readOnly tx');
+  const result = await queryBus.execute<GetNotifiedOrdersQuery, string[]>(
+    new GetNotifiedOrdersQuery(),
+  );
+  console.log('   query result:', result);
 
   await app.close();
 }

@@ -3,6 +3,7 @@ import { TransactionalModule } from '@nestjs-transactional/core';
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
 import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
 
+import { GetNotifiedOrdersHandler } from './get-notified-orders.query';
 import { NotificationHandler } from './notification.handler';
 import { PlaceOrderHandler } from './place-order.handler';
 
@@ -25,6 +26,6 @@ import { PlaceOrderHandler } from './place-order.handler';
     }),
     CqrsTransactionalModule.forRoot(),
   ],
-  providers: [PlaceOrderHandler, NotificationHandler],
+  providers: [PlaceOrderHandler, GetNotifiedOrdersHandler, NotificationHandler],
 })
 export class AppModule {}
