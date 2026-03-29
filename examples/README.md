@@ -14,21 +14,76 @@ matching your need; the four cover the canonical entry points.
 | [`basic-transactional`](basic-transactional) | `@Transactional()` on a plain service via `@InjectRepository` (Phase 14.20 transparent repositories) | TypeORM + sqljs (in-memory) |
 | [`basic-outbox`](basic-outbox) | `@OutboxEventsHandler` + `OutboxEventPublisher.publish` with the in-memory test adapter | None |
 | [`basic-typeorm-outbox`](basic-typeorm-outbox) | Production-shape outbox with Postgres, atomicity verified by testcontainers | Postgres (testcontainers) |
-| [`basic-cqrs`](basic-cqrs) | `@CommandHandler` + AFTER_COMMIT `@TransactionalEventsHandler` (in-memory, phase-aware) | None |
+| [`basic-cqrs`](basic-cqrs) | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None |
 
-## Tier 2+ — Existing examples (under per-tier renovation)
+## Tier 2 — Multi-DataSource (Phase 14.8b, planned)
 
-These examples ship today but are slated for a refresh in the
-following sub-phases:
+- `multi-datasource-basic` — billing + inventory DataSources,
+  `@Transactional({ dataSource })`, no outbox/CQRS, cross-DS
+  independence demonstrated.
+- `multi-datasource-outbox` — two DataSources each with own outbox,
+  per-DS event types via `forFeature({ dataSource })`,
+  decorator-driven handler registration (Phase 14.3.1), real Postgres
+  per-DS `event_publication` tables.
+- `multi-datasource-cqrs` — two DataSources, CQRS handlers с
+  dataSource option (Phase 14.3.1 Category B), per-DS transaction
+  context.
+- `shared-database-modular-monolith` — same Postgres, different
+  schemas / logical separation, Spring Modulith-style architecture.
+
+## Tier 3 — Externalization (Phase 14.8c, planned)
+
+- `externalization-kafka` — single DataSource, outbox +
+  outbox-microservices с Kafka, `@Externalized` events.
+- `externalization-multi-broker` — single DataSource, multiple
+  brokers (Kafka + RabbitMQ + Redis), per-event
+  `@Externalized({ client })` routing.
+- `externalization-multi-datasource` — multi-DS + multi-broker,
+  combined complexity, real production scenario.
+- `externalization-with-fallback` — externalization с ADR-016
+  reliability concerns, documented limitations exposed, fallback
+  patterns.
+
+## Tier 4 — Advanced patterns (Phase 14.8d, planned)
+
+- `saga-pattern` — long-running transaction across multiple steps,
+  compensating actions on failure, outbox for inter-step coordination.
+- `audit-logging` — `@Transactional` на business operations,
+  separate audit dataSource, audit events через outbox в audit-DS.
+- `read-write-separation` — master/replica DataSource setup,
+  `@Transactional` для writes, read queries from replica.
+- `testing-patterns` — comprehensive test setup demonstration:
+  mock adapter usage, testcontainers integration tests, in-memory
+  outbox for fast tests.
+
+## Tier 5 — Production realism (Phase 14.8e, planned)
+
+- `e-commerce-orders` — realistic domain (Order, Product, Customer),
+  multi-DS, outbox, externalization к Kafka, CQRS for read/write.
+  Complete realistic application end-to-end.
+- `async-config-from-environment` — `forRootAsync` с `ConfigService`,
+  environment-based DataSource configuration, dev/staging/prod variants.
+- `graceful-shutdown` — outbox processor draining, in-flight
+  transaction completion, connection cleanup, lifecycle hooks.
+
+## Existing examples (slated for retirement or absorption during Phase 14.8f)
+
+These predate the tier framework and overlap with planned Tier 2+
+examples. They remain runnable for now; the Phase 14.8f doc sweep
+will retire / refactor / absorb them based on the realised Tier
+2–5 coverage:
 
 - [`multi-datasource`](multi-datasource) — multiple `DataSource`s
-  wired through `TransactionalModule.forRoot` per-DS calls. *Phase
-  14.8b refresh: cross-DB transaction isolation, durable cross-DB
-  integration via outbox, Spring Modulith-style modular monolith.*
-- [`cqrs-full-stack`](cqrs-full-stack) — TypeORM + `AggregateRoot` +
-  multiple phase listeners + `Query` handler. *Phase 14.8d refresh.*
-- [`outbox-full-stack`](outbox-full-stack) — TypeORM + outbox + CQRS
-  + worker, real Postgres via docker-compose. *Phase 14.8e refresh.*
+  wired through `TransactionalModule.forRoot` per-DS calls. Likely
+  superseded by `multi-datasource-basic` (Phase 14.8b).
+- [`cqrs-full-stack`](cqrs-full-stack) — TypeORM + `AggregateRoot`
+  + multiple phase listeners + `Query` handler. Persistence side
+  may be partially absorbed into `basic-typeorm-outbox` follow-ups
+  or `e-commerce-orders` (Phase 14.8e).
+- [`outbox-full-stack`](outbox-full-stack) — TypeORM + outbox +
+  CQRS + worker, real Postgres via docker-compose. Likely
+  superseded by `e-commerce-orders` (Phase 14.8e) which targets
+  the same complete-realistic-application audience.
 
 ## How to run
 
@@ -80,10 +135,12 @@ example code.
 - "I'm using `@nestjs/cqrs` and want to know how phase listeners
   cooperate with transactions" → [`basic-cqrs`](basic-cqrs)
 - "I need multiple DataSources" → [`multi-datasource`](multi-datasource)
+  today; `multi-datasource-basic` (Phase 14.8b) when shipped
 - "Full TypeORM + CQRS + multiple phases" →
   [`cqrs-full-stack`](cqrs-full-stack)
 - "Full TypeORM + outbox + CQRS + worker + Postgres" →
-  [`outbox-full-stack`](outbox-full-stack)
+  [`outbox-full-stack`](outbox-full-stack); `e-commerce-orders`
+  (Phase 14.8e) when shipped
 
 ## Further reading
 
