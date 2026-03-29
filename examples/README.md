@@ -16,20 +16,21 @@ matching your need; the four cover the canonical entry points.
 | [`basic-typeorm-outbox`](basic-typeorm-outbox) | Production-shape outbox with Postgres, atomicity verified by testcontainers | Postgres (testcontainers) |
 | [`basic-cqrs`](basic-cqrs) | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None |
 
-## Tier 2 — Multi-DataSource (Phase 14.8b, planned)
+## Tier 2 — Multi-DataSource (Phase 14.8b, in progress)
 
-- `multi-datasource-basic` — billing + inventory DataSources,
-  `@Transactional({ dataSource })`, no outbox/CQRS, cross-DS
-  independence demonstrated.
-- `multi-datasource-outbox` — two DataSources each with own outbox,
-  per-DS event types via `forFeature({ dataSource })`,
+- [`multi-datasource-basic`](multi-datasource-basic) **— shipped.**
+  Billing + inventory DataSources, `@Transactional({ dataSource })`,
+  no outbox/CQRS, cross-DS independence demonstrated.
+- `multi-datasource-outbox` *(planned)* — two DataSources each with
+  own outbox, per-DS event types via `forFeature({ dataSource })`,
   decorator-driven handler registration (Phase 14.3.1), real Postgres
   per-DS `event_publication` tables.
-- `multi-datasource-cqrs` — two DataSources, CQRS handlers с
-  dataSource option (Phase 14.3.1 Category B), per-DS transaction
-  context.
-- `shared-database-modular-monolith` — same Postgres, different
-  schemas / logical separation, Spring Modulith-style architecture.
+- `multi-datasource-cqrs` *(planned)* — two DataSources, CQRS
+  handlers с dataSource option (Phase 14.3.1 Category B), per-DS
+  transaction context.
+- `shared-database-modular-monolith` *(planned)* — same Postgres,
+  different schemas / logical separation, Spring Modulith-style
+  architecture.
 
 ## Tier 3 — Externalization (Phase 14.8c, planned)
 
@@ -73,9 +74,6 @@ examples. They remain runnable for now; the Phase 14.8f doc sweep
 will retire / refactor / absorb them based on the realised Tier
 2–5 coverage:
 
-- [`multi-datasource`](multi-datasource) — multiple `DataSource`s
-  wired through `TransactionalModule.forRoot` per-DS calls. Likely
-  superseded by `multi-datasource-basic` (Phase 14.8b).
 - [`cqrs-full-stack`](cqrs-full-stack) — TypeORM + `AggregateRoot`
   + multiple phase listeners + `Query` handler. Persistence side
   may be partially absorbed into `basic-typeorm-outbox` follow-ups
@@ -134,8 +132,8 @@ example code.
   [`basic-typeorm-outbox`](basic-typeorm-outbox)
 - "I'm using `@nestjs/cqrs` and want to know how phase listeners
   cooperate with transactions" → [`basic-cqrs`](basic-cqrs)
-- "I need multiple DataSources" → [`multi-datasource`](multi-datasource)
-  today; `multi-datasource-basic` (Phase 14.8b) when shipped
+- "I need multiple DataSources" →
+  [`multi-datasource-basic`](multi-datasource-basic)
 - "Full TypeORM + CQRS + multiple phases" →
   [`cqrs-full-stack`](cqrs-full-stack)
 - "Full TypeORM + outbox + CQRS + worker + Postgres" →
