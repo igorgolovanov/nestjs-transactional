@@ -25,9 +25,9 @@ matching your need; the four cover the canonical entry points.
   Two DataSources each with own outbox, per-DS event types via
   `forFeature({ dataSource })`, decorator-driven handler registration
   (Phase 14.3.1), real Postgres per-DS `event_publication` tables.
-- `multi-datasource-cqrs` *(planned)* — two DataSources, CQRS
-  handlers с dataSource option (Phase 14.3.1 Category B), per-DS
-  transaction context.
+- [`multi-datasource-cqrs`](multi-datasource-cqrs) **— shipped.**
+  Two DataSources, CQRS handlers с dataSource option (Phase 14.3.1
+  Category B), per-DS transaction context.
 - `shared-database-modular-monolith` *(planned)* — same Postgres,
   different schemas / logical separation, Spring Modulith-style
   architecture.
