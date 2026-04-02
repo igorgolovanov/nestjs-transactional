@@ -1851,7 +1851,7 @@ Shipped in 4 commits: b38f4b8, d947632, ce5bb99, 3a6082b. 12 tests
 (9 unit + 3 testcontainers integration). `examples/README.md` index
 introduced.
 
-**14.8b — Tier 2: Multi-DataSource (4 examples, next)**
+**14.8b — Tier 2: Multi-DataSource (4 examples, shipped 2026-05-09)**
 
 - `multi-datasource-basic` — two DataSources (billing + inventory),
   `@Transactional({ dataSource })`, no outbox/CQRS, cross-DS
@@ -1873,6 +1873,12 @@ introduced.
   module-per-domain с separate outbox per module.
   Goal: modular monolith pattern. Different namespace, same
   infrastructure.
+
+Shipped in 5 commits: 34cf35e (basic rename + rewrite), 8d1ce01
+(outbox + testcontainers), 3bd2071 (cqrs Cat B), 1d0f0e8
+(modular-monolith Postgres schemas), and this closure commit. 17
+tests (5 unit + 12 testcontainers integration). 591/591 package
+baseline preserved across all five commits.
 
 **14.8c — Tier 3: Externalization (4 examples)**
 
@@ -2458,7 +2464,64 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-05-08 (Phase 14.8a Tier 1 — foundational
+**Last updated**: 2026-05-09 (Phase 14.8b Tier 2 — multi-DataSource
+example library shipped. Four examples cover the canonical multi-DS
+patterns:
+
+1. `multi-datasource-basic` — two DataSources (billing + inventory),
+   `@Transactional({ dataSource })`, no outbox/CQRS. sqljs in-memory.
+   Rename of the obsolete `multi-datasource` example, rewritten to
+   `@InjectRepository(Entity, dataSourceName)` (Phase 14.20).
+2. `multi-datasource-outbox` — two physical Postgres databases, each
+   with its own outbox stack. Phase 14.3.1 Category A scanner auto-
+   routes `@OutboxEventsHandler` to the dataSource that owns each
+   event class. Smart-facade `OutboxEventPublisher` (DD-024)
+   resolves the publication target at publish time.
+3. `multi-datasource-cqrs` — two DataSources, `@nestjs/cqrs`
+   integration. Phase 14.3.1 Category B in action: the
+   `@TransactionalEventsHandler({ dataSource })` decorator option
+   pins the AFTER_COMMIT hook to the right DS's transaction.
+4. `shared-database-modular-monolith` — Spring Modulith-style. ONE
+   Postgres database, two schemas (`billing` + `inventory`), per-
+   schema outbox stacks, NestJS sub-modules per domain. Schema
+   isolation extends DD-023 to within a single DB.
+
+Shipped in 5 commits (34cf35e, 8d1ce01, 3bd2071, 1d0f0e8, plus
+this closure commit). 17 tests (5 unit + 12 testcontainers
+integration). 591/591 package baseline preserved.
+
+Two design catches surfaced during verification (now documented):
+
+- **`OutboxEventPublisher` smart-facade routing requires class-token
+  DI.** First iteration of `multi-datasource-outbox` used
+  `@InjectOutboxPublisher()` which binds the per-DS
+  `DataSourceOutboxPublisher` directly, bypassing smart-facade
+  routing — every publish call attempted to write to the default
+  DS. Fix: `private readonly outbox: OutboxEventPublisher`
+  (class-token DI). Both services in `multi-datasource-outbox` and
+  `shared-database-modular-monolith` carry an explicit JSDoc
+  warning to prevent recurrence in derived examples.
+
+- **`OutboxModule.forRoot` belongs at `AppModule` level when
+  sub-modules are involved.** First iteration of
+  `shared-database-modular-monolith` put `forRoot` calls inside
+  per-domain sub-modules. The `OutboxListenerScanner`'s
+  `onModuleInit` then fired before sibling sub-modules' `forFeature`
+  factories had run, leaving event-type registries empty.
+  Centralising `forRoot` at AppModule guarantees deterministic
+  init order; sub-modules carry only `forFeature` + service +
+  listener providers. README documents the pattern.
+
+Audit-estimation pattern recorded (Phase 14.8b retrospective): the
+pre-implementation audit consistently underestimated reality by
+9–41 percent across the four commits. Estimates were anchored on
+basic Tier 1 templates; reality grew with Tier 2 complexity
+(multi-DS wiring, separate test files for testcontainers cases,
+README sections covering the architectural surface). Future tier
+audits should anchor on the closest-shipped Tier exemplar (Tier 3
+on Tier 2 averages), not on Tier 1 baselines.
+
+Earlier 2026-05-08 (Phase 14.8a Tier 1 — foundational
 examples shipped. Four examples cover the canonical entry points:
 
 1. `basic-transactional` (rewrite of obsolete `basic-usage`) — single
@@ -2762,6 +2825,26 @@ require verification of both commits before closure).
   Node16 module resolution для `/testing` subpath imports, root
   `pnpm test` excludes `examples/*`). Convention #14 inscribed —
   Tier 2+ examples ship 1-per-commit.
+- Phase 14.8b (Tier 2 — Multi-DataSource examples): four examples
+  covering the canonical multi-DS patterns — `multi-datasource-basic`
+  (rename + rewrite of obsolete `multi-datasource`, sqljs in-memory,
+  no outbox/CQRS), `multi-datasource-outbox` (two physical Postgres
+  DBs each with own outbox, Phase 14.3.1 Category A scanner auto-
+  routing, smart-facade `OutboxEventPublisher`),
+  `multi-datasource-cqrs` (sqljs ×2, `@nestjs/cqrs` with Phase
+  14.3.1 Category B `dataSource` decorator option),
+  `shared-database-modular-monolith` (Spring Modulith-style: ONE
+  Postgres + two schemas, per-domain NestJS sub-modules, per-schema
+  outbox stacks). Shipped in 5 commits (34cf35e + 8d1ce01 + 3bd2071
+  + 1d0f0e8 + closure), 17 tests (5 unit + 12 testcontainers
+  integration). Convention #14 honoured — one example per code
+  commit, plus a closure docs commit. 591/591 package baseline
+  preserved across all five commits. Two design catches inscribed:
+  smart-facade DI requires class-token (not `@InjectOutboxPublisher`),
+  and `OutboxModule.forRoot` belongs at AppModule level when
+  sub-modules are involved (deterministic scanner-vs-forFeature
+  init order). Audit-estimate variance pattern recorded for
+  future-tier audits.
 
 ### Blocked / Awaiting
 
@@ -2770,14 +2853,20 @@ require verification of both commits before closure).
 
 ### Next
 
-- Phase 14.8b (Tier 2 — Multi-DataSource): four examples shipping
-  one-per-commit (Convention #14). `multi-datasource-basic`,
-  `multi-datasource-outbox`, `multi-datasource-cqrs`,
-  `shared-database-modular-monolith`. See Phase 14.8 master plan
-  above for per-example specs.
-- Phase 14.8c (Tier 3 — Externalization), 14.8d (Tier 4 —
-  Advanced patterns), 14.8e (Tier 5 — Production realism), 14.8f
-  (Comprehensive doc sweep) — sequential per master plan.
+- Phase 14.8c (Tier 3 — Externalization): four examples shipping
+  one-per-commit (Convention #14). `externalization-kafka`
+  (single DS, outbox + outbox-microservices с Kafka,
+  `@Externalized` events, real Kafka via testcontainers if
+  applicable), `externalization-multi-broker` (single DS, Kafka +
+  RabbitMQ + Redis, per-event `@Externalized({ client })` routing),
+  `externalization-multi-datasource` (multi-DS + multi-broker,
+  combined complexity), `externalization-with-fallback`
+  (ADR-016 reliability concerns, documented limitations and
+  fallback patterns). See Phase 14.8 master plan above for per-
+  example specs.
+- Phase 14.8d (Tier 4 — Advanced patterns), 14.8e (Tier 5 —
+  Production realism), 14.8f (Comprehensive doc sweep) —
+  sequential per master plan.
 - Phase 11.5b: working example in `examples/outbox-externalization/`
   — full Postgres + Kafka stack via docker-compose, NestJS app
   demonstrating the publish → outbox → externalize flow plus the

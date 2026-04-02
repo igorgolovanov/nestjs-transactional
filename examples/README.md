@@ -16,7 +16,7 @@ matching your need; the four cover the canonical entry points.
 | [`basic-typeorm-outbox`](basic-typeorm-outbox) | Production-shape outbox with Postgres, atomicity verified by testcontainers | Postgres (testcontainers) |
 | [`basic-cqrs`](basic-cqrs) | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None |
 
-## Tier 2 — Multi-DataSource (Phase 14.8b, in progress)
+## Tier 2 — Multi-DataSource (Phase 14.8b, shipped)
 
 - [`multi-datasource-basic`](multi-datasource-basic) **— shipped.**
   Billing + inventory DataSources, `@Transactional({ dataSource })`,
