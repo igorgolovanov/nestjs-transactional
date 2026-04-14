@@ -25,7 +25,8 @@
 > through every consumer of `TransactionContext`'s static API
 > (typeorm helpers, CQRS dispatcher, outbox publisher, ~487 tests)
 > for no functional benefit. Section 7 below has been rewritten to
-> describe what we ship; CLAUDE.md DD-023 carries the same revision.
+> describe what we ship; [DD-023](../dd/023-independent-tx-contexts-per-ds.md)
+> carries the same revision.
 
 > **Note (Phase 14.3.2 module-registration shape, 2026-04-27):**
 > Point 3 ("Per-dataSource provider registration") shows

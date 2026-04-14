@@ -149,8 +149,9 @@ pnpm -C examples/multi-datasource-outbox start
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
   (Phase 14.3.1 addendum documents Category A scanner)
 - [ADR-019 — outbox multi-`forRoot` pattern](../../docs/adr/019-outbox-multi-forroot-pattern.md)
-- [DD-019 single-unit atomicity](../../CLAUDE.md), [DD-023 per-DS
-  contexts](../../CLAUDE.md), [DD-024 smart facade](../../CLAUDE.md)
+- [DD-019 single-unit atomicity](../../docs/dd/019-hybrid-delivery-atomicity.md),
+  [DD-023 per-DS contexts](../../docs/dd/023-independent-tx-contexts-per-ds.md),
+  [DD-024 smart facade](../../docs/dd/024-outbox-publisher-facade.md)
 - Atomicity regression tests at the package level:
   [`packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts`](../../packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts),
   [`packages/outbox-typeorm/test/integration/multi-datasource-outbox.integration.spec.ts`](../../packages/outbox-typeorm/test/integration/multi-datasource-outbox.integration.spec.ts).

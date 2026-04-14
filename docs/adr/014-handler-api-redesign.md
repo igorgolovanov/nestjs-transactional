@@ -19,8 +19,9 @@
 > `@ApplicationModuleHandler` / `IApplicationModuleHandler` /
 > `ApplicationModuleHandlerScanner` in the body as historical record,
 > map them to their current names when consulting the codebase. See
-> CLAUDE.md DD-013 / "Phase 10: Class-level handler API + naming
-> refinement" for the second-pass rationale.
+> [DD-013](../dd/013-class-level-handler-api.md) and the
+> CLAUDE.md "Phase 10: Class-level handler API + naming refinement"
+> entry for the second-pass rationale.
 
 > **Note (Phase 12 package rename, 2026-04-26):** Throughout this ADR's
 > original text, the abstract outbox package was named
