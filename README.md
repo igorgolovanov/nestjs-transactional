@@ -228,8 +228,11 @@ pnpm -C examples/basic-usage start
 - **Guides**: [`docs/guides/migrating-to-outbox.md`](docs/guides/migrating-to-outbox.md)
   — step-by-step migration from
   `@TransactionalEventsHandler` to durable delivery.
-- **Repository conventions** and onboarding notes:
-  [`CLAUDE.md`](CLAUDE.md).
+- **Repository conventions** and PR workflow:
+  [`CONTRIBUTING.md`](CONTRIBUTING.md). The implementation
+  roadmap and per-phase retrospectives live in
+  [`docs/roadmap/`](docs/roadmap/) and
+  [`docs/status/`](docs/status/).
 
 ## Contributing
 

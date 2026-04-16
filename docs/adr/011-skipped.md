@@ -25,8 +25,9 @@ content" record rather than a missing file.
 
 ## Where the decisions actually live
 
-- Phase 8 (testing utilities) — see CLAUDE.md "Phase 8"
-  status and `packages/outbox/src/testing/` source. No
+- Phase 8 (testing utilities) — see
+  [`docs/roadmap/README.md`](../roadmap/README.md) "Phase 8"
+  entry and `packages/outbox/src/testing/` source. No
   decisions at this point rose to ADR weight; the testing
   utilities follow the existing patterns established in
   ADR-005 (method wrapping) and ADR-007 (outbox

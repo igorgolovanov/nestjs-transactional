@@ -188,8 +188,8 @@ default.
   context entry/exit, giving operators a way to trace
   context-loss bugs in production.
 - Future: an `OpenTelemetry` integration (not yet scheduled —
-  see CLAUDE.md "Future phases") will trace ALS scopes for
-  production diagnostics.
+  see [`docs/roadmap/README.md`](../roadmap/README.md) "Future
+  phases") will trace ALS scopes for production diagnostics.
 
 ## Notes
 

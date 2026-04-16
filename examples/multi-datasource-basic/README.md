@@ -135,7 +135,9 @@ EntityManager for that dataSource.
 ## Further reading
 
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-- [DD-020..024](../../CLAUDE.md) — multi-adapter design decisions
-  (dataSource as identifier, per-DS contexts, smart facades)
+- [DD-020](../../docs/dd/020-multi-adapter-datasource-name.md) ..
+  [DD-024](../../docs/dd/024-outbox-publisher-facade.md) —
+  multi-adapter design decisions (dataSource as identifier,
+  per-DS contexts, smart facades)
 - [`@nestjs/typeorm` multi-database docs](https://docs.nestjs.com/techniques/database#multiple-databases)
   — the standard NestJS pattern this example builds on.

@@ -99,8 +99,8 @@ class BillingService {
  *
  * This is also a legitimate real-world usage pattern (programmatic
  * registration is supported by design — the scanner is a
- * convenience). See "Known Limitations (Phase 14)" in CLAUDE.md and
- * the planned Phase 14.3.1 in the roadmap.
+ * convenience). See `docs/known-limitations.md` and the planned
+ * Phase 14.3.1 in `docs/roadmap/README.md`.
  */
 describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testcontainers)', () => {
   let ctx: PostgresTestContext;

@@ -116,19 +116,101 @@ Breaking changes: append `!` to the type (`feat(core)!: ...`) or put
 
 ## Code style
 
-- **TypeScript strict mode**. All types explicit; `any` is banned
-  (`@typescript-eslint/no-explicit-any` is `error` on non-test code).
-- **No emojis in code, comments, or docs** unless a user explicitly
-  asks.
-- **No `console.log`** in production paths — use NestJS `Logger`. CI
-  rejects `console.log`; `console.warn` and `console.error` are
-  allowed for genuine errors only.
-- **JSDoc on every public class, method, and interface.** Skip it on
-  trivial private helpers only.
-- **File naming**: artefacts use dot notation (`*.service.ts`,
-  `*.module.ts`, `*.interceptor.ts`, ...); pure type files use
-  kebab-case without a suffix (`transaction-handle.ts`,
-  `isolation.ts`). See `CLAUDE.md` § "File Structure" for details.
+### TypeScript
+
+- **strict mode** is mandatory: `"strict": true` in tsconfig
+- **No implicit any**: all types are explicit
+- **Readonly where possible**: parameters and properties are
+  `readonly` when they are not reassigned
+- **No enum for string literals unless needed**: union types for
+  simple constants (exception: `PropagationMode` — IDE
+  auto-completion matters)
+- **Never use `any`** without `@ts-expect-error` and a comment;
+  prefer `unknown` plus type narrowing.
+  `@typescript-eslint/no-explicit-any` is `error` on non-test
+  code.
+- **No emojis in code, comments, or docs** unless a user
+  explicitly asks.
+- **No `console.log`** in production paths — use NestJS
+  `Logger`. CI rejects `console.log`; `console.warn` and
+  `console.error` are allowed for genuine errors only.
+
+### Naming
+
+- **Classes**: PascalCase (`TransactionManager`)
+- **Interfaces**: PascalCase without an `I` prefix
+  (`TransactionAdapter`, not `ITransactionAdapter`).
+  Exception: handler interfaces consumed by user code keep the
+  `I*` prefix to mark them as implement-this contracts
+  (`ITransactionalEventHandler`, `IOutboxEventHandler`,
+  `IIntegrationEventHandler`).
+- **Types**: PascalCase (`IsolationLevel`)
+- **Enum members**: SCREAMING_SNAKE_CASE
+  (`PropagationMode.REQUIRES_NEW`)
+- **Functions / methods**: camelCase (`runInTransaction`)
+- **Constants**: SCREAMING_SNAKE_CASE (`ADAPTER_REGISTRY`)
+- **DI tokens**: SCREAMING_SNAKE_CASE with `Symbol`
+  (`ADAPTER_REGISTRY`, `TRANSACTION_OBSERVERS`)
+
+### File structure
+
+One file = one primary public entity (class / interface /
+function). Helper types live in the same file if only used there,
+otherwise in a separate file.
+
+File names follow NestJS-style dot notation:
+`<name>.<artifact-suffix>.ts`, where the suffix names the kind of
+artifact (`service`, `controller`, `module`, `interceptor`,
+`context`, `manager`, `registry`, `adapter`, `publisher`,
+`dispatcher`, `wrapper`, `bootstrap`, ...). The `<name>` part is
+kebab-case if multi-word (e.g. `cqrs-handler.wrapper.ts`).
+
+Spec files mirror the source file name with a `.spec.ts` suffix;
+integration specs use `.integration.spec.ts`.
+
+```
+src/
+├── manager/
+│   ├── transaction.manager.ts         # class TransactionManager
+│   ├── transaction.manager.spec.ts    # tests (colocated)
+│   ├── adapter.registry.ts            # class AdapterRegistry
+│   └── adapter.registry.spec.ts
+```
+
+Pure type / interface files are an exception: no suffix,
+kebab-case allowed when the filename describes the type it
+exports (e.g. `transaction-handle.ts`, `isolation.ts`,
+`propagation.ts`).
+
+### Errors
+
+- **All errors inherit from `TransactionError`** (the package's
+  base) — never `throw new Error(...)`.
+- **Every error has a `readonly code: string`** for structured
+  logging.
+- **Messages**: explicit, actionable, and carry context.
+
+```typescript
+export class TransactionAdapterNotFoundError extends TransactionError {
+  readonly code = 'TRANSACTION_ADAPTER_NOT_FOUND';
+
+  constructor(adapterName: string, instanceName: string) {
+    super(
+      `Transaction adapter not found: ${adapterName}:${instanceName}. ` +
+      `Did you register it via TypeOrmTransactionalModule.forFeature()?`
+    );
+  }
+}
+```
+
+### Documentation
+
+- **JSDoc on all public APIs** (classes, methods, interfaces).
+- `@param`, `@returns`, `@throws` where applicable.
+- `@example` for non-trivial APIs.
+- Internal entities: JSDoc optional, encouraged for complex logic.
+- **Language**: all committed text (ADRs, READMEs, JSDoc,
+  inline comments, commit messages) is English.
 
 ## Dependency boundaries
 
@@ -143,15 +225,59 @@ cqrs → (optional) typeorm → core → NestJS platform + Node builtins
 - `typeorm` does NOT import `@nestjs/cqrs`.
 - Reverse dependencies are forbidden and should fail code review.
 
+## Testing strategy
+
+### Per-package targets
+
+- **core** — unit tests with `InMemoryTransactionAdapter` for
+  TransactionContext, TransactionManager, AdapterRegistry,
+  decorators, interceptor. Coverage target: 90% lines, 85%
+  branches on public API.
+- **typeorm** — unit tests against SQLite in-memory; integration
+  tests with testcontainers (real Postgres) for savepoint
+  behavior, isolation levels, multi-DataSource scenarios,
+  connection pool behavior. Coverage target: 85% lines on units.
+- **cqrs** — unit tests for decorators, scanner, wrapper with a
+  mocked TransactionManager. Integration tests with a full NestJS
+  testing module: real `CqrsModule` + `InMemoryTransactionAdapter`
+  (or TypeORM SQLite). E2E tests for cross-package interaction
+  (cqrs + typeorm + core). Coverage target: 85% on handler logic.
+- **outbox** — coverage target 90% lines, 85% branches.
+- **outbox-typeorm** — coverage target 85% lines (the remainder
+  is TypeORM integration that is hard to cover in unit tests).
+- **outbox-microservices** — coverage target 90% lines on units
+  (ClientProxy mocked).
+
+### Test utilities
+
+The core package exports utilities via the `/testing` subpath:
+
+```typescript
+import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
+```
+
+The outbox package exports `PublishedEvents`,
+`AssertablePublishedEvents`, and `InMemoryEventPublicationRepository`
+via its `/testing` subpath. The cqrs package may expose
+`TransactionalTestingModule` similarly.
+
+### When to use testcontainers
+
+Use `testcontainers-node` for a real Postgres specifically when
+testing the `outbox-typeorm` package, the TypeORM adapter's
+savepoint/isolation behaviour, and example end-to-end flows. For
+general application testing (even with the outbox enabled) the
+in-memory repository is sufficient.
+
 ## Architectural decisions
 
 Significant architectural choices live as ADRs under
-[`docs/adr/`](docs/adr/). If your PR changes an architectural invariant
-(dependency boundaries, public API stability, wrapping strategy, etc.),
-add or supersede an ADR in the same PR.
+[`docs/adr/`](docs/adr/). If your PR changes an architectural
+invariant (dependency boundaries, public API stability, wrapping
+strategy, etc.), add or supersede an ADR in the same PR.
 
-Smaller trade-offs that do not warrant a full ADR go in CLAUDE.md's
-"Design Decisions" section.
+Smaller trade-offs that do not warrant a full ADR go in
+[`docs/dd/`](docs/dd/) as Design Decisions.
 
 ## Opening a PR
 

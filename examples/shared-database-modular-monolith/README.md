@@ -203,8 +203,7 @@ with `schema: 'billing'` in TypeORM's `forRoot`. Two reasons:
 
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
 - [ADR-019 — outbox multi-`forRoot` pattern](../../docs/adr/019-outbox-multi-forroot-pattern.md)
-- [DD-023 — independent transaction contexts per
-  dataSource](../../CLAUDE.md)
+- [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [Spring Modulith reference — events and the publication
   registry](https://docs.spring.io/spring-modulith/reference/events.html)
   (the inspiration for the per-module-outbox pattern).

@@ -99,8 +99,9 @@ Once a handler is in production:
   handler intended for production.
 - The package README ("Listener id stability" section) walks
   through the rename scenario.
-- CLAUDE.md "DO NOT rename handler classes carelessly" note
-  cross-references this ADR.
+- The repository's "DO NOT rename handler classes carelessly"
+  rule (see [`CONTRIBUTING.md`](../../CONTRIBUTING.md)) cross-
+  references this ADR.
 
 ## Alternatives Considered
 
@@ -185,8 +186,8 @@ Rejected because:
   Phase 10 redesign + this ADR's format choice make this true.
 - **Explicit opt-in for class-rename safety.** The `id:` option
   is the single discoverable place to pin stability. The
-  decorator's JSDoc, the package README, and CLAUDE.md all
-  point at it.
+  decorator's JSDoc, the package README, and CONTRIBUTING.md
+  all point at it.
 - **Multi-event handlers disambiguate naturally.** A handler
   class handling N events produces N ids
   (`baseId#Event1`, `baseId#Event2`, ...) — the worker matches
@@ -216,9 +217,9 @@ Rejected because:
   production" note on `id:`.
 - The package README includes a "Listener id stability"
   section with the rename / refactor / removal walkthroughs.
-- CLAUDE.md "DO NOT rename handler classes carelessly once the
-  outbox is in use" cross-references this ADR with the
-  prescriptive rule.
+- The "DO NOT rename handler classes carelessly once the outbox
+  is in use" rule in [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+  cross-references this ADR with the prescriptive rule.
 - `FailedEventPublications` (the operator API) exposes
   publications with stuck listener ids; ops can see them via
   `failed.findAll()` and act before the volume becomes

@@ -233,9 +233,8 @@ both public.
 ## Notes
 
 - This ADR is process-level rather than architectural. It
-  predates the actual 1.0 release (still pending — see
-  CLAUDE.md "Blocked / Awaiting") but the policy is in
-  effect from the first published release.
+  predates the actual 1.0 release (still pending) but the
+  policy is in effect from the first published release.
 - The `@arethetypeswrong/cli` and `publint` checks were
   added in Phase 4 (CI/CD setup) and are non-negotiable
   parts of the release process.

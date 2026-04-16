@@ -41,7 +41,8 @@ wiring it to `OutboxMicroservicesModule`:
   `EVENT_EXTERNALIZER` SPI from DD-018) that bypasses
   `@nestjs/microservices` entirely and uses
   e.g. `kafkajs` directly. Future broker-aware externalizers are
-  documented in CLAUDE.md "Future phases."
+  noted in [`docs/roadmap/README.md`](../../docs/roadmap/README.md)
+  under "Future phases".
 
 This example does NOT demonstrate (1) at the code level — it is a
 configuration concern, not a code pattern. It IS what we recommend

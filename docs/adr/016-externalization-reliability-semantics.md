@@ -94,9 +94,10 @@ prominently for production users. Specifically:
    so that users adopting the package see it before they make
    production decisions. Three mitigation strategies are listed.
 
-4. **`CLAUDE.md` records the limitation** in the Phase 11 section
-   alongside this ADR's reference, so the constraint is visible
-   during future planning.
+4. **The roadmap records the limitation** in the Phase 11 entry of
+   [`docs/roadmap/README.md`](../roadmap/README.md) alongside this
+   ADR's reference, so the constraint is visible during future
+   planning.
 
 5. **A future iteration may ship broker-aware externalizers** (native
    `kafkajs` / native `amqplib` / native `nats` adapters registered
@@ -201,4 +202,5 @@ These ship with the README so users have actionable guidance:
   section.
 - `packages/outbox-microservices/test/unit/microservices-event-externalizer-silent-success.spec.ts`
   — silent-success contract pinned by mock tests.
-- CLAUDE.md — Phase 11 status entry references this ADR.
+- [`docs/roadmap/README.md`](../roadmap/README.md) — Phase 11
+  entry references this ADR.

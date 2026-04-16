@@ -1,0 +1,181 @@
+# Conventions finalised during implementation
+
+Empirically-discovered conventions surfaced during phase
+iterations. These are not in the formal Design Decisions
+(`docs/dd/`) — they fall below the bar for a DD or describe
+implementation realities rather than design choices. They ARE
+high-signal at session start: every entry is a gotcha that
+caused at least one incident or wasted at least one debugging
+session.
+
+### Conventions finalised during implementation (not in the Design Decisions section above)
+
+1. **Composite context key `${adapterName}:${instanceName}`.**
+   `TransactionManager` writes every active transaction under a
+   composite key, not just `instanceName`. Prevents collision between
+   e.g. `typeorm:default` and `in-memory:default` when both are
+   registered. Adapter-side helpers must compose their lookup key the
+   same way — see `typeOrmContextKey` in
+   `packages/typeorm/src/helpers/get-entity-manager.ts`.
+
+2. **`TransactionalInterceptor` is part of the public API.**
+   Earlier internal notes listed it as not exposed; in fact it is
+   exported and typically wired via `TransactionalModule`. Advanced
+   consumers can bind it manually on specific controllers instead
+   of globally.
+
+3. **`TransactionalModule.forRoot({ isGlobal: true })` is the default
+   from Phase 14.10 onwards.** Single-call setups pairing with
+   `TypeOrmTransactionalModule` rely on `isGlobal: true` so that
+   `AdapterRegistry` is visible in the typeorm module's provider
+   scope; multi-`forRoot` setups additionally rely on it for the
+   second-and-later calls' per-DS providers to find the singletons
+   the first call registered. Phase 14.10 flipped the option's
+   default from `false` to `true` to match `OutboxModule` and
+   remove a common-case footgun. Users who genuinely want a
+   non-global module pass `isGlobal: false` explicitly and accept
+   the per-import constraint.
+
+4. **Test file layout is inconsistent across packages.** Core colocates
+   `.spec.ts` next to source. TypeORM uses `test/unit/`,
+   `test/integration/`, `test/shared/`. CQRS mostly colocates in `src/`
+   with one exception (`test/unit/transactional-events-listener.decorator.spec.ts`
+   — historical, can be moved to match). Pick one per package and stay
+   consistent within the package.
+
+5. **Session handoff notes live under `docs/sessions/`.** Read
+   `docs/sessions/phase-2-complete.md` first when resuming after a
+   long gap — it lists current state, open issues, and the next-session
+   prompt sequence in more detail than this status block.
+
+6. **Do NOT import `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.**
+   The transactional module imports `CqrsModule` internally and overrides
+   the `EventPublisher` DI token. A duplicate `CqrsModule` import in the
+   consumer shadows the override — handlers inject the original
+   `EventPublisher` from `CqrsModule` and aggregate events bypass the
+   dispatcher. Documented in `packages/cqrs/README.md`.
+
+7. **`CQRS_TRANSACTIONAL_OPTIONS` + `CQRS_HANDLER_WRAPPER_OPTIONS` are
+   separate injection tokens.** The module-level token is a string
+   (`'CQRS_TRANSACTIONAL_OPTIONS'`); the handler-wrapper-level one is a
+   `Symbol`. `CqrsTransactionalModule.forRoot` builds the wrapper via
+   `useFactory`, passing the resolved options directly — it does not
+   wire the Symbol token. If you instantiate `CqrsHandlerWrapper`
+   outside the module, provide the Symbol token yourself.
+
+8. **`WRAPPED_MARKER` is shared via `Symbol.for('@nestjs-transactional/wrapped')`.**
+   The core package does not re-export the symbol from its public
+   barrel (internal per JSDoc), but re-deriving it in any package gives
+   the same identity — `Symbol.for` is process-global. All three
+   wrapping mechanisms (interceptor, methods-bootstrap, cqrs handler
+   wrapper) check this marker before wrapping to prevent double-wrap.
+
+9. **`OutboxModule.forRoot()` carries global config; event-class
+   registration is `forFeature(eventTypes: Type[])` per feature
+   module.** Matches `TypeOrmModule.forFeature(...)` ergonomics. Each
+   `forFeature` call generates a unique Symbol token whose factory
+   provider runs eagerly (singleton scope) during DI resolution and
+   pushes the listed event classes into the singleton
+   `EventTypeRegistry`. Multiple `forFeature` calls accumulate.
+   Empty arrays are a no-op. Duplicate registrations throw at
+   bootstrap with the offending class name. By the time any
+   `onModuleInit` hook runs (e.g.
+   `ExternalizationRegistry.onModuleInit`), every `forFeature`
+   factory has already executed — natural NestJS lifecycle ordering
+   makes the registry fully populated before any consumer reads it.
+   Do NOT pass `eventTypes` to `forRoot` — that field was removed in
+   Phase 13. Move event registrations to the feature modules that
+   own the event classes.
+
+10. **Multi-adapter naming: dataSource name is the primary
+    identifier across every package; default is `'default'`.** Tokens
+    are deterministically derived via the `getXxxToken(dataSource)`
+    helpers exported from `@nestjs-transactional/core`. The convention
+    is `'{Component}{DataSource}'` (PascalCase, dataSource
+    capitalised — e.g. `'BillingTransactionManager'`,
+    `'DefaultOutboxEventPublisher'`); dataSource `'default'` produces
+    the `'Default…'` prefix. Inject decorators
+    (`@InjectTransactionManager(dataSource?)`,
+    `@InjectOutboxPublisher(dataSource?)`, etc.) accept the same
+    optional dataSource argument with the same default. Adapter
+    constructors take a dataSource name
+    (`new TransactionalTypeOrmAdapter('billing')`); each dataSource
+    has its own `AsyncLocalStorage` so cross-dataSource calls do not
+    silently enrol into a sibling transaction (DD-023). Distributed
+    transactions across dataSources are explicitly NOT supported —
+    cross-dataSource consistency goes through the outbox, see
+    ADR-018. Phase 14 lands the implementation; Phase 14.0 is the
+    documentation-only preparation iteration.
+
+11. **Two-commit phases must verify both commits before closure.**
+    Phases that ship in two commits (code + docs) require explicit
+    verification that BOTH commits landed before the phase is marked
+    complete. "Done" reported on the code commit alone is incomplete
+    — the docs commit drifts into the next phase's session and gets
+    forgotten. Pattern observed: Phase 14.3.2 (code shipped 0ecb0e4
+    on 2026-04-27, ADR-019 docs ~10h later as 8318a64); Phase 14.10
+    (code shipped fd477fa on 2026-04-27, docs deferred and
+    eventually bundled with Phase 14.11 as a single docs commit).
+    Mitigation: end-of-phase checklist explicitly asks "did the
+    docs commit land?" before moving on. Bundling consecutive
+    cleanup phases' docs into one commit (this commit, for example)
+    is acceptable once both code commits have shipped — but the
+    bundle must still happen before another non-cleanup phase
+    starts, otherwise it slips again.
+
+12. **Patches in `@nestjs-transactional/typeorm` install at
+    module-load time, NOT at `forRoot` factory time** (Phase 14.20).
+    Importing `@nestjs-transactional/typeorm` triggers
+    `applyAllPatches()` as a side effect of evaluating
+    `typeorm-transactional.module.ts`. Reason: NestJS resolves
+    providers in dependency order; a `useFactory` provider that
+    calls `dataSource.getRepository(Entity)` (e.g.
+    `@InjectRepository`'s internal factory) may run BEFORE
+    `TypeOrmTransactionalModule.forRoot`'s factory if it has no
+    DI dependency on the latter. A Repository constructed before
+    patches are installed gets `this.manager = manager` as an
+    own-property, which permanently shadows the prototype getter
+    we install later. Module-load activation guarantees patches
+    are in place before any DI factory observes
+    `Repository.prototype`. Pattern matches typeorm-transactional's
+    `initializeTransactionalContext()` semantics — make the
+    import itself the activation point. Idempotent: install-once
+    flags inside each patch module make re-imports (e.g. via
+    pnpm hoisting glitches) safe.
+
+13. **`TypeOrmTransactionalModule.resetForTesting` resets the
+    managed-DataSource WeakSet only — prototype patches stay
+    installed for the process lifetime** (Phase 14.20). Reverting
+    a prototype patch by deleting the descriptor would silently
+    break Repository instances constructed under the patched
+    setter (those have no own-property `manager`; deletion leaves
+    `repo.manager === undefined`). The WeakSet flip is the safe
+    isolation lever — cached repositories from a prior test fall
+    through the patched getter to their captured original manager
+    (autocommit). Tests that need full isolation destroy and
+    recreate the `DataSource` between cases (the typical pattern).
+    Same trade-off documented in typeorm-transactional issues
+    #34/#51; we make the trade-off survivable instead of silent
+    via the install-once contract.
+
+14. **Tier 2+ examples ship one-per-commit** (Phase 14.8a closure,
+    decided 2026-05-08). Tier 1 (Phase 14.8a) bundled 2 examples
+    per commit because three of the four were small (~+400 LoC
+    each) and naturally paired (basic-transactional/basic-outbox in
+    Commit 1; basic-typeorm-outbox alone in Commit 2; basic-cqrs +
+    examples/README.md index in Commit 3; QueryHandler gap-fill in
+    Commit 4). Tier 2+ examples are larger (multi-DS / Kafka /
+    docker-compose stacks) and benefit from independent review
+    granularity. Pattern: audit at the start of each tier, then
+    one example per commit, then a closing docs commit recording
+    the tier completion.
+
+    **LoC envelope**: Tier 2 examples landed 700-1000 LoC per
+    commit; Tier 3 examples landed 891-1184 (broker stack +
+    externalization wiring add ~250-300 LoC over Tier 2 baseline
+    + the README needs more space for the architectural surface).
+    The original +900 cap was a Tier 1 hangover; from Tier 3 onward
+    the realistic envelope is +1200 per commit and the audit should
+    flag deviations beyond that. Multi-DS examples sit at the
+    upper edge of the envelope (1100-1200 expected for Tier 3+
+    multi-DS); single-DS examples should fit under +1000.

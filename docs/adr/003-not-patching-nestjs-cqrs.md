@@ -194,7 +194,8 @@ as in [ADR-005](005-method-wrapping-strategy.md), point (2).
 
 - **Don't import `CqrsModule` directly alongside
   `CqrsTransactionalModule.forRoot()`** — Convention #6 in
-  CLAUDE.md. The transactional module imports `CqrsModule`
+  [`docs/status/conventions.md`](../status/conventions.md). The
+  transactional module imports `CqrsModule`
   internally and overrides the `EventPublisher` DI token; a
   duplicate `CqrsModule` import in the consumer shadows the
   override and aggregate events bypass the dispatcher.
