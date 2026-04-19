@@ -179,3 +179,51 @@ session.
     flag deviations beyond that. Multi-DS examples sit at the
     upper edge of the envelope (1100-1200 expected for Tier 3+
     multi-DS); single-DS examples should fit under +1000.
+    Tier 4 actuals: 1149 / 884 / 688 / 896 — the saga (1149) sits
+    at the upper edge due to 4-step domain + compensation, the
+    no-outbox/no-cqrs `read-write-separation` (688) sets the new
+    floor for single-axis examples.
+
+15. **`OutboxEventPublisher.publish` is a silent no-op when no
+    listener is registered for the event type.** Surfaced
+    2026-05-10 in Phase 14.8d (`testing-patterns` outbox-unit
+    tier first iteration). `OutboxModule.forFeature([...])` is
+    necessary but not sufficient — the publisher only writes a
+    publication row when at least one decorated listener
+    (`@OutboxEventsHandler` or `@IntegrationEventsHandler`) is
+    registered for the event class. By design (avoids buffering
+    events nobody consumes), but it surprises tests that try to
+    assert "the service called publish, therefore the publication
+    row exists." The mitigation: any unit test asserting on
+    `PublishedEvents` / `AssertablePublishedEvents` must register
+    at least one listener. A stub class is fine — see
+    `examples/testing-patterns/test/wallet-outbox.spec.ts`'s
+    `TestAuditListener` for the pattern.
+
+16. **`@TransactionalEventsHandler` (cqrs in-memory dispatcher)
+    does NOT receive events published through
+    `OutboxEventPublisher.publish` directly.** Surfaced 2026-05-10
+    in Phase 14.8d (`testing-patterns` integration tier first
+    iteration). The in-memory dispatcher consumes from cqrs's
+    `EventBus.publish` / `AggregateRoot.commit()` paths; the
+    outbox consumes from `OutboxEventPublisher.publish`. To
+    bridge: either emit through cqrs (which `HybridEventPublisher`
+    fans to both paths when both are wired), or use
+    `@IntegrationEventsHandler` (outbox-routed when `OutboxModule`
+    binds the registrar). The example carries the right shape
+    after the iteration: `WalletProjection` is now
+    `@IntegrationEventsHandler`.
+
+17. **Subpath imports require `module: Node16` +
+    `moduleResolution: Node16` + `isolatedModules: true` in the
+    consuming `tsconfig`.** Surfaced 2026-05-10 in Phase 14.8d
+    (`testing-patterns` first build). The monorepo
+    `tsconfig.base.json` uses `module: CommonJS` /
+    `moduleResolution: node` which cannot read package.json
+    `exports` subpaths — TS errors with `TS2307: Cannot find
+    module '@nestjs-transactional/core/testing' or its
+    corresponding type declarations`. Consuming examples must
+    override. `basic-cqrs` already does (the canonical pattern);
+    `testing-patterns` followed. A future cleanup may flip the
+    base config to `Node16` and propagate; out of scope for the
+    examples-only Phase 14.8.

@@ -243,9 +243,9 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-05-09 — Phase 14.8c Tier 3 (externalization
+**Last updated**: 2026-05-10 — Phase 14.8d Tier 4 (advanced-pattern
 example library) shipped. See
-[`docs/status/2026-05-09-phase-14-8c.md`](docs/status/2026-05-09-phase-14-8c.md)
+[`docs/status/2026-05-10-phase-14-8d.md`](docs/status/2026-05-10-phase-14-8d.md)
 for the retrospective. Earlier phase retrospectives in
 [`docs/status/`](docs/status/); the full completed-phases archival
 list is at [`docs/status/completed.md`](docs/status/completed.md).
@@ -257,14 +257,16 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 
 ### Next
 
-- **Phase 14.8d (Tier 4 — Advanced patterns)**: four examples
-  shipping one-per-commit (Convention #14). `saga-pattern`,
-  `audit-logging`, `read-write-separation`, `testing-patterns`.
-  Audit estimate anchor: Tier 3 closure (LoC range 900-1200 per
-  example). See [`docs/roadmap/README.md`](docs/roadmap/README.md)
-  for the full per-example specs.
-- **Phase 14.8e** (Tier 5 — Production realism), **14.8f**
-  (Comprehensive doc sweep) — sequential per master plan.
+- **Phase 14.8e (Tier 5 — Production realism)**: three examples
+  per master plan. `e-commerce-orders` (full realistic stack,
+  multi-DS + outbox + externalization + CQRS),
+  `async-config-from-environment` (`forRootAsync` + ConfigService
+  + dev/staging/prod variants), `graceful-shutdown` (worker
+  draining + lifecycle hooks). Audit estimate anchor: Tier 4
+  closure (LoC range 688-1149; `e-commerce-orders` likely sits at
+  the upper edge given its multi-axis surface).
+- **Phase 14.8f** (Comprehensive doc sweep) — sequential after
+  14.8e per master plan.
 - **Phase 9 iteration 9.3**: release automation for the outbox
   packages — changeset entries, CI matrix tweaks, first
   0.1.0-alpha release.
@@ -274,6 +276,14 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 
 ### Five most recent decisions
 
+- Phase 14.8d shipped — Tier 4 advanced-pattern examples (saga
+  with compensation; cross-DS audit through outbox; master/replica
+  read-write-separation; meta-example with three test tiers).
+  Three new conventions (#15 silent-no-op publish without listener;
+  #16 `@TransactionalEventsHandler` does not receive
+  `OutboxEventPublisher.publish` events; #17 `Node16` module
+  resolution required for subpath imports). Idempotency-gate
+  pattern repeated consistently across 3 examples.
 - Phase 14.8c shipped — ADR-016 silent-success limitation pinned
   by the externalization example library; consumer-side
   inbox/dedup pattern inscribed as code template; three Tier 3
@@ -287,12 +297,12 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 - Phase 14.8a shipped — Tier 1 foundational examples; Convention
   #14 inscribed (Tier 2+ examples ship 1-per-commit).
 - Phase 14.21 shipped — `OutboxTypeOrmModule.forFeature` →
-  `forRoot`; Phase 14.12 alias cleanup bundled in.
-- Phase 14.20 shipped — transparent transactional repositories
-  via prototype patches (`Repository.prototype.manager` getter +
-  related). Module-load-time activation. Two documented
-  limitations (`EntityManager.save()` direct call,
-  `BaseEntity` static methods).
+  `forRoot`; Phase 14.12 alias cleanup bundled in. Phase 14.20
+  preceded — transparent transactional repositories via prototype
+  patches (`Repository.prototype.manager` getter + module-load-
+  time activation; two documented limitations:
+  `EntityManager.save()` direct call and `BaseEntity` static
+  methods).
 
 For the full list of completed phases see
 [`docs/status/completed.md`](docs/status/completed.md). For

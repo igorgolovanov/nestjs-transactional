@@ -62,17 +62,35 @@ matching your need; the four cover the canonical entry points.
   Visual demo includes manual `docker-compose stop rabbitmq` so the
   ADR-016 limitation is observable on a real broker.
 
-## Tier 4 — Advanced patterns (Phase 14.8d, planned)
+## Tier 4 — Advanced patterns (Phase 14.8d, shipped)
 
-- `saga-pattern` — long-running transaction across multiple steps,
-  compensating actions on failure, outbox for inter-step coordination.
-- `audit-logging` — `@Transactional` на business operations,
-  separate audit dataSource, audit events через outbox в audit-DS.
-- `read-write-separation` — master/replica DataSource setup,
-  `@Transactional` для writes, read queries from replica.
-- `testing-patterns` — comprehensive test setup demonstration:
-  mock adapter usage, testcontainers integration tests, in-memory
-  outbox for fast tests.
+- [`saga-pattern`](saga-pattern) **— shipped.** Choreographed
+  4-step saga (place → reserve → charge → ship) on a single
+  Postgres DataSource, coordinated through the outbox.
+  Compensation handler subscribes to both
+  `InventoryReservationFailedEvent` and `PaymentFailedEvent`; the
+  payment-failure branch restores reserved stock atomically with
+  marking the order failed. Idempotency gates per step (PK
+  `unique_violation` catches and conditional `UPDATE` predicates).
+- [`audit-logging`](audit-logging) **— shipped.** Two physical
+  Postgres DBs (business + audit) wired asymmetrically — full
+  outbox stack on business DS, only `TypeOrmTransactionalModule`
+  on audit DS (sink). `@Transactional({ dataSource: 'audit' })`
+  on the consumer; idempotency on `AuditLogRow.operationId` PK.
+  Audit-DS outage does not block business operations.
+- [`read-write-separation`](read-write-separation) **— shipped.**
+  Two `TypeOrmModule.forRoot` registrations (`'default'` master +
+  `'replica'`); only master gets the transactional adapter.
+  `@InjectRepository(Entity, 'replica')` for reads, default
+  injection for writes. README documents the alternative TypeORM
+  native `replication` option and when each shape applies.
+- [`testing-patterns`](testing-patterns) **— shipped.** Three test
+  tiers against the same `WalletService` domain: unit with
+  `InMemoryTransactionAdapter`, outbox unit with
+  `InMemoryEventPublicationRepository` + `PublishedEvents` /
+  `AssertablePublishedEvents`, integration with testcontainers
+  Postgres. README pins the gotchas (silent-no-op publish without
+  listener, `Node16` module resolution for subpath imports).
 
 ## Tier 5 — Production realism (Phase 14.8e, planned)
 
@@ -113,7 +131,9 @@ pnpm -C examples/<name> test:integration     # testcontainers integration (where
 Each example honours these scripts; `test:integration` exists in
 examples that require Docker — currently `basic-typeorm-outbox`,
 `outbox-full-stack`, every Tier 2 multi-DataSource example except
-`multi-datasource-basic`, and every Tier 3 externalization example.
+`multi-datasource-basic`, every Tier 3 externalization example,
+and every Tier 4 example (the unit-only branches of `testing-patterns`
+run under plain `pnpm test`).
 
 The root `pnpm test` deliberately excludes `examples/*` to keep the
 default dev loop fast — run the example tests directly when you change
@@ -157,6 +177,14 @@ example code.
 - "Full TypeORM + outbox + CQRS + worker + Postgres" →
   [`outbox-full-stack`](outbox-full-stack); `e-commerce-orders`
   (Phase 14.8e) when shipped
+- "Multi-step business process with compensation" →
+  [`saga-pattern`](saga-pattern)
+- "Cross-DataSource audit trail through the outbox" →
+  [`audit-logging`](audit-logging)
+- "Master/replica DataSource setup" →
+  [`read-write-separation`](read-write-separation)
+- "Test scaffolding skeleton — unit, outbox unit, integration" →
+  [`testing-patterns`](testing-patterns)
 
 ## Further reading
 
