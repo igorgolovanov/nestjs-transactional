@@ -23,7 +23,7 @@
     "savepoint"
   ],
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22.11.0"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

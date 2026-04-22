@@ -13,7 +13,7 @@ behind.
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22+
 - Docker (for the Postgres container)
 
 ## Run it
