@@ -1,0 +1,50 @@
+{
+  "name": "nestjs-transactional-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Declarative transaction management for NestJS",
+  "license": "MIT",
+  "author": "Igor Golovanov",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorgolovanov/nestjs-transactional.git"
+  },
+  "bugs": {
+    "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
+  },
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional#readme",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r --filter './packages/*' build",
+    "clean": "pnpm -r --filter './packages/*' clean && rm -rf node_modules",
+    "test": "pnpm -r --filter './packages/*' test",
+    "test:watch": "pnpm -r --filter './packages/*' --parallel test:watch",
+    "test:integration": "pnpm -r --filter './packages/*' test:integration",
+    "lint": "eslint \"packages/*/src/**/*.ts\"",
+    "lint:fix": "eslint \"packages/*/src/**/*.ts\" --fix",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,json}\" \"*.{md,json,yml,yaml}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,json}\" \"*.{md,json,yml,yaml}\"",
+    "typecheck": "tsc --build --force",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.5.4"
+  }
+}

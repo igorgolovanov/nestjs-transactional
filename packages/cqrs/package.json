@@ -1,0 +1,70 @@
+{
+  "name": "@nestjs-transactional/cqrs",
+  "version": "0.0.0",
+  "description": "@nestjs/cqrs integration for @nestjs-transactional/core — transactional event listeners with phases, handler wrapping, AggregateRoot integration",
+  "license": "MIT",
+  "author": "Igor Golovanov",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "directory": "packages/cqrs"
+  },
+  "bugs": {
+    "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
+  },
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/cqrs#readme",
+  "keywords": [
+    "nestjs",
+    "cqrs",
+    "transaction",
+    "transactional",
+    "spring",
+    "event-listener",
+    "aggregate-root",
+    "after-commit"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rimraf dist *.tsbuildinfo coverage",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "peerDependencies": {
+    "@nestjs-transactional/core": "workspace:^",
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
+    "@nestjs/cqrs": "^11.0.0",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/cqrs": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  }
+}
