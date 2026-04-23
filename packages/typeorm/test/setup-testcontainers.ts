@@ -69,3 +69,34 @@ export async function stopPostgresContainer(ctx: PostgresTestContext): Promise<v
   }
   await ctx.container.stop();
 }
+
+/**
+ * Create a second database inside the running Postgres container and
+ * return an initialised {@link DataSource} pointing at it. Useful for
+ * multi-datasource integration tests that need two logically independent
+ * DataSources without paying the cost of a second container.
+ *
+ * Caller is responsible for destroying the returned DataSource before
+ * `stopPostgresContainer` is called.
+ */
+export async function createAdditionalDatabase(
+  ctx: PostgresTestContext,
+  databaseName: string,
+  options: Pick<StartPostgresOptions, 'entities' | 'synchronize'> = {},
+): Promise<DataSource> {
+  await ctx.dataSource.query(`CREATE DATABASE ${databaseName}`);
+
+  const secondary = new DataSource({
+    type: 'postgres',
+    host: ctx.container.getHost(),
+    port: ctx.container.getPort(),
+    username: ctx.container.getUsername(),
+    password: ctx.container.getPassword(),
+    database: databaseName,
+    entities: options.entities,
+    synchronize: options.synchronize ?? false,
+    logging: false,
+  });
+  await secondary.initialize();
+  return secondary;
+}
