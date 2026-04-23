@@ -58,6 +58,7 @@ module.exports = {
         '@typescript-eslint/no-unsafe-assignment': 'off',
         '@typescript-eslint/require-await': 'off',
         '@typescript-eslint/no-empty-function': 'off',
+        '@typescript-eslint/unbound-method': 'off',
       },
     },
   ],
