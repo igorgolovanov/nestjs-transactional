@@ -56,6 +56,7 @@ module.exports = {
       rules: {
         '@typescript-eslint/no-non-null-assertion': 'off',
         '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
         '@typescript-eslint/require-await': 'off',
         '@typescript-eslint/no-empty-function': 'off',
         '@typescript-eslint/unbound-method': 'off',
