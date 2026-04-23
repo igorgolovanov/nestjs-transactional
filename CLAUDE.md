@@ -891,26 +891,98 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Phase**: Phase 0 — Monorepo setup (in progress)
+**Phase**: Phase 2 complete — Phase 3 (`@nestjs-transactional/cqrs`) not started.
 
-**Completed**:
-- Architectural discussion (all major design decisions resolved)
-- CLAUDE.md with design decisions DD-001 through DD-008
-- ADR index defined (001–005)
-- Phase 0 Iteration 0.1: monorepo skeleton created — pnpm workspaces,
-  TypeScript project references, Jest base, ESLint + Prettier,
-  Changesets, three package skeletons (core, typeorm, cqrs). Install /
-  build / lint / typecheck / format all green.
+**Test suite**: 124 unit tests green across 10 suites (106 core + 18
+typeorm). Integration specs (10 tests in 2 files) compile and are
+discovered by the integration Jest config but have not been run yet —
+they need Docker for testcontainers-node.
 
-**Architectural decisions resolved**:
-- Legacy decorators + reflect-metadata (DD-007)
-- Three-mechanism wrapping strategy (DD-008, detailed in ADR-005)
-- Wrapping marker via `Symbol.for('@nestjs-transactional/wrapped')`
+### Phase 0 — Monorepo setup — DONE
+- pnpm workspaces, TypeScript project references (composite: true)
+- Jest + ts-jest + `setupFiles: ['reflect-metadata']`
+- ESLint 8 (legacy `.eslintrc.js`) + Prettier 3
+- Changesets initialised
+- CI workflow at `.github/workflows/ci.yml` — Node 20 + 22 matrix: lint, build, test, type-check
 
-**In progress**:
-- Phase 0 wrap-up (optional: CI skeleton if not yet added)
+### Phase 1 — `@nestjs-transactional/core` — mostly done
+- Types: `PropagationMode` (all 7 Spring modes), `IsolationLevel`,
+  `TransactionOptions`, `ExtendedTransactionOptions`, `TransactionHandle`,
+  `TransactionAdapter<THandle>`, `DomainEvent`, errors (`TransactionError`
+  base + `IllegalTransactionStateError`, `TransactionAdapterNotFoundError`,
+  `OutboxWriteError`)
+- `TransactionContext` — `AsyncLocalStorage`-backed store with
+  `ActiveTransaction` entries
+- `AdapterRegistry` + `ADAPTER_REGISTRY` DI token
+- `InMemoryTransactionAdapter` (exported via `/testing` subpath)
+- `TransactionManager` — all seven propagation modes (REQUIRED,
+  REQUIRES_NEW, NESTED savepoint, SUPPORTS, NOT_SUPPORTED, NEVER,
+  MANDATORY), rollback rules (`rollbackFor` / `noRollbackFor`),
+  lifecycle hooks (before-commit / after-commit / after-rollback),
+  observers
+- `@Transactional()` / `@ReadOnly()` / `@TransactionalOn()` decorators
+  (metadata-only via `reflect-metadata`)
+- `TransactionalInterceptor` — `APP_INTERCEPTOR` for the request boundary
+- `TransactionalModule.forRoot` + `forRootAsync`
+- `TransactionObserver` + `TRANSACTION_OBSERVERS` for monitoring
+- `docs/architecture/core-design.md` documents the three extension points
 
-**Next**:
-- Phase 1 Iteration 1.1 (types and interfaces in core)
+**One item remains open in Phase 1:** `TransactionalMethodsBootstrap` —
+the second of ADR-005's three wrapping mechanisms, for service-level
+`@Transactional()` on plain `@Injectable()` providers. Without it,
+`@Transactional` on a service method is metadata-only and nothing wraps
+it at runtime. **This is the first task of the next session.**
+
+### Phase 2 — `@nestjs-transactional/typeorm` — DONE
+- `TypeOrmTransactionAdapter` using `DataSource.transaction(...)` and
+  raw `SAVEPOINT` SQL for nested transactions
+- `TypeOrmTransactionHandle` (extends core handle with `entityManager`)
+- `getCurrentEntityManager(adapterInstance?, fallback?)` +
+  `isInTransaction(adapterInstance?)` helpers
+- `TypeOrmTransactionalModule.forFeature` — inline `useFactory` that
+  registers the adapter with the shared `AdapterRegistry`
+- Integration scaffolding: `test/setup-testcontainers.ts` with
+  `startPostgresContainer` / `stopPostgresContainer` /
+  `createAdditionalDatabase` helpers, plus `jest.integration.config.js`
+
+**Limitations documented in `docs/sessions/phase-2-complete.md` §4:**
+`readOnly` and `timeout` options accepted but not yet mapped to
+per-dialect SQL; `forFeature` does not accept an `InjectionToken` for
+the DataSource yet.
+
+### Phase 3 — `@nestjs-transactional/cqrs` — NOT STARTED
+Package skeleton only; `src/index.ts` is `export {}`. See
+`docs/sessions/phase-2-complete.md` §5 for a five-prompt sequence to
+deliver it.
+
+### Conventions finalised during implementation (not in the Design Decisions section above)
+
+1. **Composite context key `${adapterName}:${instanceName}`.**
+   `TransactionManager` writes every active transaction under a
+   composite key, not just `instanceName`. Prevents collision between
+   e.g. `typeorm:default` and `in-memory:default` when both are
+   registered. Adapter-side helpers must compose their lookup key the
+   same way — see `typeOrmContextKey` in
+   `packages/typeorm/src/helpers/get-entity-manager.ts`.
+
+2. **`TransactionalInterceptor` is part of the public API.** CLAUDE.md
+   previously listed it under "Not Exposed". See § "Exported but
+   typically wired via `TransactionalModule`" above.
+
+3. **`TransactionalModule.forRoot({ isGlobal: true })` is required when
+   pairing with `TypeOrmTransactionalModule`.** Otherwise
+   `AdapterRegistry` is not visible in the typeorm module's provider
+   scope and DI fails at init.
+
+4. **Test file layout in typeorm package:** unit tests under
+   `packages/typeorm/test/unit/`, integration under
+   `packages/typeorm/test/integration/`, shared fixtures under
+   `packages/typeorm/test/shared/`. Core still colocates `.spec.ts` next
+   to source. Adopt the typeorm layout for `cqrs` tests.
+
+5. **Session handoff notes live under `docs/sessions/`.** Read
+   `docs/sessions/phase-2-complete.md` first when resuming after a
+   long gap — it lists current state, open issues, and the next-session
+   prompt sequence in more detail than this status block.
 - ADR-005 document will be written in Phase 1 before the iteration on
   TransactionalMethodsBootstrap
