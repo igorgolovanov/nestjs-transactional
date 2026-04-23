@@ -1,4 +1,5 @@
 import { TransactionContext } from '../context/transaction.context';
+import type { TransactionObserver } from '../observability/transaction-observer';
 import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
 import { IllegalTransactionStateError } from '../types/errors';
 import { PropagationMode } from '../types/propagation';
@@ -567,6 +568,125 @@ describe('TransactionManager (propagation REQUIRED)', () => {
       expect(bodyRan).toBe(false);
       expect(adapter.committedTransactions).toHaveLength(0);
       expect(adapter.rolledBackTransactions).toHaveLength(0);
+    });
+  });
+
+  describe('observability', () => {
+    interface MockObserver {
+      onTransactionStart: jest.Mock;
+      onTransactionCommit: jest.Mock;
+      onTransactionRollback: jest.Mock;
+    }
+
+    function makeObserver(): MockObserver {
+      return {
+        onTransactionStart: jest.fn(),
+        onTransactionCommit: jest.fn(),
+        onTransactionRollback: jest.fn(),
+      };
+    }
+
+    it('fires onTransactionStart before the body runs, with the full context', async () => {
+      const observer = makeObserver();
+      manager = new TransactionManager(registry, [observer]);
+
+      let observerCalledBeforeFn = false;
+      observer.onTransactionStart.mockImplementation(() => {
+        observerCalledBeforeFn = true;
+      });
+
+      await manager.run({ isolation: 'SERIALIZABLE' }, async () => {
+        expect(observerCalledBeforeFn).toBe(true);
+      });
+
+      expect(observer.onTransactionStart).toHaveBeenCalledTimes(1);
+      const ctx = observer.onTransactionStart.mock.calls[0]?.[0];
+      expect(ctx.transactionId).toBeDefined();
+      expect(ctx.transactionId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(ctx.adapterName).toBe('in-memory');
+      expect(ctx.adapterInstanceName).toBe('default');
+      expect(ctx.correlationId).toBeDefined();
+      expect(ctx.options.isolation).toBe('SERIALIZABLE');
+    });
+
+    it('fires onTransactionCommit on success with durationMs and commitCount', async () => {
+      const observer = makeObserver();
+      manager = new TransactionManager(registry, [observer]);
+
+      await manager.run({}, async () => {
+        manager.registerAfterCommit(async () => {});
+        manager.registerAfterCommit(async () => {});
+      });
+
+      expect(observer.onTransactionCommit).toHaveBeenCalledTimes(1);
+      expect(observer.onTransactionRollback).not.toHaveBeenCalled();
+      const ctx = observer.onTransactionCommit.mock.calls[0]?.[0];
+      expect(ctx.commitCount).toBe(2);
+      expect(ctx.durationMs).toBeGreaterThanOrEqual(0);
+      expect(ctx.transactionId).toBeDefined();
+    });
+
+    it('fires onTransactionRollback with error and rollbackCount', async () => {
+      const observer = makeObserver();
+      manager = new TransactionManager(registry, [observer]);
+      const boom = new Error('boom');
+
+      await expect(
+        manager.run({}, async () => {
+          manager.registerAfterRollback(async () => {});
+          throw boom;
+        }),
+      ).rejects.toBe(boom);
+
+      expect(observer.onTransactionRollback).toHaveBeenCalledTimes(1);
+      expect(observer.onTransactionCommit).not.toHaveBeenCalled();
+      const ctx = observer.onTransactionRollback.mock.calls[0]?.[0];
+      expect(ctx.error).toBe(boom);
+      expect(ctx.rollbackCount).toBe(1);
+      expect(ctx.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('invokes every observer in the array', async () => {
+      const first = makeObserver();
+      const second = makeObserver();
+      manager = new TransactionManager(registry, [first, second]);
+
+      await manager.run({}, async () => {});
+
+      expect(first.onTransactionStart).toHaveBeenCalledTimes(1);
+      expect(first.onTransactionCommit).toHaveBeenCalledTimes(1);
+      expect(second.onTransactionStart).toHaveBeenCalledTimes(1);
+      expect(second.onTransactionCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('swallows errors from an observer and keeps invoking the rest', async () => {
+      const failing: TransactionObserver = {
+        onTransactionCommit: () => {
+          throw new Error('observer boom');
+        },
+      };
+      const succeeding = makeObserver();
+      manager = new TransactionManager(registry, [failing, succeeding]);
+
+      await expect(manager.run({}, async () => 'ok')).resolves.toBe('ok');
+
+      expect(succeeding.onTransactionCommit).toHaveBeenCalledTimes(1);
+      expect(adapter.committedTransactions).toHaveLength(1);
+    });
+
+    it('fires onTransactionCommit (not rollback) when noRollbackFor swallows the error', async () => {
+      class BusinessError extends Error {}
+      const observer = makeObserver();
+      manager = new TransactionManager(registry, [observer]);
+
+      await expect(
+        manager.run({ noRollbackFor: [BusinessError] }, async () => {
+          throw new BusinessError('biz');
+        }),
+      ).rejects.toThrow(BusinessError);
+
+      expect(observer.onTransactionCommit).toHaveBeenCalledTimes(1);
+      expect(observer.onTransactionRollback).not.toHaveBeenCalled();
     });
   });
 });

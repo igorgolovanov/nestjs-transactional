@@ -15,6 +15,10 @@ import {
   AdapterRegistry,
 } from '../manager/adapter.registry';
 import { TransactionManager } from '../manager/transaction.manager';
+import {
+  TRANSACTION_OBSERVERS,
+  type TransactionObserver,
+} from '../observability/transaction-observer';
 
 /**
  * Options accepted by {@link TransactionalModule.forRoot}.
@@ -39,16 +43,25 @@ export interface TransactionalModuleOptions {
    * `isDefault: true` via a manual registration.
    */
   readonly adapters?: readonly AdapterRegistration[];
+
+  /**
+   * Transaction observers registered under {@link TRANSACTION_OBSERVERS}.
+   * Omit to leave the token unbound — `TransactionManager` falls back to an
+   * empty list. Provide your own `TRANSACTION_OBSERVERS` provider instead
+   * if your observers require DI resolution.
+   */
+  readonly observers?: readonly TransactionObserver[];
 }
 
 /**
  * Shape returned by {@link TransactionalModuleAsyncOptions.useFactory}.
- * Only `adapters` is resolvable asynchronously — `isGlobal` and
- * `registerInterceptor` remain static because they must be known at module
- * definition time.
+ * Only `adapters` and `observers` are resolvable asynchronously —
+ * `isGlobal` and `registerInterceptor` remain static because they must be
+ * known at module definition time.
  */
 export interface TransactionalModuleAsyncFactoryResult {
   readonly adapters?: readonly AdapterRegistration[];
+  readonly observers?: readonly TransactionObserver[];
 }
 
 /**
@@ -106,6 +119,13 @@ export class TransactionalModule {
       TransactionManager,
     ];
 
+    if (options.observers !== undefined) {
+      providers.push({
+        provide: TRANSACTION_OBSERVERS,
+        useValue: [...options.observers],
+      });
+    }
+
     if (options.registerInterceptor !== false) {
       providers.push({
         provide: APP_INTERCEPTOR,
@@ -150,7 +170,19 @@ export class TransactionalModule {
       inject: [ASYNC_OPTIONS_TOKEN],
     };
 
-    const providers: Provider[] = [asyncOptionsProvider, registryProvider, TransactionManager];
+    const observersProvider: FactoryProvider = {
+      provide: TRANSACTION_OBSERVERS,
+      useFactory: (opts: TransactionalModuleAsyncFactoryResult): readonly TransactionObserver[] =>
+        opts.observers ? [...opts.observers] : [],
+      inject: [ASYNC_OPTIONS_TOKEN],
+    };
+
+    const providers: Provider[] = [
+      asyncOptionsProvider,
+      registryProvider,
+      observersProvider,
+      TransactionManager,
+    ];
 
     if (options.registerInterceptor !== false) {
       providers.push({

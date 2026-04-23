@@ -5,6 +5,7 @@ import request from 'supertest';
 import { Transactional } from '../decorators/transactional.decorator';
 import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
 import { TransactionManager } from '../manager/transaction.manager';
+import type { TransactionObserver } from '../observability/transaction-observer';
 import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
 import { PropagationMode } from '../types/propagation';
 
@@ -139,6 +140,31 @@ describe('TransactionalModule (integration)', () => {
       await moduleRef.close();
     });
 
+    it('registers observers via options.observers and delivers lifecycle events to them', async () => {
+      const adapter = new InMemoryTransactionAdapter();
+      const observer: TransactionObserver = {
+        onTransactionStart: jest.fn(),
+        onTransactionCommit: jest.fn(),
+      };
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          TransactionalModule.forRoot({
+            adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+            observers: [observer],
+          }),
+        ],
+      }).compile();
+
+      const manager = moduleRef.get(TransactionManager);
+      await manager.run({}, async () => {});
+
+      expect(observer.onTransactionStart).toHaveBeenCalledTimes(1);
+      expect(observer.onTransactionCommit).toHaveBeenCalledTimes(1);
+
+      await moduleRef.close();
+    });
+
     it('respects registerInterceptor: false — module still wires manager + registry', async () => {
       const adapter = new InMemoryTransactionAdapter();
       const moduleRef = await Test.createTestingModule({
@@ -178,6 +204,29 @@ describe('TransactionalModule (integration)', () => {
       await manager.run({}, async () => {});
 
       expect(adapter.committedTransactions).toHaveLength(1);
+
+      await moduleRef.close();
+    });
+
+    it('wires observers from forRootAsync factory result', async () => {
+      const adapter = new InMemoryTransactionAdapter();
+      const observer: TransactionObserver = { onTransactionCommit: jest.fn() };
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          TransactionalModule.forRootAsync({
+            useFactory: () => ({
+              adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+              observers: [observer],
+            }),
+          }),
+        ],
+      }).compile();
+
+      const manager = moduleRef.get(TransactionManager);
+      await manager.run({}, async () => {});
+
+      expect(observer.onTransactionCommit).toHaveBeenCalledTimes(1);
 
       await moduleRef.close();
     });
