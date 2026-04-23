@@ -465,7 +465,8 @@ describe('TransactionManager (propagation REQUIRED)', () => {
 
       await manager.run({}, async () => {
         await manager.run({ propagation: PropagationMode.SUPPORTS }, async () => {
-          innerSawStore = TransactionContext.getActiveTransaction('default') !== undefined;
+          innerSawStore =
+            TransactionContext.getActiveTransaction('in-memory:default') !== undefined;
         });
       });
 
@@ -477,7 +478,7 @@ describe('TransactionManager (propagation REQUIRED)', () => {
       let ranWithoutTx: boolean | undefined;
 
       const result = await manager.run({ propagation: PropagationMode.SUPPORTS }, async () => {
-        ranWithoutTx = TransactionContext.getActiveTransaction('default') === undefined;
+        ranWithoutTx = TransactionContext.getActiveTransaction('in-memory:default') === undefined;
         return 'ok';
       });
 
@@ -495,9 +496,11 @@ describe('TransactionManager (propagation REQUIRED)', () => {
 
       await manager.run({}, async () => {
         await manager.run({ propagation: PropagationMode.NOT_SUPPORTED }, async () => {
-          innerSawActive = TransactionContext.getActiveTransaction('default') !== undefined;
+          innerSawActive =
+            TransactionContext.getActiveTransaction('in-memory:default') !== undefined;
         });
-        outerRestoredAfterInner = TransactionContext.getActiveTransaction('default') !== undefined;
+        outerRestoredAfterInner =
+          TransactionContext.getActiveTransaction('in-memory:default') !== undefined;
       });
 
       expect(innerSawActive).toBe(false);

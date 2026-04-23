@@ -95,8 +95,9 @@ export class TransactionManager {
     const adapterName = options.adapter ?? this.registry.getDefaultAdapterName();
     const instanceName = options.adapterInstance ?? this.registry.getDefaultInstanceName();
     const propagation = options.propagation ?? PropagationMode.REQUIRED;
+    const key = TransactionManager.contextKey(adapterName, instanceName);
 
-    const existing = TransactionContext.getActiveTransaction(instanceName);
+    const existing = TransactionContext.getActiveTransaction(key);
 
     switch (propagation) {
       case PropagationMode.REQUIRED: {
@@ -112,11 +113,11 @@ export class TransactionManager {
         if (existing === undefined) {
           return this.startNew(adapter, adapterName, instanceName, options, fn);
         }
-        TransactionContext.removeActiveTransaction(instanceName);
+        TransactionContext.removeActiveTransaction(key);
         try {
           return await this.startNew(adapter, adapterName, instanceName, options, fn);
         } finally {
-          TransactionContext.setActiveTransaction(instanceName, existing);
+          TransactionContext.setActiveTransaction(key, existing);
         }
       }
 
@@ -136,11 +137,11 @@ export class TransactionManager {
         if (existing === undefined) {
           return fn();
         }
-        TransactionContext.removeActiveTransaction(instanceName);
+        TransactionContext.removeActiveTransaction(key);
         try {
           return await fn();
         } finally {
-          TransactionContext.setActiveTransaction(instanceName, existing);
+          TransactionContext.setActiveTransaction(key, existing);
         }
       }
 
@@ -148,7 +149,7 @@ export class TransactionManager {
         if (existing !== undefined) {
           throw new IllegalTransactionStateError(
             `Propagation NEVER cannot be invoked inside an active transaction ` +
-              `(instance: '${instanceName}')`,
+              `(adapter: '${adapterName}', instance: '${instanceName}')`,
           );
         }
         return fn();
@@ -158,12 +159,22 @@ export class TransactionManager {
         if (existing === undefined) {
           throw new IllegalTransactionStateError(
             `Propagation MANDATORY requires an active transaction, but none is ` +
-              `active (instance: '${instanceName}')`,
+              `active (adapter: '${adapterName}', instance: '${instanceName}')`,
           );
         }
         return fn();
       }
     }
+  }
+
+  /**
+   * Compose the {@link TransactionContext} key for a given adapter
+   * (type name) + instance pair. Manager and helper packages must agree
+   * on this format so that `@nestjs-transactional/typeorm`'s
+   * `getCurrentEntityManager` can find the transaction registered here.
+   */
+  private static contextKey(adapterName: string, instanceName: string): string {
+    return `${adapterName}:${instanceName}`;
   }
 
   /**
@@ -210,6 +221,7 @@ export class TransactionManager {
 
     let activeTx: ActiveTransaction | undefined;
     const startTime = Date.now();
+    const key = TransactionManager.contextKey(adapterName, instanceName);
 
     const body = async (): Promise<T> => {
       let result: InternalResult<T>;
@@ -228,7 +240,7 @@ export class TransactionManager {
               beforeCommitHooks: [],
               correlationId,
             };
-            TransactionContext.setActiveTransaction(instanceName, activeTx);
+            TransactionContext.setActiveTransaction(key, activeTx);
 
             this.notifyStart({
               transactionId: handle.id,
@@ -257,7 +269,7 @@ export class TransactionManager {
                 return { ok: false, error: err };
               }
             } finally {
-              TransactionContext.removeActiveTransaction(instanceName);
+              TransactionContext.removeActiveTransaction(key);
             }
           },
         );
