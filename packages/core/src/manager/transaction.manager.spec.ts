@@ -1,5 +1,7 @@
 import { TransactionContext } from '../context/transaction.context';
 import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
+import { IllegalTransactionStateError } from '../types/errors';
+import { PropagationMode } from '../types/propagation';
 
 import { AdapterRegistry } from './adapter.registry';
 import { TransactionManager } from './transaction.manager';
@@ -295,6 +297,276 @@ describe('TransactionManager (propagation REQUIRED)', () => {
       expect(adapter.rolledBackTransactions).toHaveLength(0);
       expect(afterCommitRan).toBe(true);
       expect(afterRollbackRan).toBe(false);
+    });
+  });
+
+  describe('propagation REQUIRES_NEW', () => {
+    it('behaves like REQUIRED when no outer transaction is active', async () => {
+      await manager.run({ propagation: PropagationMode.REQUIRES_NEW }, async () => {
+        // body runs in the new transaction
+      });
+
+      expect(adapter.committedTransactions).toHaveLength(1);
+      expect(adapter.rolledBackTransactions).toHaveLength(0);
+    });
+
+    it('starts a separate transaction inside an active outer — adapter sees two distinct commits', async () => {
+      await manager.run({}, async () => {
+        await manager.run({ propagation: PropagationMode.REQUIRES_NEW }, async () => {
+          // inner body
+        });
+      });
+
+      expect(adapter.committedTransactions).toHaveLength(2);
+      const ids = adapter.committedTransactions.map((t) => t.id);
+      expect(new Set(ids).size).toBe(2);
+    });
+
+    it('inner REQUIRES_NEW rollback does not roll back the outer transaction', async () => {
+      const innerBoom = new Error('inner boom');
+
+      await manager.run({}, async () => {
+        await expect(
+          manager.run({ propagation: PropagationMode.REQUIRES_NEW }, async () => {
+            throw innerBoom;
+          }),
+        ).rejects.toBe(innerBoom);
+        // outer keeps running and commits normally
+      });
+
+      expect(adapter.rolledBackTransactions).toHaveLength(1);
+      expect(adapter.rolledBackTransactions[0]?.error).toBe(innerBoom);
+      expect(adapter.committedTransactions).toHaveLength(1);
+    });
+
+    it('outer rollback leaves the inner REQUIRES_NEW commit intact', async () => {
+      const outerBoom = new Error('outer boom');
+
+      await expect(
+        manager.run({}, async () => {
+          await manager.run({ propagation: PropagationMode.REQUIRES_NEW }, async () => {
+            // inner commits successfully
+          });
+          throw outerBoom;
+        }),
+      ).rejects.toBe(outerBoom);
+
+      expect(adapter.committedTransactions).toHaveLength(1);
+      expect(adapter.rolledBackTransactions).toHaveLength(1);
+      expect(adapter.rolledBackTransactions[0]?.error).toBe(outerBoom);
+    });
+
+    it('inner AFTER_COMMIT hook fires on inner commit and is independent of outer lifecycle', async () => {
+      let innerAfterCommitRan = false;
+      let outerAfterCommitRan = false;
+      let outerAfterRollbackReceived: unknown;
+      const outerBoom = new Error('outer boom');
+
+      await expect(
+        manager.run({}, async () => {
+          manager.registerAfterCommit(async () => {
+            outerAfterCommitRan = true;
+          });
+          manager.registerAfterRollback(async (err) => {
+            outerAfterRollbackReceived = err;
+          });
+
+          await manager.run({ propagation: PropagationMode.REQUIRES_NEW }, async () => {
+            manager.registerAfterCommit(async () => {
+              innerAfterCommitRan = true;
+            });
+          });
+
+          // At this point the inner AFTER_COMMIT has already fired
+          expect(innerAfterCommitRan).toBe(true);
+
+          throw outerBoom;
+        }),
+      ).rejects.toBe(outerBoom);
+
+      expect(innerAfterCommitRan).toBe(true);
+      expect(outerAfterCommitRan).toBe(false);
+      expect(outerAfterRollbackReceived).toBe(outerBoom);
+    });
+  });
+
+  describe('propagation NESTED', () => {
+    it('behaves like REQUIRED when no outer transaction is active', async () => {
+      await manager.run({ propagation: PropagationMode.NESTED }, async () => {
+        // body
+      });
+
+      expect(adapter.committedTransactions).toHaveLength(1);
+      expect(adapter.savepointsCreated).toHaveLength(0);
+    });
+
+    it('creates a savepoint inside an active outer transaction and releases it on success', async () => {
+      await manager.run({}, async () => {
+        await manager.run({ propagation: PropagationMode.NESTED }, async () => {
+          // body
+        });
+      });
+
+      expect(adapter.savepointsCreated).toHaveLength(1);
+      expect(adapter.savepointsReleased).toHaveLength(1);
+      expect(adapter.savepointsRolledBack).toHaveLength(0);
+      expect(adapter.committedTransactions).toHaveLength(1); // outer only
+    });
+
+    it('savepoint rollback lets the outer transaction continue and commit', async () => {
+      const innerBoom = new Error('inner boom');
+
+      await manager.run({}, async () => {
+        await expect(
+          manager.run({ propagation: PropagationMode.NESTED }, async () => {
+            throw innerBoom;
+          }),
+        ).rejects.toBe(innerBoom);
+        // outer keeps running
+      });
+
+      expect(adapter.savepointsCreated).toHaveLength(1);
+      expect(adapter.savepointsRolledBack).toHaveLength(1);
+      expect(adapter.savepointsRolledBack[0]?.error).toBe(innerBoom);
+      expect(adapter.savepointsReleased).toHaveLength(0);
+      expect(adapter.committedTransactions).toHaveLength(1); // outer committed
+      expect(adapter.rolledBackTransactions).toHaveLength(0);
+    });
+
+    it('AFTER_COMMIT hook registered inside NESTED attaches to the outer transaction', async () => {
+      let hookRan = false;
+      let releasedAtHookTime: number | undefined;
+      let committedAtHookTime: number | undefined;
+
+      await manager.run({}, async () => {
+        await manager.run({ propagation: PropagationMode.NESTED }, async () => {
+          manager.registerAfterCommit(async () => {
+            hookRan = true;
+            releasedAtHookTime = adapter.savepointsReleased.length;
+            committedAtHookTime = adapter.committedTransactions.length;
+          });
+        });
+
+        // Savepoint released, but hook NOT yet fired (outer still open)
+        expect(adapter.savepointsReleased).toHaveLength(1);
+        expect(hookRan).toBe(false);
+      });
+
+      expect(hookRan).toBe(true);
+      expect(releasedAtHookTime).toBe(1);
+      expect(committedAtHookTime).toBe(1); // outer already committed when hook runs
+    });
+  });
+
+  describe('propagation SUPPORTS', () => {
+    it('joins the active outer transaction — no new commit', async () => {
+      let innerSawStore: boolean | undefined;
+
+      await manager.run({}, async () => {
+        await manager.run({ propagation: PropagationMode.SUPPORTS }, async () => {
+          innerSawStore = TransactionContext.getActiveTransaction('default') !== undefined;
+        });
+      });
+
+      expect(innerSawStore).toBe(true);
+      expect(adapter.committedTransactions).toHaveLength(1); // outer only
+    });
+
+    it('runs fn with no transaction when none is active, returning fn value', async () => {
+      let ranWithoutTx: boolean | undefined;
+
+      const result = await manager.run({ propagation: PropagationMode.SUPPORTS }, async () => {
+        ranWithoutTx = TransactionContext.getActiveTransaction('default') === undefined;
+        return 'ok';
+      });
+
+      expect(result).toBe('ok');
+      expect(ranWithoutTx).toBe(true);
+      expect(adapter.committedTransactions).toHaveLength(0);
+      expect(adapter.rolledBackTransactions).toHaveLength(0);
+    });
+  });
+
+  describe('propagation NOT_SUPPORTED', () => {
+    it('suspends the outer transaction for the duration of fn — inner sees no active tx', async () => {
+      let innerSawActive: boolean | undefined;
+      let outerRestoredAfterInner: boolean | undefined;
+
+      await manager.run({}, async () => {
+        await manager.run({ propagation: PropagationMode.NOT_SUPPORTED }, async () => {
+          innerSawActive = TransactionContext.getActiveTransaction('default') !== undefined;
+        });
+        outerRestoredAfterInner = TransactionContext.getActiveTransaction('default') !== undefined;
+      });
+
+      expect(innerSawActive).toBe(false);
+      expect(outerRestoredAfterInner).toBe(true);
+      expect(adapter.committedTransactions).toHaveLength(1); // outer still commits
+    });
+
+    it('runs fn without a transaction when none is active', async () => {
+      const result = await manager.run(
+        { propagation: PropagationMode.NOT_SUPPORTED },
+        async () => 'ok',
+      );
+
+      expect(result).toBe('ok');
+      expect(adapter.committedTransactions).toHaveLength(0);
+    });
+  });
+
+  describe('propagation NEVER', () => {
+    it('throws IllegalTransactionStateError when called inside an active transaction', async () => {
+      let neverBodyRan = false;
+
+      await expect(
+        manager.run({}, async () => {
+          await manager.run({ propagation: PropagationMode.NEVER }, async () => {
+            neverBodyRan = true;
+          });
+        }),
+      ).rejects.toThrow(IllegalTransactionStateError);
+
+      expect(neverBodyRan).toBe(false);
+      // Outer rolls back because the NEVER throw propagates up through it
+      expect(adapter.rolledBackTransactions).toHaveLength(1);
+      expect(adapter.committedTransactions).toHaveLength(0);
+    });
+
+    it('runs fn without a transaction when none is active', async () => {
+      const result = await manager.run({ propagation: PropagationMode.NEVER }, async () => 'ok');
+
+      expect(result).toBe('ok');
+      expect(adapter.committedTransactions).toHaveLength(0);
+    });
+  });
+
+  describe('propagation MANDATORY', () => {
+    it('joins the active outer transaction — no new commit', async () => {
+      let innerRan = false;
+
+      await manager.run({}, async () => {
+        await manager.run({ propagation: PropagationMode.MANDATORY }, async () => {
+          innerRan = true;
+        });
+      });
+
+      expect(innerRan).toBe(true);
+      expect(adapter.committedTransactions).toHaveLength(1); // outer only
+    });
+
+    it('throws IllegalTransactionStateError when no outer transaction is active', async () => {
+      let bodyRan = false;
+
+      await expect(
+        manager.run({ propagation: PropagationMode.MANDATORY }, async () => {
+          bodyRan = true;
+        }),
+      ).rejects.toThrow(IllegalTransactionStateError);
+
+      expect(bodyRan).toBe(false);
+      expect(adapter.committedTransactions).toHaveLength(0);
+      expect(adapter.rolledBackTransactions).toHaveLength(0);
     });
   });
 });
