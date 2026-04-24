@@ -5,3 +5,4 @@ export * from './schema/event-publication-schema';
 export * from './schema/schema-initialization-options';
 export * from './schema/schema-initializer';
 export * from './migrations/1700000000000-create-event-publication';
+export * from './module/outbox-typeorm.module';
