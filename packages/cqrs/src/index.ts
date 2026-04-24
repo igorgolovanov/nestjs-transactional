@@ -11,3 +11,5 @@ export {
 } from './decorators/transactional-events-listener.decorator';
 
 export { TransactionalEventDispatcher } from './event-dispatcher/event-dispatcher';
+
+export { TransactionalListenerScanner } from './handlers/listener-scanner';
