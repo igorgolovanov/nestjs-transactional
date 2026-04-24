@@ -8,10 +8,11 @@ NestJS module wiring.
 
 ## Status
 
-**Alpha / in development.** Iteration 6.2 delivers the entities and the
-repository implementation. Module wiring and migration helpers arrive
-in subsequent iterations. Public API is not yet stable and will change
-between 0.x releases.
+**Alpha / in development.** Iteration 6.2 delivered the entities and
+the repository implementation; Iteration 6.3 adds the schema migration
+and a `SchemaInitializer` for development-time auto-init. Module
+wiring (`OutboxTypeOrmModule`) arrives in a subsequent iteration. The
+public API is not yet stable and will change between 0.x releases.
 
 ## What ships today
 
@@ -100,11 +101,79 @@ export class AppModule {}
 
 ## Schema management
 
-This revision does **not** ship a generated migration. Until one
-lands, development environments can rely on TypeORM's `synchronize`
-flag (or call `dataSource.synchronize()` once at startup). Production
-deployments should use a migration step — instructions will ship in
-Iteration 6.x alongside the migration helper.
+Two supported paths, matching Spring Modulith's split between
+reviewed schema changes and the
+`spring.modulith.events.jdbc.schema-initialization.enabled`
+developer shortcut.
+
+### Production: run the TypeORM migration (preferred)
+
+The package ships a ready-to-use migration,
+`CreateEventPublication1700000000000`, that creates both
+`event_publication` and `event_publication_archive` with every
+index. Register it with your DataSource and run it through the
+TypeORM CLI as part of your deploy:
+
+```typescript
+// data-source.ts
+import { DataSource } from 'typeorm';
+import { CreateEventPublication1700000000000 } from '@nestjs-transactional/outbox-typeorm';
+
+export const dataSource = new DataSource({
+  type: 'postgres',
+  // ...
+  migrations: [CreateEventPublication1700000000000, /* ...your own */],
+});
+```
+
+```bash
+pnpm typeorm migration:run -d ./dist/data-source.js
+```
+
+The timestamp `1700000000000` is a placeholder chosen to sort
+before most application-owned migrations. Feel free to copy the
+migration file into your own `migrations/` directory and rename it
+to match your team's timestamp convention — the migration body is
+just a call to `applyEventPublicationSchema(queryRunner)` from this
+package, so keeping a thin wrapper in your own tree is encouraged.
+
+### Development: auto-init at bootstrap
+
+Useful for local development and integration suites that spin a
+fresh database up per run. `SchemaInitializer` is a
+NestJS-lifecycle-aware provider that creates both tables on
+application bootstrap when its `enabled` option is set:
+
+```typescript
+import { Module } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import {
+  SchemaInitializer,
+  SCHEMA_INITIALIZATION_OPTIONS,
+} from '@nestjs-transactional/outbox-typeorm';
+
+@Module({
+  providers: [
+    {
+      provide: SCHEMA_INITIALIZATION_OPTIONS,
+      useValue: { enabled: process.env.NODE_ENV !== 'production' },
+    },
+    {
+      provide: SchemaInitializer,
+      useFactory: (ds: DataSource, opts) => new SchemaInitializer(ds, opts),
+      inject: [getDataSourceToken(), SCHEMA_INITIALIZATION_OPTIONS],
+    },
+  ],
+})
+export class OutboxSchemaModule {}
+```
+
+The initializer is a no-op when `enabled: false`. When enabled and
+the hot table already exists, it logs a debug line and bails out
+before running any DDL — safe to leave on across restarts. **Do
+not enable in production** — schema changes should always go
+through a reviewed migration.
 
 ## Testing
 
