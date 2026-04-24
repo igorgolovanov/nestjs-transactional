@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -11,7 +11,8 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { OutboxEventListener } from '../decorators/outbox-event-listener.decorator';
+import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
+import type { IOutboxEventsHandler } from '../interfaces/outbox-events-handler.interface';
 
 import { OutboxListenerRegistry } from './listener-registry';
 import { OutboxListenerScanner } from './outbox-listener-scanner';
@@ -55,24 +56,35 @@ class PaymentCapturedEvent {
 }
 
 @Injectable()
-class DecoratedService {
+@OutboxEventsHandler(OrderPlacedEvent)
+class OrderPlacedHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
   invocations: OrderPlacedEvent[] = [];
-
-  @OutboxEventListener(OrderPlacedEvent)
-  async onOrderPlaced(event: OrderPlacedEvent): Promise<void> {
+  async handle(event: OrderPlacedEvent): Promise<void> {
     this.invocations.push(event);
   }
-
-  @OutboxEventListener(PaymentCapturedEvent, { id: 'custom-payment-id' })
-  async onPaymentCaptured(_event: PaymentCapturedEvent): Promise<void> {}
-
-  plainMethod(): void {}
 }
 
 @Injectable()
-class NoTxService {
-  @OutboxEventListener(OrderPlacedEvent, { newTransaction: false })
-  async onOrderPlacedNoTx(_event: OrderPlacedEvent): Promise<void> {}
+@OutboxEventsHandler({ events: [PaymentCapturedEvent], id: 'custom-payment-id' })
+class PaymentCapturedHandler implements IOutboxEventsHandler<PaymentCapturedEvent> {
+  async handle(_event: PaymentCapturedEvent): Promise<void> {}
+}
+
+@Injectable()
+@OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
+class NoTxHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+  async handle(_event: OrderPlacedEvent): Promise<void> {}
+}
+
+@Injectable()
+@OutboxEventsHandler(OrderPlacedEvent, PaymentCapturedEvent)
+class MultiEventHandler
+  implements IOutboxEventsHandler<OrderPlacedEvent | PaymentCapturedEvent>
+{
+  invocations: (OrderPlacedEvent | PaymentCapturedEvent)[] = [];
+  async handle(event: OrderPlacedEvent | PaymentCapturedEvent): Promise<void> {
+    this.invocations.push(event);
+  }
 }
 
 @Injectable()
@@ -106,12 +118,18 @@ describe('OutboxListenerScanner', () => {
   }
 
   afterEach(async () => {
-    await module?.close();
+    try {
+      await module?.close();
+    } catch {
+      // Swallow close errors — tests that force init to fail leave the
+      // module in a half-initialised state that close cannot reliably
+      // tear down. The unit here is the scanner, not Nest lifecycle.
+    }
     module = undefined;
   });
 
-  it('registers a decorated method under its event type', async () => {
-    await build([DecoratedService]);
+  it('registers a decorated class under its event type', async () => {
+    await build([OrderPlacedHandler]);
 
     const listeners = registry.getByEventType('OrderPlacedEvent');
 
@@ -119,63 +137,98 @@ describe('OutboxListenerScanner', () => {
     expect(listeners[0]!.eventType).toBe('OrderPlacedEvent');
   });
 
-  it('uses the explicit id from options when provided', async () => {
-    await build([DecoratedService]);
+  it('uses the explicit id option as the base for the listener id', async () => {
+    await build([PaymentCapturedHandler]);
 
-    expect(registry.getById('custom-payment-id')).toBeDefined();
-    expect(registry.getById('custom-payment-id')!.eventType).toBe('PaymentCapturedEvent');
+    const listener = registry.getById('custom-payment-id#PaymentCapturedEvent');
+    expect(listener).toBeDefined();
+    expect(listener!.eventType).toBe('PaymentCapturedEvent');
   });
 
-  it('derives the default id from `${ClassName}.${methodName}` when no id option is given', async () => {
-    await build([DecoratedService]);
+  it('derives the default id from `${ClassName}#${EventName}` when no id option is given', async () => {
+    await build([OrderPlacedHandler]);
 
-    expect(registry.getById('DecoratedService.onOrderPlaced')).toBeDefined();
+    expect(registry.getById('OrderPlacedHandler#OrderPlacedEvent')).toBeDefined();
   });
 
-  it('invokes a newTransaction=true listener inside a REQUIRES_NEW transaction', async () => {
-    await build([DecoratedService]);
+  it('invokes a newTransaction=true handler inside a REQUIRES_NEW transaction', async () => {
+    await build([OrderPlacedHandler]);
 
-    const listener = registry.getById('DecoratedService.onOrderPlaced')!;
+    const listener = registry.getById('OrderPlacedHandler#OrderPlacedEvent')!;
     await listener.invoke(new OrderPlacedEvent('order-99'));
 
     expect(adapter.committedTransactions).toHaveLength(1);
   });
 
-  it('invokes a newTransaction=false listener without starting a transaction', async () => {
-    await build([NoTxService]);
+  it('invokes a newTransaction=false handler without starting a transaction', async () => {
+    await build([NoTxHandler]);
 
-    const listener = registry.getById('NoTxService.onOrderPlacedNoTx')!;
+    const listener = registry.getById('NoTxHandler#OrderPlacedEvent')!;
     await listener.invoke(new OrderPlacedEvent('order-99'));
 
     expect(adapter.committedTransactions).toHaveLength(0);
   });
 
-  it('registers every decorated method on a service with multiple listeners', async () => {
-    await build([DecoratedService]);
+  it('registers one entry per event type for multi-event handlers', async () => {
+    await build([MultiEventHandler]);
 
-    const decoratedIds = registry.getAll().map((l) => l.id).sort();
-
-    expect(decoratedIds).toEqual(['DecoratedService.onOrderPlaced', 'custom-payment-id']);
+    const ids = registry.getAll().map((l) => l.id).sort();
+    expect(ids).toEqual([
+      'MultiEventHandler#OrderPlacedEvent',
+      'MultiEventHandler#PaymentCapturedEvent',
+    ]);
   });
 
-  it('does not register methods without @OutboxEventListener or services that only have plain methods', async () => {
-    await build([DecoratedService, UndecoratedService]);
+  it('does not register plain providers', async () => {
+    await build([OrderPlacedHandler, UndecoratedService]);
 
     const allIds = registry.getAll().map((l) => l.id);
-
-    expect(allIds).not.toContain('DecoratedService.plainMethod');
-    expect(allIds).not.toContain('UndecoratedService.doWork');
+    expect(allIds).toEqual(['OrderPlacedHandler#OrderPlacedEvent']);
   });
 
-  it('binds `this` correctly — the listener can access instance state', async () => {
-    await build([DecoratedService]);
+  it('binds `this` correctly — the handler can access instance state', async () => {
+    await build([OrderPlacedHandler]);
 
-    const decorated = module!.get(DecoratedService);
-    const listener = registry.getById('DecoratedService.onOrderPlaced')!;
+    const decorated = module!.get(OrderPlacedHandler);
+    const listener = registry.getById('OrderPlacedHandler#OrderPlacedEvent')!;
     const event = new OrderPlacedEvent('order-42');
 
     await listener.invoke(event);
 
     expect(decorated.invocations).toEqual([event]);
+  });
+
+  it('warns and skips a decorated class that does not expose `handle`', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    @Injectable()
+    @OutboxEventsHandler(OrderPlacedEvent)
+    class BrokenHandler {
+      // intentionally no `handle` method
+      doSomething(): void {}
+    }
+
+    await build([BrokenHandler]);
+
+    expect(registry.getAll()).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BrokenHandler'));
+  });
+
+  it('duplicate listener ids throw during registration', async () => {
+    // Two handlers with the same explicit id would produce the same
+    // suffix — colliding when registered with the registry.
+    @Injectable()
+    @OutboxEventsHandler({ events: [OrderPlacedEvent], id: 'shared-id' })
+    class FirstHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+      async handle(_event: OrderPlacedEvent): Promise<void> {}
+    }
+
+    @Injectable()
+    @OutboxEventsHandler({ events: [OrderPlacedEvent], id: 'shared-id' })
+    class SecondHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+      async handle(_event: OrderPlacedEvent): Promise<void> {}
+    }
+
+    await expect(build([FirstHandler, SecondHandler])).rejects.toThrow(/shared-id/);
   });
 });

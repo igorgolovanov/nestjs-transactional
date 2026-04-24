@@ -3,8 +3,9 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
   FailedEventPublications,
-  OutboxEventListener,
+  type IOutboxEventsHandler,
   OutboxEventPublisher,
+  OutboxEventsHandler,
   OutboxModule,
   type OutboxModuleOptions,
   EventPublicationProcessor,
@@ -29,12 +30,12 @@ class OrderPlacedEvent {
 }
 
 @Injectable()
-class OrderListener {
+@OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
+class OrderListener implements IOutboxEventsHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
   failuresRemaining = 0;
 
-  @OutboxEventListener(OrderPlacedEvent, { newTransaction: false })
-  async onOrderPlaced(event: OrderPlacedEvent): Promise<void> {
+  async handle(event: OrderPlacedEvent): Promise<void> {
     if (this.failuresRemaining > 0) {
       this.failuresRemaining--;
       throw new Error('simulated listener failure');

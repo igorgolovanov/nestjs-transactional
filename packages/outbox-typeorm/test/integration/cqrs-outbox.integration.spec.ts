@@ -20,8 +20,9 @@ import {
 } from '@nestjs-transactional/cqrs';
 import {
   EventPublicationProcessor,
-  OutboxEventListener,
+  type IOutboxEventsHandler,
   OutboxEventPublisher,
+  OutboxEventsHandler,
   OutboxListenerRegistry,
   OutboxModule,
   PublicationStatus,
@@ -91,17 +92,15 @@ class InMemoryInventoryHandlers implements ITransactionalEventsHandler<OrderPlac
 }
 
 /**
- * Persistent listener (outbox). Runs only after the publication row
- * is committed and the worker picks it up. Uses the method-level
- * `@OutboxEventListener` — the outbox-core class-level equivalent
- * (`@OutboxEventsHandler`) is introduced in a later phase.
+ * Persistent handler (outbox). Runs only after the publication row
+ * is committed and the worker picks it up.
  */
 @Injectable()
-class PersistentInventoryHandlers {
+@OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
+class PersistentInventoryHandlers implements IOutboxEventsHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
-  @OutboxEventListener(OrderPlacedEvent, { newTransaction: false })
-  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+  async handle(event: OrderPlacedEvent): Promise<void> {
     this.received.push(event);
   }
 }

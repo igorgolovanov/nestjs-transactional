@@ -12,7 +12,7 @@ import { OutboxListenerRegistry } from '../registry/listener-registry';
 /**
  * High-level API that business code uses to publish events.
  *
- * For a given event, looks up every `@OutboxEventListener` currently
+ * For a given event, looks up every `@OutboxEventsHandler` currently
  * registered for that event type and asks the
  * {@link EventPublicationRegistry} to persist one publication per
  * listener — atomically with the ambient transaction.
