@@ -1,0 +1,28 @@
+# Local development Postgres — NOT used by the integration test suite.
+# Integration tests manage their own container via testcontainers-node.
+# Use this compose file when you want a long-lived Postgres for manual
+# queries during development:
+#
+#   cd packages/outbox-typeorm
+#   docker compose up -d
+#   psql postgres://test:test@localhost:5433/test
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test -d test']
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
