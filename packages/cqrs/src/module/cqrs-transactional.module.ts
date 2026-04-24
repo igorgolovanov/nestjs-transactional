@@ -7,6 +7,7 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
 import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher';
 import { TransactionalEventPublisher } from '../event-publisher/transactional-event-publisher';
 import { TransactionalEventPublisherAdapter } from '../event-publisher/transactional-event-publisher-adapter';
+import { ApplicationModuleHandlerScanner } from '../handlers/application-module-handler-scanner';
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
 import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner';
@@ -33,10 +34,10 @@ export const CQRS_TRANSACTIONAL_OPTIONS = 'CQRS_TRANSACTIONAL_OPTIONS';
  */
 export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
   /**
-   * If `true` (default), overrides `@nestjs/cqrs`'s `EventPublisher` DI
-   * token with {@link TransactionalEventPublisherAdapter` so
+   * If `true` (default), overrides `@nestjs/cqrs`'s `EventPublisher`
+   * DI token with {@link TransactionalEventPublisherAdapter} so
    * `AggregateRoot.commit()` routes events through the transactional
-   * dispatcher (phase-aware listeners). Set to `false` to leave the
+   * dispatcher (phase-aware handlers). Set to `false` to leave the
    * standard `EventPublisher` in place — useful when integrating
    * progressively into an existing codebase.
    */
@@ -46,15 +47,20 @@ export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
 /**
  * NestJS module that wires the `@nestjs-transactional/cqrs` runtime:
  *
- * - {@link TransactionalEventDispatcher} for phase-aware event routing.
+ * - {@link TransactionalEventDispatcher} for phase-aware event
+ *   routing.
  * - {@link TransactionalListenerScanner} for auto-registration of
- *   `@TransactionalEventsListener`-decorated methods at module init.
- * - {@link CqrsHandlerWrapper} + {@link CqrsTransactionalBootstrap} to
- *   wrap `@CommandHandler` / `@QueryHandler` / `@EventsHandler`
+ *   `@TransactionalEventsHandler`-decorated classes at module init.
+ * - {@link ApplicationModuleHandlerScanner} for
+ *   `@ApplicationModuleHandler`-decorated classes, with smart routing
+ *   to the outbox (when bound) or the dispatcher (otherwise).
+ * - {@link CqrsHandlerWrapper} + {@link CqrsTransactionalBootstrap}
+ *   to wrap `@CommandHandler` / `@QueryHandler` / `@EventsHandler`
  *   execute/handle methods at application bootstrap.
  * - {@link TransactionalEventPublisher} +
  *   {@link TransactionalEventPublisherAdapter} as the `EventPublisher`
- *   DI override so `AggregateRoot.commit()` flows through the dispatcher.
+ *   DI override so `AggregateRoot.commit()` flows through the
+ *   dispatcher.
  *
  * Pair with `TransactionalModule.forRoot({ isGlobal: true })` at the
  * application root. For TypeORM-backed applications, also register
@@ -101,6 +107,7 @@ export class CqrsTransactionalModule {
       },
       TransactionalEventDispatcher,
       TransactionalListenerScanner,
+      ApplicationModuleHandlerScanner,
       {
         provide: CqrsHandlerWrapper,
         useFactory: (

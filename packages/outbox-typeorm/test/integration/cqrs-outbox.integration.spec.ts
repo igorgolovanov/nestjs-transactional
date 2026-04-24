@@ -10,15 +10,19 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
-  ApplicationModuleListener,
+  ApplicationModuleHandler,
   CqrsTransactionalModule,
+  type IApplicationModuleHandler,
+  type ITransactionalEventsHandler,
+  OUTBOX_LISTENER_REGISTRAR,
   OUTBOX_PUBLICATION_SCHEDULER,
-  TransactionalEventsListener,
+  TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
 import {
   EventPublicationProcessor,
   OutboxEventListener,
   OutboxEventPublisher,
+  OutboxListenerRegistry,
   OutboxModule,
   PublicationStatus,
 } from '@nestjs-transactional/outbox-core';
@@ -73,22 +77,24 @@ class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, void> {
 }
 
 /**
- * In-memory listener (phase-aware, NOT persistent). Fires
+ * In-memory handler (phase-aware, NOT persistent). Fires
  * synchronously-ish inside the transaction's `AFTER_COMMIT` hook.
  */
 @Injectable()
-class InMemoryInventoryHandlers {
+@TransactionalEventsHandler(OrderPlacedEvent)
+class InMemoryInventoryHandlers implements ITransactionalEventsHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
-  @TransactionalEventsListener(OrderPlacedEvent)
-  onOrderPlaced(event: OrderPlacedEvent): void {
+  handle(event: OrderPlacedEvent): void {
     this.received.push(event);
   }
 }
 
 /**
  * Persistent listener (outbox). Runs only after the publication row
- * is committed and the worker picks it up.
+ * is committed and the worker picks it up. Uses the method-level
+ * `@OutboxEventListener` — the outbox-core class-level equivalent
+ * (`@OutboxEventsHandler`) is introduced in a later phase.
  */
 @Injectable()
 class PersistentInventoryHandlers {
@@ -101,24 +107,29 @@ class PersistentInventoryHandlers {
 }
 
 /**
- * Listener using the composite `@ApplicationModuleListener`. With the
+ * Handler using the composite `@ApplicationModuleHandler`. With the
  * outbox bound, delivery MUST go exclusively through the outbox path
- * — the in-memory scanner skips this method, so we expect exactly one
- * invocation per published event.
+ * — the smart scanner routes straight to the registrar instead of
+ * registering with the in-memory dispatcher. Exactly one invocation
+ * per published event.
  */
 @Injectable()
-class ApplicationModuleHandlers {
+@ApplicationModuleHandler({
+  events: [OrderPlacedEvent],
+  id: 'ApplicationModule.stable-id',
+})
+class ApplicationModuleHandlers implements IApplicationModuleHandler<OrderPlacedEvent> {
   received: OrderPlacedEvent[] = [];
 
-  @ApplicationModuleListener(OrderPlacedEvent, { id: 'ApplicationModule.stable-id' })
-  async onOrderPlaced(event: OrderPlacedEvent): Promise<void> {
+  async handle(event: OrderPlacedEvent): Promise<void> {
     this.received.push(event);
   }
 }
 
 // The module that wires CqrsTransactionalModule + OutboxTypeOrmModule
-// + OutboxModule together, with the outbox scheduler binding that
-// turns the hybrid publisher into a dual-path router.
+// + OutboxModule together, with the two structural bindings that
+// turn the hybrid publisher + application-module scanner into a
+// dual-path router.
 @Module({
   providers: [
     // Binds OutboxEventPublisher under the CQRS package's scheduler
@@ -126,6 +137,13 @@ class ApplicationModuleHandlers {
     {
       provide: OUTBOX_PUBLICATION_SCHEDULER,
       useExisting: OutboxEventPublisher,
+    },
+    // Binds OutboxListenerRegistry under the CQRS package's registrar
+    // token so ApplicationModuleHandlerScanner routes
+    // @ApplicationModuleHandler classes through the outbox.
+    {
+      provide: OUTBOX_LISTENER_REGISTRAR,
+      useExisting: OutboxListenerRegistry,
     },
   ],
 })
@@ -227,7 +245,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
     }
   });
 
-  it('@ApplicationModuleListener: outbox is bound → delivers EXACTLY ONCE via the outbox, skipping the in-memory fallback', async () => {
+  it('@ApplicationModuleHandler: outbox is bound → delivers EXACTLY ONCE via the outbox, skipping the in-memory fallback', async () => {
     const app = await buildApp();
     try {
       const commandBus = app.get(CommandBus);
@@ -237,15 +255,20 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
       await commandBus.execute(new PlaceOrderCommand('order-am-1'));
       await new Promise<void>((resolve) => setImmediate(resolve));
 
-      // The in-memory fallback must NOT fire — the scanner skipped the
-      // @ApplicationModuleListener registration because the outbox
-      // scheduler is bound.
+      // The in-memory fallback must NOT fire — the smart scanner
+      // routed this handler to the outbox instead of registering
+      // it with the in-memory dispatcher because the registrar is
+      // bound.
       expect(appModuleListener.received).toHaveLength(0);
 
       // The publication row is present and the stable listener id
-      // matches the explicit one we gave to @ApplicationModuleListener.
+      // matches the explicit one we gave to @ApplicationModuleHandler
+      // (suffixed with `#OrderPlacedEvent` per the scanner's id
+      // composition rule).
       const rows = await ctx.dataSource.getRepository(EventPublicationEntity).find();
-      const amRow = rows.find((r) => r.listenerId === 'ApplicationModule.stable-id');
+      const amRow = rows.find(
+        (r) => r.listenerId === 'ApplicationModule.stable-id#OrderPlacedEvent',
+      );
       expect(amRow).toBeDefined();
       expect(amRow!.status).toBe(PublicationStatus.PUBLISHED);
 

@@ -9,12 +9,12 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import {
-  TransactionPhase,
-  type TransactionalEventsListenerMetadata,
-} from '../types/transactional-listener.types';
+import { TransactionPhase } from '../types/transactional-listener.types';
 
-import { TransactionalEventDispatcher } from './event-dispatcher';
+import {
+  type DispatcherListenerMetadata,
+  TransactionalEventDispatcher,
+} from './event-dispatcher';
 
 // Inline fake adapter — standing in for `InMemoryTransactionAdapter` from
 // `@nestjs-transactional/core/testing`. The subpath export can't be resolved
@@ -71,8 +71,8 @@ class ChildEvent extends ParentEvent {}
 
 const metadata = (
   phase: TransactionPhase,
-  overrides: Partial<TransactionalEventsListenerMetadata> = {},
-): TransactionalEventsListenerMetadata => ({
+  overrides: Partial<DispatcherListenerMetadata> = {},
+): DispatcherListenerMetadata => ({
   eventType: OrderPlaced,
   phase,
   fallbackExecution: false,

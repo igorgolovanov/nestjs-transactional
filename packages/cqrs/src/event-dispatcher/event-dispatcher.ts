@@ -1,22 +1,33 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type Type } from '@nestjs/common';
 import { TransactionContext, TransactionManager } from '@nestjs-transactional/core';
 
-import {
-  TransactionPhase,
-  type TransactionalEventsListenerMetadata,
-} from '../types/transactional-listener.types';
+import { TransactionPhase } from '../types/transactional-listener.types';
 
 /**
- * Method shape expected of a registered listener: a function that accepts
- * the domain event as its first argument and, for {@link TransactionPhase.AFTER_ROLLBACK}
- * / {@link TransactionPhase.AFTER_COMPLETION} listeners, the causing error
- * as its second.
+ * Resolved per-event-type listener configuration used by
+ * {@link TransactionalEventDispatcher.registerListener}. Scanners flatten
+ * class-level `@TransactionalEventsHandler` metadata (which lists many
+ * event types per class) into one of these entries per event type.
+ */
+export interface DispatcherListenerMetadata {
+  readonly eventType: Type;
+  readonly phase: TransactionPhase;
+  readonly fallbackExecution: boolean;
+  readonly async: boolean;
+}
+
+/**
+ * Method shape expected of a registered listener: a function that
+ * accepts the domain event as its first argument and, for
+ * {@link TransactionPhase.AFTER_ROLLBACK} /
+ * {@link TransactionPhase.AFTER_COMPLETION} listeners, the causing
+ * error as its second.
  */
 type ListenerMethod = (event: unknown, error?: unknown) => unknown;
 
 /**
- * Internal record of one `@TransactionalEventsListener`-decorated method
- * known to a dispatcher. Populated via {@link TransactionalEventDispatcher.registerListener}
+ * Internal record of one handler method known to a dispatcher.
+ * Populated via {@link TransactionalEventDispatcher.registerListener}
  * by a scanner at bootstrap. The method is bound to its instance at
  * registration time so dispatch does no string-keyed lookup.
  */
@@ -24,29 +35,32 @@ interface RegisteredListener {
   readonly handler: ListenerMethod;
   readonly instanceLabel: string;
   readonly methodName: string;
-  readonly metadata: TransactionalEventsListenerMetadata;
+  readonly metadata: DispatcherListenerMetadata;
 }
 
 /**
- * Routes domain events to methods decorated with `@TransactionalEventsListener`,
- * honouring the requested {@link TransactionPhase}:
+ * Routes domain events to methods registered by scanners for
+ * `@TransactionalEventsHandler`-annotated classes, honouring the
+ * requested {@link TransactionPhase}:
  *
- * - Inside an active transaction, the listener is attached to the transaction
- *   as a before-commit / after-commit / after-rollback hook via
- *   {@link TransactionManager}. Phase AFTER_COMPLETION attaches to both
- *   after-commit and after-rollback.
- * - Outside any transaction, listeners with `fallbackExecution: true` are
- *   invoked via `queueMicrotask`; others are dropped with a warning.
+ * - Inside an active transaction, the listener is attached to the
+ *   transaction as a before-commit / after-commit / after-rollback
+ *   hook via {@link TransactionManager}. Phase AFTER_COMPLETION
+ *   attaches to both after-commit and after-rollback.
+ * - Outside any transaction, listeners with `fallbackExecution: true`
+ *   are invoked via `queueMicrotask`; others are dropped with a
+ *   warning.
  *
  * Error propagation:
  * - Errors thrown from a BEFORE_COMMIT listener propagate through the
  *   manager's commit path and trigger rollback (matches Spring).
- * - Errors thrown from an AFTER_COMMIT / AFTER_ROLLBACK / AFTER_COMPLETION
- *   listener are logged and swallowed by {@link TransactionManager}'s hook
- *   runner — the transaction outcome is already decided.
- * - `async: true` listeners are fire-and-forget via `queueMicrotask`: their
- *   failures are logged but never reach the enclosing transaction, even in
- *   BEFORE_COMMIT phase.
+ * - Errors thrown from an AFTER_COMMIT / AFTER_ROLLBACK /
+ *   AFTER_COMPLETION listener are logged and swallowed by
+ *   {@link TransactionManager}'s hook runner — the transaction
+ *   outcome is already decided.
+ * - `async: true` listeners are fire-and-forget via `queueMicrotask`:
+ *   their failures are logged but never reach the enclosing
+ *   transaction, even in BEFORE_COMMIT phase.
  */
 @Injectable()
 export class TransactionalEventDispatcher {
@@ -56,24 +70,24 @@ export class TransactionalEventDispatcher {
   constructor(private readonly manager: TransactionManager) {}
 
   /**
-   * Register a listener method discovered on `instance`. The lookup key is
-   * `metadata.eventType.name` — see {@link scheduleDispatch} for matching
-   * semantics. Multiple listeners for the same event are invoked in
-   * registration order within the hook runner.
+   * Register a handler method discovered on `instance`. The lookup key
+   * is `metadata.eventType.name` — see {@link scheduleDispatch} for
+   * matching semantics. Multiple handlers for the same event are
+   * invoked in registration order within the hook runner.
    *
-   * @throws {TypeError} If `instance[methodName]` is not a function. This
-   *   is a caller contract violation — the scanner must only pass method
-   *   names that actually resolve to methods on the instance.
+   * @throws {TypeError} If `instance[methodName]` is not a function.
+   *   This is a caller contract violation — the scanner must only pass
+   *   method names that actually resolve to methods on the instance.
    */
   registerListener(
     instance: object,
     methodName: string,
-    metadata: TransactionalEventsListenerMetadata,
+    metadata: DispatcherListenerMetadata,
   ): void {
     const rawMethod = (instance as Record<string, unknown>)[methodName];
     if (typeof rawMethod !== 'function') {
       throw new TypeError(
-        `@TransactionalEventsListener target ${instance.constructor.name}.${methodName} ` +
+        `Transactional event handler target ${instance.constructor.name}.${methodName} ` +
           `is not a function — cannot register as a listener`,
       );
     }
@@ -95,15 +109,16 @@ export class TransactionalEventDispatcher {
     }
 
     this.logger.debug(
-      `Registered listener ${instanceLabel}.${methodName} for ${typeName} phase=${metadata.phase}`,
+      `Registered handler ${instanceLabel}.${methodName} for ${typeName} phase=${metadata.phase}`,
     );
   }
 
   /**
-   * Route `event` to every listener registered for its exact constructor
-   * name. Listener matching is nominal and non-inheriting: a listener
-   * registered for `Parent` is NOT invoked for a `Child extends Parent`
-   * event, because the lookup uses `event.constructor.name`.
+   * Route `event` to every listener registered for its exact
+   * constructor name. Listener matching is nominal and non-inheriting:
+   * a listener registered for `Parent` is NOT invoked for a `Child
+   * extends Parent` event, because the lookup uses
+   * `event.constructor.name`.
    */
   scheduleDispatch(event: object): void {
     const typeName = event.constructor.name;
@@ -121,7 +136,7 @@ export class TransactionalEventDispatcher {
           this.scheduleFallback(listener, event);
         } else {
           this.logger.warn(
-            `Event ${typeName} published outside a transaction; listener ` +
+            `Event ${typeName} published outside a transaction; handler ` +
               `${listener.instanceLabel}.${listener.methodName} has no ` +
               `fallbackExecution=true — skipping.`,
           );
@@ -209,7 +224,7 @@ export class TransactionalEventDispatcher {
 
   private logListenerFailure(listener: RegisteredListener, err: unknown): void {
     this.logger.error(
-      `Transactional event listener ${listener.instanceLabel}.${listener.methodName} failed`,
+      `Transactional event handler ${listener.instanceLabel}.${listener.methodName} failed`,
       err instanceof Error ? err.stack : String(err),
     );
   }

@@ -20,11 +20,12 @@ import {
   Transactional,
 } from '@nestjs-transactional/core';
 
-import { TransactionalEventsListener } from '../decorators/transactional-events-listener.decorator';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
 import { CQRS_HANDLER_WRAPPER_OPTIONS, CqrsHandlerWrapper } from '../handlers/handler-wrapper';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner';
+import type { ITransactionalEventsHandler } from '../interfaces/transactional-events-handler.interface';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
 import { TransactionalEventPublisher } from './transactional-event-publisher';
@@ -135,17 +136,24 @@ class PlaceOrderClassHandler implements ICommandHandler<PlaceOrderClassCommand, 
 }
 
 @Injectable()
-class OrderListener {
+@TransactionalEventsHandler(OrderPlacedEvent)
+class OrderCommittedHandler implements ITransactionalEventsHandler<OrderPlacedEvent> {
   afterCommit: OrderPlacedEvent[] = [];
-  afterRollback: { event: OrderPlacedEvent; error: unknown }[] = [];
 
-  @TransactionalEventsListener(OrderPlacedEvent)
-  onCommitted(event: OrderPlacedEvent): void {
+  handle(event: OrderPlacedEvent): void {
     this.afterCommit.push(event);
   }
+}
 
-  @TransactionalEventsListener(OrderPlacedEvent, { phase: TransactionPhase.AFTER_ROLLBACK })
-  onRolledBack(event: OrderPlacedEvent, error: unknown): void {
+@Injectable()
+@TransactionalEventsHandler({
+  events: [OrderPlacedEvent],
+  phase: TransactionPhase.AFTER_ROLLBACK,
+})
+class OrderRollbackHandler implements ITransactionalEventsHandler<OrderPlacedEvent> {
+  afterRollback: { event: OrderPlacedEvent; error: unknown }[] = [];
+
+  handle(event: OrderPlacedEvent, error?: unknown): void {
     this.afterRollback.push({ event, error });
   }
 }
@@ -191,7 +199,8 @@ const buildModule = async (adapter: FakeAdapter): Promise<TestingModule> => {
       },
       PlaceOrderHandler,
       PlaceOrderClassHandler,
-      OrderListener,
+      OrderCommittedHandler,
+      OrderRollbackHandler,
     ],
   }).compile();
 
@@ -203,13 +212,15 @@ describe('TransactionalEventPublisher (integration with AggregateRoot)', () => {
   let adapter: FakeAdapter;
   let module: TestingModule;
   let commandBus: CommandBus;
-  let listener: OrderListener;
+  let committedHandler: OrderCommittedHandler;
+  let rollbackHandler: OrderRollbackHandler;
 
   beforeEach(async () => {
     adapter = new FakeAdapter();
     module = await buildModule(adapter);
     commandBus = module.get(CommandBus);
-    listener = module.get(OrderListener);
+    committedHandler = module.get(OrderCommittedHandler);
+    rollbackHandler = module.get(OrderRollbackHandler);
     midTransactionGate = null;
   });
 
@@ -226,7 +237,7 @@ describe('TransactionalEventPublisher (integration with AggregateRoot)', () => {
       release = resolve;
     });
 
-    expect(listener.afterCommit).toHaveLength(0);
+    expect(committedHandler.afterCommit).toHaveLength(0);
 
     const exec = commandBus.execute(new PlaceOrderCommand('o-1'));
     // Let the handler enter the await.
@@ -234,43 +245,43 @@ describe('TransactionalEventPublisher (integration with AggregateRoot)', () => {
 
     // Aggregate has emitted and "committed" its event to the dispatcher,
     // but the enclosing transaction hasn't committed yet.
-    expect(listener.afterCommit).toHaveLength(0);
+    expect(committedHandler.afterCommit).toHaveLength(0);
     expect(adapter.committedTransactions).toHaveLength(0);
 
     release();
     await exec;
     await drainEventLoop();
 
-    expect(listener.afterCommit).toHaveLength(1);
-    expect(listener.afterCommit[0]?.orderId).toBe('o-1');
+    expect(committedHandler.afterCommit).toHaveLength(1);
+    expect(committedHandler.afterCommit[0]?.orderId).toBe('o-1');
     expect(adapter.committedTransactions).toHaveLength(1);
   });
 
-  it('does not fire an AFTER_COMMIT listener when the transaction rolls back', async () => {
+  it('does not fire an AFTER_COMMIT handler when the transaction rolls back', async () => {
     await expect(commandBus.execute(new PlaceOrderCommand('o-fail', true))).rejects.toThrow('boom');
     await drainEventLoop();
 
-    expect(listener.afterCommit).toHaveLength(0);
+    expect(committedHandler.afterCommit).toHaveLength(0);
     expect(adapter.rolledBackTransactions).toHaveLength(1);
   });
 
-  it('fires an AFTER_ROLLBACK listener with the causing error when the transaction rolls back', async () => {
+  it('fires an AFTER_ROLLBACK handler with the causing error when the transaction rolls back', async () => {
     await expect(commandBus.execute(new PlaceOrderCommand('o-fail-2', true))).rejects.toThrow(
       'boom',
     );
     await drainEventLoop();
 
-    expect(listener.afterRollback).toHaveLength(1);
-    expect(listener.afterRollback[0]?.event.orderId).toBe('o-fail-2');
-    expect(listener.afterRollback[0]?.error).toBeInstanceOf(Error);
-    expect((listener.afterRollback[0]?.error as Error).message).toBe('boom');
+    expect(rollbackHandler.afterRollback).toHaveLength(1);
+    expect(rollbackHandler.afterRollback[0]?.event.orderId).toBe('o-fail-2');
+    expect(rollbackHandler.afterRollback[0]?.error).toBeInstanceOf(Error);
+    expect((rollbackHandler.afterRollback[0]?.error as Error).message).toBe('boom');
   });
 
   it('mergeClassContext produces an aggregate class whose events also flow through the dispatcher', async () => {
     await commandBus.execute(new PlaceOrderClassCommand('o-class-7'));
     await drainEventLoop();
 
-    expect(listener.afterCommit.map((e) => e.orderId)).toContain('o-class-7');
+    expect(committedHandler.afterCommit.map((e) => e.orderId)).toContain('o-class-7');
     expect(adapter.committedTransactions).toHaveLength(1);
   });
 });
