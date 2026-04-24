@@ -63,6 +63,7 @@
   },
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/outbox-core": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/cqrs": "^11.0.0",

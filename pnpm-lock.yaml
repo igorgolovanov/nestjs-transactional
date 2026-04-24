@@ -209,6 +209,9 @@ importers:
       '@nestjs-transactional/core':
         specifier: workspace:*
         version: link:../core
+      '@nestjs-transactional/outbox-core':
+        specifier: workspace:*
+        version: link:../outbox-core
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
