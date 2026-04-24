@@ -26,3 +26,8 @@ export * from './recovery/staleness-monitor';
 export * from './api/failed-event-publications';
 export * from './api/incomplete-event-publications';
 export * from './api/completed-event-publications';
+
+export * from './recovery/startup-recovery';
+
+export * from './module/outbox.module';
+export * from './module/outbox-processing.module';
