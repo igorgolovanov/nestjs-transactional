@@ -13,3 +13,6 @@ export * from './repository/event-publication-repository';
 
 export * from './registry/event-publication-registry';
 export * from './registry/listener-registry';
+export * from './registry/outbox-listener-scanner';
+
+export * from './decorators/outbox-event-listener.decorator';
