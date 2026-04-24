@@ -80,8 +80,7 @@ const metadata = (
   ...overrides,
 });
 
-const flushMicrotasks = (): Promise<void> =>
-  new Promise<void>((resolve) => setImmediate(resolve));
+const flushMicrotasks = (): Promise<void> => new Promise<void>((resolve) => setImmediate(resolve));
 
 describe('TransactionalEventDispatcher', () => {
   let adapter: FakeAdapter;
@@ -256,9 +255,7 @@ describe('TransactionalEventDispatcher', () => {
 
   describe('outside any transaction', () => {
     it('skips listeners without fallbackExecution and logs a warning', async () => {
-      const warnSpy = jest
-        .spyOn(Logger.prototype, 'warn')
-        .mockImplementation(() => undefined);
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
       const host = { onPlaced: jest.fn() };
       dispatcher.registerListener(
@@ -349,11 +346,7 @@ describe('TransactionalEventDispatcher', () => {
       const placedHost = { onPlaced: jest.fn() };
       const paymentHost = { onPayment: jest.fn() };
 
-      dispatcher.registerListener(
-        placedHost,
-        'onPlaced',
-        metadata(TransactionPhase.AFTER_COMMIT),
-      );
+      dispatcher.registerListener(placedHost, 'onPlaced', metadata(TransactionPhase.AFTER_COMMIT));
       dispatcher.registerListener(paymentHost, 'onPayment', {
         eventType: PaymentCaptured,
         phase: TransactionPhase.AFTER_COMMIT,

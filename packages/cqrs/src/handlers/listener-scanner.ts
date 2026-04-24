@@ -30,7 +30,11 @@ export class TransactionalListenerScanner implements OnModuleInit {
     const providers = this.discovery.getProviders();
 
     for (const wrapper of providers) {
-      if (wrapper.metatype === null || wrapper.instance === null || wrapper.instance === undefined) {
+      if (
+        wrapper.metatype === null ||
+        wrapper.instance === null ||
+        wrapper.instance === undefined
+      ) {
         continue;
       }
 

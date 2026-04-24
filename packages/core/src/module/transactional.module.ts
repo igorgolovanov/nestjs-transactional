@@ -6,8 +6,9 @@ import {
   type ModuleMetadata,
   type Provider,
 } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
 
+import { TransactionalMethodsBootstrap } from '../bootstrap/transactional-methods.bootstrap';
 import { TransactionalInterceptor } from '../interceptor/transactional.interceptor';
 import {
   ADAPTER_REGISTRY,
@@ -36,6 +37,16 @@ export interface TransactionalModuleOptions {
    * interceptor manually on specific controllers.
    */
   readonly registerInterceptor?: boolean;
+
+  /**
+   * When `true` (default), registers {@link TransactionalMethodsBootstrap}
+   * — an `OnApplicationBootstrap` service that wraps every
+   * `@Transactional()` method on plain `@Injectable()` providers with
+   * `TransactionManager.run(...)`. Set to `false` to opt out when the
+   * application has no service-level `@Transactional` methods, or when
+   * another mechanism handles wrapping.
+   */
+  readonly registerMethodsBootstrap?: boolean;
 
   /**
    * Adapters to register with {@link AdapterRegistry} at module init time.
@@ -71,6 +82,7 @@ export interface TransactionalModuleAsyncFactoryResult {
 export interface TransactionalModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
   readonly isGlobal?: boolean;
   readonly registerInterceptor?: boolean;
+  readonly registerMethodsBootstrap?: boolean;
   readonly useFactory: (
     ...args: never[]
   ) => Promise<TransactionalModuleAsyncFactoryResult> | TransactionalModuleAsyncFactoryResult;
@@ -133,9 +145,14 @@ export class TransactionalModule {
       });
     }
 
+    if (options.registerMethodsBootstrap !== false) {
+      providers.push(TransactionalMethodsBootstrap);
+    }
+
     return {
       module: TransactionalModule,
       global: options.isGlobal ?? false,
+      imports: [DiscoveryModule],
       providers,
       exports: [TransactionManager, ADAPTER_REGISTRY],
     };
@@ -191,10 +208,14 @@ export class TransactionalModule {
       });
     }
 
+    if (options.registerMethodsBootstrap !== false) {
+      providers.push(TransactionalMethodsBootstrap);
+    }
+
     return {
       module: TransactionalModule,
       global: options.isGlobal ?? false,
-      imports: options.imports,
+      imports: [DiscoveryModule, ...(options.imports ?? [])],
       providers,
       exports: [TransactionManager, ADAPTER_REGISTRY],
     };
