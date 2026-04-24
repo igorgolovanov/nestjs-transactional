@@ -1,1 +1,1 @@
-export {};
+export * from './in-memory-repository';

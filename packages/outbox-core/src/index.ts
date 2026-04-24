@@ -8,3 +8,5 @@ export * from './types/errors';
 export * from './serialization/event-serializer';
 export * from './serialization/event-type-registry';
 export * from './serialization/json-event-serializer';
+
+export * from './repository/event-publication-repository';
