@@ -36,7 +36,7 @@ does" contract users expect from `@Transactional`:
    naïve in-memory event buses). Downstream services react to an
    order that never got saved.
 
-The in-memory phase-aware `@TransactionalEventsListener`
+The in-memory phase-aware `@TransactionalEventsHandler`
 (`packages/cqrs`) already solves (3). It still cannot solve (1) or
 (2) — nothing in-memory survives a crash.
 
@@ -154,7 +154,7 @@ inspiration for this package. The feature set maps one-to-one:
 | Spring Modulith | `@nestjs-transactional/outbox-*` |
 | --- | --- |
 | `EventPublicationRegistry` | `EventPublicationRegistry` |
-| `@ApplicationModuleListener` | `@ApplicationModuleListener` (cqrs) |
+| `@ApplicationModuleListener` | `@ApplicationModuleHandler` (cqrs, class-level — see ADR-014) |
 | `EventPublicationRepository` SPI | `EventPublicationRepository` SPI |
 | JDBC persistence module | `outbox-typeorm` |
 | `CompletedEventPublications` | `CompletedEventPublications` |
@@ -226,25 +226,26 @@ poll entirely.
   box — `FailedEventPublications.resubmit()`,
   `IncompleteEventPublications`, etc.
 
-### Keep `@TransactionalEventsListener` instead when…
+### Keep `@TransactionalEventsHandler` instead when…
 
-- …the listener is **in-process, cheap, idempotent on re-runs**,
+- …the handler is **in-process, cheap, idempotent on re-runs**,
   and the side effect is **safe to lose** on a crash between
   commit and invocation. Examples: cache invalidation, metrics
   increment, logging.
-- …the listener must run **inside or right before the same
+- …the handler must run **inside or right before the same
   transaction** (`BEFORE_COMMIT` phase). The outbox always runs
   after the transaction commits.
 - …you are writing a **library or internal plugin** where installing
   a Postgres table would be surprising to the user.
 
-### Use `@ApplicationModuleListener` as the default…
+### Use `@ApplicationModuleHandler` as the default…
 
-- …for most **cross-module cross-boundary** integration listeners
+- …for most **cross-module cross-boundary** integration handlers
   in a NestJS application. The decorator picks the right path
-  automatically: durable via outbox when the outbox is wired, in-
-  memory fallback otherwise. Upgrading from "no outbox" to "outbox"
-  requires a module-wiring change, not a decorator change.
+  automatically: durable via outbox when the `OUTBOX_LISTENER_REGISTRAR`
+  structural port is bound, in-memory fallback otherwise. Upgrading
+  from "no outbox" to "outbox" requires a module-wiring change,
+  not a decorator change.
 
 ## See also
 

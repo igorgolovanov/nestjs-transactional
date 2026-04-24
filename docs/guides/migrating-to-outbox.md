@@ -1,20 +1,27 @@
-# Migrating from `@TransactionalEventsListener` to the outbox
+# Migrating from `@TransactionalEventsHandler` to the outbox
 
 This guide walks through upgrading an application that today
 relies on `@nestjs-transactional/cqrs`'s in-memory
-`@TransactionalEventsListener` to the durable outbox-backed
+`@TransactionalEventsHandler` to the durable outbox-backed
 delivery path (`@nestjs-transactional/outbox-core` plus a
 backend package such as `@nestjs-transactional/outbox-typeorm`).
 
-No breaking changes — every existing `@TransactionalEventsListener`
-keeps working as before. The migration is opt-in per listener,
-and in most cases requires one decorator change plus a one-time
-module wiring update.
+No behavioural breaking changes — every existing
+`@TransactionalEventsHandler` keeps working as before. The
+migration is opt-in per handler class, and in most cases
+requires one decorator change plus a one-time module wiring
+update.
+
+> **Coming from the pre-0.1.0 method-level decorators?** See the
+> "Migrating from method-level listeners" section at the end —
+> you need to move the method into `handle(event)` and lift the
+> decorator up to the class before the rest of this guide
+> applies.
 
 ## What you get after the migration
 
 - **Durable delivery** — publications survive process crashes and
-  deploys. A listener that was "in the middle of running" is
+  deploys. A handler that was "in the middle of running" is
   resumed on next startup.
 - **Operator-facing retry** — failed publications are queryable
   and resubmittable via `FailedEventPublications.resubmit(...)`.
@@ -33,7 +40,7 @@ module wiring update.
 - Your `@Transactional()` methods.
 - Your `@nestjs/cqrs` command / query handlers.
 - Your aggregates (`AggregateRoot.apply(...)`, `commit()`).
-- Any `@TransactionalEventsListener` you leave untouched. It keeps
+- Any `@TransactionalEventsHandler` you leave untouched. It keeps
   running in-memory, at its current phase, exactly as before.
 
 ## Step 1 — install the packages
@@ -112,12 +119,14 @@ through a reviewed migration.
 
 ## Step 4 — wire the modules
 
-Add three entries to your root module, in this order:
+Add three imports and two provider bindings to your root module:
 
 ```ts
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 import {
+  OutboxEventPublisher,
+  OutboxListenerRegistry,
   OutboxModule,
   OutboxProcessingModule,
 } from '@nestjs-transactional/outbox-core';
@@ -125,6 +134,11 @@ import {
   OutboxTypeOrmModule,
   typeOrmEventPublicationRepositoryProvider,
 } from '@nestjs-transactional/outbox-typeorm';
+import {
+  CqrsTransactionalModule,
+  OUTBOX_LISTENER_REGISTRAR,
+  OUTBOX_PUBLICATION_SCHEDULER,
+} from '@nestjs-transactional/cqrs';
 
 @Module({
   imports: [
@@ -142,6 +156,16 @@ import {
 
     // Only in worker processes — not in API-only apps that merely publish.
     OutboxProcessingModule,                                         // NEW
+
+    CqrsTransactionalModule.forRoot(),                              // already there
+  ],
+  providers: [
+    // NEW — routes AggregateRoot.commit() events to the outbox
+    // for durable publication.
+    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
+    // NEW — routes @ApplicationModuleHandler classes to the outbox
+    // registry for durable delivery.
+    { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
   ],
 })
 export class AppModule {}
@@ -155,67 +179,103 @@ survives a restart. The aliasing Provider forwards the
 `EVENT_PUBLICATION_REPOSITORY` token to the TypeORM
 implementation provided by `OutboxTypeOrmModule`.
 
-## Step 5 — pick a listener per use case
+The two `provide:` lines wire the cqrs-side structural ports to
+outbox-core's concrete services:
 
-For each `@TransactionalEventsListener` in your codebase, decide
+- `OUTBOX_PUBLICATION_SCHEDULER` makes `HybridEventPublisher`
+  route `AggregateRoot.commit()` events into the outbox for
+  durable publication.
+- `OUTBOX_LISTENER_REGISTRAR` makes
+  `ApplicationModuleHandlerScanner` route
+  `@ApplicationModuleHandler` classes to the outbox instead of
+  to the in-memory dispatcher.
+
+Omit either binding and that half of the integration falls back
+to in-memory.
+
+## Step 5 — pick a handler per use case
+
+For each `@TransactionalEventsHandler` in your codebase, decide
 what kind of delivery it needs.
 
-### Keep `@TransactionalEventsListener` when…
+### Keep `@TransactionalEventsHandler` when…
 
-- …the listener is cheap, in-process, and idempotent on re-runs.
+- …the handler is cheap, in-process, and idempotent on re-runs.
 - …the side effect is safe to lose on a crash between commit and
   invocation. Examples: cache invalidation, metric counters,
   in-process logging.
-- …the listener must run inside `BEFORE_COMMIT` (the outbox is
+- …the handler must run inside `BEFORE_COMMIT` (the outbox is
   always post-commit).
 
 ```ts
 // Unchanged:
-@TransactionalEventsListener(OrderPlacedEvent)
-onOrderPlaced(event: OrderPlacedEvent): void {
-  this.metrics.increment('orders.placed');
+@TransactionalEventsHandler(OrderPlacedEvent)
+export class OrderPlacedMetrics
+  implements ITransactionalEventsHandler<OrderPlacedEvent>
+{
+  handle(event: OrderPlacedEvent): void {
+    this.metrics.increment('orders.placed');
+  }
 }
 ```
 
-### Replace with `@ApplicationModuleListener` when…
+### Replace with `@ApplicationModuleHandler` when…
 
-- …the listener does cross-module or external-system work and
+- …the handler does cross-module or external-system work and
   at-least-once delivery matters. This covers the typical
   "send an email", "call an external API", "write to another
   bounded context" cases.
 
 ```ts
 // Before:
-@TransactionalEventsListener(OrderPlacedEvent)
-async sendConfirmation(event: OrderPlacedEvent): Promise<void> {
-  await this.emailer.send(event);
+@TransactionalEventsHandler(OrderPlacedEvent)
+export class SendConfirmationHandler
+  implements ITransactionalEventsHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
+    await this.emailer.send(event);
+  }
 }
 
 // After:
-@ApplicationModuleListener(OrderPlacedEvent)
-async sendConfirmation(event: OrderPlacedEvent): Promise<void> {
-  await this.emailer.send(event);
+@ApplicationModuleHandler(OrderPlacedEvent)
+export class SendConfirmationHandler
+  implements IApplicationModuleHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
+    await this.emailer.send(event);
+  }
 }
 ```
 
-The decorator is the only change. Semantics when the outbox is
-wired: durable, retried on failure, runs in a fresh
-`REQUIRES_NEW` transaction. Semantics when the outbox is NOT
-wired: in-memory `AFTER_COMMIT` with `async: true` — same
-behaviour the `@TransactionalEventsListener` gave you before. So
-adding the decorator does not break anything in staging or test
-environments that have not yet enabled the outbox.
+The decorator and the marker interface are the only changes.
+Semantics when the outbox registrar is bound: durable, retried
+on failure, runs in a fresh `REQUIRES_NEW` transaction.
+Semantics when the registrar is NOT bound: in-memory
+`AFTER_COMMIT` with `async: true` in a fresh transaction — close
+to the behaviour the `@TransactionalEventsHandler` gave you
+before. So adding the decorator does not break anything in
+staging or test environments that have not yet enabled the
+outbox.
 
-### Use `@OutboxEventListener` when…
+### Use `@OutboxEventsHandler` when…
 
-- …you want the outbox explicitly, no in-memory fallback.
-- …the method name might change and you need a stable `id` for
+- …you want the outbox explicitly, no in-memory fallback. The
+  class will simply not be delivered if the outbox is not wired.
+- …the class name might change and you need a stable `id` for
   the persistent registry to resolve across renames.
 
 ```ts
-@OutboxEventListener(OrderPlacedEvent, { id: 'Inventory.stable-id' })
-async reserveStock(event: OrderPlacedEvent): Promise<void> {
-  await this.inventory.reserve(event.orderId);
+@OutboxEventsHandler({
+  events: [OrderPlacedEvent],
+  id: 'Inventory.stable-id',
+})
+export class InventoryReservationHandler
+  implements IOutboxEventsHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
+    await this.inventory.reserve(event.orderId);
+  }
 }
 ```
 
@@ -260,36 +320,105 @@ it('publishes OrderPlacedEvent for the placed order', async () => {
 });
 ```
 
-## Breaking changes
+## Migrating from method-level listeners (pre-0.1.0 snapshots)
 
-None. Every user-facing API shipped before Phase 5 continues to
-work unchanged:
+If you are coming from an earlier snapshot that had
+`@TransactionalEventsListener`, `@OutboxEventListener`, or
+`@ApplicationModuleListener` as **method-level** decorators,
+every occurrence must be rewritten to the new class-level shape
+before the rest of this guide applies. See ADR-014 for the
+rationale.
 
-- `@Transactional()`, propagation modes, isolation levels.
-- `@TransactionalEventsListener` — still in-memory, still
-  phase-aware.
-- `TransactionalEventPublisher` — still available as a
-  standalone strategy. The adapter used by
-  `CqrsTransactionalModule.forRoot()` changed to
-  `HybridEventPublisher`, but the observable behaviour is
-  identical when the outbox is NOT wired.
+**Mechanical conversion**:
 
-The only observable change for existing codebases is that the
-`EventPublisher` DI override now resolves to an adapter built
-around `HybridEventPublisher` instead of
-`TransactionalEventPublisher`. Both implement `IEventPublisher`
-identically; any code that consumed the adapter through the
-`EventPublisher` token sees no difference.
+```ts
+// Before (method-level, pre-0.1.0):
+@Injectable()
+class NotificationHandlers {
+  @TransactionalEventsListener(OrderPlacedEvent)
+  onOrderPlaced(event: OrderPlacedEvent): void {
+    this.metrics.increment('orders.placed');
+  }
+
+  @ApplicationModuleListener(OrderPlacedEvent)
+  async shipOrder(event: OrderPlacedEvent): Promise<void> {
+    await this.shipping.createShipment(event.orderId);
+  }
+}
+
+// After (class-level):
+@Injectable()
+@TransactionalEventsHandler(OrderPlacedEvent)
+class OrderPlacedMetrics
+  implements ITransactionalEventsHandler<OrderPlacedEvent>
+{
+  handle(event: OrderPlacedEvent): void {
+    this.metrics.increment('orders.placed');
+  }
+}
+
+@Injectable()
+@ApplicationModuleHandler(OrderPlacedEvent)
+class ShipOrderHandler
+  implements IApplicationModuleHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
+    await this.shipping.createShipment(event.orderId);
+  }
+}
+```
+
+Each method that previously carried a decorator becomes its own
+class with that decorator at the class level, the method renamed
+to `handle`, and the matching `I*Handler` interface
+implemented. Register both new classes as providers (the module's
+`providers` array or `@Module({ providers: [...] })`).
+
+**Listener id change**: the new scanner composes listener ids as
+`${baseId}#${EventName}` where baseId defaults to the class name
+(or an explicit `options.id`). Stored publications written under
+the old `${ClassName}.${methodName}` format will NOT be resolved
+by the new scanners — they become orphans. Before re-running a
+migrated application against a database with stored publications:
+
+- **Maintenance-window option** — run the application's old
+  version until the `event_publication` table is empty (or drop
+  the outstanding rows if you can afford to), then deploy the
+  new version.
+- **Manual replay option** — for every orphaned `listenerId` you
+  see in the database, call
+  `OutboxListenerRegistry.register(...)` at bootstrap with a
+  matching id and an `invoke` closure that re-dispatches to the
+  renamed class.
+
+For a fresh database (no stored publications) no cleanup is
+needed.
+
+## Breaking changes vs. previous snapshots
+
+- **Pre-0.1.0 listener decorators removed**. See "Migrating from
+  method-level listeners" above. No deprecation period — this is
+  a pre-release shift.
+- **Listener id format changed** from
+  `${ClassName}.${methodName}` to `${baseId}#${EventName}`.
+  Stored publications from the old format need manual cleanup or
+  replay registration.
+
+All other user-facing APIs — `@Transactional()`, propagation
+modes, isolation levels, `AggregateRoot.commit()`,
+`TransactionalEventPublisher` — are unchanged.
 
 ## Troubleshooting
 
-**"My `@OutboxEventListener` never fires."**
+**"My `@OutboxEventsHandler` never fires."**
 Likely causes: (1) the `repository` option on
 `OutboxModule.forRoot` is missing or pointing at the InMemory
 default — no rows make it to Postgres; (2) no worker is running
 — import `OutboxProcessingModule` in a process; (3) the event
 type was not registered in `OutboxModule.forRoot({ eventTypes: [...] })`
-— deserialisation fails silently and the row stays in `FAILED`.
+— deserialisation fails silently and the row stays in `FAILED`;
+(4) the class lacks a `handle` method — the scanner logs a
+warning and skips.
 
 **"Rollback leaks a publication row."**
 Should not happen — flush is a `beforeCommit` hook, and
@@ -305,17 +434,20 @@ uses a conditional `UPDATE ... WHERE status IN (...)`. If you
 are running the worker on a database without `SKIP LOCKED`
 support, you need a different backend adapter.
 
-**"`@ApplicationModuleListener` fires twice."**
-The in-memory scanner did not skip the method. Verify that
-`OUTBOX_PUBLICATION_SCHEDULER` is bound — typically by a
-`{ provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher }`
-provider. `TransactionalListenerScanner` uses the presence of
-this binding as its "outbox is wired" signal.
+**"`@ApplicationModuleHandler` fires twice."**
+Shouldn't happen with the new scanner — each class is routed to
+exactly one path. If you see a double invocation, verify you
+haven't registered the same class twice under different module
+hierarchies, and that you don't have both an
+`@ApplicationModuleHandler` and an `@OutboxEventsHandler` on
+overlapping event types from separate classes (which would be
+two deliveries, one per class — the intended behaviour).
 
 ## See also
 
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
 - [Outbox integration with CQRS](../architecture/outbox-integration-with-cqrs.md)
-- [ADR-006 — rationale](../adr/006-outbox-pattern.md)
-- [ADR-007 — architecture](../adr/007-outbox-architecture.md)
+- [ADR-006 — outbox rationale](../adr/006-outbox-pattern.md)
+- [ADR-007 — outbox architecture](../adr/007-outbox-architecture.md)
+- [ADR-014 — class-level handler API redesign](../adr/014-handler-api-redesign.md)
 - [`examples/outbox-full-stack/`](../../examples/outbox-full-stack/)

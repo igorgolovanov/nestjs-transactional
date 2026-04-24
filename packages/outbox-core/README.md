@@ -6,15 +6,15 @@ that brings Spring Modulith-equivalent delivery guarantees to the
 
 ## Overview
 
-`@TransactionalEventsListener` from `@nestjs-transactional/cqrs` provides
-phase-based dispatching (like Spring Framework core): listeners fire
+`@TransactionalEventsHandler` from `@nestjs-transactional/cqrs` provides
+phase-based dispatching (like Spring Framework core): handlers fire
 `AFTER_COMMIT`, `BEFORE_COMMIT`, `AFTER_ROLLBACK`, or `AFTER_COMPLETION`.
 That covers a lot, but it is purely in-memory — if the process dies
-between commit and listener invocation, the event is lost.
+between commit and handler invocation, the event is lost.
 
 `outbox-core` closes that gap. It gives you:
 
-- A persistent **Event Publication Registry** — every listener
+- A persistent **Event Publication Registry** — every handler
   invocation is logged atomically with the business transaction.
 - **Retry on process restart** — publications that were not acknowledged
   before shutdown are replayed on next startup.
@@ -72,22 +72,43 @@ import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outb
 export class AppModule {}
 ```
 
-### 2. Declaring a listener
+### 2. Declaring a handler
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { OutboxEventListener } from '@nestjs-transactional/outbox-core';
+import {
+  type IOutboxEventsHandler,
+  OutboxEventsHandler,
+} from '@nestjs-transactional/outbox-core';
 
 @Injectable()
-export class InventoryHandlers {
-  @OutboxEventListener(OrderPlacedEvent)
-  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+@OutboxEventsHandler(OrderPlacedEvent)
+export class InventoryReservationHandler
+  implements IOutboxEventsHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
     // Runs inside a fresh REQUIRES_NEW transaction, only after the
     // publishing transaction has committed. Retried on exception,
     // resumable across restarts.
   }
 }
 ```
+
+The decorator accepts either rest params or an options object:
+
+```typescript
+// Short form — defaults (newTransaction: true).
+@OutboxEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
+
+// Long form — explicit options.
+@OutboxEventsHandler({
+  events: [OrderPlacedEvent],
+  id: 'inventory.reservation',  // stable base id, see "Listener ids" below
+  newTransaction: false,        // skip the REQUIRES_NEW wrapper
+})
+```
+
+See ADR-014 for the rationale behind the class-level shape.
 
 ### 3. Publishing events
 
@@ -117,6 +138,25 @@ await this.failedEventPublications.resubmit(
 );
 await this.completedEventPublications.purge(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 ```
+
+## Listener ids
+
+Every stored publication carries a `listenerId` string that identifies
+which handler class should deliver it. The scanner composes the id as:
+
+```
+${baseId}#${EventName}
+```
+
+- **No explicit `id`**: baseId is the class name. Example:
+  `InventoryReservationHandler#OrderPlacedEvent`.
+- **With `options.id`**: baseId is the supplied string. Example:
+  `inventory.reservation#OrderPlacedEvent`.
+
+A class that handles multiple event types produces one id per event.
+Renaming the class without supplying an explicit `id` breaks delivery
+for every stored publication under the old id — set `options.id` when
+you want stability across renames.
 
 ## Testing utilities
 
@@ -189,7 +229,7 @@ part of Phase 5 of the monorepo roadmap. The public API is not yet
 stable and will change between 0.x releases.
 
 Tracking issue and design notes: see the repository root `CLAUDE.md`
-and `docs/adr/006-outbox-pattern.md` (to be created).
+and `docs/adr/006-outbox-pattern.md`.
 
 ## Inspired by Spring Modulith
 
@@ -199,7 +239,9 @@ closely — lifecycle states, `@ApplicationModuleListener` semantics,
 completion modes, and staleness monitoring all map one-to-one. The
 deviations from Spring Modulith are limited to what is needed to fit
 the Node.js / NestJS runtime (async workers instead of thread pools,
-AsyncLocalStorage for transaction context, NestJS DI conventions).
+AsyncLocalStorage for transaction context, NestJS DI conventions,
+class-level handler decorators aligned with `@nestjs/cqrs`
+conventions — see ADR-014).
 
 ## License
 

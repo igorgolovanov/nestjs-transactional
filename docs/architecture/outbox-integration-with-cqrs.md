@@ -5,25 +5,26 @@
 `@nestjs-transactional/outbox-core`. A single
 `aggregate.commit()` call fans out to both the in-memory
 phase-aware dispatcher AND (when wired) the durable outbox, with
-automatic de-duplication so each listener runs exactly once.
+automatic routing so each handler runs exactly once.
 
-## The three listener flavours
+## The three handler flavours
 
-The package ships three listener decorators, each with a distinct
-delivery guarantee. They coexist in the same application and can
-even target the same event — the runtime routes each method to the
-single path appropriate to its decorators.
+The stack ships three class-level handler decorators, each with a
+distinct delivery guarantee. They coexist in the same application
+and can even target the same event — the runtime routes each class
+to the single path appropriate to its decorator.
 
 | Decorator | Where it lives | Delivery | Retry | Survives crash? | Transaction |
 | --- | --- | --- | --- | --- | --- |
-| `@TransactionalEventsListener` | cqrs | In-memory, phase-aware | No | No | Joins the publishing tx's lifecycle |
-| `@OutboxEventListener` | outbox-core | Persistent, via worker | Yes (operator) | Yes | `REQUIRES_NEW` by default |
-| `@ApplicationModuleListener` | cqrs | Outbox if wired, else in-memory fallback | Yes if outbox wired | Yes if outbox wired | `REQUIRES_NEW` |
+| `@TransactionalEventsHandler` | cqrs | In-memory, phase-aware | No | No | Joins the publishing tx's lifecycle |
+| `@OutboxEventsHandler` | outbox-core | Persistent, via worker | Yes (operator) | Yes | `REQUIRES_NEW` by default |
+| `@ApplicationModuleHandler` | cqrs | Outbox if registrar bound, else in-memory fallback | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` |
 
 All three decorators are **metadata-only**: they write a Reflect
-metadata entry on the decorated method and do no runtime work at
+metadata entry on the decorated class and do no runtime work at
 decoration time. Actual dispatch is performed by scanners and
-dispatchers wired by the modules.
+dispatchers wired by the modules. See ADR-014 for the rationale
+behind the class-level shape.
 
 ## HybridEventPublisher
 
@@ -40,7 +41,7 @@ HybridEventPublisher.publish(event)
       │
       ├──▶ TransactionalEventDispatcher.scheduleDispatch(event)
       │         attaches the event to the current transaction's
-      │         AFTER_COMMIT hook — listeners fire in-process after
+      │         AFTER_COMMIT hook — handlers fire in-process after
       │         the commit succeeds.
       │
       └──▶ OutboxPublicationScheduler.scheduleForPublication(event)
@@ -61,39 +62,63 @@ Without that provider, `HybridEventPublisher` behaves identically
 to `TransactionalEventPublisher` (in-memory only) — the
 `@Optional()` injection leaves the outbox half undefined.
 
-## Exactly-once delivery with `@ApplicationModuleListener`
+## Exactly-once delivery with `@ApplicationModuleHandler`
 
-`@ApplicationModuleListener` is a composite decorator: it writes
-BOTH outbox listener metadata (via a shared `Symbol.for(...)` key)
-AND in-memory listener metadata (`AFTER_COMMIT`, `async: true`) on
-the same method. Naïvely, a publish would invoke the method twice:
-once via the in-memory dispatcher, once via the worker.
+`@ApplicationModuleHandler` is a standalone class-level decorator
+with its own dedicated metadata key. A separate scanner,
+`ApplicationModuleHandlerScanner` in the cqrs package, decides the
+delivery path at bootstrap:
 
-To prevent double-invocation, `TransactionalListenerScanner` in
-cqrs injects `OUTBOX_PUBLICATION_SCHEDULER` with `@Optional()`. At
-bootstrap, for every method it scans:
+1. For each provider carrying `@ApplicationModuleHandler` metadata,
+   check whether the `OUTBOX_LISTENER_REGISTRAR` DI token is bound.
+2. **Bound**: register with the outbox registry (via the structural
+   registrar port) with a `REQUIRES_NEW`-wrapped invoke closure.
+   Delivery goes through the worker — durable, retried, resumable.
+3. **Unbound**: register with `TransactionalEventDispatcher` as an
+   `AFTER_COMMIT` + `async: true` hook, wrapping the invocation in
+   a fresh transaction to match outbox semantics as closely as
+   in-memory dispatch allows.
 
-1. If the method has no in-memory listener metadata → ignore.
-2. If it has in-memory metadata AND the outbox scheduler is bound
-   AND it also has outbox listener metadata → **skip** the
-   in-memory registration. The outbox's own scanner registers the
-   method, and the worker delivers it exactly once.
-3. Otherwise → register in-memory as usual.
+A single class is registered in exactly ONE path — so the handler
+fires exactly once per event. `TransactionalListenerScanner` in cqrs
+only scans for `@TransactionalEventsHandler`, so there is no overlap
+between the two scanners and no skip-logic is needed.
 
-Rule (2) is what makes `@ApplicationModuleListener` a "smart
-default" — same decorator, two delivery modes, chosen by module
-wiring rather than by decorator choice.
+Rule (2) — the automatic routing based on `OUTBOX_LISTENER_REGISTRAR`
+— is what makes `@ApplicationModuleHandler` a "smart default":
+same decorator, two delivery modes, chosen by module wiring rather
+than by decorator choice.
 
-## Metadata co-location
+## Structural ports, no hard dependency
 
-The two metadata entries written by `@ApplicationModuleListener`
-stay compatible across packages because they share a
-**well-known `Symbol.for(...)` key** (`@nestjs-transactional/outbox-event-listener-metadata`).
-`@nestjs-transactional/cqrs` re-derives the same key without
-importing any runtime code from `outbox-core`. The metadata shape
-is locally duplicated in cqrs and checked at the unit-test level
-against outbox-core's real `getOutboxEventListenerMetadata` reader
-— if either side drifts, tests fail.
+The cqrs package defines both ports as process-local Symbols with a
+structural TypeScript interface:
+
+```ts
+// cqrs package
+export const OUTBOX_PUBLICATION_SCHEDULER = Symbol('OUTBOX_PUBLICATION_SCHEDULER');
+export interface OutboxPublicationScheduler {
+  scheduleForPublication(event: unknown): void;
+}
+
+export const OUTBOX_LISTENER_REGISTRAR = Symbol('OUTBOX_LISTENER_REGISTRAR');
+export interface OutboxListenerRegistrar {
+  register(listener: { id: string; eventType: string; invoke: (event: unknown) => Promise<void> }): void;
+}
+```
+
+`@nestjs-transactional/outbox-core` provides implementations that
+satisfy these interfaces structurally — `OutboxEventPublisher`
+exposes `scheduleForPublication(event)`, `OutboxListenerRegistry`
+exposes the `register(...)` shape. Consumers bind the tokens in
+their app module when they want outbox delivery:
+
+```ts
+providers: [
+  { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
+  { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
+],
+```
 
 This keeps the dependency graph clean:
 
@@ -111,13 +136,7 @@ This keeps the dependency graph clean:
 ```
 
 No arrow from cqrs to outbox-core. The two packages communicate
-through:
-
-- `Symbol.for(...)` metadata keys (write-side — read-side lives
-  in outbox-core's scanner).
-- The `OUTBOX_PUBLICATION_SCHEDULER` DI token (runtime — a
-  structural `OutboxPublicationScheduler` interface in cqrs, with
-  outbox-core's `OutboxEventPublisher` satisfying it).
+entirely through DI tokens and structural interfaces.
 
 ## End-to-end walkthrough
 
@@ -148,18 +167,24 @@ class PlaceOrderHandler {
 }
 
 @Injectable()
-class NotificationHandlers {
-  @TransactionalEventsListener(OrderPlacedEvent)
-  onOrderPlacedInMemory(e: OrderPlacedEvent): void {
-    this.metrics.increment('orders.placed');   // cheap, in-process
+@TransactionalEventsHandler(OrderPlacedEvent)
+class OrderPlacedMetrics
+  implements ITransactionalEventsHandler<OrderPlacedEvent>
+{
+  constructor(private readonly metrics: Metrics) {}
+  handle(e: OrderPlacedEvent): void {
+    this.metrics.increment('orders.placed'); // cheap, in-process
   }
 }
 
 @Injectable()
-class IntegrationHandlers {
-  @ApplicationModuleListener(OrderPlacedEvent)
-  async shipOrder(e: OrderPlacedEvent): Promise<void> {
-    await this.shipping.createShipment(e.orderId);  // durable
+@ApplicationModuleHandler(OrderPlacedEvent)
+class ShipOrderHandler
+  implements IApplicationModuleHandler<OrderPlacedEvent>
+{
+  constructor(private readonly shipping: ShippingClient) {}
+  async handle(e: OrderPlacedEvent): Promise<void> {
+    await this.shipping.createShipment(e.orderId); // durable
   }
 }
 ```
@@ -174,22 +199,22 @@ class IntegrationHandlers {
 2. `HybridEventPublisher` does two things per event:
 
    a. `TransactionalEventDispatcher.scheduleDispatch(event)` —
-      registers every `@TransactionalEventsListener` for the event
-      type as a hook on the current transaction's appropriate
+      registers every `@TransactionalEventsHandler`'d class for the
+      event type as a hook on the current transaction's appropriate
       phase list (`AFTER_COMMIT`, `BEFORE_COMMIT`, etc.).
-      `@ApplicationModuleListener` methods would be registered
-      here too if the scanner had not skipped them; with the
-      outbox wired, only the pure
-      `@TransactionalEventsListener`'d `onOrderPlacedInMemory` is
-      on the list.
+      `@ApplicationModuleHandler` classes are NOT on this list —
+      they were routed at bootstrap to either the outbox (when the
+      registrar is bound) or to their own dispatcher entry (when
+      not), not via this scanner.
 
    b. `outboxScheduler.scheduleForPublication(event)` — buffers
       the event on a per-transaction buffer. On first call per
       transaction, registers ONE `beforeCommit` hook that flushes
       the whole buffer via `outboxPublisher.publishAll(...)`.
       `publishAll` writes one `event_publication` row per
-      registered outbox listener (both plain `@OutboxEventListener`
-      and `@ApplicationModuleListener` count here).
+      registered outbox listener (both plain `@OutboxEventsHandler`
+      classes and outbox-routed `@ApplicationModuleHandler` classes
+      count here).
 
 3. The transaction's `beforeCommit` hooks fire. The outbox flush
    hook runs and inserts the `event_publication` rows. If any
@@ -200,8 +225,8 @@ class IntegrationHandlers {
    now durable.
 
 5. The `afterCommit` hooks fire synchronously, invoking the
-   `@TransactionalEventsListener` methods (`onOrderPlacedInMemory`
-   in the example). These run in-process with no durability
+   `@TransactionalEventsHandler` classes (`OrderPlacedMetrics` in
+   the example). These run in-process with no durability
    guarantee — a crash between commit and invocation silently
    drops them. Which is fine, because the example metric-increment
    is both cheap and losable.
@@ -209,9 +234,9 @@ class IntegrationHandlers {
 6. Elsewhere — in the same process if `OutboxProcessingModule` is
    imported, or in a separate worker — the
    `EventPublicationProcessor` polls, claims the new
-   `PUBLISHED` rows (`tryClaim`), invokes the outbox listeners
-   (`shipOrder` in the example, in a fresh `REQUIRES_NEW`
-   transaction), and marks the rows `COMPLETED`. A listener
+   `PUBLISHED` rows (`tryClaim`), invokes the outbox handlers
+   (`ShipOrderHandler` in the example, in a fresh `REQUIRES_NEW`
+   transaction), and marks the rows `COMPLETED`. A handler
    failure marks the row `FAILED` — an operator resubmit or the
    startup recovery will move it back into the queue later.
 
@@ -220,7 +245,7 @@ class IntegrationHandlers {
 **Publishing transaction rolls back.** The `beforeCommit` outbox
 hook either ran (and its inserts roll back with the transaction)
 or did not run (the transaction rolled back before reaching it).
-Either way, no `event_publication` rows exist and no listener runs.
+Either way, no `event_publication` rows exist and no handler runs.
 
 **Worker crashes mid-invocation.** The `event_publication` row
 sits in `PROCESSING`. The `StalenessMonitor` detects it's been in
@@ -234,7 +259,7 @@ fresh attempt.
 been claimed yet are still ready to go for the next worker. No
 data loss as long as the transaction committed before the crash.
 
-**Listener throws persistently.** The row cycles through `FAILED`
+**Handler throws persistently.** The row cycles through `FAILED`
 and can be inspected via `FailedEventPublications.findAll()`. The
 operator API exposes `resubmit(ResubmissionOptions)` for
 controlled retry, with batch size / max attempts / custom filter.
@@ -243,5 +268,5 @@ controlled retry, with batch size / max attempts / custom filter.
 
 - [Outbox pattern overview](outbox-pattern.md)
 - [ADR-006 — Outbox rationale](../adr/006-outbox-pattern.md)
+- [ADR-014 — Class-level handler API redesign](../adr/014-handler-api-redesign.md)
 - [`@nestjs-transactional/cqrs` README, "Outbox integration" section](../../packages/cqrs/README.md#outbox-integration)
-- [Phase-aware dispatching](../adr/002-transactional-events-spring-semantics.md) *(planned)*

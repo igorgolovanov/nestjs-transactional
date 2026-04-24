@@ -176,16 +176,21 @@ the transaction rolls back, the publication row is rolled back too
 — there is no "event published without the business change landing"
 failure mode.
 
-### Declaring a listener
+### Declaring a handler
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { OutboxEventListener } from '@nestjs-transactional/outbox-core';
+import {
+  type IOutboxEventsHandler,
+  OutboxEventsHandler,
+} from '@nestjs-transactional/outbox-core';
 
 @Injectable()
-export class InventoryHandlers {
-  @OutboxEventListener(OrderPlacedEvent)
-  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+@OutboxEventsHandler(OrderPlacedEvent)
+export class InventoryReservationHandler
+  implements IOutboxEventsHandler<OrderPlacedEvent>
+{
+  async handle(event: OrderPlacedEvent): Promise<void> {
     // Runs in a fresh REQUIRES_NEW transaction after the publishing
     // transaction has committed, retried on exception, resumable
     // across process restarts.
@@ -273,13 +278,17 @@ through a reviewed migration.
 
 When the application uses `@nestjs/cqrs` aggregates, bind
 `OutboxEventPublisher` under the cqrs package's
-`OUTBOX_PUBLICATION_SCHEDULER` token. `HybridEventPublisher` (wired
-by `CqrsTransactionalModule.forRoot()`) then routes every
-`aggregate.commit()` through both the in-memory phase-aware
-dispatcher AND the outbox. See
-[`../cqrs/README.md#outbox-integration`](../cqrs/README.md#outbox-integration)
+`OUTBOX_PUBLICATION_SCHEDULER` token AND bind
+`OutboxListenerRegistry` under `OUTBOX_LISTENER_REGISTRAR`.
+`HybridEventPublisher` (wired by `CqrsTransactionalModule.forRoot()`)
+then routes every `aggregate.commit()` through both the in-memory
+phase-aware dispatcher AND the outbox, and
+`ApplicationModuleHandlerScanner` routes
+`@ApplicationModuleHandler` classes through the outbox worker.
+See [`../cqrs/README.md#outbox-integration`](../cqrs/README.md#outbox-integration)
 for the full wiring recipe and the trade-offs between
-`@TransactionalEventsListener` and `@OutboxEventListener`.
+`@TransactionalEventsHandler`, `@OutboxEventsHandler`, and
+`@ApplicationModuleHandler`.
 
 ## Testing
 
