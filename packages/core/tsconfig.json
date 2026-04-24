@@ -2,10 +2,9 @@
   "$schema": "https://json.schemastore.org/tsconfig.json",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "noEmit": true,
+    "composite": false,
+    "incremental": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "coverage"]
+  "include": ["src/**/*", "test/**/*"]
 }
