@@ -1,0 +1,31 @@
+{
+  "name": "@nestjs-transactional-examples/outbox-full-stack",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end outbox: aggregate → command → durable publication → worker → listener. Real Postgres.",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "start": "tsc && node dist/main.js"
+  },
+  "dependencies": {
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/cqrs": "workspace:*",
+    "@nestjs-transactional/outbox-core": "workspace:*",
+    "@nestjs-transactional/outbox-typeorm": "workspace:*",
+    "@nestjs-transactional/typeorm": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/cqrs": "^11.0.0",
+    "@nestjs/typeorm": "^11.0.0",
+    "pg": "^8.13.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.25"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  }
+}

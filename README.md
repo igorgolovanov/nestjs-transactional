@@ -5,26 +5,31 @@
 [![Node: 20+](https://img.shields.io/badge/node-%3E%3D20.11-brightgreen)](https://nodejs.org)
 [![TypeScript: 5.5+](https://img.shields.io/badge/typescript-5.5+-blue)](https://www.typescriptlang.org/)
 
-**Spring Framework-style declarative transaction management for NestJS.**
-`@Transactional`, every propagation mode, multi-datasource support, and
-phase-aware event listeners that integrate with `@nestjs/cqrs`
-`AggregateRoot`.
+**Spring Modulith-equivalent transactional + event-delivery
+infrastructure for NestJS.** Declarative `@Transactional` with
+every propagation mode, multi-datasource support, phase-aware
+event listeners that integrate with `@nestjs/cqrs`
+`AggregateRoot`, and a durable Event Publication Registry with
+retry, recovery, and at-least-once delivery semantics.
 
 ## Packages
 
-| Package                                             | npm                                                                                                                                   | Purpose                                                                                        |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`@nestjs-transactional/core`](packages/core)       | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/core.svg)](https://www.npmjs.com/package/@nestjs-transactional/core)       | AsyncLocalStorage context, `TransactionManager`, `@Transactional` decorator, adapter port      |
-| [`@nestjs-transactional/typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/typeorm.svg)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | TypeORM adapter, `getCurrentEntityManager`, multi-datasource support                           |
-| [`@nestjs-transactional/cqrs`](packages/cqrs)       | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/cqrs.svg)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)       | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsListener`, aggregate events |
+| Package | npm | Purpose |
+| --- | --- | --- |
+| [`@nestjs-transactional/core`](packages/core) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/core.svg)](https://www.npmjs.com/package/@nestjs-transactional/core) | AsyncLocalStorage context, `TransactionManager`, `@Transactional` decorator, adapter port |
+| [`@nestjs-transactional/typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/typeorm.svg)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | TypeORM adapter, `getCurrentEntityManager`, multi-datasource support |
+| [`@nestjs-transactional/cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/cqrs.svg)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsListener`, `@ApplicationModuleListener`, aggregate events |
+| [`@nestjs-transactional/outbox-core`](packages/outbox-core) | *(unreleased, alpha)* | Persistent Event Publication Registry — lifecycle states, async worker, staleness monitor, startup recovery, operator APIs |
+| [`@nestjs-transactional/outbox-typeorm`](packages/outbox-typeorm) | *(unreleased, alpha)* | TypeORM persistence backend for the outbox — `event_publication` table, `FOR UPDATE SKIP LOCKED`, migration, dev-time auto-init |
 
 ## Why?
 
 NestJS apps that talk to a database quickly grow a thicket of
-`dataSource.transaction(async em => ...)` blocks, repositories that
-thread `EntityManager` as an argument, and "is this event fired after
-the write is durable, or only if it is?" doubt. Spring solved that
-decades ago — this library brings the same ergonomics:
+`dataSource.transaction(async em => ...)` blocks, repositories
+that thread `EntityManager` as an argument, and "is this event
+fired after the write is durable, or only if it is?" doubt.
+Spring solved that decades ago — this library brings the same
+ergonomics:
 
 ```ts
 @Injectable()
@@ -40,24 +45,29 @@ export class OrderService {
 ```
 
 - **All seven Spring propagation modes**: `REQUIRED` (default),
-  `REQUIRES_NEW`, `NESTED` (savepoints), `SUPPORTS`, `NOT_SUPPORTED`,
-  `NEVER`, `MANDATORY`.
+  `REQUIRES_NEW`, `NESTED` (savepoints), `SUPPORTS`,
+  `NOT_SUPPORTED`, `NEVER`, `MANDATORY`.
 - **Rollback rules** via `rollbackFor` / `noRollbackFor`.
 - **Multi-datasource** as a first-class feature —
   `@Transactional({ adapterInstance: 'billing' })`.
-- **Phase-aware event listeners** via `@TransactionalEventsListener`:
-  `BEFORE_COMMIT`, `AFTER_COMMIT`, `AFTER_ROLLBACK`, `AFTER_COMPLETION`.
-- **AggregateRoot integration** — `order.commit()` attaches events as
-  `AFTER_COMMIT` hooks; no more "event published, transaction rolled
-  back" races.
-- **Three coordinated wrapping mechanisms** (see ADR-005):
-  `TransactionalInterceptor` for request-boundary handlers,
-  `TransactionalMethodsBootstrap` for plain `@Injectable` services,
-  `CqrsHandlerWrapper` for CQRS handlers.
+- **Phase-aware event listeners** via
+  `@TransactionalEventsListener`: `BEFORE_COMMIT`, `AFTER_COMMIT`,
+  `AFTER_ROLLBACK`, `AFTER_COMPLETION`.
+- **AggregateRoot integration** — `order.commit()` attaches
+  events as hooks on the current transaction; no more "event
+  published, transaction rolled back" races.
+- **Durable event delivery via the outbox pattern** — event
+  publications commit atomically with business writes; a
+  background worker delivers them at-least-once with automatic
+  retry, staleness detection, and startup recovery.
+- **`@ApplicationModuleListener` as smart default** —
+  Spring-Modulith-equivalent composite decorator. Durable via
+  the outbox when wired, in-memory fallback otherwise. Same
+  source code, two delivery modes, chosen by module wiring.
 
 ## Quick start
 
-For a TypeORM-backed application:
+### Transactions only (TypeORM)
 
 ```bash
 pnpm add @nestjs-transactional/core @nestjs-transactional/typeorm
@@ -95,21 +105,83 @@ export class OrderService {
 }
 ```
 
-Add `@nestjs-transactional/cqrs` on top for phase-aware event listeners
-and AggregateRoot integration — see
-[`packages/cqrs/README.md`](packages/cqrs/README.md).
+### Full stack with CQRS and the outbox
+
+```bash
+pnpm add @nestjs-transactional/core \
+         @nestjs-transactional/typeorm \
+         @nestjs-transactional/cqrs \
+         @nestjs-transactional/outbox-core \
+         @nestjs-transactional/outbox-typeorm
+```
+
+```ts
+@Module({
+  imports: [
+    TransactionalModule.forRoot({ isGlobal: true }),
+    TypeOrmTransactionalModule.forFeature({ dataSource }),
+    OutboxTypeOrmModule.forFeature({ dataSource }),
+    OutboxModule.forRoot({
+      eventTypes: [OrderPlacedEvent],
+      repository: typeOrmEventPublicationRepositoryProvider,
+      republishOnStartup: true,
+    }),
+    OutboxProcessingModule, // worker processes only
+    CqrsModule.forRoot(),
+    CqrsTransactionalModule.forRoot(),
+  ],
+  providers: [
+    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
+    PlaceOrderHandler,
+    InventoryHandlers,
+  ],
+})
+export class AppModule {}
+```
+
+```ts
+@Injectable()
+export class InventoryHandlers {
+  @ApplicationModuleListener(OrderPlacedEvent)
+  async reserveStock(event: OrderPlacedEvent): Promise<void> {
+    // Durable. Runs in its own REQUIRES_NEW transaction after
+    // the publishing tx commits. Retries on failure. Resumes
+    // after a process restart.
+  }
+}
+```
+
+## Roadmap
+
+| Phase | Status | Scope |
+| --- | --- | --- |
+| 0 — Monorepo setup | ✅ done | pnpm workspaces, TypeScript project refs, Jest, ESLint, Prettier, Changesets, CI |
+| 1 — `@nestjs-transactional/core` | ✅ done | Context, manager, propagation modes, decorator, interceptor, methods bootstrap, observability |
+| 2 — `@nestjs-transactional/typeorm` | ✅ done | Adapter, `getCurrentEntityManager`, multi-datasource, savepoints |
+| 3 — `@nestjs-transactional/cqrs` | ✅ done | Phase-aware dispatching, handler wrapping, `TransactionalEventPublisher`, `AggregateRoot` integration |
+| 4 — Examples & CI | ✅ done | Three runnable examples, GitHub Actions, coverage reports |
+| 5 — `@nestjs-transactional/outbox-core` | ✅ done (alpha) | Types, SPI, registry, publisher, processor, staleness monitor, startup recovery, operator APIs, in-memory repo, NestJS modules |
+| 6 — `@nestjs-transactional/outbox-typeorm` | ✅ done (alpha) | Entity, repository, migration, `SchemaInitializer`, `OutboxTypeOrmModule` |
+| 7 — CQRS ↔ outbox integration | ✅ done (alpha) | `HybridEventPublisher`, `@ApplicationModuleListener`, scanner skip logic |
+| 8 — Testing utilities | ✅ done (alpha) | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
+| 9 — Documentation & release | 🟡 in progress | Architecture docs, ADRs, migration guide, full-stack example, first 0.x release |
+| *(future)* | 🗓 not scheduled | outbox-kafka, outbox-rabbitmq, outbox-prisma, outbox-mongodb, OpenTelemetry, ESM dual packaging |
 
 ## Examples
 
-Three self-contained runnable examples under [`examples/`](examples/):
+Four self-contained runnable examples under [`examples/`](examples/):
 
-- [`examples/basic-usage`](examples/basic-usage) — one `@Transactional`
-  service, commit and rollback shown.
+- [`examples/basic-usage`](examples/basic-usage) — one
+  `@Transactional` service, commit and rollback shown.
 - [`examples/multi-datasource`](examples/multi-datasource) —
   `@Transactional` routing to two independent DataSources.
-- [`examples/cqrs-full-stack`](examples/cqrs-full-stack) — full flow:
-  aggregate → command handler → `AFTER_COMMIT` listener →
-  `AFTER_ROLLBACK` listener.
+- [`examples/cqrs-full-stack`](examples/cqrs-full-stack) — full
+  flow: aggregate → command handler → `AFTER_COMMIT` listener →
+  `AFTER_ROLLBACK` listener. In-memory dispatch.
+- [`examples/outbox-full-stack`](examples/outbox-full-stack) —
+  end-to-end outbox: aggregate → command handler → publication
+  row → worker → durable listener. Real Postgres via
+  `docker-compose`.
 
 ```bash
 pnpm -C examples/basic-usage start
@@ -117,17 +189,29 @@ pnpm -C examples/basic-usage start
 
 ## Documentation
 
-- Per-package READMEs: [`core`](packages/core/README.md),
+- **Per-package READMEs**: [`core`](packages/core/README.md),
   [`typeorm`](packages/typeorm/README.md),
-  [`cqrs`](packages/cqrs/README.md).
-- Architecture overview: [`docs/architecture/core-design.md`](docs/architecture/core-design.md).
-- Architecture Decision Records: [`docs/adr/`](docs/adr/).
-- Repository conventions and onboarding notes: [`CLAUDE.md`](CLAUDE.md).
+  [`cqrs`](packages/cqrs/README.md),
+  [`outbox-core`](packages/outbox-core/README.md),
+  [`outbox-typeorm`](packages/outbox-typeorm/README.md).
+- **Architecture overview**:
+  - [`docs/architecture/core-design.md`](docs/architecture/core-design.md) — core transaction infrastructure.
+  - [`docs/architecture/outbox-pattern.md`](docs/architecture/outbox-pattern.md) — the outbox pattern, lifecycle, performance.
+  - [`docs/architecture/outbox-integration-with-cqrs.md`](docs/architecture/outbox-integration-with-cqrs.md) — `HybridEventPublisher`, `@ApplicationModuleListener`, listener flavours.
+- **Architecture Decision Records**: [`docs/adr/`](docs/adr/) —
+  ADR-005 (method wrapping), ADR-006 (outbox rationale),
+  ADR-007 (outbox architecture).
+- **Guides**: [`docs/guides/migrating-to-outbox.md`](docs/guides/migrating-to-outbox.md)
+  — step-by-step migration from
+  `@TransactionalEventsListener` to durable delivery.
+- **Repository conventions** and onboarding notes:
+  [`CLAUDE.md`](CLAUDE.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for dev-environment setup,
-testing, commit message style, and the changeset workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev-environment
+setup, testing, commit message style, and the changeset
+workflow.
 
 ## License
 
