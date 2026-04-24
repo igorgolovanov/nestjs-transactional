@@ -4,3 +4,7 @@ export * from './types/completion-mode';
 export * from './types/resubmission-options';
 export * from './types/staleness-config';
 export * from './types/errors';
+
+export * from './serialization/event-serializer';
+export * from './serialization/event-type-registry';
+export * from './serialization/json-event-serializer';
