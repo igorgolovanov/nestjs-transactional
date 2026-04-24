@@ -16,3 +16,5 @@ export * from './registry/listener-registry';
 export * from './registry/outbox-listener-scanner';
 
 export * from './decorators/outbox-event-listener.decorator';
+
+export * from './dispatcher/outbox-event-publisher';
