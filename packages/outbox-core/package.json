@@ -1,0 +1,77 @@
+{
+  "name": "@nestjs-transactional/outbox-core",
+  "version": "0.0.0",
+  "description": "Persistent Event Publication Registry for @nestjs-transactional — Spring Modulith equivalent (ORM-agnostic core)",
+  "license": "MIT",
+  "author": "Igor Golovanov",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "directory": "packages/outbox-core"
+  },
+  "bugs": {
+    "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
+  },
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/outbox-core#readme",
+  "keywords": [
+    "nestjs",
+    "outbox",
+    "event-publication-registry",
+    "spring-modulith",
+    "transactional-outbox",
+    "transaction"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "!dist/**/*.spec.*"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist *.tsbuildinfo coverage",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "peerDependencies": {
+    "@nestjs-transactional/core": "workspace:^",
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.5.4"
+  }
+}

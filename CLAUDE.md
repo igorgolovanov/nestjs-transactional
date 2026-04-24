@@ -22,11 +22,12 @@ growing set of npm packages organised by concern.
   (BEFORE_COMMIT, AFTER_COMMIT, AFTER_ROLLBACK, AFTER_COMPLETION), and an
   EventPublisher override that integrates with AggregateRoot.
 
-### Planned (Phase 5–8)
+- **@nestjs-transactional/outbox-core** *(alpha — Phase 5 in progress)* —
+  persistent Event Publication Registry: event lifecycle states,
+  repository SPI, async worker, staleness monitor, startup recovery.
+  ORM-agnostic. Package skeleton in-tree; public API still empty.
 
-- **@nestjs-transactional/outbox-core** — persistent Event Publication
-  Registry: event lifecycle states, repository SPI, async worker,
-  staleness monitor, startup recovery. ORM-agnostic.
+### Planned (Phase 6–8)
 
 - **@nestjs-transactional/outbox-typeorm** — TypeORM persistence
   implementation of the outbox-core SPI (`event_publication` table,
@@ -132,16 +133,32 @@ nestjs-transactional-monorepo/
 │   │   ├── test/                      # unit + integration tests
 │   │   └── ...
 │   │
-│   └── cqrs/                          # @nestjs-transactional/cqrs
+│   ├── cqrs/                          # @nestjs-transactional/cqrs
+│   │   ├── src/
+│   │   │   ├── decorators/            # @TransactionalEventsListener
+│   │   │   ├── types/                 # TransactionPhase, metadata
+│   │   │   ├── event-dispatcher/      # TransactionalEventDispatcher
+│   │   │   ├── event-publisher/       # TransactionalEventPublisher (+ adapter)
+│   │   │   ├── handlers/              # CqrsHandlerWrapper, bootstrap, scanner
+│   │   │   ├── module/                # CqrsTransactionalModule
+│   │   │   └── index.ts
+│   │   └── ...
+│   │
+│   └── outbox-core/                   # @nestjs-transactional/outbox-core (alpha)
 │       ├── src/
-│       │   ├── decorators/            # @TransactionalEventsListener
-│       │   ├── types/                 # TransactionPhase, metadata
-│       │   ├── event-dispatcher/      # TransactionalEventDispatcher
-│       │   ├── event-publisher/       # TransactionalEventPublisher (+ adapter)
-│       │   ├── handlers/              # CqrsHandlerWrapper, bootstrap, scanner
-│       │   ├── module/                # CqrsTransactionalModule
+│       │   ├── types/                 # EventPublication, lifecycle states
+│       │   ├── repository/            # EventPublicationRepository SPI
+│       │   ├── registry/              # EventPublicationRegistry, listeners
+│       │   ├── dispatcher/            # EventPublicationProcessor (async worker)
+│       │   ├── recovery/              # StartupRecoveryService, StalenessMonitor
+│       │   ├── module/                # OutboxModule (forRoot/forRootAsync)
+│       │   ├── testing/               # InMemoryEventPublicationRepository (/testing)
 │       │   └── index.ts
-│       └── ...
+│       ├── test/                      # unit + integration
+│       ├── package.json
+│       ├── tsconfig.json              # noEmit for jest/IDE/type-check
+│       ├── tsconfig.build.json        # emit, excludes specs
+│       └── README.md
 │
 ├── examples/
 │   ├── basic-usage/                   # minimal service with @Transactional
@@ -970,14 +987,14 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 
 ## Implementation Roadmap
 
-### Phase 0: Monorepo setup
+### Phase 0: Monorepo setup (done)
 - pnpm workspaces, TypeScript project references
 - Jest configuration
 - ESLint, Prettier
 - Changesets
 - CI skeleton (GitHub Actions)
 
-### Phase 1: @nestjs-transactional/core
+### Phase 1: @nestjs-transactional/core (done)
 - Types and interfaces
 - TransactionContext (AsyncLocalStorage)
 - AdapterRegistry
@@ -991,14 +1008,14 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 - TransactionalModule (forRoot / forRootAsync)
 - Observability hooks (before/after commit/rollback)
 
-### Phase 2: @nestjs-transactional/typeorm
+### Phase 2: @nestjs-transactional/typeorm (done)
 - TypeOrmTransactionAdapter
 - getCurrentEntityManager, isInTransaction helpers
 - TypeOrmTransactionalModule
 - Multi-datasource support
 - Savepoints for NESTED propagation
 
-### Phase 3: @nestjs-transactional/cqrs
+### Phase 3: @nestjs-transactional/cqrs (done)
 - TransactionPhase enum, metadata types
 - @TransactionalEventsListener decorator
 - TransactionalEventDispatcher (with phase routing)
@@ -1010,13 +1027,13 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 - AggregateRoot integration (mergeObjectContext, mergeClassContext)
 - CqrsTransactionalModule
 
-### Phase 4: CI/CD and publishing
+### Phase 4: CI/CD and publishing (done)
 - Full GitHub Actions workflow
 - Release automation with changesets
 - NPM publishing setup
 - Documentation generation
 
-### Phase 5: @nestjs-transactional/outbox-core (planned)
+### Phase 5: @nestjs-transactional/outbox-core (in progress)
 
 Core infrastructure for the Event Publication Registry:
 - `EventPublication` types and lifecycle states (`PUBLISHED`, `PROCESSING`,
@@ -1167,7 +1184,16 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ### In Progress / Starting
 
-- Phase 5: `@nestjs-transactional/outbox-core` infrastructure
+- **Phase 5: `@nestjs-transactional/outbox-core` infrastructure** —
+  package skeleton created (Iteration 5.1): `packages/outbox-core/`
+  with `src/` subfolders (types, repository, registry, dispatcher,
+  recovery, module, testing), `test/` (unit, integration),
+  `tsconfig.build.json` / `tsconfig.json` split, `jest.config.js`,
+  `package.json` with peer deps on `@nestjs-transactional/core`,
+  `publishConfig.provenance`, `/testing` subpath. Root `tsconfig.json`
+  has a project reference. Build / lint / type-check green on the
+  empty scaffold. Next iterations will flesh out event types,
+  repository SPI, registry, and decorators.
 
 ### Blocked / Awaiting
 
