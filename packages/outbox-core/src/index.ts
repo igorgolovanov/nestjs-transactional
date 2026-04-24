@@ -22,3 +22,7 @@ export * from './dispatcher/event-publication-processor';
 export * from './dispatcher/processor-options';
 
 export * from './recovery/staleness-monitor';
+
+export * from './api/failed-event-publications';
+export * from './api/incomplete-event-publications';
+export * from './api/completed-event-publications';
