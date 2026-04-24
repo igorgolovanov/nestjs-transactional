@@ -6,7 +6,8 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { IllegalTransactionStateError, TransactionManager } from '@nestjs-transactional/core';
 
 import type {
   EventPublicationRepository,
@@ -23,8 +24,16 @@ import { PublicationStatus } from '../types/publication-status';
  * In-memory reference implementation of {@link EventPublicationRepository}.
  *
  * Intended for unit and integration tests of outbox-core consumers that
- * do not want to spin up a real database. Not thread-safe and not
- * transactional — do not use in production.
+ * do not want to spin up a real database. Not thread-safe — do not use
+ * in production.
+ *
+ * Optional `TransactionManager` enables transaction-aware behaviour:
+ * when a mutating method is called inside an active transaction, the
+ * repository registers an `afterRollback` hook that undoes the change
+ * — so the visible state after rollback matches what a real
+ * transactional backend would show. When no `TransactionManager` is
+ * provided (or no transaction is active), mutations apply immediately
+ * and are not undone.
  *
  * Exposes a few extra methods beyond the SPI (`reset`, `getAll`,
  * `count`) to help tests set up and assert on state.
@@ -32,6 +41,11 @@ import { PublicationStatus } from '../types/publication-status';
 @Injectable()
 export class InMemoryEventPublicationRepository implements EventPublicationRepository {
   private readonly publications = new Map<string, EventPublication>();
+
+  constructor(
+    @Optional()
+    private readonly transactionManager?: TransactionManager,
+  ) {}
 
   async createAll(inputs: NewEventPublication[]): Promise<EventPublication[]> {
     const created: EventPublication[] = [];
@@ -51,6 +65,13 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
       this.publications.set(publication.id, publication);
       created.push(publication);
     }
+
+    this.trackRollback(() => {
+      for (const p of created) {
+        this.publications.delete(p.id);
+      }
+    });
+
     return created;
   }
 
@@ -79,6 +100,10 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
       lastResubmissionDate: options.lastResubmissionDate ?? existing.lastResubmissionDate,
     };
     this.publications.set(id, updated);
+
+    this.trackRollback(() => {
+      this.publications.set(id, existing);
+    });
   }
 
   async tryClaim(id: string): Promise<boolean> {
@@ -160,7 +185,7 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
   }
 
   async deleteCompleted(olderThan?: Date): Promise<number> {
-    const toDelete: string[] = [];
+    const deleted: [string, EventPublication][] = [];
     for (const [id, p] of this.publications.entries()) {
       if (p.status !== PublicationStatus.COMPLETED) {
         continue;
@@ -168,26 +193,48 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
       if (olderThan && (p.completionDate === null || p.completionDate >= olderThan)) {
         continue;
       }
-      toDelete.push(id);
+      deleted.push([id, p]);
     }
-    for (const id of toDelete) {
+    for (const [id] of deleted) {
       this.publications.delete(id);
     }
-    return toDelete.length;
+
+    if (deleted.length > 0) {
+      this.trackRollback(() => {
+        for (const [id, p] of deleted) {
+          this.publications.set(id, p);
+        }
+      });
+    }
+
+    return deleted.length;
   }
 
   async archiveCompleted(id: string): Promise<void> {
-    // In-memory has no separate archive table — archival is a plain delete.
+    const existing = this.publications.get(id);
     this.publications.delete(id);
+
+    if (existing !== undefined) {
+      this.trackRollback(() => {
+        this.publications.set(id, existing);
+      });
+    }
   }
 
   async delete(id: string): Promise<void> {
+    const existing = this.publications.get(id);
     this.publications.delete(id);
+
+    if (existing !== undefined) {
+      this.trackRollback(() => {
+        this.publications.set(id, existing);
+      });
+    }
   }
 
   // --- Testing helpers (not part of the SPI) ---
 
-  /** Drop every stored publication. */
+  /** Drop every stored publication. Does not interact with transactions. */
   reset(): void {
     this.publications.clear();
   }
@@ -200,5 +247,26 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
   /** Number of stored publications. */
   count(): number {
     return this.publications.size;
+  }
+
+  /**
+   * If a `TransactionManager` was provided and a transaction is active,
+   * register the given `undo` closure to fire on rollback. Otherwise
+   * this is a no-op.
+   */
+  private trackRollback(undo: () => void): void {
+    if (this.transactionManager === undefined) {
+      return;
+    }
+    try {
+      this.transactionManager.registerAfterRollback(async () => {
+        undo();
+      });
+    } catch (err) {
+      if (err instanceof IllegalTransactionStateError) {
+        return;
+      }
+      throw err;
+    }
   }
 }
