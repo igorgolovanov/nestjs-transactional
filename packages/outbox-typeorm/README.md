@@ -269,6 +269,18 @@ before running any DDL — safe to leave on across restarts. **Do
 not enable in production** — schema changes should always go
 through a reviewed migration.
 
+## Using with `@nestjs-transactional/cqrs`
+
+When the application uses `@nestjs/cqrs` aggregates, bind
+`OutboxEventPublisher` under the cqrs package's
+`OUTBOX_PUBLICATION_SCHEDULER` token. `HybridEventPublisher` (wired
+by `CqrsTransactionalModule.forRoot()`) then routes every
+`aggregate.commit()` through both the in-memory phase-aware
+dispatcher AND the outbox. See
+[`../cqrs/README.md#outbox-integration`](../cqrs/README.md#outbox-integration)
+for the full wiring recipe and the trade-offs between
+`@TransactionalEventsListener` and `@OutboxEventListener`.
+
 ## Testing
 
 Integration tests live under `test/integration/` and rely on

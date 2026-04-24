@@ -4,6 +4,7 @@ import { CqrsModule, EventBus, EventPublisher } from '@nestjs/cqrs';
 import { TransactionManager } from '@nestjs-transactional/core';
 
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher';
 import { TransactionalEventPublisher } from '../event-publisher/transactional-event-publisher';
 import { TransactionalEventPublisherAdapter } from '../event-publisher/transactional-event-publisher-adapter';
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
@@ -115,17 +116,22 @@ export class CqrsTransactionalModule {
     const exportTokens: unknown[] = [TransactionalEventDispatcher];
 
     if (resolved.useTransactionalEventPublisher) {
+      // Keep TransactionalEventPublisher as a standalone provider for
+      // consumers that want the in-memory-only strategy. The adapter
+      // itself now routes through HybridEventPublisher, which picks
+      // up the optional outbox scheduler via @Optional injection.
       providers.push(TransactionalEventPublisher);
+      providers.push(HybridEventPublisher);
       providers.push({
         provide: EventPublisher,
         useFactory: (
-          publisher: TransactionalEventPublisher,
+          strategy: HybridEventPublisher,
           eventBus: EventBus,
         ): TransactionalEventPublisherAdapter =>
-          new TransactionalEventPublisherAdapter(publisher, eventBus),
-        inject: [TransactionalEventPublisher, EventBus],
+          new TransactionalEventPublisherAdapter(strategy, eventBus),
+        inject: [HybridEventPublisher, EventBus],
       });
-      exportTokens.push(TransactionalEventPublisher, EventPublisher);
+      exportTokens.push(TransactionalEventPublisher, HybridEventPublisher, EventPublisher);
     }
 
     return {
