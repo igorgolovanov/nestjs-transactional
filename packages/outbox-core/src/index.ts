@@ -12,3 +12,4 @@ export * from './serialization/json-event-serializer';
 export * from './repository/event-publication-repository';
 
 export * from './registry/event-publication-registry';
+export * from './registry/listener-registry';
