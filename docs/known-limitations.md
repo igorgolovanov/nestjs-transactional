@@ -75,3 +75,43 @@ configurable opt-in `EntityManager.prototype` patching mode if
 demand emerges, but the recursion-avoidance complexity makes it
 opt-in rather than default behaviour. Tracking under "future
 phases (not scheduled)".
+
+### Phase 14.8e — `TypeOrmTransactionalModule.forRootAsync` bootstrap bug
+
+**Surfaced**: 2026-05-10 in Phase 14.8e
+(`async-config-from-environment` example).
+
+When `TypeOrmTransactionalModule.forRootAsync` is added to imports
+alongside `TypeOrmModule.forRootAsync`, TypeORM's
+`PostgresDriver.createPool` raises
+`TypeError: this.postgres.Pool is not a constructor` and the
+`@nestjs/typeorm` connect-retry loop spins until timeout. The
+error happens INSIDE TypeORM's own DataSource init, BEFORE the
+registration factory of `TypeOrmTransactionalModule.forRootAsync`
+runs.
+
+Bisected: bug triggered solely by adding the async-variant
+`TypeOrmTransactionalModule` to imports — sync `forRoot()` of the
+same module in the same composition works cleanly. Replacing
+`moduleRef.resolve` with `moduleRef.get` in the registration
+factory does NOT fix it (verified by direct dist patch). Two
+`typeorm` package copies in the pnpm store
+(`typeorm@0.3.28_pg…` vs `typeorm@0.3.28_ioredis…`) are a
+candidate root cause worth investigating.
+
+**Workaround**: call `TypeOrmTransactionalModule.forRoot()`
+(sync) even when the rest of the stack is `forRootAsync`. The
+module has no async-resolvable tunables anyway (`dataSource` and
+`isDefault` are statically declared per the JSDoc on
+`TypeOrmTransactionalAsyncOptions`), so there is no semantic
+loss. The `async-config-from-environment` example does exactly
+that. See Convention #22 in
+[`docs/status/conventions.md`](status/conventions.md) for the
+full diagnosis.
+
+**Fix:** scheduled — investigation and fix tracked as a
+sequential follow-up to Phase 14.8e closure (ahead of Phase
+14.8f or before any future example promotes the module to async).
+The `async-config-from-environment` README already documents the
+workaround; once the fix lands, that section can be retired and
+the example flipped to use `forRootAsync` for symmetry.

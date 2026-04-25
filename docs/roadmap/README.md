@@ -472,7 +472,7 @@ baseline preserved across all five commits.
   `docker-compose stop rabbitmq` so the ADR-016 limit is
   observable on a real broker.
 
-**14.8d — Tier 4: Advanced patterns (4 examples)**
+**14.8d — Tier 4: Advanced patterns (4 examples, shipped 2026-05-10)**
 
 - `saga-pattern` — long-running transaction across multiple steps,
   compensating actions on failure, outbox for inter-step
@@ -493,7 +493,7 @@ baseline preserved across all five commits.
   test setup demonstration.
   Goal: how к test apps using framework. Critical для adoption.
 
-**14.8e — Tier 5: Production realism (3 examples)**
+**14.8e — Tier 5: Production realism (3 examples, shipped 2026-05-10)**
 
 - `e-commerce-orders` — realistic domain (Order, Product, Customer),
   multi-DS (orders, inventory, payments separate), outbox для
