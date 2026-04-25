@@ -24,6 +24,8 @@ import { CompletionMode } from '../types/completion-mode';
 import { PublicationStatus } from '../types/publication-status';
 
 import type { EventExternalizer } from './event-externalizer';
+import { ExternalizationRegistry } from './externalization-registry';
+import { Externalized } from './externalized.decorator';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -53,7 +55,26 @@ class OrderPlacedEvent {
   constructor(readonly orderId: string) {}
 }
 
-describe('EventPublicationProcessor (with externalizer wired)', () => {
+@Externalized<ExternalizedOrderPlacedEvent>({
+  target: 'orders',
+  client: 'KAFKA_CLIENT',
+  routingKey: (e) => e.tenantId,
+  headers: (e) => ({ 'x-tenant': e.tenantId }),
+})
+class ExternalizedOrderPlacedEvent {
+  constructor(readonly orderId: string, readonly tenantId: string) {}
+}
+
+@Externalized({ target: 'audit.events', headers: { 'x-source': 'audit-svc' } })
+class AuditedEvent {
+  constructor(readonly id: string) {}
+}
+
+class PlainAuditEvent {
+  constructor(readonly id: string) {}
+}
+
+describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegistry)', () => {
   let manager: TransactionManager;
   let repo: InMemoryEventPublicationRepository;
   let listenerRegistry: OutboxListenerRegistry;
@@ -121,7 +142,7 @@ describe('EventPublicationProcessor (with externalizer wired)', () => {
     expect(pub!.status).toBe(PublicationStatus.COMPLETED);
   });
 
-  it('does not invoke the externalizer in Phase 11.1 — ExternalizationRegistry resolution lands in 11.2', async () => {
+  it('does not invoke the externalizer when no ExternalizationRegistry is bound (defensive no-op)', async () => {
     listenerRegistry.register({
       id: 'Inventory.onOrderPlaced',
       eventType: 'OrderPlacedEvent',
@@ -154,23 +175,162 @@ describe('EventPublicationProcessor (with externalizer wired)', () => {
     expect(pub!.failureReason).toBe('downstream unreachable');
   });
 
-  it('keeps the listener-then-externalize call order intact (verified via the FAILED-listener path)', async () => {
-    // The Phase 11.1 stub never calls the externalizer, so we cannot
-    // observe ordering from a successful path yet. The negative case
-    // — listener throws BEFORE we ever reach `tryExternalize` — pins
-    // the contract that externalization is gated on listener success.
+});
+
+describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wired)', () => {
+  let manager: TransactionManager;
+  let repo: InMemoryEventPublicationRepository;
+  let listenerRegistry: OutboxListenerRegistry;
+  let publisher: OutboxEventPublisher;
+  let processor: EventPublicationProcessor;
+  let externalizer: jest.Mocked<EventExternalizer>;
+
+  const options: EventPublicationProcessorOptions = {
+    ...DEFAULT_PROCESSOR_OPTIONS,
+    pollingInterval: 10_000,
+    batchSize: 10,
+    maxConcurrent: 4,
+    completionMode: CompletionMode.UPDATE,
+  };
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    const adapter = new FakeAdapter();
+    const adapterRegistry = new AdapterRegistry();
+    adapterRegistry.register({ adapterName: 'in-memory', instanceName: 'default', adapter });
+    manager = new TransactionManager(adapterRegistry);
+    repo = new InMemoryEventPublicationRepository(manager);
+
+    const eventTypes = new EventTypeRegistry();
+    eventTypes.registerAll([ExternalizedOrderPlacedEvent, AuditedEvent, PlainAuditEvent]);
+    const externalizationRegistry = new ExternalizationRegistry(eventTypes);
+    externalizationRegistry.onModuleInit();
+
+    const publicationRegistry = new EventPublicationRegistry(
+      repo,
+      new JsonEventSerializer(eventTypes),
+    );
+    listenerRegistry = new OutboxListenerRegistry();
+    publisher = new OutboxEventPublisher(publicationRegistry, listenerRegistry, manager);
+    externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
+    processor = new EventPublicationProcessor(
+      publicationRegistry,
+      listenerRegistry,
+      options,
+      externalizer,
+      externalizationRegistry,
+    );
+  });
+
+  afterEach(() => {
+    processor.stop();
+  });
+
+  it('invokes the externalizer with resolved metadata for events carrying @Externalized', async () => {
     listenerRegistry.register({
       id: 'Inventory.onOrderPlaced',
-      eventType: 'OrderPlacedEvent',
-      invoke: async () => {
-        throw new Error('boom');
-      },
+      eventType: 'ExternalizedOrderPlacedEvent',
+      invoke: async () => {},
     });
 
-    await manager.run({}, () => publisher.publish(new OrderPlacedEvent('order-1')));
+    await manager.run({}, () =>
+      publisher.publish(new ExternalizedOrderPlacedEvent('order-1', 'tenant-A')),
+    );
+    await processor.processBatch();
+
+    expect(externalizer.externalize).toHaveBeenCalledTimes(1);
+    const [event, metadata] = externalizer.externalize.mock.calls[0]!;
+    expect(event).toBeInstanceOf(ExternalizedOrderPlacedEvent);
+    expect(metadata).toEqual({
+      eventType: 'ExternalizedOrderPlacedEvent',
+      target: 'orders',
+      client: 'KAFKA_CLIENT',
+      routingKey: 'tenant-A',
+      headers: { 'x-tenant': 'tenant-A' },
+    });
+
+    const [pub] = repo.getAll();
+    expect(pub!.status).toBe(PublicationStatus.COMPLETED);
+  });
+
+  it('skips externalization for events without an @Externalized mapping', async () => {
+    listenerRegistry.register({
+      id: 'Audit.onAudited',
+      eventType: 'PlainAuditEvent',
+      invoke: async () => {},
+    });
+
+    await manager.run({}, () => publisher.publish(new PlainAuditEvent('a-1')));
     await processor.processBatch();
 
     expect(externalizer.externalize).not.toHaveBeenCalled();
+    const [pub] = repo.getAll();
+    expect(pub!.status).toBe(PublicationStatus.COMPLETED);
+  });
+
+  it('does not invoke the externalizer when the local listener fails (DD-019 atomicity)', async () => {
+    listenerRegistry.register({
+      id: 'Inventory.onOrderPlaced',
+      eventType: 'ExternalizedOrderPlacedEvent',
+      invoke: async () => {
+        throw new Error('downstream unreachable');
+      },
+    });
+
+    await manager.run({}, () =>
+      publisher.publish(new ExternalizedOrderPlacedEvent('order-1', 'tenant-A')),
+    );
+    await processor.processBatch();
+
+    expect(externalizer.externalize).not.toHaveBeenCalled();
+    const [pub] = repo.getAll();
+    expect(pub!.status).toBe(PublicationStatus.FAILED);
+    expect(pub!.failureReason).toBe('downstream unreachable');
+  });
+
+  it('marks the publication FAILED and records ExternalizationError context when the externalizer throws', async () => {
+    listenerRegistry.register({
+      id: 'Inventory.onOrderPlaced',
+      eventType: 'ExternalizedOrderPlacedEvent',
+      invoke: async () => {},
+    });
+    externalizer.externalize.mockRejectedValueOnce(new Error('broker unreachable'));
+
+    await manager.run({}, () =>
+      publisher.publish(new ExternalizedOrderPlacedEvent('order-1', 'tenant-A')),
+    );
+    await processor.processBatch();
+
+    const [pub] = repo.getAll();
+    expect(pub!.status).toBe(PublicationStatus.FAILED);
+    expect(pub!.failureReason).toMatch(/Externalization failed/);
+    expect(pub!.failureReason).toMatch(/ExternalizedOrderPlacedEvent/);
+    expect(pub!.failureReason).toMatch(/broker unreachable/);
+  });
+
+  it('runs the local listener BEFORE the externalizer (success path)', async () => {
+    const calls: string[] = [];
+    listenerRegistry.register({
+      id: 'Inventory.onOrderPlaced',
+      eventType: 'ExternalizedOrderPlacedEvent',
+      invoke: async () => {
+        calls.push('listener');
+      },
+    });
+    externalizer.externalize.mockImplementation(async () => {
+      calls.push('externalize');
+    });
+
+    await manager.run({}, () =>
+      publisher.publish(new ExternalizedOrderPlacedEvent('order-1', 'tenant-A')),
+    );
+    await processor.processBatch();
+
+    expect(calls).toEqual(['listener', 'externalize']);
   });
 });
 
