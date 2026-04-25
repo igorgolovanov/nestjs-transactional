@@ -7,9 +7,9 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
 import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher';
 import { TransactionalEventPublisher } from '../event-publisher/transactional-event-publisher';
 import { TransactionalEventPublisherAdapter } from '../event-publisher/transactional-event-publisher-adapter';
-import { ApplicationModuleHandlerScanner } from '../handlers/application-module-handler-scanner';
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
 import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper';
+import { IntegrationEventsHandlerScanner } from '../handlers/integration-events-handler-scanner';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner';
 
 /**
@@ -51,8 +51,8 @@ export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
  *   routing.
  * - {@link TransactionalListenerScanner} for auto-registration of
  *   `@TransactionalEventsHandler`-decorated classes at module init.
- * - {@link ApplicationModuleHandlerScanner} for
- *   `@ApplicationModuleHandler`-decorated classes, with smart routing
+ * - {@link IntegrationEventsHandlerScanner} for
+ *   `@IntegrationEventsHandler`-decorated classes, with smart routing
  *   to the outbox (when bound) or the dispatcher (otherwise).
  * - {@link CqrsHandlerWrapper} + {@link CqrsTransactionalBootstrap}
  *   to wrap `@CommandHandler` / `@QueryHandler` / `@EventsHandler`
@@ -107,7 +107,7 @@ export class CqrsTransactionalModule {
       },
       TransactionalEventDispatcher,
       TransactionalListenerScanner,
-      ApplicationModuleHandlerScanner,
+      IntegrationEventsHandlerScanner,
       {
         provide: CqrsHandlerWrapper,
         useFactory: (

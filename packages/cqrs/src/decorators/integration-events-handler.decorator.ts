@@ -3,21 +3,21 @@ import 'reflect-metadata';
 import { type Type } from '@nestjs/common';
 
 /**
- * Metadata key under which {@link ApplicationModuleHandlerMetadata} is
- * stored on classes decorated with {@link ApplicationModuleHandler}.
+ * Metadata key under which {@link IntegrationEventsHandlerMetadata} is
+ * stored on classes decorated with {@link IntegrationEventsHandler}.
  *
  * Private to the cqrs package — not shared with outbox-core (the
  * smart scanner routes the handler based on whether a registrar is
  * bound, not by inspecting shared metadata).
  */
-export const APPLICATION_MODULE_HANDLER_METADATA = Symbol(
-  'APPLICATION_MODULE_HANDLER_METADATA',
+export const INTEGRATION_EVENTS_HANDLER_METADATA = Symbol(
+  'INTEGRATION_EVENTS_HANDLER_METADATA',
 );
 
 /**
- * Options accepted by the long form of {@link ApplicationModuleHandler}.
+ * Options accepted by the long form of {@link IntegrationEventsHandler}.
  */
-export interface ApplicationModuleHandlerOptions {
+export interface IntegrationEventsHandlerOptions {
   /** Domain event classes the handler subscribes to. Must be non-empty. */
   readonly events: Type[];
   /**
@@ -35,17 +35,18 @@ export interface ApplicationModuleHandlerOptions {
 /**
  * Resolved metadata attached to a handler class.
  */
-export interface ApplicationModuleHandlerMetadata {
+export interface IntegrationEventsHandlerMetadata {
   readonly eventTypes: Type[];
   readonly id?: string;
 }
 
 /**
- * Spring Modulith-equivalent smart-default decorator for cross-module
- * event handlers.
+ * Smart-default decorator for cross-module / cross-service integration
+ * event handlers. The NestJS-idiomatic equivalent of Spring Modulith's
+ * `@ApplicationModuleListener` — see "Naming" below.
  *
  * Behaviour depends on module wiring, decided at bootstrap by
- * `ApplicationModuleHandlerScanner`:
+ * `IntegrationEventsHandlerScanner`:
  *
  * 1. **Outbox wired** (the `OUTBOX_LISTENER_REGISTRAR` provider is
  *    bound, typically via `OutboxModule`): the handler is registered
@@ -62,9 +63,9 @@ export interface ApplicationModuleHandlerMetadata {
  * Either way, consumer code is identical:
  *
  * ```ts
- * @ApplicationModuleHandler(OrderPlacedEvent)
+ * @IntegrationEventsHandler(OrderPlacedEvent)
  * export class InventoryReservationHandler
- *   implements IApplicationModuleHandler<OrderPlacedEvent>
+ *   implements IIntegrationEventsHandler<OrderPlacedEvent>
  * {
  *   async handle(event: OrderPlacedEvent): Promise<void> { ... }
  * }
@@ -74,41 +75,53 @@ export interface ApplicationModuleHandlerMetadata {
  *
  * ```ts
  * // Short form:
- * @ApplicationModuleHandler(OrderPlacedEvent, OrderCancelledEvent)
+ * @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
  *
  * // Long form with stable id:
- * @ApplicationModuleHandler({
+ * @IntegrationEventsHandler({
  *   events: [OrderPlacedEvent],
  *   id: 'inventory.reservation',
  * })
  * ```
  *
+ * Behaviour is opinionated and fixed: AFTER_COMMIT phase, async
+ * execution, REQUIRES_NEW transaction. If you need any of those to
+ * differ, use {@link TransactionalEventsHandler} with explicit
+ * options instead — that decorator exposes the full configuration
+ * surface for in-memory event handling.
+ *
+ * **Naming.** The Spring Modulith decorator with this role is called
+ * `@ApplicationModuleListener`. We use `@IntegrationEventsHandler`
+ * because (a) "Application Module" overlaps with NestJS's `@Module()`
+ * (a DI concept), and (b) "Integration events" is the established
+ * DDD/microservices term for cross-module/cross-service event flow.
+ *
  * @throws {Error} If no event types are supplied.
  */
-export function ApplicationModuleHandler(...events: Type[]): ClassDecorator;
-export function ApplicationModuleHandler(
-  options: ApplicationModuleHandlerOptions,
+export function IntegrationEventsHandler(...events: Type[]): ClassDecorator;
+export function IntegrationEventsHandler(
+  options: IntegrationEventsHandlerOptions,
 ): ClassDecorator;
-export function ApplicationModuleHandler(
-  ...args: [ApplicationModuleHandlerOptions] | Type[]
+export function IntegrationEventsHandler(
+  ...args: [IntegrationEventsHandlerOptions] | Type[]
 ): ClassDecorator {
-  const metadata: ApplicationModuleHandlerMetadata = resolveMetadata(args);
+  const metadata: IntegrationEventsHandlerMetadata = resolveMetadata(args);
 
   if (metadata.eventTypes.length === 0) {
     throw new Error(
-      '@ApplicationModuleHandler requires at least one event type. ' +
+      '@IntegrationEventsHandler requires at least one event type. ' +
         'Pass class constructors as rest arguments or via the `events` option.',
     );
   }
 
   return (target: object): void => {
-    Reflect.defineMetadata(APPLICATION_MODULE_HANDLER_METADATA, metadata, target);
+    Reflect.defineMetadata(INTEGRATION_EVENTS_HANDLER_METADATA, metadata, target);
   };
 }
 
 function resolveMetadata(
-  args: [ApplicationModuleHandlerOptions] | Type[],
-): ApplicationModuleHandlerMetadata {
+  args: [IntegrationEventsHandlerOptions] | Type[],
+): IntegrationEventsHandlerMetadata {
   if (args.length === 1 && isOptionsObject(args[0])) {
     const options = args[0];
     return {
@@ -124,7 +137,7 @@ function resolveMetadata(
 
 function isOptionsObject(
   candidate: unknown,
-): candidate is ApplicationModuleHandlerOptions {
+): candidate is IntegrationEventsHandlerOptions {
   return (
     candidate !== null &&
     typeof candidate === 'object' &&
@@ -135,13 +148,13 @@ function isOptionsObject(
 }
 
 /**
- * Read the {@link ApplicationModuleHandlerMetadata} attached to
- * `target` by {@link ApplicationModuleHandler}. Returns `undefined`
+ * Read the {@link IntegrationEventsHandlerMetadata} attached to
+ * `target` by {@link IntegrationEventsHandler}. Returns `undefined`
  * when the class was not decorated.
  */
-export function getApplicationModuleHandlerMetadata(
+export function getIntegrationEventsHandlerMetadata(
   target: object,
-): ApplicationModuleHandlerMetadata | undefined {
-  const value: unknown = Reflect.getMetadata(APPLICATION_MODULE_HANDLER_METADATA, target);
-  return value as ApplicationModuleHandlerMetadata | undefined;
+): IntegrationEventsHandlerMetadata | undefined {
+  const value: unknown = Reflect.getMetadata(INTEGRATION_EVENTS_HANDLER_METADATA, target);
+  return value as IntegrationEventsHandlerMetadata | undefined;
 }

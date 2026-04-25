@@ -98,8 +98,8 @@ export class AppModule {
         // and routes aggregate events through both paths.
         { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
         // Binds OutboxListenerRegistry under the CQRS package's
-        // registrar token. ApplicationModuleHandlerScanner picks it up
-        // and routes @ApplicationModuleHandler classes to the outbox
+        // registrar token. IntegrationEventsHandlerScanner picks it up
+        // and routes @IntegrationEventsHandler classes to the outbox
         // for durable delivery. Without this binding the scanner falls
         // back to in-memory AFTER_COMMIT dispatch.
         { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
