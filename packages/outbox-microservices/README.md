@@ -17,6 +17,58 @@ yet stable and will change between 0.x releases. Headers / routingKey
 are accepted on `@Externalized` but not yet applied to the wire
 payload — see *Limitations* below.
 
+## Important: reliability semantics (read before production use)
+
+**Read this before adopting the package in production.** The
+`@nestjs/microservices` `ClientProxy.emit()` API this package depends
+on (per [DD-017](../../CLAUDE.md)) does NOT propagate broker-side
+delivery failures in a way the externalizer can observe. In
+fire-and-forget mode the Observable returned by `emit()` completes
+when the proxy considers the dispatch *handed off to the transport*,
+not when the broker has *durably acknowledged* the message.
+
+Concretely, this means:
+
+- A `ClientKafka` configured against an unreachable broker can resolve
+  `emit()` successfully, the externalizer reports success, and the
+  outbox publication is finalised as `COMPLETED` — even though no
+  message ever reached a broker.
+- The same applies to RabbitMQ in default fire-and-forget mode and to
+  any other transport `@nestjs/microservices` supports.
+- Silent broker failures bypass the outbox-core retry / staleness /
+  resubmit machinery: there is nothing to retry, because as far as
+  this layer is concerned delivery succeeded.
+
+The outbox still gives you crash-consistent **enqueueing** of events
+and at-least-once **local listener** delivery. What it does NOT give
+you, in this version, is at-least-once **broker-side** delivery
+through `ClientProxy`.
+
+[ADR-016](../../docs/adr/016-externalization-reliability-semantics.md)
+documents the finding in full and lays out the future path
+(broker-aware externalizers using native producers under the same
+`EVENT_EXTERNALIZER` SPI).
+
+### Mitigation strategies for production
+
+1. **Configure the underlying `ClientProxy` for stronger
+   acknowledgment.** Kafka: `producer.acks: 'all'` plus
+   `producer.idempotent: true`. RabbitMQ: confirm-channel via
+   `amqp-connection-manager`. NATS: JetStream with explicit ack. The
+   package reuses whatever proxy you registered (DD-017) — it does
+   not interfere with this configuration.
+
+2. **Combine with consumer-side acknowledgment / inbox patterns.**
+   Track processed message ids on the receiving system and surface
+   gaps to operators. The outbox publication's listener id plus the
+   domain event id is enough to deduplicate.
+
+3. **Wait for the broker-aware externalizer iteration** when neither
+   of the above is feasible. The
+   [`EVENT_EXTERNALIZER` SPI](../outbox-core/src/externalization/event-externalizer.ts)
+   is stable; native adapters will plug into the same place without
+   client-side changes.
+
 ## Installation
 
 ```bash
