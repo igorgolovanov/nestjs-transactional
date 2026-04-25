@@ -18,6 +18,10 @@ import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
 } from '../dispatcher/processor-options';
+import {
+  EVENT_EXTERNALIZER,
+  type EventExternalizer,
+} from '../externalization/event-externalizer';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
 import {
   OUTBOX_RECOVERY_OPTIONS,
@@ -208,8 +212,14 @@ export class OutboxModule {
           registry: EventPublicationRegistry,
           listeners: OutboxListenerRegistry,
           opts: EventPublicationProcessorOptions,
-        ) => new EventPublicationProcessor(registry, listeners, opts),
-        inject: [EventPublicationRegistry, OutboxListenerRegistry, OUTBOX_PROCESSOR_OPTIONS],
+          externalizer?: EventExternalizer,
+        ) => new EventPublicationProcessor(registry, listeners, opts, externalizer),
+        inject: [
+          EventPublicationRegistry,
+          OutboxListenerRegistry,
+          OUTBOX_PROCESSOR_OPTIONS,
+          { token: EVENT_EXTERNALIZER, optional: true },
+        ],
       },
       { provide: OUTBOX_STALENESS_CONFIG, useValue: stalenessConfig },
       {
@@ -281,8 +291,14 @@ export class OutboxModule {
           registry: EventPublicationRegistry,
           listeners: OutboxListenerRegistry,
           opts: EventPublicationProcessorOptions,
-        ) => new EventPublicationProcessor(registry, listeners, opts),
-        inject: [EventPublicationRegistry, OutboxListenerRegistry, OUTBOX_PROCESSOR_OPTIONS],
+          externalizer?: EventExternalizer,
+        ) => new EventPublicationProcessor(registry, listeners, opts, externalizer),
+        inject: [
+          EventPublicationRegistry,
+          OutboxListenerRegistry,
+          OUTBOX_PROCESSOR_OPTIONS,
+          { token: EVENT_EXTERNALIZER, optional: true },
+        ],
       },
       {
         provide: OUTBOX_STALENESS_CONFIG,

@@ -23,6 +23,11 @@ export * from './dispatcher/outbox-event-publisher';
 export * from './dispatcher/event-publication-processor';
 export * from './dispatcher/processor-options';
 
+export type { ExternalizationMetadata } from './externalization/types';
+export type { EventExternalizer } from './externalization/event-externalizer';
+export { EVENT_EXTERNALIZER } from './externalization/event-externalizer';
+export { ExternalizationError } from './externalization/errors';
+
 export * from './recovery/staleness-monitor';
 
 export * from './api/failed-event-publications';
