@@ -27,13 +27,10 @@ hard-coded values. This example:
    key the app reads. Bootstrap fails fast on a malformed
    environment, with all violations reported in one pass
    (`abortEarly: false`).
-2. Replaces three of the four `forRoot` calls with `forRootAsync`
-   (`TypeOrmModule`, `OutboxModule`, `OutboxTypeOrmModule`). Every
-   factory `inject`s `ConfigService` and reads the validated env
-   into typed config blocks. `TypeOrmTransactionalModule` stays
-   synchronous — it has no async-resolvable tunables, and the
-   `forRootAsync` variant currently has a bootstrap bug (see
-   "Common pitfalls" below).
+2. Replaces all four `forRoot` calls with `forRootAsync`
+   (`TypeOrmModule`, `TypeOrmTransactionalModule`, `OutboxModule`,
+   `OutboxTypeOrmModule`). Every factory `inject`s `ConfigService`
+   and reads the validated env into typed config blocks.
 3. Ships three `.env.*` profiles. `NODE_ENV` selects which file
    loads, so the same binary deploys to dev / staging / prod
    without recompilation.
@@ -125,9 +122,8 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
 
 ## What it shows (verified by integration tests)
 
-1. **`forRootAsync` symmetry across the stack.** Three of the four
-   modules accept the same `imports + inject + useFactory` shape
-   (`TypeOrmModule`, `OutboxModule`, `OutboxTypeOrmModule`).
+1. **`forRootAsync` symmetry across the stack.** All four modules
+   accept the same `imports + inject + useFactory` shape.
    `ConfigService` is the single read source for every layer.
 2. **Joi schema validates fail-fast.** A missing required key
    (`PG_HOST` omitted) and an out-of-range numeric
@@ -163,20 +159,6 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
   This example registers `repository:
   typeOrmEventPublicationRepositoryProvider()` at the top level —
   see [`src/app.module.ts`](src/app.module.ts).
-- **`TypeOrmTransactionalModule.forRootAsync` currently fails to
-  bootstrap when paired with `TypeOrmModule.forRootAsync`.**
-  TypeORM's `PostgresDriver.loadDependencies` ends up with a
-  `pg` namespace whose `Pool` is `undefined` at the time
-  `createPool()` runs, raising `TypeError: this.postgres.Pool is
-  not a constructor` and stalling in the connect-retry loop.
-  This is a framework bug surfaced by Tier 5 work — the sync
-  `forRoot()` variant takes no async-resolvable tunables anyway
-  (`dataSource` and `isDefault` are statically declared per the
-  JSDoc on `TypeOrmTransactionalAsyncOptions`), so the workaround
-  is to call `TypeOrmTransactionalModule.forRoot()` even when the
-  rest of the stack is `forRootAsync`. The example does exactly
-  that. Track the framework fix before promoting `forRootAsync`
-  here.
 - **dotenv refuses to overwrite an existing `process.env` key.**
   Two consequences: (1) tests that load different `.env` files
   sequentially in the same process get cross-contamination — an

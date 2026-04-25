@@ -295,26 +295,38 @@ session.
     (Convention #15 again). Canonical correct placement in
     `examples/async-config-from-environment/src/app.module.ts`.
 
-22. **`TypeOrmTransactionalModule.forRootAsync` has a bootstrap
-    bug when combined with `TypeOrmModule.forRootAsync`.**
-    Surfaced 2026-05-10 in Phase 14.8e
-    (`async-config-from-environment`). TypeORM's
-    `PostgresDriver.createPool` raises
-    `TypeError: this.postgres.Pool is not a constructor` and
-    stalls in the `@nestjs/typeorm` connect-retry loop. The error
-    happens inside TypeORM's own DataSource init, BEFORE the
-    registration factory of `TypeOrmTransactionalModule.forRootAsync`
-    runs. Bisected: bug triggered solely by adding the async-
-    variant to imports — sync `forRoot()` of the same module
-    works in the same composition. **Workaround**: call
-    `TypeOrmTransactionalModule.forRoot()` (sync) even when the
-    rest of the stack is `forRootAsync`. The module has no
-    async-resolvable tunables anyway (`dataSource` and `isDefault`
-    are statically declared per the JSDoc on
-    `TypeOrmTransactionalAsyncOptions`), so there is no semantic
-    loss. Tracked as a framework-fix task; ahead of any future
-    example promoting the module to async, cross-referenced in
-    [`docs/known-limitations.md`](../known-limitations.md).
+22. **`TypeOrmTransactionalModule.forRootAsync` registers via
+    `OnModuleInit`, not via a `useFactory` provider** (fixed
+    2026-05-10, same Phase 14.8e session that surfaced it).
+    Originally surfaced as a bootstrap failure
+    (`TypeError: this.postgres.Pool is not a constructor` cascading
+    from `markAsManaged(undefined)`) when `forRootAsync` was used
+    alongside `TypeOrmModule.forRootAsync`. **Root cause**: the
+    historical registration was a `useFactory` provider that
+    pulled the DataSource via `moduleRef.resolve(...)` (or
+    `moduleRef.get(...)`) at factory-resolution time — but
+    `@nestjs/typeorm`'s DataSource provider is async and may not
+    yet be settled when the framework's `useFactory` providers
+    run. `markAsManaged` was therefore called with `undefined`,
+    which threw "Invalid value used in weak set" inside our weak
+    registry. The thrown error cascaded through `@nestjs/typeorm`'s
+    retry loop into a malformed PostgresDriver state on the next
+    attempt, producing the surface error.
+    **Fix shape**: extract the registration into an
+    `@Injectable() OnModuleInit` class generated per
+    `forRootAsync` call (each call gets a fresh class identity for
+    DI uniqueness). `OnModuleInit` runs after every provider
+    instantiation, so `moduleRef.get(getDataSourceToken(name))`
+    returns the real DataSource. The synchronous `forRoot()` path
+    is unchanged — it injects `getDataSourceToken(name)` directly
+    in its `useFactory.inject` array, which forces NestJS to
+    resolve the DataSource first, so the gap never opened there.
+    Pinned by the regression spec
+    `packages/typeorm/test/integration/forrootasync.integration.spec.ts`
+    (3 cases: `TypeOrmModule.forRootAsync` alone; + sync
+    `forRoot()`; + async `forRootAsync({ ... })`). Keep this entry
+    as a historical record so future refactors know why the
+    OnModuleInit indirection exists.
 
 23. **dotenv refuses to overwrite an existing `process.env` key.**
     Surfaced 2026-05-10 in Phase 14.8e
