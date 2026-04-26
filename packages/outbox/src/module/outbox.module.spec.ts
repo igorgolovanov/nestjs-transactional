@@ -82,9 +82,9 @@ describe('OutboxModule (integration)', () => {
           adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
         }),
         OutboxModule.forRoot({
-          eventTypes: [OrderPlacedEvent],
           ...outboxOptions,
         }),
+        OutboxModule.forFeature([OrderPlacedEvent]),
       ],
       providers: [FlakyListener],
     }).compile();
@@ -201,9 +201,10 @@ describe('OutboxModule (integration)', () => {
         OutboxModule.forRootAsync({
           useFactory: async () => {
             await Promise.resolve();
-            return { eventTypes: [OrderPlacedEvent] };
+            return {};
           },
         }),
+        OutboxModule.forFeature([OrderPlacedEvent]),
       ],
       providers: [FlakyListener],
     }).compile();

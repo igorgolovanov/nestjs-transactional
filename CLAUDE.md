@@ -1324,7 +1324,10 @@ Core infrastructure for the Event Publication Registry:
 - `FailedEventPublications`, `IncompleteEventPublications`,
   `CompletedEventPublications` — public APIs
 - `StartupRecoveryService` — republish on restart
-- `OutboxModule` (`forRoot` / `forRootAsync`), `OutboxProcessingModule`
+- `OutboxModule` (`forRoot` / `forRootAsync` for global config,
+  `forFeature` for per-module event-class registration — matches
+  `TypeOrmModule.forFeature(...)` ergonomics)
+- `OutboxProcessingModule`
 - In-memory repository for testing
 
 ### Phase 6: @nestjs-transactional/outbox-typeorm (planned)
@@ -1779,3 +1782,20 @@ READMEs / architecture docs / migration guide / examples).
    the same identity — `Symbol.for` is process-global. All three
    wrapping mechanisms (interceptor, methods-bootstrap, cqrs handler
    wrapper) check this marker before wrapping to prevent double-wrap.
+
+9. **`OutboxModule.forRoot()` carries global config; event-class
+   registration is `forFeature(eventTypes: Type[])` per feature
+   module.** Matches `TypeOrmModule.forFeature(...)` ergonomics. Each
+   `forFeature` call generates a unique Symbol token whose factory
+   provider runs eagerly (singleton scope) during DI resolution and
+   pushes the listed event classes into the singleton
+   `EventTypeRegistry`. Multiple `forFeature` calls accumulate.
+   Empty arrays are a no-op. Duplicate registrations throw at
+   bootstrap with the offending class name. By the time any
+   `onModuleInit` hook runs (e.g.
+   `ExternalizationRegistry.onModuleInit`), every `forFeature`
+   factory has already executed — natural NestJS lifecycle ordering
+   makes the registry fully populated before any consumer reads it.
+   Do NOT pass `eventTypes` to `forRoot` — that field was removed in
+   Phase 13. Move event registrations to the feature modules that
+   own the event classes.

@@ -17,9 +17,9 @@ import type { ExternalizationMetadata } from './types';
  * Event classes registered AFTER `onModuleInit` (e.g. via
  * `EventTypeRegistry.register` from a custom provider's
  * `OnApplicationBootstrap`) will not appear in the index — register
- * event types via `OutboxModule.forRoot({ eventTypes: [...] })` or as
- * a side effect of an earlier provider so they are present before
- * this registry initialises.
+ * event types via `OutboxModule.forFeature([...])` so the feature-
+ * module factory provider populates the registry during eager
+ * provider instantiation, before any `onModuleInit` hook runs.
  *
  * Consumed by `EventPublicationProcessor.tryExternalize` to resolve
  * the per-publication {@link ExternalizationMetadata} that the bound

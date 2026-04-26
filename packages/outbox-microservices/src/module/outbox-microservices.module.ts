@@ -40,7 +40,8 @@ export interface OutboxMicroservicesAsyncOptions extends Pick<ModuleMetadata, 'i
  *     ClientsModule.register([
  *       { name: 'KAFKA_CLIENT', transport: Transport.KAFKA, options: { ... } },
  *     ]),
- *     OutboxModule.forRoot({ eventTypes: [OrderPlacedEvent] }),
+ *     OutboxModule.forRoot({}),
+ *     OutboxModule.forFeature([OrderPlacedEvent]),
  *     OutboxMicroservicesModule.forRoot({ defaultClient: 'KAFKA_CLIENT' }),
  *   ],
  * })

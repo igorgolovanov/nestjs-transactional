@@ -4,16 +4,32 @@ import { Injectable, Type } from '@nestjs/common';
  * Registry that maps event class names to their constructors so the
  * serializer can reconstruct class instances from stored JSON payloads.
  *
- * Event classes must be registered at application startup — either
- * manually via {@link register} / {@link registerAll} or through
- * `OutboxModule.forFeature({ eventTypes: [...] })` (planned, Phase 5).
+ * Event classes are registered at application startup, typically via
+ * `OutboxModule.forFeature([...])` in the feature module that owns the
+ * event class. Each event type can only be registered once — duplicate
+ * registrations throw at bootstrap, so a misconfigured module fails
+ * fast rather than silently shadowing an earlier registration.
  */
 @Injectable()
 export class EventTypeRegistry {
   private readonly registry = new Map<string, Type<object>>();
 
-  /** Register a single event class, keyed by its constructor name. */
+  /**
+   * Register a single event class, keyed by its constructor name.
+   *
+   * @throws `Error` when an event class with the same constructor name
+   * has already been registered. Duplicate registration almost always
+   * indicates a configuration bug (the same event type appearing in
+   * two `forFeature` calls) — fail fast rather than silently shadow.
+   */
   register(eventType: Type<object>): void {
+    if (this.registry.has(eventType.name)) {
+      throw new Error(
+        `Event type '${eventType.name}' already registered. ` +
+          `Each event type can only be registered once — check for ` +
+          `duplicate entries across OutboxModule.forFeature() calls.`,
+      );
+    }
     this.registry.set(eventType.name, eventType);
   }
 
@@ -40,8 +56,8 @@ export class EventTypeRegistry {
     if (!type) {
       throw new Error(
         `Event type '${typeName}' not registered. ` +
-          `Ensure it's registered via EventTypeRegistry.register() or ` +
-          `OutboxModule.forFeature({ eventTypes: [...] }).`,
+          `Ensure it's registered via OutboxModule.forFeature([...]) in ` +
+          `the feature module that owns this event class.`,
       );
     }
     return type;

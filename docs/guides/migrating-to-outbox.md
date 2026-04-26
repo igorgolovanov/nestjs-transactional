@@ -147,12 +147,16 @@ import {
 
     OutboxTypeOrmModule.forFeature({ dataSource }),                // NEW
     OutboxModule.forRoot({
-      eventTypes: [OrderPlacedEvent, /* ... */],                   // NEW
       repository: typeOrmEventPublicationRepositoryProvider,       // NEW — IMPORTANT
       republishOnStartup: true,                                    // optional
       processor: { pollingInterval: 1000, batchSize: 100 },         // optional
       staleness: { processing: 60_000, monitorInterval: 30_000 },   // optional
     }),
+
+    // Register the event classes the outbox should know about.
+    // In modular apps each feature module imports forFeature() for
+    // its own events; this snippet collapses them for clarity.
+    OutboxModule.forFeature([OrderPlacedEvent /* , ... */ ]),       // NEW
 
     // Only in worker processes — not in API-only apps that merely publish.
     OutboxProcessingModule,                                         // NEW
@@ -415,10 +419,15 @@ Likely causes: (1) the `repository` option on
 `OutboxModule.forRoot` is missing or pointing at the InMemory
 default — no rows make it to Postgres; (2) no worker is running
 — import `OutboxProcessingModule` in a process; (3) the event
-type was not registered in `OutboxModule.forRoot({ eventTypes: [...] })`
-— deserialisation fails silently and the row stays in `FAILED`;
-(4) the class lacks a `handle` method — the scanner logs a
-warning and skips.
+type was not registered via `OutboxModule.forFeature([...])` in
+any imported module — deserialisation fails and the row stays in
+`FAILED`; (4) the class lacks a `handle` method — the scanner logs
+a warning and skips.
+
+**"Event type 'X' already registered."**
+The same event class appears in two `OutboxModule.forFeature([...])`
+calls. Move the registration to a single feature module — the one
+that actually owns the event class.
 
 **"Rollback leaks a publication row."**
 Should not happen — flush is a `beforeCommit` hook, and

@@ -168,9 +168,8 @@ export class OrderPlacedEvent {
         options: { client: { brokers: ['localhost:9092'] } },
       },
     ]),
-    OutboxModule.forRoot({
-      eventTypes: [OrderPlacedEvent],
-    }),
+    OutboxModule.forRoot({}),
+    OutboxModule.forFeature([OrderPlacedEvent]),
     OutboxMicroservicesModule.forRoot({
       defaultClient: 'KAFKA_CLIENT',
     }),

@@ -115,9 +115,8 @@ describe('Externalization end-to-end (OutboxModule + mock externalizer)', () => 
           adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
         }),
         ExternalizerBridgeModule.forValue(externalizer),
-        OutboxModule.forRoot({
-          eventTypes: [OrderPlacedEvent, InternalAuditEvent],
-        }),
+        OutboxModule.forRoot({}),
+        OutboxModule.forFeature([OrderPlacedEvent, InternalAuditEvent]),
       ],
       providers: [OrderPlacedListener, AuditListener],
     }).compile();
@@ -260,9 +259,8 @@ describe('Externalization end-to-end (OutboxModule without an externalizer)', ()
           registerMethodsBootstrap: false,
           adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
         }),
-        OutboxModule.forRoot({
-          eventTypes: [OrderPlacedEvent],
-        }),
+        OutboxModule.forRoot({}),
+        OutboxModule.forFeature([OrderPlacedEvent]),
       ],
       providers: [OrderPlacedListener],
     }).compile();

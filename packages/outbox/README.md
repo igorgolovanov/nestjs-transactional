@@ -44,6 +44,11 @@ Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`,
 
 ### 1. Module wiring
 
+`OutboxModule.forRoot()` provides global infrastructure (registry,
+serializer, processor, recovery). `OutboxModule.forFeature([...])`
+declares the event classes a feature module owns — matches
+`TypeOrmModule.forFeature(...)` ergonomics.
+
 ```typescript
 import { Module } from '@nestjs/common';
 import { TransactionalModule } from '@nestjs-transactional/core';
@@ -58,7 +63,6 @@ import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outb
       adapters: [/* your adapter registrations */],
     }),
     OutboxModule.forRoot({
-      eventTypes: [OrderPlacedEvent, OrderShippedEvent],
       republishOnStartup: true,
       processor: { pollingInterval: 1000, batchSize: 100 },
       staleness: { processing: 60_000, monitorInterval: 30_000 },
@@ -67,10 +71,54 @@ import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outb
     // Import OutboxProcessingModule ONLY in worker processes — not in
     // API-only apps that merely publish events.
     OutboxProcessingModule,
+    // Register the event classes this module emits / consumes.
+    OutboxModule.forFeature([OrderPlacedEvent, OrderShippedEvent]),
   ],
 })
 export class AppModule {}
 ```
+
+#### Modular pattern (multiple feature modules)
+
+Distribute event registrations to the modules that own them:
+
+```typescript
+@Module({
+  imports: [OutboxModule.forFeature([OrderPlacedEvent, OrderCancelledEvent])],
+  providers: [OrderService],
+})
+export class OrderModule {}
+
+@Module({
+  imports: [OutboxModule.forFeature([InventoryReservedEvent])],
+  providers: [InventoryService],
+})
+export class InventoryModule {}
+
+@Module({
+  imports: [
+    TransactionalModule.forRoot({ isGlobal: true /* ... */ }),
+    OutboxModule.forRoot({ republishOnStartup: true /* ... */ }),
+    OrderModule,
+    InventoryModule,
+  ],
+})
+export class AppModule {}
+```
+
+Multiple `forFeature` calls accumulate into the singleton
+`EventTypeRegistry` provided by `forRoot`. Each event class can only
+be registered once — duplicates throw at bootstrap with the offending
+class name:
+
+```
+Error: Event type 'OrderPlacedEvent' already registered.
+Each event type can only be registered once — check for duplicate
+entries across OutboxModule.forFeature() calls.
+```
+
+`OutboxModule.forFeature([])` is accepted as a no-op (matches
+`TypeOrmModule.forFeature([])`).
 
 ### 2. Declaring a handler
 
@@ -261,7 +309,8 @@ describe('PlaceOrder', () => {
     app = await Test.createTestingModule({
       imports: [
         TransactionalModule.forRoot({ isGlobal: true /* ... */ }),
-        OutboxModule.forRoot({ eventTypes: [OrderPlacedEvent] }),
+        OutboxModule.forRoot({}),
+        OutboxModule.forFeature([OrderPlacedEvent]),
       ],
       providers: [
         PlaceOrderService,

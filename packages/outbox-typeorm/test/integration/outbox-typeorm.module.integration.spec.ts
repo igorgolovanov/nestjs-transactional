@@ -79,10 +79,10 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
           dataSource: ctx.dataSource,
         }),
         OutboxModule.forRoot({
-          eventTypes: [OrderPlacedEvent],
           repository: typeOrmEventPublicationRepositoryProvider,
           ...outboxOverrides,
         }),
+        OutboxModule.forFeature([OrderPlacedEvent]),
       ],
       providers: [OrderListener, PlaceOrderService],
     }).compile();
