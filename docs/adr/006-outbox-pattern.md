@@ -4,6 +4,11 @@
 
 Accepted — 2026-04-24.
 
+> **Note (Phase 12 package rename, 2026-04-26):** The package referred to
+> as `@nestjs-transactional/outbox-core` in this ADR's original text was
+> renamed to `@nestjs-transactional/outbox` in Phase 12. Body references
+> have been updated inline; the decision content is unchanged.
+
 ## Context
 
 Through Phase 3 the monorepo's self-described scope was
@@ -46,7 +51,7 @@ Implement a full Spring-Modulith-equivalent Event Publication
 Registry as a first-party feature of the monorepo, split across
 new packages:
 
-- `@nestjs-transactional/outbox-core` — types, the
+- `@nestjs-transactional/outbox` — types, the
   `EventPublicationRepository` SPI, the listener/publisher
   infrastructure, the async worker, staleness monitor, startup
   recovery, operator APIs, testing utilities, and the NestJS

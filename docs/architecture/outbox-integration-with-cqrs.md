@@ -2,7 +2,7 @@
 
 `@nestjs-transactional/cqrs` bridges `@nestjs/cqrs`'s
 `AggregateRoot` pattern with the Event Publication Registry from
-`@nestjs-transactional/outbox-core`. A single
+`@nestjs-transactional/outbox`. A single
 `aggregate.commit()` call fans out to both the in-memory
 phase-aware dispatcher AND (when wired) the durable outbox, with
 automatic routing so each handler runs exactly once.
@@ -17,7 +17,7 @@ to the single path appropriate to its decorator.
 | Decorator | Where it lives | Delivery | Retry | Survives crash? | Transaction |
 | --- | --- | --- | --- | --- | --- |
 | `@TransactionalEventsHandler` | cqrs | In-memory, phase-aware | No | No | Joins the publishing tx's lifecycle |
-| `@OutboxEventsHandler` | outbox-core | Persistent, via worker | Yes (operator) | Yes | `REQUIRES_NEW` by default |
+| `@OutboxEventsHandler` | outbox | Persistent, via worker | Yes (operator) | Yes | `REQUIRES_NEW` by default |
 | `@IntegrationEventsHandler` | cqrs | Outbox if registrar bound, else in-memory fallback | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` |
 
 All three decorators are **metadata-only**: they write a Reflect
@@ -107,7 +107,7 @@ export interface OutboxListenerRegistrar {
 }
 ```
 
-`@nestjs-transactional/outbox-core` provides implementations that
+`@nestjs-transactional/outbox` provides implementations that
 satisfy these interfaces structurally — `OutboxEventPublisher`
 exposes `scheduleForPublication(event)`, `OutboxListenerRegistry`
 exposes the `register(...)` shape. Consumers bind the tokens in
@@ -129,13 +129,13 @@ This keeps the dependency graph clean:
                │
     ┌──────────┼──────────┬───────────────┐
     ▼          ▼          ▼               ▼
-  typeorm    cqrs    outbox-core    (other adapters)
+  typeorm    cqrs    outbox    (other adapters)
                           │
                           ▼
                    outbox-typeorm
 ```
 
-No arrow from cqrs to outbox-core. The two packages communicate
+No arrow from cqrs to outbox. The two packages communicate
 entirely through DI tokens and structural interfaces.
 
 ## End-to-end walkthrough

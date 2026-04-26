@@ -24,7 +24,7 @@ growing set of npm packages organised by concern.
   the outbox when wired, and an EventPublisher override that integrates
   with AggregateRoot.
 
-- **@nestjs-transactional/outbox-core** *(alpha)* — persistent Event
+- **@nestjs-transactional/outbox** *(alpha)* — persistent Event
   Publication Registry: lifecycle states, repository SPI, async worker,
   staleness monitor, startup recovery, operator APIs
   (Failed/Incomplete/Completed), testing utilities
@@ -75,13 +75,13 @@ for NestJS applications, not just Spring Framework core.
 - AsyncLocalStorage for transaction context (core)
 
 **Spring Modulith features (partially covered, expansion planned):**
-- Event Publication Registry with persistent log — outbox-core (Phase 5)
+- Event Publication Registry with persistent log — outbox (Phase 5)
 - `@IntegrationEventsHandler` shortcut — cqrs integration (Phase 7)
-- Failed / Incomplete / Completed publications API — outbox-core (Phase 5)
-- Staleness monitor — outbox-core (Phase 5)
-- Republish on restart — outbox-core (Phase 5)
-- Completion modes (UPDATE / DELETE / ARCHIVE) — outbox-core (Phase 5)
-- `PublishedEvents` test utility — outbox-core `/testing` (Phase 8)
+- Failed / Incomplete / Completed publications API — outbox (Phase 5)
+- Staleness monitor — outbox (Phase 5)
+- Republish on restart — outbox (Phase 5)
+- Completion modes (UPDATE / DELETE / ARCHIVE) — outbox (Phase 5)
+- `PublishedEvents` test utility — outbox `/testing` (Phase 8)
 - Event externalization to brokers — Phase 11 in progress: SPI,
   `@Externalized`, `outbox-microservices` package, ADR-015,
   reliability caveat in ADR-016. One package covers all
@@ -164,7 +164,7 @@ nestjs-transactional-monorepo/
 │   │   │   └── index.ts
 │   │   └── ...
 │   │
-│   └── outbox-core/                   # @nestjs-transactional/outbox-core (alpha)
+│   └── outbox/                   # @nestjs-transactional/outbox (alpha)
 │       ├── src/
 │       │   ├── types/                 # EventPublication, lifecycle states
 │       │   ├── repository/            # EventPublicationRepository SPI
@@ -496,7 +496,7 @@ Spring Modulith provides for production systems.
   persistence concerns to CQRS, prevents use of outbox without CQRS.
 
 **Decision**: Implement full Event Publication Registry equivalent as
-separate `outbox-core` + `outbox-typeorm` packages. Integration with cqrs
+separate `outbox` + `outbox-typeorm` packages. Integration with cqrs
 via `HybridEventPublisher` and the `@IntegrationEventsHandler` decorator.
 
 **Consequences**:
@@ -517,7 +517,7 @@ Prisma / MikroORM / MongoDB in future).
 - `@nestjs-transactional/outbox-{backend}` monolithic packages (one per
   backend). Rejected: duplicates core logic.
 
-**Decision**: `outbox-core` with an `EventPublicationRepository` SPI plus
+**Decision**: `outbox` with an `EventPublicationRepository` SPI plus
 separate `outbox-{backend}` packages implementing the SPI. Follows the
 existing pattern (core + typeorm).
 
@@ -634,7 +634,7 @@ production use cases Spring Modulith targets.
   `@nestjs/microservices` already solves this.
 
 **Decision**: Externalization is a first-class feature, implemented as:
-- An optional `EventExternalizer` SPI added to `outbox-core`.
+- An optional `EventExternalizer` SPI added to `outbox`.
 - A new `@nestjs-transactional/outbox-microservices` package that
   provides one `EventExternalizer` implementation backed by
   `@nestjs/microservices` `ClientProxy` — covering every transport
@@ -645,7 +645,7 @@ production use cases Spring Modulith targets.
 - One externalization package replaces planned per-broker variants —
   fewer packages to maintain, one mental model for users.
 - Reliability (retry, recovery, staleness monitor) inherited from
-  `outbox-core`.
+  `outbox`.
 - Naturally composes with the existing NestJS `ClientsModule` pattern
   (see DD-017).
 - Future native (broker-specific) implementations can register under the
@@ -688,7 +688,7 @@ not register any clients itself.
 
 ### DD-018: `EventExternalizer` SPI as a structural port
 
-**Context**: `outbox-core` should not import a specific externalization
+**Context**: `outbox` should not import a specific externalization
 implementation at compile time, since externalization is optional and
 may have multiple backends. We need an abstraction that supports the
 same `@Optional()` injection pattern already used for
@@ -700,10 +700,10 @@ same `@Optional()` injection pattern already used for
   hidden dependencies, awkward error handling, non-idiomatic for NestJS
   DI.
 - Hard compile-time dependency on a concrete implementation. Rejected:
-  forces every `outbox-core` user to install `@nestjs/microservices`
+  forces every `outbox` user to install `@nestjs/microservices`
   even when they only need internal eventing.
 
-**Decision**: `outbox-core` defines an `EventExternalizer` interface
+**Decision**: `outbox` defines an `EventExternalizer` interface
 and an `EVENT_EXTERNALIZER` DI token (Symbol). Concrete implementations
 (e.g. `MicroservicesEventExternalizer`) register themselves under this
 token via `useClass` or `useExisting`. `EventPublicationProcessor`
@@ -716,7 +716,7 @@ outbox runs in internal-only mode.
   `OUTBOX_PUBLICATION_SCHEDULER` per DD-011).
 - Externalization is genuinely optional; the outbox works without it.
 - Easy to add alternative externalizer implementations (native Kafka,
-  native AMQP, custom transports) without touching `outbox-core`.
+  native AMQP, custom transports) without touching `outbox`.
 - Bundler-friendly: no dynamic require, no hidden module resolution.
 
 ### DD-019: Atomicity unit and execution order for hybrid delivery
@@ -1189,7 +1189,7 @@ import { TransactionalTestingModule } from '@nestjs-transactional/cqrs/testing';
 
 ### Testing events and outbox
 
-The outbox-core and cqrs packages (Phase 8) export testing utilities via
+The outbox and cqrs packages (Phase 8) export testing utilities via
 the `/testing` subpath:
 
 - **`PublishedEvents`**: query events published during a test.
@@ -1203,7 +1203,7 @@ application testing (even with the outbox enabled) the in-memory
 repository is sufficient.
 
 Coverage targets:
-- outbox-core: 90% lines, 85% branches
+- outbox: 90% lines, 85% branches
 - outbox-typeorm: 85% lines (the remainder is TypeORM integration that
   is hard to cover in unit tests)
 
@@ -1307,7 +1307,7 @@ Breaking changes: `feat(core)!: ...` or `BREAKING CHANGE:` in the body.
 - NPM publishing setup
 - Documentation generation
 
-### Phase 5: @nestjs-transactional/outbox-core (in progress)
+### Phase 5: @nestjs-transactional/outbox (in progress)
 
 Core infrastructure for the Event Publication Registry:
 - `EventPublication` types and lifecycle states (`PUBLISHED`, `PROCESSING`,
@@ -1332,7 +1332,7 @@ Core infrastructure for the Event Publication Registry:
 TypeORM persistence implementation:
 - `EventPublicationEntity` with proper indexes
 - `EventPublicationArchiveEntity` (for ARCHIVE completion mode)
-- `TypeOrmEventPublicationRepository` implementing the SPI from outbox-core
+- `TypeOrmEventPublicationRepository` implementing the SPI from outbox
 - Uses `FOR UPDATE SKIP LOCKED` for concurrent worker safety
 - Schema migration (`createEventPublication`)
 - Auto schema initialization (development only)
@@ -1354,7 +1354,7 @@ Changes to the existing cqrs package:
 
 ### Phase 8: Testing utilities (planned)
 
-In outbox-core (`/testing` subpath) and cqrs (`/testing` subpath):
+In outbox (`/testing` subpath) and cqrs (`/testing` subpath):
 - `PublishedEvents`: inspect events during tests
 - `AssertablePublishedEvents` with a fluent API
 - Integration with Jest
@@ -1378,7 +1378,7 @@ to external message brokers via `@nestjs/microservices` `ClientProxy`
 (DD-016, DD-017, DD-018, DD-019). See ADR-015 (planned) for the full
 design rationale.
 
-**11.1: `EventExternalizer` SPI in outbox-core**
+**11.1: `EventExternalizer` SPI in outbox**
 - `ExternalizationMetadata` interface (event type → routing target)
 - `EventExternalizer` interface
 - `EVENT_EXTERNALIZER` DI token (structural port — DD-018)
@@ -1436,7 +1436,7 @@ In place of the integration tests we shipped:
   `packages/outbox-microservices/README.md` so users see the
   limitation before adopting.
 
-The `outbox-core` reliability machinery (retry, recovery, staleness
+The `outbox` reliability machinery (retry, recovery, staleness
 monitor, `FailedEventPublications.resubmit`) still triggers for any
 publication that the externalizer DOES report as failed — the
 limitation only applies to broker-side silent failures the proxy
@@ -1456,7 +1456,7 @@ users.
 - `outbox-microservices` README polished with cross-links to
   ADR-015 / ADR-016 / architecture doc + Spring Modulith mapping
   summary.
-- `outbox-core` README's existing externalization section linked to
+- `outbox` README's existing externalization section linked to
   ADR-015 / ADR-016 / architecture doc.
 - Root README packages list now includes `outbox-microservices`;
   Roadmap rows added for Phase 10 (handler rename) and Phase 11
@@ -1549,7 +1549,7 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 **Last updated**: 2026-04-26 (Phase 11, Iteration 11.5a shipped —
 ADR-015 accepted, `docs/architecture/event-externalization.md`
-created, `outbox-microservices` and `outbox-core` READMEs polished
+created, `outbox-microservices` and `outbox` READMEs polished
 with ADR cross-links, root README packages list and roadmap
 updated, deferred doc-wide `@ApplicationModuleHandler` →
 `@IntegrationEventsHandler` rename sweep completed across all
@@ -1568,7 +1568,7 @@ READMEs / architecture docs / migration guide / examples).
   examples; GitHub Actions with lint / build / test)
 - Post-Phase-4 technical debt: spec files excluded from publish tarballs,
   provenance configured, coverage reporting in CI
-- Phase 5: `@nestjs-transactional/outbox-core` (alpha) — types, SPI,
+- Phase 5: `@nestjs-transactional/outbox` (alpha) — types, SPI,
   event publication registry, outbox publisher, async processor,
   staleness monitor, startup recovery, operator APIs
   (Failed/Incomplete/Completed), in-memory repo, `OutboxModule` +
@@ -1590,7 +1590,7 @@ READMEs / architecture docs / migration guide / examples).
   outbox/dispatcher based on `OUTBOX_LISTENER_REGISTRAR` binding.
 - Phase 8: Testing utilities — `PublishedEvents`,
   `AssertablePublishedEvents`, `PublishedEventsAssertionError`
-  exported via `/testing` subpath of outbox-core. 15 unit tests.
+  exported via `/testing` subpath of outbox. 15 unit tests.
 - Phase 9: Documentation & release (Iterations 9.1, 9.2 shipped;
   Iteration 9.3 — release automation — pending under "Next") —
   ADR-006 (outbox rationale), ADR-007 (outbox architecture),
@@ -1623,7 +1623,7 @@ READMEs / architecture docs / migration guide / examples).
     examples is absorbed into Phase 11.5.
 - Phase 11.0 (preparation): CLAUDE.md updates for event
   externalization — DD-016..19, ADR-015 entry, Phase 11 roadmap.
-- Phase 11.1: `EventExternalizer` SPI in `outbox-core` —
+- Phase 11.1: `EventExternalizer` SPI in `outbox` —
   `ExternalizationMetadata` interface, `EventExternalizer` interface,
   `EVENT_EXTERNALIZER` DI token, `ExternalizationError` extending
   `OutboxError`, optional `@Inject(EVENT_EXTERNALIZER)` injection
@@ -1659,7 +1659,7 @@ READMEs / architecture docs / migration guide / examples).
   ADR-016. `docs/architecture/event-externalization.md` shipped
   with a high-level diagram, end-to-end sequence, failure-mode
   table, reliability semantics section, and Spring Modulith
-  mapping. `outbox-microservices` and `outbox-core` READMEs gained
+  mapping. `outbox-microservices` and `outbox` READMEs gained
   cross-links to the new docs. Root README updated: packages list
   includes `outbox-microservices`, roadmap rows for Phase 10 +
   Phase 11, documentation index links the new architecture doc

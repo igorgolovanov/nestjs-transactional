@@ -1,6 +1,6 @@
 # Outbox Pattern
 
-`@nestjs-transactional/outbox-core` (and its TypeORM backend
+`@nestjs-transactional/outbox` (and its TypeORM backend
 `@nestjs-transactional/outbox-typeorm`) implements the
 **Transactional Outbox** pattern: event publications are persisted
 atomically with the business data inside the same database
@@ -253,6 +253,6 @@ poll entirely.
 - [ADR-007 — Outbox architecture (core + typeorm split)](../adr/007-outbox-architecture.md)
 - [Outbox integration with CQRS](outbox-integration-with-cqrs.md)
 - [Migration guide](../guides/migrating-to-outbox.md)
-- [`@nestjs-transactional/outbox-core` README](../../packages/outbox-core/README.md)
+- [`@nestjs-transactional/outbox` README](../../packages/outbox/README.md)
 - [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)
 - [Spring Modulith — Event Publication Registry](https://docs.spring.io/spring-modulith/reference/events.html)

@@ -19,7 +19,7 @@ retry, recovery, and at-least-once delivery semantics.
 | [`@nestjs-transactional/core`](packages/core) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/core.svg)](https://www.npmjs.com/package/@nestjs-transactional/core) | AsyncLocalStorage context, `TransactionManager`, `@Transactional` decorator, adapter port |
 | [`@nestjs-transactional/typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/typeorm.svg)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | TypeORM adapter, `getCurrentEntityManager`, multi-datasource support |
 | [`@nestjs-transactional/cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/@nestjs-transactional/cqrs.svg)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsHandler`, `@IntegrationEventsHandler`, aggregate events |
-| [`@nestjs-transactional/outbox-core`](packages/outbox-core) | *(unreleased, alpha)* | Persistent Event Publication Registry — lifecycle states, async worker, staleness monitor, startup recovery, operator APIs, `@Externalized` SPI |
+| [`@nestjs-transactional/outbox`](packages/outbox) | *(unreleased, alpha)* | Persistent Event Publication Registry — lifecycle states, async worker, staleness monitor, startup recovery, operator APIs, `@Externalized` SPI |
 | [`@nestjs-transactional/outbox-typeorm`](packages/outbox-typeorm) | *(unreleased, alpha)* | TypeORM persistence backend for the outbox — `event_publication` table, `FOR UPDATE SKIP LOCKED`, migration, dev-time auto-init |
 | [`@nestjs-transactional/outbox-microservices`](packages/outbox-microservices) | *(unreleased, alpha)* | Event externalization to message brokers via `@nestjs/microservices` `ClientProxy` (Kafka, RabbitMQ, NATS, JMS, gRPC, custom) — Spring Modulith `@Externalized` parity |
 
@@ -113,7 +113,7 @@ export class OrderService {
 pnpm add @nestjs-transactional/core \
          @nestjs-transactional/typeorm \
          @nestjs-transactional/cqrs \
-         @nestjs-transactional/outbox-core \
+         @nestjs-transactional/outbox \
          @nestjs-transactional/outbox-typeorm
 ```
 
@@ -164,7 +164,7 @@ export class InventoryReservationHandler
 | 2 — `@nestjs-transactional/typeorm` | ✅ done | Adapter, `getCurrentEntityManager`, multi-datasource, savepoints |
 | 3 — `@nestjs-transactional/cqrs` | ✅ done | Phase-aware dispatching, handler wrapping, `TransactionalEventPublisher`, `AggregateRoot` integration |
 | 4 — Examples & CI | ✅ done | Three runnable examples, GitHub Actions, coverage reports |
-| 5 — `@nestjs-transactional/outbox-core` | ✅ done (alpha) | Types, SPI, registry, publisher, processor, staleness monitor, startup recovery, operator APIs, in-memory repo, NestJS modules |
+| 5 — `@nestjs-transactional/outbox` | ✅ done (alpha) | Types, SPI, registry, publisher, processor, staleness monitor, startup recovery, operator APIs, in-memory repo, NestJS modules |
 | 6 — `@nestjs-transactional/outbox-typeorm` | ✅ done (alpha) | Entity, repository, migration, `SchemaInitializer`, `OutboxTypeOrmModule` |
 | 7 — CQRS ↔ outbox integration | ✅ done (alpha) | `HybridEventPublisher`, `@IntegrationEventsHandler`, `IntegrationEventsHandlerScanner` with outbox/in-memory routing |
 | 8 — Testing utilities | ✅ done (alpha) | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
@@ -199,7 +199,7 @@ pnpm -C examples/basic-usage start
 - **Per-package READMEs**: [`core`](packages/core/README.md),
   [`typeorm`](packages/typeorm/README.md),
   [`cqrs`](packages/cqrs/README.md),
-  [`outbox-core`](packages/outbox-core/README.md),
+  [`outbox`](packages/outbox/README.md),
   [`outbox-typeorm`](packages/outbox-typeorm/README.md),
   [`outbox-microservices`](packages/outbox-microservices/README.md).
 - **Architecture overview**:

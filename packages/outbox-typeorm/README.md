@@ -1,7 +1,7 @@
 # @nestjs-transactional/outbox-typeorm
 
 TypeORM persistence backend for
-[`@nestjs-transactional/outbox-core`](../outbox-core). Ships the
+[`@nestjs-transactional/outbox`](../outbox). Ships the
 `event_publication` table schema, a TypeORM-backed implementation of
 the `EventPublicationRepository` SPI, and (in a later iteration) the
 NestJS module wiring.
@@ -38,7 +38,7 @@ change between 0.x releases.
 ### Repository
 
 `TypeOrmEventPublicationRepository` implements
-`EventPublicationRepository` from `outbox-core`. Highlights:
+`EventPublicationRepository` from `outbox`. Highlights:
 
 - Every read and write goes through the ambient
   `EntityManager` resolved by
@@ -62,7 +62,7 @@ change between 0.x releases.
 ```bash
 pnpm add @nestjs-transactional/core \
          @nestjs-transactional/typeorm \
-         @nestjs-transactional/outbox-core \
+         @nestjs-transactional/outbox \
          @nestjs-transactional/outbox-typeorm
 ```
 
@@ -82,7 +82,7 @@ import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 import {
   OutboxModule,
   OutboxProcessingModule,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import {
   EventPublicationEntity,
   EventPublicationArchiveEntity,
@@ -121,7 +121,7 @@ const dataSource = new DataSource({
     }),
 
     // 4. Outbox-core wiring. Forward the TypeORM repository via the
-    //    aliasing Provider so outbox-core does NOT install its
+    //    aliasing Provider so outbox does NOT install its
     //    InMemory default.
     OutboxModule.forRoot({
       eventTypes: [OrderPlacedEvent],
@@ -157,7 +157,7 @@ the database.
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-transactional/core';
-import { OutboxEventPublisher } from '@nestjs-transactional/outbox-core';
+import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 
 @Injectable()
 export class PlaceOrderHandler {
@@ -183,7 +183,7 @@ import { Injectable } from '@nestjs/common';
 import {
   type IOutboxEventsHandler,
   OutboxEventsHandler,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent)

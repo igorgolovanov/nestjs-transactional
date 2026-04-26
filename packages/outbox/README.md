@@ -1,4 +1,4 @@
-# @nestjs-transactional/outbox-core
+# @nestjs-transactional/outbox
 
 Persistent Event Publication Registry for NestJS — an ORM-agnostic core
 that brings Spring Modulith-equivalent delivery guarantees to the
@@ -12,7 +12,7 @@ phase-based dispatching (like Spring Framework core): handlers fire
 That covers a lot, but it is purely in-memory — if the process dies
 between commit and handler invocation, the event is lost.
 
-`outbox-core` closes that gap. It gives you:
+`outbox` closes that gap. It gives you:
 
 - A persistent **Event Publication Registry** — every handler
   invocation is logged atomically with the business transaction.
@@ -32,7 +32,7 @@ sibling package such as `@nestjs-transactional/outbox-typeorm`.
 ## Installation
 
 ```bash
-pnpm add @nestjs-transactional/core @nestjs-transactional/outbox-core
+pnpm add @nestjs-transactional/core @nestjs-transactional/outbox
 # plus a persistence backend, e.g.:
 pnpm add @nestjs-transactional/outbox-typeorm
 ```
@@ -47,11 +47,11 @@ Peer dependencies: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`,
 ```typescript
 import { Module } from '@nestjs/common';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox-core';
+import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
 
 @Module({
   imports: [
-    // isGlobal: true is REQUIRED so outbox-core providers can see
+    // isGlobal: true is REQUIRED so outbox providers can see
     // TransactionManager across module boundaries.
     TransactionalModule.forRoot({
       isGlobal: true,
@@ -79,7 +79,7 @@ import { Injectable } from '@nestjs/common';
 import {
   type IOutboxEventsHandler,
   OutboxEventsHandler,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent)
@@ -115,7 +115,7 @@ See ADR-014 for the rationale behind the class-level shape.
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-transactional/core';
-import { OutboxEventPublisher } from '@nestjs-transactional/outbox-core';
+import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 
 @Injectable()
 export class PlaceOrderHandler {
@@ -183,7 +183,7 @@ unit atomicity (DD-019): if either step fails, the publication is
 recorded as `FAILED` and can be resubmitted via `FailedEventPublications`.
 
 ```typescript
-import { Externalized } from '@nestjs-transactional/outbox-core';
+import { Externalized } from '@nestjs-transactional/outbox';
 
 @Externalized<OrderPlacedEvent>({
   target: 'orders.placed',                       // broker-side destination
@@ -204,7 +204,7 @@ this is normally done by an extension package (`outbox-microservices`).
 Custom implementations can register the same way:
 
 ```typescript
-import { EVENT_EXTERNALIZER, type EventExternalizer } from '@nestjs-transactional/outbox-core';
+import { EVENT_EXTERNALIZER, type EventExternalizer } from '@nestjs-transactional/outbox';
 
 @Module({
   providers: [
@@ -225,7 +225,7 @@ generic externalizer that resolves targets some other way). Inspect
 the resolved mapping at runtime via `ExternalizationRegistry`:
 
 ```typescript
-import { ExternalizationRegistry } from '@nestjs-transactional/outbox-core';
+import { ExternalizationRegistry } from '@nestjs-transactional/outbox';
 
 @Injectable()
 export class MyDiagnostics {
@@ -251,7 +251,7 @@ the code under test published. Mirrors Spring Modulith's
 import {
   PublishedEvents,
   AssertablePublishedEvents,
-} from '@nestjs-transactional/outbox-core/testing';
+} from '@nestjs-transactional/outbox/testing';
 
 describe('PlaceOrder', () => {
   let app: TestingModule;

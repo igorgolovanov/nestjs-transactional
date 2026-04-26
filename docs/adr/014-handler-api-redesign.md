@@ -22,10 +22,16 @@
 > CLAUDE.md DD-013 / "Phase 10: Class-level handler API + naming
 > refinement" for the second-pass rationale.
 
+> **Note (Phase 12 package rename, 2026-04-26):** Throughout this ADR's
+> original text, the abstract outbox package was named
+> `@nestjs-transactional/outbox-core`. It was renamed to
+> `@nestjs-transactional/outbox` in Phase 12. Body references have been
+> updated inline; the handler-API decision content is unchanged.
+
 ## Context
 
 Until this ADR, the listener decorators in both `@nestjs-transactional/cqrs`
-and `@nestjs-transactional/outbox-core` were **method-level**:
+and `@nestjs-transactional/outbox` were **method-level**:
 
 ```ts
 @Injectable()
@@ -155,8 +161,8 @@ an `OutboxListenerRegistrar` is bound under the
   as `AFTER_COMMIT` + `async: true`, wrapped in a fresh transaction.
 
 The registrar is a **structural port** declared in the cqrs package —
-`outbox-core`'s `OutboxListenerRegistry` satisfies the interface
-without cqrs importing from outbox-core (same pattern as
+`outbox`'s `OutboxListenerRegistry` satisfies the interface
+without cqrs importing from outbox (same pattern as
 `OUTBOX_PUBLICATION_SCHEDULER`). Consumers bind the token explicitly in
 their app module:
 
