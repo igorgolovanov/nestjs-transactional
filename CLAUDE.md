@@ -82,10 +82,13 @@ for NestJS applications, not just Spring Framework core.
 - Republish on restart — outbox-core (Phase 5)
 - Completion modes (UPDATE / DELETE / ARCHIVE) — outbox-core (Phase 5)
 - `PublishedEvents` test utility — outbox-core `/testing` (Phase 8)
-- Event externalization to brokers — planned (Phase 11), via the
-  `@nestjs/microservices` `ClientProxy` abstraction in a single
-  `outbox-microservices` package (one package covers all transports;
-  see DD-016)
+- Event externalization to brokers — Phase 11 in progress: SPI,
+  `@Externalized`, `outbox-microservices` package, ADR-015,
+  reliability caveat in ADR-016. One package covers all
+  `@nestjs/microservices` transports (DD-016). End-to-end working
+  example pending in Phase 11.5b. Reliability semantics weaker than
+  Spring Modulith's broker-acked story — see ADR-016 for the
+  trade-off and three production mitigation strategies.
 
 **Explicitly out of scope:**
 - Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)
@@ -222,6 +225,7 @@ Design Decisions section below:
 - **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md`
 - **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md`
 - **ADR-014**: Class-level handler API redesign — `docs/adr/014-handler-api-redesign.md`
+- **ADR-015**: Event externalization architecture — `docs/adr/015-event-externalization-architecture.md`
 - **ADR-016**: Externalization reliability semantics with `@nestjs/microservices` — `docs/adr/016-externalization-reliability-semantics.md`
 
 Planned (not yet written):
@@ -229,7 +233,6 @@ Planned (not yet written):
 - **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md`
 - **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md`
 - **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md` *(the design was absorbed into ADR-014 — see Supersedes note there)*
-- **ADR-015**: Event externalization architecture — `docs/adr/015-event-externalization.md` *(Phase 11)*
 
 Process: every significant architectural decision gets a new ADR numbered n+1.
 The discussion is captured; the status is one of accepted / rejected /
@@ -1442,15 +1445,38 @@ unscheduled) plugging into the same `EVENT_EXTERNALIZER` SPI from
 DD-018 can offer stricter guarantees without breaking existing
 users.
 
-**11.5: Documentation and rename sweep**
-- ADR-015 — event externalization architecture
-- `docs/architecture/event-externalization.md`
-- README for `outbox-microservices` package, Spring Modulith mapping
-  note (`@Externalized` parity)
-- Working example in `examples/outbox-externalization/`
-- Absorbs the deferred Phase B work from Iteration 10:
-  sweep remaining `@ApplicationModuleHandler` references across docs
-  (READMEs, ADR-014, architecture docs, migration guide, examples)
+**11.5: Documentation pass — split into 11.5a (docs) and 11.5b (example)**
+
+*11.5a (shipped, this iteration):*
+- ADR-015 — event externalization architecture (Accepted) with a
+  reliability caveat section that defers to ADR-016.
+- `docs/architecture/event-externalization.md` — diagrams,
+  end-to-end sequence, failure-mode table, reliability semantics,
+  Spring Modulith mapping.
+- `outbox-microservices` README polished with cross-links to
+  ADR-015 / ADR-016 / architecture doc + Spring Modulith mapping
+  summary.
+- `outbox-core` README's existing externalization section linked to
+  ADR-015 / ADR-016 / architecture doc.
+- Root README packages list now includes `outbox-microservices`;
+  Roadmap rows added for Phase 10 (handler rename) and Phase 11
+  (event externalization, in progress); Documentation index links
+  the new architecture doc and ADR-015 / ADR-016.
+- Deferred Phase B doc-wide sweep from Iteration 10 completed —
+  every remaining `@ApplicationModuleHandler` /
+  `IApplicationModuleHandler` / `ApplicationModuleHandlerScanner`
+  reference across READMEs, architecture docs, migration guide,
+  and examples renamed to `@IntegrationEventsHandler` /
+  `IIntegrationEventsHandler` / `IntegrationEventsHandlerScanner`.
+  ADR-014 keeps its body intact as historical record but gains a
+  top note pointing at the second-pass rename.
+
+*11.5b (planned):*
+- `examples/outbox-externalization/` — full Postgres + Kafka stack
+  via docker-compose, real running NestJS app demonstrating the
+  publish → outbox → externalize flow plus the ADR-016 reliability
+  limitation in action ("stop the broker, observe COMPLETED").
+- Verified-running end-to-end against the docker-compose stack.
 
 ### Future phases (not scheduled)
 
@@ -1521,10 +1547,13 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-25 (Phase 11, Iterations 11.0–11.4
-shipped; 11.4 closed with ADR-016 documenting the silent-success
-limitation of `@nestjs/microservices` `ClientProxy.emit()` instead
-of the originally-planned testcontainers integration tests).
+**Last updated**: 2026-04-26 (Phase 11, Iteration 11.5a shipped —
+ADR-015 accepted, `docs/architecture/event-externalization.md`
+created, `outbox-microservices` and `outbox-core` READMEs polished
+with ADR cross-links, root README packages list and roadmap
+updated, deferred doc-wide `@ApplicationModuleHandler` →
+`@IntegrationEventsHandler` rename sweep completed across all
+READMEs / architecture docs / migration guide / examples).
 
 ### Completed
 
@@ -1625,6 +1654,25 @@ of the originally-planned testcontainers integration tests).
   strategies. Future broker-aware externalizers can register under
   the same `EVENT_EXTERNALIZER` SPI (DD-018) for stricter
   guarantees.
+- Phase 11.5a (documentation pass): ADR-015 (event externalization
+  architecture) accepted with a reliability caveat referencing
+  ADR-016. `docs/architecture/event-externalization.md` shipped
+  with a high-level diagram, end-to-end sequence, failure-mode
+  table, reliability semantics section, and Spring Modulith
+  mapping. `outbox-microservices` and `outbox-core` READMEs gained
+  cross-links to the new docs. Root README updated: packages list
+  includes `outbox-microservices`, roadmap rows for Phase 10 +
+  Phase 11, documentation index links the new architecture doc
+  and ADR-015 / ADR-016. Deferred Phase B doc-wide rename sweep
+  from Iteration 10 completed — `@ApplicationModuleHandler` /
+  `IApplicationModuleHandler` / `ApplicationModuleHandlerScanner`
+  replaced by `@IntegrationEventsHandler` /
+  `IIntegrationEventsHandler` /
+  `IntegrationEventsHandlerScanner` across READMEs (root,
+  cqrs, outbox-typeorm, outbox-full-stack), architecture docs,
+  migration guide, and ADR-006. ADR-014 keeps its accepted-text
+  body intact and gains a top note pointing at the second-pass
+  rename.
 
 ### Blocked / Awaiting
 
@@ -1633,13 +1681,12 @@ of the originally-planned testcontainers integration tests).
 
 ### Next
 
-- Phase 11.5: comprehensive documentation pass — ADR-015 (event
-  externalization architecture), `docs/architecture/event-externalization.md`,
-  `outbox-microservices` package README polish, working example in
-  `examples/outbox-externalization/`. Absorbs the deferred
-  doc-wide `@ApplicationModuleHandler` → `@IntegrationEventsHandler`
-  sweep (Phase B from Iteration 10) across READMEs / ADR-014 /
-  architecture docs / migration guide / examples.
+- Phase 11.5b: working example in `examples/outbox-externalization/`
+  — full Postgres + Kafka stack via docker-compose, NestJS app
+  demonstrating the publish → outbox → externalize flow plus the
+  ADR-016 reliability limitation in action ("stop the broker,
+  observe COMPLETED"). Verified-running end-to-end against the
+  docker-compose stack.
 - Phase 9 iteration 9.3: release automation for the outbox
   packages — changeset entries, CI matrix tweaks if needed,
   first 0.1.0-alpha release.

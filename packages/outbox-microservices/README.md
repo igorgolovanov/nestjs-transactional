@@ -10,6 +10,31 @@ existing `ClientsModule` registration in your application — one
 package covers every transport `@nestjs/microservices` already
 supports (Kafka, RabbitMQ, NATS, JMS, gRPC, custom).
 
+## Architectural foundation
+
+- [ADR-015 — event externalization architecture](../../docs/adr/015-event-externalization-architecture.md)
+  explains the design (single-package strategy, structural-port SPI,
+  reuse of `ClientsModule`, atomicity / ordering rules).
+- [ADR-016 — externalization reliability semantics with `@nestjs/microservices`](../../docs/adr/016-externalization-reliability-semantics.md)
+  documents the silent-success limitation that scopes what this
+  package can guarantee out of the box, and the three production
+  mitigation strategies.
+- [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)
+  has diagrams, the end-to-end sequence, the failure-mode table, and
+  the Spring Modulith mapping.
+
+### Spring Modulith mapping (at a glance)
+
+This package is the NestJS analogue of Spring Modulith's
+`@Externalized` plus its four broker-specific artefacts
+(`spring-modulith-events-kafka`, `-amqp`, `-jms`, `-messaging`)
+collapsed into one. `@Externalized` (in `outbox-core`) lifts directly
+from Spring's annotation; the broker setup moves from a Spring
+auto-configuration to the user's own `ClientsModule.register()`.
+Function-based `routingKey` and `headers` callbacks replace SpEL
+expressions; bring your own type system. Full table in the
+architecture doc above.
+
 ## Status
 
 **Alpha / Phase 11.3 of the monorepo roadmap.** The public API is not
@@ -48,6 +73,10 @@ through `ClientProxy`.
 documents the finding in full and lays out the future path
 (broker-aware externalizers using native producers under the same
 `EVENT_EXTERNALIZER` SPI).
+[ADR-015](../../docs/adr/015-event-externalization-architecture.md)
+records why this trade-off is acceptable for the v1 scope —
+[`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)
+has the full sequence diagram and the failure-mode table.
 
 ### Mitigation strategies for production
 

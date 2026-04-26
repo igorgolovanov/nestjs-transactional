@@ -18,7 +18,7 @@ to the single path appropriate to its decorator.
 | --- | --- | --- | --- | --- | --- |
 | `@TransactionalEventsHandler` | cqrs | In-memory, phase-aware | No | No | Joins the publishing tx's lifecycle |
 | `@OutboxEventsHandler` | outbox-core | Persistent, via worker | Yes (operator) | Yes | `REQUIRES_NEW` by default |
-| `@ApplicationModuleHandler` | cqrs | Outbox if registrar bound, else in-memory fallback | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` |
+| `@IntegrationEventsHandler` | cqrs | Outbox if registrar bound, else in-memory fallback | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` |
 
 All three decorators are **metadata-only**: they write a Reflect
 metadata entry on the decorated class and do no runtime work at
@@ -62,14 +62,14 @@ Without that provider, `HybridEventPublisher` behaves identically
 to `TransactionalEventPublisher` (in-memory only) — the
 `@Optional()` injection leaves the outbox half undefined.
 
-## Exactly-once delivery with `@ApplicationModuleHandler`
+## Exactly-once delivery with `@IntegrationEventsHandler`
 
-`@ApplicationModuleHandler` is a standalone class-level decorator
+`@IntegrationEventsHandler` is a standalone class-level decorator
 with its own dedicated metadata key. A separate scanner,
-`ApplicationModuleHandlerScanner` in the cqrs package, decides the
+`IntegrationEventsHandlerScanner` in the cqrs package, decides the
 delivery path at bootstrap:
 
-1. For each provider carrying `@ApplicationModuleHandler` metadata,
+1. For each provider carrying `@IntegrationEventsHandler` metadata,
    check whether the `OUTBOX_LISTENER_REGISTRAR` DI token is bound.
 2. **Bound**: register with the outbox registry (via the structural
    registrar port) with a `REQUIRES_NEW`-wrapped invoke closure.
@@ -85,7 +85,7 @@ only scans for `@TransactionalEventsHandler`, so there is no overlap
 between the two scanners and no skip-logic is needed.
 
 Rule (2) — the automatic routing based on `OUTBOX_LISTENER_REGISTRAR`
-— is what makes `@ApplicationModuleHandler` a "smart default":
+— is what makes `@IntegrationEventsHandler` a "smart default":
 same decorator, two delivery modes, chosen by module wiring rather
 than by decorator choice.
 
@@ -178,9 +178,9 @@ class OrderPlacedMetrics
 }
 
 @Injectable()
-@ApplicationModuleHandler(OrderPlacedEvent)
+@IntegrationEventsHandler(OrderPlacedEvent)
 class ShipOrderHandler
-  implements IApplicationModuleHandler<OrderPlacedEvent>
+  implements IIntegrationEventsHandler<OrderPlacedEvent>
 {
   constructor(private readonly shipping: ShippingClient) {}
   async handle(e: OrderPlacedEvent): Promise<void> {
@@ -202,7 +202,7 @@ class ShipOrderHandler
       registers every `@TransactionalEventsHandler`'d class for the
       event type as a hook on the current transaction's appropriate
       phase list (`AFTER_COMMIT`, `BEFORE_COMMIT`, etc.).
-      `@ApplicationModuleHandler` classes are NOT on this list —
+      `@IntegrationEventsHandler` classes are NOT on this list —
       they were routed at bootstrap to either the outbox (when the
       registrar is bound) or to their own dispatcher entry (when
       not), not via this scanner.
@@ -213,7 +213,7 @@ class ShipOrderHandler
       the whole buffer via `outboxPublisher.publishAll(...)`.
       `publishAll` writes one `event_publication` row per
       registered outbox listener (both plain `@OutboxEventsHandler`
-      classes and outbox-routed `@ApplicationModuleHandler` classes
+      classes and outbox-routed `@IntegrationEventsHandler` classes
       count here).
 
 3. The transaction's `beforeCommit` hooks fire. The outbox flush

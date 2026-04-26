@@ -14,7 +14,7 @@ phases without forking `@nestjs/cqrs` (see ADR-003).
   decorated class implements `ITransactionalEventsHandler<T>` and
   exposes a single `handle(event)` method. Matches the ergonomics of
   `@nestjs/cqrs`'s own `@EventsHandler` (see ADR-014).
-- **`@ApplicationModuleHandler(...events)`** — class-level smart
+- **`@IntegrationEventsHandler(...events)`** — class-level smart
   default for cross-module handlers. Delivers via the outbox when the
   `OUTBOX_LISTENER_REGISTRAR` structural port is bound (durable,
   retried, resumable), falls back to in-memory `AFTER_COMMIT` + `async:
@@ -40,9 +40,9 @@ phases without forking `@nestjs/cqrs` (see ADR-003).
   class-level), or matches kind-specific defaults (e.g. read-only
   wrapping for queries).
 - **`TransactionalListenerScanner` +
-  `ApplicationModuleHandlerScanner`** — `OnModuleInit` scanners that
+  `IntegrationEventsHandlerScanner`** — `OnModuleInit` scanners that
   auto-register every `@TransactionalEventsHandler` /
-  `@ApplicationModuleHandler` class with the appropriate delivery
+  `@IntegrationEventsHandler` class with the appropriate delivery
   path.
 - **`CqrsTransactionalModule.forRoot({...})`** — single entry point that
   wires all of the above.
@@ -222,7 +222,7 @@ Every handler decorator accepts two equivalent forms:
 // Short form — rest params. Use when defaults are fine.
 @TransactionalEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 @OutboxEventsHandler(OrderPlacedEvent)
-@ApplicationModuleHandler(OrderPlacedEvent)
+@IntegrationEventsHandler(OrderPlacedEvent)
 
 // Long form — options object. Use when you need non-default phase,
 // async, fallbackExecution, or a stable listener id.
@@ -232,7 +232,7 @@ Every handler decorator accepts two equivalent forms:
   async: false,
   fallbackExecution: true,
 })
-@ApplicationModuleHandler({
+@IntegrationEventsHandler({
   events: [OrderPlacedEvent],
   id: 'Inventory.stable-id',
 })
@@ -301,7 +301,7 @@ import {
     // Routes AggregateRoot.commit() events to the outbox for durable
     // publication.
     { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-    // Routes @ApplicationModuleHandler classes to the outbox registry
+    // Routes @IntegrationEventsHandler classes to the outbox registry
     // for durable delivery.
     { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
   ],
@@ -319,7 +319,7 @@ With both bindings in place, a single `aggregate.commit()` call:
    `event_publication` rows, atomically with the business write.
 3. Once the transaction commits, the outbox processor (running in
    a worker) polls those rows and invokes every
-   `@OutboxEventsHandler` / `@ApplicationModuleHandler` class
+   `@OutboxEventsHandler` / `@IntegrationEventsHandler` class
    registered for the event.
 
 Rollback rolls back all three: no in-memory handlers fire, no
@@ -338,7 +338,7 @@ business change landed".
   Use for integration with external systems, email sends, billing
   events, or any side effect where at-least-once delivery matters.
   Requires `OutboxModule` to be wired.
-- **`@ApplicationModuleHandler`** — smart default, class-level
+- **`@IntegrationEventsHandler`** — smart default, class-level
   composite. When the outbox registrar is bound, delivery goes
   through the outbox (durable). Without it, delivery falls back to
   the in-memory dispatcher with `AFTER_COMMIT` + `async: true` +
@@ -353,21 +353,21 @@ business change landed".
 | --- | --- | --- | --- | --- | --- |
 | `@TransactionalEventsHandler` | No — in-memory only | No | No | Joins the publishing transaction's lifecycle (fires at configured phase) | Cache invalidation, metrics, in-process enrichment |
 | `@OutboxEventsHandler` | Yes — `event_publication` row per listener | Yes — via operator-triggered resubmit | Yes — `republishOnStartup` replays | `REQUIRES_NEW` per invocation (default) | External API calls, emails, billing events, cross-module integration where loss is unacceptable |
-| `@ApplicationModuleHandler` | Yes if outbox registrar bound, No otherwise | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` (outbox) or `AFTER_COMMIT + async: true` inside a fresh tx (fallback) | Default choice for cross-module handlers — upgrades gracefully when the outbox comes online |
+| `@IntegrationEventsHandler` | Yes if outbox registrar bound, No otherwise | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` (outbox) or `AFTER_COMMIT + async: true` inside a fresh tx (fallback) | Default choice for cross-module handlers — upgrades gracefully when the outbox comes online |
 
-How `@ApplicationModuleHandler` routes depends on module wiring, not
+How `@IntegrationEventsHandler` routes depends on module wiring, not
 on call-site configuration: write one decorator, and the same handler
 runs via the in-memory path during early development and via the
 durable outbox once the team is ready to stand up the worker process.
-`ApplicationModuleHandlerScanner` decides at bootstrap based on
+`IntegrationEventsHandlerScanner` decides at bootstrap based on
 whether the `OUTBOX_LISTENER_REGISTRAR` provider is bound — so the
 handler fires exactly once.
 
 ```ts
 @Injectable()
-@ApplicationModuleHandler(OrderPlacedEvent)
+@IntegrationEventsHandler(OrderPlacedEvent)
 export class InventoryReservationHandler
-  implements IApplicationModuleHandler<OrderPlacedEvent>
+  implements IIntegrationEventsHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     // with outbox wired: runs from the worker, retried on failure.
@@ -379,7 +379,7 @@ export class InventoryReservationHandler
 Supply a stable `id` when the class name might change:
 
 ```ts
-@ApplicationModuleHandler({
+@IntegrationEventsHandler({
   events: [OrderPlacedEvent],
   id: 'Inventory.stable-id',
 })

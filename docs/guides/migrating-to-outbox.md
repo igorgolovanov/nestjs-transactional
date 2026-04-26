@@ -163,7 +163,7 @@ import {
     // NEW — routes AggregateRoot.commit() events to the outbox
     // for durable publication.
     { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-    // NEW — routes @ApplicationModuleHandler classes to the outbox
+    // NEW — routes @IntegrationEventsHandler classes to the outbox
     // registry for durable delivery.
     { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
   ],
@@ -186,8 +186,8 @@ outbox-core's concrete services:
   route `AggregateRoot.commit()` events into the outbox for
   durable publication.
 - `OUTBOX_LISTENER_REGISTRAR` makes
-  `ApplicationModuleHandlerScanner` route
-  `@ApplicationModuleHandler` classes to the outbox instead of
+  `IntegrationEventsHandlerScanner` route
+  `@IntegrationEventsHandler` classes to the outbox instead of
   to the in-memory dispatcher.
 
 Omit either binding and that half of the integration falls back
@@ -219,7 +219,7 @@ export class OrderPlacedMetrics
 }
 ```
 
-### Replace with `@ApplicationModuleHandler` when…
+### Replace with `@IntegrationEventsHandler` when…
 
 - …the handler does cross-module or external-system work and
   at-least-once delivery matters. This covers the typical
@@ -238,9 +238,9 @@ export class SendConfirmationHandler
 }
 
 // After:
-@ApplicationModuleHandler(OrderPlacedEvent)
+@IntegrationEventsHandler(OrderPlacedEvent)
 export class SendConfirmationHandler
-  implements IApplicationModuleHandler<OrderPlacedEvent>
+  implements IIntegrationEventsHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     await this.emailer.send(event);
@@ -358,9 +358,9 @@ class OrderPlacedMetrics
 }
 
 @Injectable()
-@ApplicationModuleHandler(OrderPlacedEvent)
+@IntegrationEventsHandler(OrderPlacedEvent)
 class ShipOrderHandler
-  implements IApplicationModuleHandler<OrderPlacedEvent>
+  implements IIntegrationEventsHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     await this.shipping.createShipment(event.orderId);
@@ -434,12 +434,12 @@ uses a conditional `UPDATE ... WHERE status IN (...)`. If you
 are running the worker on a database without `SKIP LOCKED`
 support, you need a different backend adapter.
 
-**"`@ApplicationModuleHandler` fires twice."**
+**"`@IntegrationEventsHandler` fires twice."**
 Shouldn't happen with the new scanner — each class is routed to
 exactly one path. If you see a double invocation, verify you
 haven't registered the same class twice under different module
 hierarchies, and that you don't have both an
-`@ApplicationModuleHandler` and an `@OutboxEventsHandler` on
+`@IntegrationEventsHandler` and an `@OutboxEventsHandler` on
 overlapping event types from separate classes (which would be
 two deliveries, one per class — the intended behaviour).
 
