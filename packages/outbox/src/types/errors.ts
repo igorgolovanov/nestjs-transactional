@@ -3,7 +3,7 @@ import { TransactionError } from '@nestjs-transactional/core';
 import type { PublicationStatus } from './publication-status';
 
 /**
- * Base class for errors raised by `@nestjs-transactional/outbox-core`.
+ * Base class for errors raised by `@nestjs-transactional/outbox`.
  * Subclass for any specific failure mode so that callers can match on
  * `code` without relying on string parsing.
  */

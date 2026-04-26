@@ -1,11 +1,11 @@
-import { PublicationStatus } from '@nestjs-transactional/outbox-core';
+import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 /**
  * Hot-queue TypeORM entity backing the Event Publication Registry.
  *
  * Schema follows the contract of `EventPublication` from
- * `@nestjs-transactional/outbox-core`. Rows move through the lifecycle
+ * `@nestjs-transactional/outbox`. Rows move through the lifecycle
  * `PUBLISHED → PROCESSING → COMPLETED` (or `FAILED → RESUBMITTED → ...`
  * on retry).
  *

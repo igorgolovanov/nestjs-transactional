@@ -7,10 +7,10 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
  * Minimal structural contract for the outbox-side publisher. Declared
  * here (and injected via the {@link OUTBOX_PUBLICATION_SCHEDULER}
  * token) rather than importing from
- * `@nestjs-transactional/outbox-core` directly — keeps `cqrs` usable
+ * `@nestjs-transactional/outbox` directly — keeps `cqrs` usable
  * without pulling in the outbox stack.
  *
- * `@nestjs-transactional/outbox-core`'s `OutboxEventPublisher`
+ * `@nestjs-transactional/outbox`'s `OutboxEventPublisher`
  * satisfies this interface structurally (it exposes
  * `scheduleForPublication`). Wire the token in the host application
  * when the outbox is enabled:

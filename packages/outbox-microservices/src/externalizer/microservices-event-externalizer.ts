@@ -11,7 +11,7 @@ import {
   type EventExternalizer,
   ExternalizationError,
   type ExternalizationMetadata,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import { firstValueFrom } from 'rxjs';
 
 import {

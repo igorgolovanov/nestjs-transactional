@@ -4,7 +4,7 @@ import {
   TransactionManager,
   TransactionalModule,
 } from '@nestjs-transactional/core';
-import { PublicationStatus } from '@nestjs-transactional/outbox-core';
+import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
 

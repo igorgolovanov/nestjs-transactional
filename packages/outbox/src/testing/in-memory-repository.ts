@@ -23,7 +23,7 @@ import { PublicationStatus } from '../types/publication-status';
 /**
  * In-memory reference implementation of {@link EventPublicationRepository}.
  *
- * Intended for unit and integration tests of outbox-core consumers that
+ * Intended for unit and integration tests of outbox consumers that
  * do not want to spin up a real database. Not thread-safe — do not use
  * in production.
  *

@@ -4,7 +4,7 @@ import { type ClientProxy } from '@nestjs/microservices';
 import {
   ExternalizationError,
   type ExternalizationMetadata,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import { Observable, of, throwError } from 'rxjs';
 
 import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';

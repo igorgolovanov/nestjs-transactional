@@ -5,7 +5,7 @@ import {
   EVENT_EXTERNALIZER,
   type EventExternalizer,
   type ExternalizationMetadata,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import { of } from 'rxjs';
 
 import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';

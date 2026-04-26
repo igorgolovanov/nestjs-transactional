@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 import { CommandBus } from '@nestjs/cqrs';
-import { PublicationStatus } from '@nestjs-transactional/outbox-core';
+import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { EventPublicationEntity } from '@nestjs-transactional/outbox-typeorm';
 
 import { AppModule, createDataSource, readPostgresConfigFromEnv } from './app.module';

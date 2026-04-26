@@ -29,7 +29,7 @@ type HandlerMethod = (event: unknown) => unknown;
  * whether an {@link OutboxListenerRegistrar} is bound:
  *
  * - **Outbox bound** (typically via `OutboxModule` from
- *   `@nestjs-transactional/outbox-core`): the handler's `handle`
+ *   `@nestjs-transactional/outbox`): the handler's `handle`
  *   method is registered with the outbox registry, wrapped in a
  *   `REQUIRES_NEW` transaction. Delivery is durable, at-least-once,
  *   retried on failure, survives restarts.

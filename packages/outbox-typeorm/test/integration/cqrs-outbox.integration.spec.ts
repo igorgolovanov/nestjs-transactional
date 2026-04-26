@@ -25,7 +25,7 @@ import {
   OutboxListenerRegistry,
   OutboxModule,
   PublicationStatus,
-} from '@nestjs-transactional/outbox-core';
+} from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
 import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';

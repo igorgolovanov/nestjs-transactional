@@ -11,7 +11,7 @@
   "dependencies": {
     "@nestjs-transactional/core": "workspace:*",
     "@nestjs-transactional/cqrs": "workspace:*",
-    "@nestjs-transactional/outbox-core": "workspace:*",
+    "@nestjs-transactional/outbox": "workspace:*",
     "@nestjs-transactional/outbox-typeorm": "workspace:*",
     "@nestjs-transactional/typeorm": "workspace:*",
     "@nestjs/common": "^11.0.0",

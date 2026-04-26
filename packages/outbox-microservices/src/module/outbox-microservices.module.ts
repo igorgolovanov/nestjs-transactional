@@ -5,7 +5,7 @@ import {
   type ModuleMetadata,
   type Provider,
 } from '@nestjs/common';
-import { EVENT_EXTERNALIZER } from '@nestjs-transactional/outbox-core';
+import { EVENT_EXTERNALIZER } from '@nestjs-transactional/outbox';
 
 import { MicroservicesEventExternalizer } from '../externalizer/microservices-event-externalizer';
 import {
@@ -29,7 +29,7 @@ export interface OutboxMicroservicesAsyncOptions extends Pick<ModuleMetadata, 'i
 /**
  * NestJS module that wires the
  * {@link MicroservicesEventExternalizer} as the
- * `EventExternalizer` for `outbox-core`. Reuses the user's existing
+ * `EventExternalizer` for `outbox`. Reuses the user's existing
  * `@nestjs/microservices` `ClientsModule` registration (DD-017) — the
  * package does NOT register clients itself.
  *

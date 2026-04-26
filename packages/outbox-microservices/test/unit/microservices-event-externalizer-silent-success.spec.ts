@@ -30,7 +30,7 @@
 import { type InjectionToken, Logger } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 import { type ClientProxy } from '@nestjs/microservices';
-import { type ExternalizationMetadata } from '@nestjs-transactional/outbox-core';
+import { type ExternalizationMetadata } from '@nestjs-transactional/outbox';
 import { Observable, of } from 'rxjs';
 
 import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';

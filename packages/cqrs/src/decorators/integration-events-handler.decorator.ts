@@ -6,7 +6,7 @@ import { type Type } from '@nestjs/common';
  * Metadata key under which {@link IntegrationEventsHandlerMetadata} is
  * stored on classes decorated with {@link IntegrationEventsHandler}.
  *
- * Private to the cqrs package — not shared with outbox-core (the
+ * Private to the cqrs package — not shared with outbox (the
  * smart scanner routes the handler based on whether a registrar is
  * bound, not by inspecting shared metadata).
  */

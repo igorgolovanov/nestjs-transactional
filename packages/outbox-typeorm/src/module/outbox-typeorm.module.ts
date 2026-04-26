@@ -1,5 +1,5 @@
 import { type DynamicModule, Module, type Provider } from '@nestjs/common';
-import { EVENT_PUBLICATION_REPOSITORY } from '@nestjs-transactional/outbox-core';
+import { EVENT_PUBLICATION_REPOSITORY } from '@nestjs-transactional/outbox';
 import type { DataSource } from 'typeorm';
 
 import { TypeOrmEventPublicationRepository } from '../repository/typeorm-event-publication.repository';
