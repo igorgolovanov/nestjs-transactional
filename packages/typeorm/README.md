@@ -255,6 +255,16 @@ The bundled `docker-compose.yml` is for manual local use (`psql` against a persi
 
 When a method uses `PropagationMode.NESTED` from inside an existing TypeORM transaction, the adapter issues a `SAVEPOINT sp_<uuid-30>` statement. Rollback rolls back to the savepoint; the outer transaction continues. Savepoint names are at most 33 characters long — valid on Postgres, MySQL, MariaDB, SQLite, and Oracle's identifier limit.
 
+## Worked examples
+
+- [`basic-transactional`](../../examples/basic-transactional) — `@Transactional()` on `@InjectRepository`, single DataSource. Phase 14.20 transparent repository showcase.
+- [`multi-datasource-basic`](../../examples/multi-datasource-basic) — two DataSources with `@Transactional({ dataSource })`, no outbox.
+- [`read-write-separation`](../../examples/read-write-separation) — master + replica, only the master gets `TypeOrmTransactionalModule`.
+- [`async-config-from-environment`](../../examples/async-config-from-environment) — `TypeOrmTransactionalModule.forRootAsync` end-to-end with `ConfigService` + Joi profiles.
+- [`e-commerce-orders`](../../examples/e-commerce-orders) — three-DataSource flagship combining transparent repositories + per-DS outbox + CQRS + REST + Kafka externalization.
+
+Full catalogue: [examples/README.md](../../examples/README.md).
+
 ## Status
 
 Work in progress. Not yet published to npm.
