@@ -1,5 +1,4 @@
-import { type DynamicModule, Module } from '@nestjs/common';
-import { CqrsModule } from '@nestjs/cqrs';
+import { type DynamicModule, Global, Module } from '@nestjs/common';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import {
   CqrsTransactionalModule,
@@ -61,6 +60,34 @@ export async function createDataSource(config: PostgresConfig): Promise<DataSour
   return ds;
 }
 
+/**
+ * Bridges the outbox stack into the cqrs package's structural ports.
+ *
+ * - Binds `OutboxEventPublisher` under `OUTBOX_PUBLICATION_SCHEDULER`
+ *   so `HybridEventPublisher`'s `@Optional()` injection picks it up
+ *   and routes aggregate-emitted events through both the in-memory
+ *   dispatcher AND the outbox.
+ * - Binds `OutboxListenerRegistry` under `OUTBOX_LISTENER_REGISTRAR`
+ *   so `IntegrationEventsHandlerScanner` routes
+ *   `@IntegrationEventsHandler` classes through the outbox for
+ *   durable delivery. Without this binding the scanner falls back
+ *   to in-memory `AFTER_COMMIT` dispatch.
+ *
+ * `@Global()` + explicit `exports` are required: the consumers of
+ * these tokens live INSIDE `CqrsTransactionalModule`, which has its
+ * own DI scope and cannot see plain `providers` declared on the
+ * application module.
+ */
+@Global()
+@Module({
+  providers: [
+    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
+    { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
+  ],
+  exports: [OUTBOX_PUBLICATION_SCHEDULER, OUTBOX_LISTENER_REGISTRAR],
+})
+class OutboxCqrsBridgeModule {}
+
 @Module({})
 export class AppModule {
   static forDataSource(dataSource: DataSource): DynamicModule {
@@ -88,21 +115,16 @@ export class AppModule {
         // the worker in the same application so the demo runs end to
         // end.
         OutboxProcessingModule,
-        CqrsModule.forRoot(),
+        // NOTE: CqrsModule is intentionally NOT imported alongside
+        // CqrsTransactionalModule — the latter imports the former
+        // internally and overrides the EventPublisher DI token. A
+        // duplicate import shadows the override and aggregate events
+        // bypass the dispatcher (CLAUDE.md convention #6).
         CqrsTransactionalModule.forRoot(),
+        OutboxCqrsBridgeModule,
       ],
       providers: [
         { provide: DataSource, useValue: dataSource },
-        // Binds OutboxEventPublisher under the CQRS package's scheduler
-        // token. HybridEventPublisher's @Optional injection picks it up
-        // and routes aggregate events through both paths.
-        { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-        // Binds OutboxListenerRegistry under the CQRS package's
-        // registrar token. IntegrationEventsHandlerScanner picks it up
-        // and routes @IntegrationEventsHandler classes to the outbox
-        // for durable delivery. Without this binding the scanner falls
-        // back to in-memory AFTER_COMMIT dispatch.
-        { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
         OrderRepository,
         PlaceOrderHandler,
         ShippingHandlers,

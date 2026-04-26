@@ -17,8 +17,6 @@ import {
   stopPostgresContainer,
 } from '../setup-testcontainers';
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 function seedInput(overrides: {
   listenerId?: string;
   eventType?: string;
@@ -175,7 +173,14 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
       expect(ready.map((p) => p.listenerId)).toEqual(['a', 'b', 'c']);
     });
 
-    it('FOR UPDATE SKIP LOCKED: two concurrent workers each get disjoint rows', async () => {
+    it('concurrent workers race for the same rows — tryClaim guarantees exactly-one-claim semantics', async () => {
+      // Architectural note: previous design used `FOR UPDATE SKIP
+      // LOCKED` here to give workers disjoint row sets. That design
+      // was dropped (the pessimistic lock requires an enclosing
+      // transaction whose lifetime did not fit the worker flow);
+      // correctness now relies entirely on `tryClaim`, which uses
+      // an atomic conditional UPDATE so only one worker per row can
+      // win the claim. This test pins that contract.
       await manager.run({}, () =>
         repo.createAll([
           seedInput({ listenerId: 'p1' }),
@@ -185,30 +190,30 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
         ]),
       );
 
-      // Two concurrent transactions each poll with limit=2. SKIP LOCKED
-      // makes the second poll skip the rows already locked by the first
-      // — so the two results together cover all four rows without
-      // duplicates. The 120ms sleep inside each tx keeps both locks
-      // alive long enough to observe the skip.
-      const [batchA, batchB] = await Promise.all([
-        manager.run({}, async () => {
-          const got = await repo.findReadyForProcessing(2);
-          await sleep(120);
-          return got;
-        }),
-        manager.run({}, async () => {
-          await sleep(20);
-          const got = await repo.findReadyForProcessing(2);
-          return got;
-        }),
-      ]);
+      async function workerClaim(): Promise<string[]> {
+        // Each worker fetches the full ready set and then races to
+        // claim every row it sees. With FOR UPDATE SKIP LOCKED gone
+        // both workers DO see the same four rows, but `tryClaim`'s
+        // conditional UPDATE returns false on rows another worker
+        // already won.
+        const ready = await repo.findReadyForProcessing(10);
+        const claimed: string[] = [];
+        for (const row of ready) {
+          if (await repo.tryClaim(row.id)) {
+            claimed.push(row.id);
+          }
+        }
+        return claimed;
+      }
 
-      const idsA = batchA.map((p) => p.id).sort();
-      const idsB = batchB.map((p) => p.id).sort();
-      expect(idsA).toHaveLength(2);
-      expect(idsB).toHaveLength(2);
-      expect(idsA.some((id) => idsB.includes(id))).toBe(false);
-      expect(new Set([...idsA, ...idsB]).size).toBe(4);
+      const [claimedA, claimedB] = await Promise.all([workerClaim(), workerClaim()]);
+
+      // Together the workers claim all four rows exactly once: no
+      // overlap, no missed rows, total claims === 4.
+      expect(claimedA.some((id) => claimedB.includes(id))).toBe(false);
+      const claimedAll = [...claimedA, ...claimedB].sort();
+      expect(claimedAll).toHaveLength(4);
+      expect(new Set(claimedAll).size).toBe(4);
     });
   });
 

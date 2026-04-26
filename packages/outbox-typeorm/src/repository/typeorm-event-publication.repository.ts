@@ -32,12 +32,20 @@ import { EventPublicationEntity } from '../entity/event-publication.entity';
  * `@nestjs-transactional/core`'s `AsyncLocalStorage`), so publication
  * rows commit atomically with the business data.
  *
- * `findReadyForProcessing` uses `SELECT ... FOR UPDATE SKIP LOCKED` so
- * multiple workers can poll the queue concurrently without fighting
- * over the same rows. `tryClaim` uses a conditional `UPDATE` that
- * transitions `PUBLISHED`/`RESUBMITTED` → `PROCESSING` atomically and
- * returns whether the row was actually claimed, so a losing worker can
- * move on to the next publication.
+ * `findReadyForProcessing` returns ready rows in publication-date
+ * order WITHOUT per-row locking. The earlier design used
+ * `SELECT ... FOR UPDATE SKIP LOCKED` to give concurrent workers
+ * disjoint row sets; that approach was dropped because pessimistic
+ * locks require an enclosing transaction whose lifetime did not fit
+ * the worker's `find → tryClaim → invoke → finalize` flow (a
+ * transaction wide enough to hold the lock would have to wrap the
+ * listener invocation, which is unsafe for long-running listeners).
+ * Concurrent workers may now SEE the same rows; correctness comes
+ * from {@link tryClaim}, whose conditional `UPDATE` transitions
+ * `PUBLISHED`/`RESUBMITTED` → `PROCESSING` atomically and returns
+ * whether the row was actually claimed. A losing worker simply moves
+ * on. With small worker counts (typical: 1–3) the duplicate-fetch
+ * cost is negligible.
  *
  * The repository is adapter-instance-aware: pass a non-default
  * `adapterInstance` when the application uses multiple DataSources
@@ -138,8 +146,6 @@ export class TypeOrmEventPublicationRepository implements EventPublicationReposi
       })
       .orderBy('p.publication_date', 'ASC')
       .limit(limit)
-      .setLock('pessimistic_write')
-      .setOnLocked('skip_locked')
       .getMany();
 
     return entities.map(toDomain);
