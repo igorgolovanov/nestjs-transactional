@@ -113,7 +113,7 @@ In outbox (`/testing` subpath) and cqrs (`/testing` subpath):
 - `docs/architecture/outbox-integration-with-cqrs.md`
 - ADR-006 through ADR-009 (and ADR-010 from Phase 7)
 - Migration guide: `@TransactionalEventsHandler` → `@OutboxEventsHandler`
-- Full working example in `examples/outbox-full-stack/`
+- Full working example absorbed into Tier 1 `basic-typeorm-outbox` and Tier 5 `e-commerce-orders` (Phase 14.8a / 14.8e example library)
 - CI updates for new packages
 - Changesets for version bumps
 - Update main README with the expanded roadmap
@@ -330,11 +330,10 @@ Two-commit shape:
   fallbackExecution still fires when no transaction is active
   anywhere.
 
-Pre-Phase-14.3.1 manual workarounds removed across multi-DS specs
-and `examples/outbox-full-stack/src/app.module.ts`. The
-[`docs/known-limitations.md`](../known-limitations.md) entry for
-the scanner gaps was removed entirely. ADR-018 carries Phase 14.3.1
-addendum.
+Pre-Phase-14.3.1 manual workarounds removed across multi-DS specs.
+The [`docs/known-limitations.md`](../known-limitations.md) entry
+for the scanner gaps was removed entirely. ADR-018 carries Phase
+14.3.1 addendum.
 
 **14.4: TypeORM adapter migration (`@nestjs-transactional/typeorm`)**
 - `TransactionalTypeOrmAdapter` constructor accepts a dataSource

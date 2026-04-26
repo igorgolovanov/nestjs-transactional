@@ -103,7 +103,7 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
   example's pattern) or `getCurrentEntityManager()`.
 - **Don't import `CqrsModule` directly alongside
   `CqrsTransactionalModule.forRoot()`.** Not relevant here (no CQRS),
-  but the rule applies to `basic-cqrs` and `cqrs-full-stack`.
+  but the rule applies to `basic-cqrs` and `e-commerce-orders`.
 
 ## Related examples
 
@@ -113,8 +113,9 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
   the in-memory test adapter — no Docker, no DB.
 - [`basic-cqrs`](../basic-cqrs) — `@CommandHandler` +
   `@TransactionalEventsHandler` (in-memory phase-aware delivery).
-- [`outbox-full-stack`](../outbox-full-stack) — same TypeORM + outbox
-  shape plus `@nestjs/cqrs` `AggregateRoot` events.
+- [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
+  combining the same TypeORM + outbox shape with `@nestjs/cqrs`
+  aggregates, multi-DataSource saga, and Kafka externalization.
 
 ## Further reading
 

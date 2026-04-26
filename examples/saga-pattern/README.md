@@ -152,8 +152,8 @@ pnpm -C examples/saga-pattern start
   `OutboxModule.forFeature` so the outbox sees them. Aggregate-
   emitted events that are NOT in the registry stay in-memory only
   and the saga chain breaks silently. (See
-  [`outbox-full-stack`](../outbox-full-stack) for the aggregate-
-  root + outbox combo.)
+  [`e-commerce-orders`](../e-commerce-orders) for the aggregate-
+  root + outbox combo at Tier 5 scale.)
 - **Compensation publishing more events.** This example's
   compensation handler is a leaf — it does not publish further
   events. If your compensation needs to fan out (e.g. notify a
@@ -166,8 +166,11 @@ pnpm -C examples/saga-pattern start
 
 ## Related examples
 
-- [`outbox-full-stack`](../outbox-full-stack) — single-step outbox
-  delivery with `AggregateRoot`. Foundation pattern.
+- [`basic-typeorm-outbox`](../basic-typeorm-outbox) — single-step
+  outbox delivery with TypeORM persistence. Foundation pattern.
+- [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
+  with the same saga pattern at multi-DataSource scale plus REST
+  surface and Kafka externalization.
 - [`multi-datasource-outbox`](../multi-datasource-outbox) — outbox
   per dataSource with decorator-driven routing (Phase 14.3.1).
 - [`externalization-with-fallback`](../externalization-with-fallback) —

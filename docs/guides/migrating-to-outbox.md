@@ -459,4 +459,5 @@ two deliveries, one per class — the intended behaviour).
 - [ADR-006 — outbox rationale](../adr/006-outbox-pattern.md)
 - [ADR-007 — outbox architecture](../adr/007-outbox-architecture.md)
 - [ADR-014 — class-level handler API redesign](../adr/014-handler-api-redesign.md)
-- [`examples/outbox-full-stack/`](../../examples/outbox-full-stack/)
+- [`examples/basic-typeorm-outbox/`](../../examples/basic-typeorm-outbox/) (single-DS production-shape baseline)
+- [`examples/e-commerce-orders/`](../../examples/e-commerce-orders/) (Phase 14.8e flagship; multi-DS outbox + CQRS + Kafka externalization)

@@ -23,7 +23,8 @@ together, not persistence.
   delivery (this example) and durable outbox delivery (`basic-outbox`).
 
 For a more involved CQRS setup (TypeORM persistence, multiple phases,
-projections, queries) see [`cqrs-full-stack`](../cqrs-full-stack).
+projections, queries, REST controller, multi-DataSource saga) see
+the Tier 5 [`e-commerce-orders`](../e-commerce-orders) flagship.
 For durable cross-process delivery see [`basic-outbox`](../basic-outbox)
 and [`basic-typeorm-outbox`](../basic-typeorm-outbox).
 
@@ -121,9 +122,10 @@ Expected `pnpm start` output:
   Useful for compensating actions or observability.
 - `AFTER_COMPLETION` — fires on either commit or rollback.
 
-`cqrs-full-stack` demonstrates `AFTER_ROLLBACK` alongside
-`AFTER_COMMIT`. The full enum is in
-`@nestjs-transactional/cqrs`'s `TransactionPhase`.
+[`saga-pattern`](../saga-pattern) demonstrates `AFTER_ROLLBACK`
+alongside `AFTER_COMMIT` for compensating-action handlers.
+The full enum is in `@nestjs-transactional/cqrs`'s
+`TransactionPhase`.
 
 ## Related examples
 
@@ -133,8 +135,9 @@ Expected `pnpm start` output:
   (`@OutboxEventsHandler`), in-memory backend.
 - [`basic-typeorm-outbox`](../basic-typeorm-outbox) — durable
   outbox + Postgres + atomicity testcontainers test.
-- [`cqrs-full-stack`](../cqrs-full-stack) — TypeORM persistence,
-  multiple phases, projection rollback handler, query handler.
+- [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
+  combining TypeORM persistence, multi-DataSource saga, projections,
+  query handlers, REST controller, and Kafka externalization.
 
 ## Further reading
 

@@ -13,8 +13,8 @@ this shape?" rather than "this is the shortest illustration of X."
   correctly.
 - You want to see how Tier 1–4 patterns compose: choreographed
   saga (Tier 4), per-DS outbox (Tier 2), externalization (Tier
-  3), CQRS aggregate-root commit (`outbox-full-stack` carry-over),
-  REST surface (new in Tier 5) — all in one app.
+  3), CQRS aggregate-root commit, REST surface (new in Tier 5) —
+  all in one app.
 - You're evaluating the framework against a non-trivial
   benchmark.
 
@@ -247,9 +247,9 @@ docker compose exec kafka kafka-console-consumer \
   outbox stacks without externalization.
 - [`externalization-multi-datasource`](../externalization-multi-datasource)
   — multi-DS + per-event broker routing without the saga / REST.
-- [`outbox-full-stack`](../outbox-full-stack) — single-DS
-  CQRS + outbox + worker. Slated for absorption into this
-  example during Phase 14.8f doc sweep.
+- [`basic-typeorm-outbox`](../basic-typeorm-outbox) — single-DS
+  outbox + Postgres baseline; this flagship is its multi-DS
+  composition.
 
 ## Further reading
 
