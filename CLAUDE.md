@@ -228,6 +228,7 @@ Design Decisions section below:
 - **ADR-015**: Event externalization architecture — `docs/adr/015-event-externalization-architecture.md`
 - **ADR-016**: Externalization reliability semantics with `@nestjs/microservices` — `docs/adr/016-externalization-reliability-semantics.md`
 - **ADR-018**: Multi-adapter architecture (dataSource-name-keyed registration) — `docs/adr/018-multi-adapter-architecture.md`
+- **ADR-019**: OutboxModule multi-`forRoot` registration pattern (Phase 14.3.2) — `docs/adr/019-outbox-multi-forroot-pattern.md`
 
 Planned (not yet written):
 
