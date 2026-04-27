@@ -103,6 +103,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
 
   beforeEach(async () => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

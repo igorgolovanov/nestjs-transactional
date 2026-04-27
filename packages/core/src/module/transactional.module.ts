@@ -29,92 +29,119 @@ import {
 import type { TransactionAdapter } from '../types/transaction-adapter';
 
 /**
- * Options accepted by {@link TransactionalModule.forRoot}.
+ * Synchronous options for {@link TransactionalModule.forRoot}.
+ *
+ * Multi-dataSource deployments call `forRoot` once per dataSource:
+ *
+ * ```ts
+ * TransactionalModule.forRoot({ adapter: defaultAdapter }),                 // default
+ * TransactionalModule.forRoot({ adapter: billingAdapter }),                 // billing
+ * TransactionalModule.forRoot({ adapter: inventoryAdapter }),               // inventory
+ * ```
+ *
+ * Matches NestJS conventions (`TypeOrmModule`, `MongooseModule`,
+ * `ClientsModule`) and aligns with `OutboxModule.forRoot` from
+ * Phase 14.3.2 (ADR-019). Cross-call coordination of singletons
+ * (`AdapterRegistry`, `TransactionManager`, `APP_INTERCEPTOR`,
+ * `TransactionalMethodsBootstrap`, `TRANSACTION_OBSERVERS`) lives in
+ * static class storage on {@link TransactionalModule}, mirroring
+ * `@nestjs/typeorm`'s `EntitiesMetadataStorage` pattern.
+ *
+ * The `infrastructure-only` shorthand `TransactionalModule.forRoot({})`
+ * (no adapter) is preserved for setups where the adapter is contributed
+ * by an integration package's `forFeature` (e.g.
+ * `TypeOrmTransactionalModule.forFeature` calls `AdapterRegistry.register`
+ * imperatively at module-init time).
+ *
+ * Q5 invariants on multi-call:
+ * - Two calls with the same `adapter.dataSourceName` throw at module-
+ *   definition time.
+ * - Two `forRoot({})` calls (both infrastructure-only) — the second
+ *   throws because infrastructure has already been registered.
+ * - `forRoot({})` then `forRoot({ adapter })` works.
+ * - `forRoot({ adapter A })` then `forRoot({ adapter B })` (different
+ *   dataSource) works.
+ * - `forRoot({ adapter })` then `forRoot({})` throws (infrastructure
+ *   already registered).
+ *
+ * Tests that build multiple modules sequentially MUST call
+ * {@link TransactionalModule.resetForTesting} in `beforeEach`.
  */
 export interface TransactionalModuleOptions {
   /**
-   * When `true`, the module is registered as `@Global()` — its exports are
-   * available app-wide without being re-imported. Defaults to `false`.
+   * Adapter instance to register. The adapter's `dataSourceName`
+   * keys this registration; duplicate dataSource names across
+   * `forRoot` calls throw. When omitted, this call only registers
+   * the process-wide infrastructure — adapters are then expected
+   * from an integration package (e.g.
+   * `TypeOrmTransactionalModule.forFeature`).
+   */
+  readonly adapter?: TransactionAdapter;
+
+  /**
+   * When `true` (default — Phase 14.10), the module is registered as
+   * `@Global()` — its exports are available app-wide without being
+   * re-imported. Honored per call (each `forRoot` builds its own
+   * `DynamicModule` with its own `global` flag). Multi-call setups
+   * effectively require `isGlobal: true` on at least the first call
+   * for `TransactionManager` and `AdapterRegistry` to be visible
+   * across sibling DynamicModules; the default flip aligns the API
+   * with `OutboxModule` (also default-global) and removes a
+   * common-case footgun.
    */
   readonly isGlobal?: boolean;
 
   /**
-   * When `true` (default), registers {@link TransactionalInterceptor} as
-   * `APP_INTERCEPTOR`. Set to `false` to opt out — for instance to wire the
-   * interceptor manually on specific controllers.
+   * When `true` (default), the FIRST `forRoot` call registers
+   * {@link TransactionalInterceptor} as `APP_INTERCEPTOR`. Honored
+   * only on the first call — the value passed to subsequent calls is
+   * ignored (the interceptor is process-wide).
    */
   readonly registerInterceptor?: boolean;
 
   /**
-   * When `true` (default), registers {@link TransactionalMethodsBootstrap}
-   * — an `OnApplicationBootstrap` service that wraps every
-   * `@Transactional()` method on plain `@Injectable()` providers with
-   * `TransactionManager.run(...)`. Set to `false` to opt out when the
-   * application has no service-level `@Transactional` methods, or when
-   * another mechanism handles wrapping.
+   * When `true` (default), the FIRST `forRoot` call registers
+   * {@link TransactionalMethodsBootstrap} — an
+   * `OnApplicationBootstrap` service that wraps every `@Transactional()`
+   * method on plain `@Injectable()` providers with
+   * `TransactionManager.run(...)`. Honored only on the first call;
+   * subsequent calls' value is ignored.
    */
   readonly registerMethodsBootstrap?: boolean;
 
   /**
-   * Single adapter shorthand (DD-021). Registers the adapter under
-   * `(adapter.name, adapter.dataSourceName)` and exposes per-dataSource
-   * DI tokens (`getTransactionalAdapterToken`,
-   * `getTransactionContextToken`, `getTransactionManagerToken`).
-   *
-   * Recommended for the common single-adapter case. For multi-adapter
-   * setups, list every adapter in {@link adapters} — this module
-   * supports a single `forRoot()` call only (NestJS provider
-   * deduplication makes multi-`forRoot()` infeasible without
-   * coordination state we deliberately do not maintain).
-   */
-  readonly adapter?: TransactionAdapter;
-
-  /**
-   * Multiple adapters as full {@link AdapterRegistration} entries, for
-   * advanced multi-adapter setups. The first entry becomes the default
-   * unless a later entry is passed with `isDefault: true` via a manual
-   * registration.
-   *
-   * For multi-adapter, register every adapter through this single
-   * array — multi-`forRoot()` calls are not supported.
-   */
-  readonly adapters?: readonly AdapterRegistration[];
-
-  /**
    * Transaction observers registered under {@link TRANSACTION_OBSERVERS}.
-   * Omit to leave the token unbound — `TransactionManager` falls back to an
-   * empty list. Provide your own `TRANSACTION_OBSERVERS` provider instead
-   * if your observers require DI resolution.
+   * Honored only on the FIRST `forRoot` call (Q2 invariant) — passing
+   * `observers` to a subsequent call throws at module-definition time.
+   * Provide your own `TRANSACTION_OBSERVERS` provider via standard DI
+   * if your observers need DI resolution.
    */
   readonly observers?: readonly TransactionObserver[];
 }
 
 /**
- * Shape returned by {@link TransactionalModuleAsyncOptions.useFactory}.
- * Only `adapters` and `observers` are resolvable asynchronously —
- * `isGlobal` and `registerInterceptor` remain static because they must be
- * known at module definition time.
+ * Result shape resolved by {@link TransactionalModuleAsyncOptions.useFactory}.
+ *
+ * Per-DS DI tokens (`getTransactionalAdapterToken(ds)`,
+ * `getTransactionContextToken(ds)`,
+ * `getTransactionManagerToken(ds)`) are NOT registered for
+ * `forRootAsync` because the dataSource name is only known after the
+ * async factory runs, while NestJS provider tokens must be declared
+ * statically. If per-DS injection matters, use sync
+ * `forRoot({ adapter })` instead — build the adapter configuration
+ * through your own async logic before reaching the module imports.
  */
 export interface TransactionalModuleAsyncFactoryResult {
-  /**
-   * Single adapter shorthand — equivalent to the {@link adapters} array
-   * but lets the factory return one adapter directly. See
-   * {@link TransactionalModuleOptions.adapter} for semantics.
-   *
-   * Per-dataSource DI tokens (`getTransactionalAdapterToken` etc.) are
-   * NOT registered for `forRootAsync` because the dataSource name is
-   * only known after the async factory runs, while NestJS provider
-   * tokens must be declared statically. Use synchronous
-   * `forRoot({ adapter })` if per-dataSource tokens are required.
-   */
   readonly adapter?: TransactionAdapter;
-  readonly adapters?: readonly AdapterRegistration[];
   readonly observers?: readonly TransactionObserver[];
 }
 
 /**
- * Options for {@link TransactionalModule.forRootAsync}. Mirrors the shape
- * of other `*Async` helpers in the NestJS ecosystem.
+ * Asynchronous options for {@link TransactionalModule.forRootAsync}.
+ * Mirrors the multi-call pattern of `forRoot`: each call registers one
+ * dataSource's adapter (resolved asynchronously). See
+ * {@link TransactionalModuleAsyncFactoryResult} for the per-DS-token
+ * limitation.
  */
 export interface TransactionalModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
   readonly isGlobal?: boolean;
@@ -126,223 +153,400 @@ export interface TransactionalModuleAsyncOptions extends Pick<ModuleMetadata, 'i
   readonly inject?: readonly InjectionToken[];
 }
 
-const ASYNC_OPTIONS_TOKEN = Symbol('TRANSACTIONAL_ASYNC_OPTIONS');
+const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
+  Symbol(`TRANSACTIONAL_ASYNC_OPTIONS[${id}]`);
+const ASYNC_REGISTRATION_TOKEN = (id: number): symbol =>
+  Symbol(`TRANSACTIONAL_ASYNC_REGISTRATION[${id}]`);
 
 /**
  * NestJS module that wires the core transactional runtime:
- * {@link AdapterRegistry}, {@link TransactionManager}, and (by default) the
- * global {@link TransactionalInterceptor}. Import it once at the
- * application root via {@link TransactionalModule.forRoot} or the async
- * {@link TransactionalModule.forRootAsync}.
+ * {@link AdapterRegistry}, {@link TransactionManager}, and (by
+ * default) the global {@link TransactionalInterceptor}. ADR-018
+ * shape — multi-dataSource deployments call {@link forRoot} once per
+ * dataSource. Static class storage coordinates singletons across
+ * calls (mirrors Phase 14.3.2 `OutboxModule` per ADR-019).
  *
- * Adapter-specific registration (TypeORM, Prisma, ...) is handled by the
- * corresponding integration package's `forFeature` helper — this module
- * only provides the adapter-agnostic infrastructure.
+ * The first call registers the process-wide infrastructure; subsequent
+ * calls only contribute per-dataSource providers. Adapter-specific
+ * registration (TypeORM, Prisma, ...) is handled by the integration
+ * package's `forFeature` helper — this module only provides the
+ * adapter-agnostic infrastructure.
  */
 @Module({})
 export class TransactionalModule {
   /**
-   * Synchronous registration.
+   * @internal
+   * Process-wide map of adapter-bearing `forRoot` calls, keyed by
+   * `adapter.dataSourceName`. Used for dedup of duplicate dataSource
+   * registrations at module-definition time. The {@link AdapterRegistry}
+   * itself is populated imperatively by per-DS adapter providers
+   * (factory side effect) — this Map exists for `forRoot`-call-time
+   * coordination only.
    *
-   * @example
+   * Tests that build multiple modules sequentially MUST call
+   * {@link resetForTesting} between cases.
+   */
+  private static readonly registrations = new Map<string, AdapterRegistration>();
+
+  /**
+   * @internal
+   * `true` once any `forRoot` (or `forRootAsync`) call has run.
+   * First-call-special providers (singletons, interceptor, methods
+   * bootstrap, observers) are only registered when this is `false` at
+   * the start of a call.
+   *
+   * Tracked separately from {@link registrations} because the
+   * shorthand `forRoot({})` (no adapter) still registers
+   * infrastructure but contributes nothing to the Map. Q5 invariant:
+   * a second `forRoot({})` after infrastructure is already registered
+   * throws — the first call already wired everything; the second has
+   * nothing to add.
+   */
+  private static infrastructureRegistered = false;
+
+  /**
+   * @internal
+   * Counter for `forRootAsync`-only token uniqueness. Not strictly
+   * needed for `Symbol()` (each call returns a unique symbol
+   * regardless of description), but keeping a numeric id makes
+   * provider names deterministic in error messages.
+   */
+  private static asyncCounter = 0;
+
+  /**
+   * Test-only — drop every registration so a subsequent `forRoot`
+   * starts from a clean slate. Mirrors the pattern used with
+   * `OutboxModule.resetForTesting` and `EntitiesMetadataStorage` in
+   * `@nestjs/typeorm` test suites.
+   *
+   * Production code should never call this. Calling at runtime after
+   * the module has been initialised does NOT clear the provider tree
+   * NestJS already built — it only affects subsequent `forRoot` calls.
+   *
+   * @internal
+   */
+  static resetForTesting(): void {
+    this.registrations.clear();
+    this.infrastructureRegistered = false;
+    this.asyncCounter = 0;
+  }
+
+  /**
+   * Synchronous registration. Each call registers one dataSource's
+   * adapter (or, with `adapter` omitted, only the process-wide
+   * infrastructure for an integration package's `forFeature` to write
+   * into).
+   *
+   * @example Single-adapter
    * ```ts
-   * @Module({
-   *   imports: [
-   *     TransactionalModule.forRoot({
-   *       isGlobal: true,
-   *       adapters: [
-   *         { adapterName: 'typeorm', instanceName: 'default', adapter },
-   *       ],
-   *     }),
-   *   ],
-   * })
-   * export class AppModule {}
+   * TransactionalModule.forRoot({ isGlobal: true, adapter })
+   * ```
+   *
+   * @example Multi-adapter (multiple calls)
+   * ```ts
+   * TransactionalModule.forRoot({ isGlobal: true, adapter: defaultAdapter }),
+   * TransactionalModule.forRoot({ adapter: billingAdapter }),
+   * TransactionalModule.forRoot({ adapter: inventoryAdapter }),
+   * ```
+   *
+   * @example Infrastructure-only (TypeORM forFeature handles adapters)
+   * ```ts
+   * TransactionalModule.forRoot({ isGlobal: true }),
+   * TypeOrmTransactionalModule.forFeature({ dataSource }),
    * ```
    */
   static forRoot(options: TransactionalModuleOptions = {}): DynamicModule {
-    const registrations = resolveRegistrations(options);
-    const providers: Provider[] = [
-      {
+    const isFirst = !this.infrastructureRegistered;
+    const adapter = options.adapter;
+
+    if (adapter !== undefined) {
+      const ds = adapter.dataSourceName;
+      if (this.registrations.has(ds)) {
+        throw new Error(
+          `TransactionalModule.forRoot — dataSource '${ds}' already registered. ` +
+            `dataSource names must be unique across forRoot calls. ` +
+            `If this is a test, call TransactionalModule.resetForTesting() between cases.`,
+        );
+      }
+      this.registrations.set(ds, {
+        adapterName: adapter.name,
+        instanceName: ds,
+        adapter,
+      });
+    } else if (!isFirst) {
+      throw new Error(
+        `TransactionalModule.forRoot({}) called without adapter, but infrastructure ` +
+          `has already been registered by an earlier forRoot call. Pass an adapter to ` +
+          `register an additional dataSource, or omit this call entirely. ` +
+          `If this is a test, call TransactionalModule.resetForTesting() between cases.`,
+      );
+    }
+
+    if (!isFirst && options.observers !== undefined) {
+      throw new Error(
+        `TransactionalModule.forRoot({ observers }) — observers can only be passed in ` +
+          `the first forRoot call. Subsequent calls must omit the observers field.`,
+      );
+    }
+
+    const providers: Provider[] = [];
+    const exportTokens: InjectionToken[] = [];
+
+    if (adapter !== undefined) {
+      providers.push(...buildPerDataSourceProviders(adapter));
+      exportTokens.push(...buildPerDataSourceExports(adapter.dataSourceName));
+    }
+
+    if (isFirst) {
+      this.infrastructureRegistered = true;
+
+      // ADAPTER_REGISTRY factory closes over the static `registrations`
+      // Map. By the time NestJS resolves this factory, every synchronous
+      // `forRoot` body has run and the Map is fully populated. Pattern
+      // mirrors Phase 14.3.2 `OutboxModule` per ADR-019.
+      providers.push({
         provide: ADAPTER_REGISTRY,
-        useFactory: (): AdapterRegistry => buildRegistry(registrations),
-      },
-      TransactionManager,
-      ...buildPerDataSourceProviders(registrations),
-    ];
-
-    if (options.observers !== undefined) {
-      providers.push({
-        provide: TRANSACTION_OBSERVERS,
-        useValue: [...options.observers],
+        useFactory: (): AdapterRegistry =>
+          buildRegistryFromStaticStorage(TransactionalModule),
       });
-    }
-
-    if (options.registerInterceptor !== false) {
       providers.push({
-        provide: APP_INTERCEPTOR,
-        useClass: TransactionalInterceptor,
+        provide: AdapterRegistry,
+        useExisting: ADAPTER_REGISTRY,
       });
-    }
+      providers.push(TransactionManager);
 
-    if (options.registerMethodsBootstrap !== false) {
-      providers.push(TransactionalMethodsBootstrap);
+      if (options.observers !== undefined) {
+        providers.push({
+          provide: TRANSACTION_OBSERVERS,
+          useValue: [...options.observers],
+        });
+      }
+
+      if (options.registerInterceptor !== false) {
+        providers.push({
+          provide: APP_INTERCEPTOR,
+          useClass: TransactionalInterceptor,
+        });
+      }
+
+      if (options.registerMethodsBootstrap !== false) {
+        providers.push(TransactionalMethodsBootstrap);
+      }
+
+      exportTokens.push(TransactionManager, ADAPTER_REGISTRY, AdapterRegistry);
     }
 
     return {
       module: TransactionalModule,
-      global: options.isGlobal ?? false,
+      global: options.isGlobal ?? true,
       imports: [DiscoveryModule],
       providers,
-      exports: [
-        TransactionManager,
-        ADAPTER_REGISTRY,
-        ...buildPerDataSourceExports(registrations),
-      ],
+      exports: exportTokens,
     };
   }
 
   /**
-   * Asynchronous registration. Useful when adapter configuration depends on
-   * runtime state (config service, environment, etc.). `isGlobal` and
-   * `registerInterceptor` remain static top-level flags.
+   * Asynchronous registration. Each call registers one dataSource's
+   * adapter (resolved asynchronously via `useFactory`). Multi-DS
+   * deployments call `forRootAsync` once per dataSource.
+   *
+   * **Per-DS DI token limitation**: per-DS tokens
+   * (`getTransactionalAdapterToken(ds)`, etc.) are NOT registered
+   * for `forRootAsync` calls because the dataSource identifier is
+   * only known after the async factory runs, while NestJS provider
+   * tokens must be declared statically. If per-DS injection matters,
+   * use sync `forRoot({ adapter })` instead — build the adapter
+   * configuration through your own async logic before reaching the
+   * module imports.
+   *
+   * `forRootAsync` still works for `AdapterRegistry`-based access
+   * (`@Transactional({ dataSource })`,
+   * `getCurrentEntityManager(dataSource)`,
+   * `manager.run({ dataSource })`) — those route through the registry,
+   * which is populated by the async factory's side effect via
+   * `AdapterRegistry.register(...)`.
    *
    * @example
    * ```ts
    * TransactionalModule.forRootAsync({
    *   inject: [ConfigService],
    *   useFactory: (config: ConfigService) => ({
-   *     adapters: [buildAdapterFromConfig(config)],
+   *     adapter: buildAdapterFromConfig(config),
    *   }),
    * });
    * ```
    */
   static forRootAsync(options: TransactionalModuleAsyncOptions): DynamicModule {
+    const isFirst = !this.infrastructureRegistered;
+    const id = this.asyncCounter++;
+    const asyncToken = ASYNC_OPTIONS_TOKEN(id);
+    const registrationToken = ASYNC_REGISTRATION_TOKEN(id);
+
+    // forRootAsync cannot dedup at call time (dataSource name unknown
+    // until factory runs). The eager-registration factory below calls
+    // AdapterRegistry.register at provider-resolution time; duplicate
+    // dataSources propagate as registry-level overwrites at runtime
+    // rather than module-build-time errors. This is the documented
+    // limitation that pushes per-DS-injection-needs to sync forRoot.
+
     const asyncOptionsProvider: FactoryProvider = {
-      provide: ASYNC_OPTIONS_TOKEN,
+      provide: asyncToken,
       useFactory: options.useFactory,
       inject: options.inject ? [...options.inject] : undefined,
     };
 
-    const registryProvider: FactoryProvider = {
-      provide: ADAPTER_REGISTRY,
-      useFactory: (opts: TransactionalModuleAsyncFactoryResult): AdapterRegistry =>
-        buildRegistry(resolveRegistrations(opts)),
-      inject: [ASYNC_OPTIONS_TOKEN],
-    };
-
-    const observersProvider: FactoryProvider = {
-      provide: TRANSACTION_OBSERVERS,
-      useFactory: (opts: TransactionalModuleAsyncFactoryResult): readonly TransactionObserver[] =>
-        opts.observers ? [...opts.observers] : [],
-      inject: [ASYNC_OPTIONS_TOKEN],
+    const adapterEagerRegistrationProvider: FactoryProvider = {
+      provide: registrationToken,
+      useFactory: (
+        opts: TransactionalModuleAsyncFactoryResult,
+        registry: AdapterRegistry,
+      ): true => {
+        if (opts.adapter !== undefined) {
+          registry.register({
+            adapterName: opts.adapter.name,
+            instanceName: opts.adapter.dataSourceName,
+            adapter: opts.adapter,
+          });
+        }
+        return true;
+      },
+      inject: [asyncToken, ADAPTER_REGISTRY],
     };
 
     const providers: Provider[] = [
       asyncOptionsProvider,
-      registryProvider,
-      observersProvider,
-      TransactionManager,
+      adapterEagerRegistrationProvider,
     ];
+    const exportTokens: InjectionToken[] = [];
 
-    if (options.registerInterceptor !== false) {
+    if (isFirst) {
+      this.infrastructureRegistered = true;
+
+      // forRootAsync's `AdapterRegistry` is built fresh and the
+      // eager-registration factory below mutates it via
+      // `register(...)`. Ordering: NestJS resolves the registry
+      // factory, then the eager-registration factory whose `inject`
+      // depends on it — so by the time consumers read the registry,
+      // every adapter has been registered.
       providers.push({
-        provide: APP_INTERCEPTOR,
-        useClass: TransactionalInterceptor,
+        provide: ADAPTER_REGISTRY,
+        useFactory: (): AdapterRegistry => new AdapterRegistry(),
       });
-    }
+      providers.push({
+        provide: AdapterRegistry,
+        useExisting: ADAPTER_REGISTRY,
+      });
+      providers.push(TransactionManager);
 
-    if (options.registerMethodsBootstrap !== false) {
-      providers.push(TransactionalMethodsBootstrap);
+      // First-call-only observers honoring (Q2 invariant). The async
+      // factory may return `observers` — only the first forRootAsync's
+      // observers are wired; subsequent calls' observers are ignored
+      // (we cannot throw at call time because the value is only known
+      // after the factory runs).
+      providers.push({
+        provide: TRANSACTION_OBSERVERS,
+        useFactory: (opts: TransactionalModuleAsyncFactoryResult): readonly TransactionObserver[] =>
+          opts.observers ? [...opts.observers] : [],
+        inject: [asyncToken],
+      });
+
+      if (options.registerInterceptor !== false) {
+        providers.push({
+          provide: APP_INTERCEPTOR,
+          useClass: TransactionalInterceptor,
+        });
+      }
+
+      if (options.registerMethodsBootstrap !== false) {
+        providers.push(TransactionalMethodsBootstrap);
+      }
+
+      exportTokens.push(TransactionManager, ADAPTER_REGISTRY, AdapterRegistry);
     }
 
     return {
       module: TransactionalModule,
-      global: options.isGlobal ?? false,
+      global: options.isGlobal ?? true,
       imports: [DiscoveryModule, ...(options.imports ?? [])],
       providers,
-      exports: [TransactionManager, ADAPTER_REGISTRY],
+      exports: exportTokens,
     };
   }
 }
 
-function buildRegistry(adapters: readonly AdapterRegistration[]): AdapterRegistry {
+/**
+ * Per-dataSource DI providers for ADR-018's token-based access pattern.
+ * Each adapter-bearing `forRoot` call registers, for the supplied
+ * adapter:
+ *
+ * - `getTransactionalAdapterToken(ds)` — `useValue` the adapter
+ *   directly. The {@link AdapterRegistry}'s population is handled by
+ *   the first-call factory (which closes over the static
+ *   `registrations` Map and walks every entry at resolution time);
+ *   per-DS adapter providers therefore do NOT need to inject the
+ *   registry — they would not see it across multi-call DI scopes
+ *   without `isGlobal: true`.
+ * - `getTransactionContextToken(ds)` — a {@link TransactionContextView}
+ *   pre-bound to the dataSource. Sync — the dataSource name is known
+ *   at call time.
+ * - `getTransactionManagerToken(ds)` — `useExisting` alias to the
+ *   class-token {@link TransactionManager}. Per-call dataSource
+ *   selection still goes through `manager.run({ dataSource })`; this
+ *   token exists for symmetry with `@nestjs/typeorm`'s per-dataSource
+ *   injection pattern (DD-022).
+ *
+ * `useExisting: TransactionManager` here works without cross-module
+ * import because each DynamicModule with `module: TransactionalModule`
+ * shares a class-token resolution within the parent module's DI tree
+ * once at least one of them registers the class. For consumer modules
+ * to reach `TransactionManager` and `AdapterRegistry`, set
+ * `isGlobal: true` on the first `forRoot` call (the typical pattern).
+ */
+function buildPerDataSourceProviders(adapter: TransactionAdapter): Provider[] {
+  const ds = adapter.dataSourceName;
+  return [
+    {
+      provide: getTransactionalAdapterToken(ds),
+      useValue: adapter,
+    },
+    {
+      provide: getTransactionContextToken(ds),
+      useValue: new TransactionContextView(ds),
+    },
+    {
+      provide: getTransactionManagerToken(ds),
+      useExisting: TransactionManager,
+    },
+  ];
+}
+
+/**
+ * Build a fresh {@link AdapterRegistry} populated from the static
+ * `registrations` Map on {@link TransactionalModule}. Called by the
+ * first-`forRoot`'s `ADAPTER_REGISTRY` factory at provider-resolution
+ * time — by then every synchronous `forRoot` body has populated the
+ * Map. Pattern mirrors Phase 14.3.2 `OutboxModule` per ADR-019.
+ *
+ * @internal
+ */
+function buildRegistryFromStaticStorage(
+  moduleClass: typeof TransactionalModule,
+): AdapterRegistry {
   const registry = new AdapterRegistry();
-  for (const adapter of adapters) {
-    registry.register(adapter);
+  // The Map is `private static` — read it through a structural cast.
+  const registrations = (
+    moduleClass as unknown as { registrations: Map<string, AdapterRegistration> }
+  ).registrations;
+  for (const reg of registrations.values()) {
+    registry.register(reg);
   }
   return registry;
 }
 
-/**
- * Resolve user-facing options (`adapter` | `adapters`) into the canonical
- * `AdapterRegistration[]` shape. The single `adapter` shortcut derives
- * `(adapterName, instanceName)` from the adapter's own properties
- * (`adapter.name`, `adapter.dataSourceName`) — the user does not need
- * to repeat them.
- *
- * Both options can be provided together; the single-form entry is
- * appended to the array. Duplicate dataSource names across the
- * combined list are surfaced at registry-resolution time, not here.
- */
-function resolveRegistrations(
-  options: { readonly adapter?: TransactionAdapter; readonly adapters?: readonly AdapterRegistration[] },
-): readonly AdapterRegistration[] {
-  const fromArray = options.adapters ?? [];
-  if (options.adapter === undefined) {
-    return fromArray;
-  }
-  const single: AdapterRegistration = {
-    adapterName: options.adapter.name,
-    instanceName: options.adapter.dataSourceName,
-    adapter: options.adapter,
-  };
-  return [...fromArray, single];
-}
-
-/**
- * Per-dataSource DI providers for ADR-018's token-based access pattern.
- * For each registered adapter:
- * - `getTransactionalAdapterToken(dataSource)` resolves to the adapter
- *   instance directly.
- * - `getTransactionContextToken(dataSource)` resolves to a
- *   {@link TransactionContextView} pre-bound to the dataSource.
- * - `getTransactionManagerToken(dataSource)` aliases the singleton
- *   `TransactionManager` via `useExisting`. Per-call dataSource
- *   selection still goes through `manager.run({ dataSource })` —
- *   this token exists for symmetry with `@nestjs/typeorm`'s
- *   per-dataSource injection pattern (DD-022).
- */
-function buildPerDataSourceProviders(
-  registrations: readonly AdapterRegistration[],
-): Provider[] {
-  const providers: Provider[] = [];
-  for (const reg of registrations) {
-    const ds = reg.instanceName;
-    providers.push({
-      provide: getTransactionalAdapterToken(ds),
-      useValue: reg.adapter,
-    });
-    providers.push({
-      provide: getTransactionContextToken(ds),
-      useValue: new TransactionContextView(ds),
-    });
-    providers.push({
-      provide: getTransactionManagerToken(ds),
-      useExisting: TransactionManager,
-    });
-  }
-  return providers;
-}
-
-function buildPerDataSourceExports(
-  registrations: readonly AdapterRegistration[],
-): InjectionToken[] {
-  const exports: InjectionToken[] = [];
-  for (const reg of registrations) {
-    const ds = reg.instanceName;
-    exports.push(getTransactionalAdapterToken(ds));
-    exports.push(getTransactionContextToken(ds));
-    exports.push(getTransactionManagerToken(ds));
-  }
-  return exports;
+function buildPerDataSourceExports(ds: string): InjectionToken[] {
+  return [
+    getTransactionalAdapterToken(ds),
+    getTransactionContextToken(ds),
+    getTransactionManagerToken(ds),
+  ];
 }

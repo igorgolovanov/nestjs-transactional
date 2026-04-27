@@ -42,6 +42,7 @@ describe('TransactionalMethodsBootstrap', () => {
   let adapter: InMemoryTransactionAdapter;
 
   beforeEach(() => {
+    TransactionalModule.resetForTesting();
     adapter = new InMemoryTransactionAdapter();
   });
 
@@ -50,7 +51,7 @@ describe('TransactionalMethodsBootstrap', () => {
       imports: [
         TransactionalModule.forRoot({
           isGlobal: true,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
           registerInterceptor: false,
         }),
       ],
@@ -124,7 +125,7 @@ describe('TransactionalMethodsBootstrap', () => {
       imports: [
         TransactionalModule.forRoot({
           isGlobal: true,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
           registerInterceptor: false,
           registerMethodsBootstrap: false,
         }),
@@ -143,13 +144,17 @@ describe('TransactionalMethodsBootstrap', () => {
 });
 
 describe('TransactionalMethodsBootstrap + TransactionManager coordination', () => {
+  beforeEach(() => {
+    TransactionalModule.resetForTesting();
+  });
+
   it('wrapped method promises resolve with the original return value', async () => {
     const adapter = new InMemoryTransactionAdapter();
     const module = await Test.createTestingModule({
       imports: [
         TransactionalModule.forRoot({
           isGlobal: true,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
           registerInterceptor: false,
         }),
       ],
@@ -170,7 +175,7 @@ describe('TransactionalMethodsBootstrap + TransactionManager coordination', () =
       imports: [
         TransactionalModule.forRoot({
           isGlobal: true,
-          adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter }],
+          adapter,
           registerInterceptor: false,
         }),
       ],

@@ -55,7 +55,7 @@ function transactionalModule(): ReturnType<typeof TransactionalModule.forRoot> {
     isGlobal: true,
     registerInterceptor: false,
     registerMethodsBootstrap: false,
-    adapters: [{ adapterName: 'in-memory', instanceName: 'default', adapter: new FakeAdapter() }],
+    adapter: new FakeAdapter(),
   });
 }
 
@@ -64,6 +64,7 @@ describe('OutboxModule.forFeature', () => {
 
   beforeEach(() => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
   });
 
   afterEach(async () => {

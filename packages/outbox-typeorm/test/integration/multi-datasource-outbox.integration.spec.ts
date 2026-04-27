@@ -99,6 +99,7 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
 
   beforeAll(async () => {
     OutboxModule.resetForTesting();
+    TransactionalModule.resetForTesting();
 
     ctx = await startPostgresContainer({
       entities: [EventPublicationEntity, EventPublicationArchiveEntity],
@@ -189,6 +190,12 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
   });
 
   beforeEach(async () => {
+    // Reset only the static flag/Map so probe-style tests building
+    // their own modules below see fresh "first call" behaviour. The
+    // shared `app` module built in beforeAll is already wired and
+    // unaffected by this reset.
+    TransactionalModule.resetForTesting();
+
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

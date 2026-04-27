@@ -45,6 +45,7 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
   let repo: TypeOrmEventPublicationRepository;
 
   beforeAll(async () => {
+    TransactionalModule.resetForTesting();
     ctx = await startPostgresContainer({
       entities: [EventPublicationEntity, EventPublicationArchiveEntity],
       synchronize: true,

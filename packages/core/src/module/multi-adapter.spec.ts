@@ -28,6 +28,10 @@ import { TransactionalModule } from './transactional.module';
 describe('Multi-adapter (Phase 14.2)', () => {
   let module: TestingModule;
 
+  beforeEach(() => {
+    TransactionalModule.resetForTesting();
+  });
+
   afterEach(async () => {
     await module?.close();
   });
@@ -84,11 +88,9 @@ describe('Multi-adapter (Phase 14.2)', () => {
             isGlobal: true,
             registerInterceptor: false,
             registerMethodsBootstrap: false,
-            adapters: [
-              { adapterName: 'in-memory', instanceName: 'billing', adapter: billing },
-              { adapterName: 'in-memory', instanceName: 'inventory', adapter: inventory },
-            ],
+            adapter: billing,
           }),
+          TransactionalModule.forRoot({ adapter: inventory }),
         ],
       }).compile();
       await module.init();
@@ -153,11 +155,9 @@ describe('Multi-adapter (Phase 14.2)', () => {
             isGlobal: true,
             registerInterceptor: false,
             registerMethodsBootstrap: false,
-            adapters: [
-              { adapterName: 'in-memory', instanceName: 'billing', adapter: billing },
-              { adapterName: 'in-memory', instanceName: 'inventory', adapter: inventory },
-            ],
+            adapter: billing,
           }),
+          TransactionalModule.forRoot({ adapter: inventory }),
         ],
       }).compile();
       await module.init();

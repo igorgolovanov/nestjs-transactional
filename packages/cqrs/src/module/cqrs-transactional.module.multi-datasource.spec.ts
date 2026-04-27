@@ -233,6 +233,7 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
 
     beforeEach(async () => {
       OutboxModule.resetForTesting();
+      TransactionalModule.resetForTesting();
 
       jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
       jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
@@ -245,19 +246,9 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
             isGlobal: true,
             registerInterceptor: false,
             registerMethodsBootstrap: true,
-            adapters: [
-              {
-                adapterName: 'in-memory',
-                instanceName: 'default',
-                adapter: new NamedFakeAdapter('default'),
-              },
-              {
-                adapterName: 'in-memory',
-                instanceName: 'billing',
-                adapter: new NamedFakeAdapter('billing'),
-              },
-            ],
+            adapter: new NamedFakeAdapter('default'),
           }),
+          TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('billing') }),
 
           // Two outbox stacks — ADR-019 multi-forRoot.
           OutboxModule.forRoot({}),
