@@ -6,13 +6,38 @@ import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter';
 
 /**
  * Options accepted by {@link TypeOrmTransactionalModule.forFeature}.
+ *
+ * The dataSource identifier and the actual TypeORM `DataSource` instance
+ * are two distinct concepts here, and they live in two distinct fields:
+ *
+ *  - `dataSourceName` — the *string identifier* used everywhere across
+ *    `@nestjs-transactional` (e.g. `@Transactional({ dataSource: 'billing' })`,
+ *    `getCurrentEntityManager('billing')`, the `AdapterRegistry` lookup).
+ *  - `dataSource` — the *actual TypeORM `DataSource` instance* (or a
+ *    factory returning one). Distinct field name retained because it
+ *    has been the public contract since the package was introduced.
+ *
+ * See ADR-018's "Vocabulary asymmetry" note for why two terms are
+ * preserved despite the surface inconsistency.
  */
 export interface TypeOrmTransactionalOptions {
   /**
-   * Adapter instance name under which this TypeORM DataSource is
-   * registered with the core {@link AdapterRegistry}. Defaults to
-   * `'default'`. Use distinct names for multi-datasource setups
-   * (`'primary'`, `'billing'`, ...).
+   * Identifier under which this TypeORM dataSource is registered with
+   * the core {@link AdapterRegistry}. Defaults to `'default'`. Use
+   * distinct names for multi-datasource setups (`'billing'`,
+   * `'inventory'`, ...).
+   *
+   * Aligns with the `dataSourceName` property exposed by
+   * {@link TransactionalAdapter} (Phase 14.2) — the same string flows
+   * through `@Transactional({ dataSource })`, `getCurrentEntityManager`,
+   * and the adapter registry.
+   */
+  readonly dataSourceName?: string;
+
+  /**
+   * @deprecated Use {@link dataSourceName} — kept as a permanent alias
+   * for backwards compatibility. When both are set, `dataSourceName`
+   * wins. Removal deferred to a future major version.
    */
   readonly instanceName?: string;
 
@@ -20,6 +45,9 @@ export interface TypeOrmTransactionalOptions {
    * DataSource to bind, either directly or through a factory. The factory
    * allows async resolution (e.g. reading from configuration) and runs
    * once at module-init time.
+   *
+   * Note: this is the *DataSource instance*, not its identifier. The
+   * identifier lives in {@link dataSourceName}.
    */
   readonly dataSource: DataSource | (() => Promise<DataSource> | DataSource);
 
@@ -57,8 +85,10 @@ export interface TypeOrmTransactionalOptions {
 @Module({})
 export class TypeOrmTransactionalModule {
   static forFeature(options: TypeOrmTransactionalOptions): DynamicModule {
-    const instanceName = options.instanceName ?? 'default';
-    const providerToken = `TYPEORM_ADAPTER_${instanceName}`;
+    // dataSourceName takes precedence over the deprecated instanceName.
+    // Both default to 'default' when omitted.
+    const dataSourceName = options.dataSourceName ?? options.instanceName ?? 'default';
+    const providerToken = `TYPEORM_ADAPTER_${dataSourceName}`;
 
     return {
       module: TypeOrmTransactionalModule,
@@ -71,9 +101,9 @@ export class TypeOrmTransactionalModule {
                 ? await options.dataSource()
                 : options.dataSource;
 
-            const adapter = new TypeOrmTransactionAdapter(ds, instanceName);
+            const adapter = new TypeOrmTransactionAdapter(ds, dataSourceName);
             registry.register(
-              { adapterName: 'typeorm', instanceName, adapter },
+              { adapterName: 'typeorm', instanceName: dataSourceName, adapter },
               options.isDefault ?? false,
             );
             return adapter;

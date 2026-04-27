@@ -403,16 +403,32 @@ adapters are minimal ORM-specific implementations.
 - Multiple DataSources through a separate package
 
 **Choice**: multi-DataSource support from day one. Each adapter is registered
-under an `instanceName` (e.g. `'primary'`, `'billing'`).
+under a dataSource name (e.g. `'default'`, `'billing'`).
 
 ```typescript
-@Transactional({ adapterInstance: 'billing' })
+@Transactional({ dataSource: 'billing' })
 async generateInvoice() { ... }
 ```
 
-**Trade-off**: the API is slightly more complex (the `adapterInstance`
+**Trade-off**: the API is slightly more complex (the `dataSource`
 parameter), but without this, users cannot realistically use the package in
 multi-database projects.
+
+**Phase 14 alignment** (Phase 14.4, 2026-04-27):
+The `@nestjs-transactional/typeorm` package is fully aligned with the
+Phase 14 multi-adapter conventions. `TypeOrmTransactionalOptions`
+gains the `dataSourceName` field as the canonical identifier;
+`instanceName` is preserved as a permanent `@deprecated` alias for
+backwards compatibility (`dataSourceName` wins when both are set).
+Phase 14.2 introduced `@Transactional({ dataSource: 'billing' })`
+as the user-facing identifier syntax; the legacy
+`@Transactional({ adapterInstance: 'billing' })` continues to work
+through the same `AdapterRegistry` lookup. Phase 14.4 closed the
+verification gap by adding integration tests against real Postgres
+that exercise both syntaxes side-by-side, plus cross-dataSource
+transaction isolation tests honouring DD-023's keyed-Map guarantee.
+See ADR-018 for the multi-adapter architecture and its breaking-
+changes list.
 
 ### DD-006: Jest over Vitest
 
@@ -1711,9 +1727,12 @@ rationale and DD-020..DD-024 for the design decisions.
   using the dataSource name as the lookup key
 - `getCurrentEntityManager(dataSource?: string)` defaults to
   `'default'`
-- `TypeOrmTransactionalModule.forFeature({ dataSource, ... })`
-  unchanged in surface but renames `instanceName` → `dataSource`
-  for consistency
+- `TypeOrmTransactionalModule.forFeature({ dataSourceName, ... })`
+  unchanged in surface but renames `instanceName` → `dataSourceName`
+  for consistency. The existing `dataSource` field (holding the
+  actual TypeORM `DataSource` instance) keeps its name — see ADR-018
+  "Vocabulary asymmetry" for the two-fields-two-purposes rationale.
+  `instanceName` preserved as `@deprecated` alias.
 
 **14.5: Outbox-typeorm migration (`@nestjs-transactional/outbox-typeorm`)**
 - `typeOrmEventPublicationRepositoryProvider` becomes a factory
@@ -1889,8 +1908,12 @@ Acceptable because no package has shipped a stable release yet.
 7. `getCurrentEntityManager(dataSource?: string, fallback?)` —
    parameter renamed from `instanceName` to `dataSource`. Same
    semantics; the rename is for cross-package consistency.
-8. `TypeOrmTransactionalModule.forFeature` — `instanceName` field
-   renamed to `dataSource`. Same semantics.
+8. `TypeOrmTransactionalModule.forFeature` — gains `dataSourceName`
+   field as the canonical identifier (`instanceName` retained as a
+   permanent `@deprecated` alias; `dataSourceName` wins when both
+   are set). The existing `dataSource` field continues to hold the
+   actual TypeORM `DataSource` instance — see ADR-018 "Vocabulary
+   asymmetry" for why both names coexist. Same semantics throughout.
 9. New inject decorators (`@InjectTransactionManager`, etc.) ship.
    Strictly additive — `@Inject(TransactionManager)` (class token)
    continues to work for the default dataSource via a class-token
