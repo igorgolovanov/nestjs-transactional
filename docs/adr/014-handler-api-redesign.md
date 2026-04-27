@@ -11,7 +11,7 @@
 > **Note (Phase 10 naming refinement, 2026-04-25):** The class-level
 > decorator named `@ApplicationModuleHandler` in this ADR was later
 > renamed to **`@IntegrationEventsHandler`** (interface
-> `IIntegrationEventsHandler`, scanner
+> `IIntegrationEventHandler`, scanner
 > `IntegrationEventsHandlerScanner`) to align with DDD/microservices
 > terminology and avoid collision with NestJS `@Module()` semantics.
 > The original ADR text below intentionally preserves the names that
@@ -98,8 +98,8 @@ Each decorator:
 - Requires the class to expose a `handle(event): Promise<void> | void`
   method. Type-safety is enforced by implementing the corresponding
   `I*Handler` interface:
-  - `ITransactionalEventsHandler<T>`
-  - `IOutboxEventsHandler<T>` — `handle` returns `Promise<void>` only
+  - `ITransactionalEventHandler<T>`
+  - `IOutboxEventHandler<T>` — `handle` returns `Promise<void>` only
     (async-only)
   - `IApplicationModuleHandler<T>`
 
@@ -109,7 +109,7 @@ Example:
 // Short form
 @TransactionalEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 export class OrderProjection
-  implements ITransactionalEventsHandler<OrderPlacedEvent | OrderCancelledEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent | OrderCancelledEvent>
 {
   handle(event: OrderPlacedEvent | OrderCancelledEvent): void { ... }
 }
@@ -120,7 +120,7 @@ export class OrderProjection
   phase: TransactionPhase.BEFORE_COMMIT,
   async: false,
 })
-export class OrderValidation implements ITransactionalEventsHandler<OrderPlacedEvent> {
+export class OrderValidation implements ITransactionalEventHandler<OrderPlacedEvent> {
   handle(event: OrderPlacedEvent): void { ... }
 }
 ```

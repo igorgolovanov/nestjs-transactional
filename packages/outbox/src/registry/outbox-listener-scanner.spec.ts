@@ -12,7 +12,7 @@ import {
 } from '@nestjs-transactional/core';
 
 import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
-import type { IOutboxEventsHandler } from '../interfaces/outbox-events-handler.interface';
+import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface';
 
 import { OutboxListenerRegistry } from './listener-registry';
 import { OutboxListenerScanner } from './outbox-listener-scanner';
@@ -58,7 +58,7 @@ class PaymentCapturedEvent {
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent)
-class OrderPlacedHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+class OrderPlacedHandler implements IOutboxEventHandler<OrderPlacedEvent> {
   invocations: OrderPlacedEvent[] = [];
   async handle(event: OrderPlacedEvent): Promise<void> {
     this.invocations.push(event);
@@ -67,20 +67,20 @@ class OrderPlacedHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
 
 @Injectable()
 @OutboxEventsHandler({ events: [PaymentCapturedEvent], id: 'custom-payment-id' })
-class PaymentCapturedHandler implements IOutboxEventsHandler<PaymentCapturedEvent> {
+class PaymentCapturedHandler implements IOutboxEventHandler<PaymentCapturedEvent> {
   async handle(_event: PaymentCapturedEvent): Promise<void> {}
 }
 
 @Injectable()
 @OutboxEventsHandler({ events: [OrderPlacedEvent], newTransaction: false })
-class NoTxHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+class NoTxHandler implements IOutboxEventHandler<OrderPlacedEvent> {
   async handle(_event: OrderPlacedEvent): Promise<void> {}
 }
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent, PaymentCapturedEvent)
 class MultiEventHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent | PaymentCapturedEvent>
+  implements IOutboxEventHandler<OrderPlacedEvent | PaymentCapturedEvent>
 {
   invocations: (OrderPlacedEvent | PaymentCapturedEvent)[] = [];
   async handle(event: OrderPlacedEvent | PaymentCapturedEvent): Promise<void> {
@@ -220,13 +220,13 @@ describe('OutboxListenerScanner', () => {
     // suffix — colliding when registered with the registry.
     @Injectable()
     @OutboxEventsHandler({ events: [OrderPlacedEvent], id: 'shared-id' })
-    class FirstHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+    class FirstHandler implements IOutboxEventHandler<OrderPlacedEvent> {
       async handle(_event: OrderPlacedEvent): Promise<void> {}
     }
 
     @Injectable()
     @OutboxEventsHandler({ events: [OrderPlacedEvent], id: 'shared-id' })
-    class SecondHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+    class SecondHandler implements IOutboxEventHandler<OrderPlacedEvent> {
       async handle(_event: OrderPlacedEvent): Promise<void> {}
     }
 

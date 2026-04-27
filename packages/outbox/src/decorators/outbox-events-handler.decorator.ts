@@ -52,7 +52,7 @@ export interface OutboxEventsHandlerMetadata {
 
 /**
  * Mark a class as a persistent outbox handler. The class must
- * implement {@link IOutboxEventsHandler} — expose a
+ * implement {@link IOutboxEventHandler} — expose a
  * `handle(event): Promise<void>` method.
  *
  * Distinct from `@TransactionalEventsHandler` (cqrs package), which

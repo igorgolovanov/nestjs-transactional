@@ -20,7 +20,7 @@ export * from './decorators/inject-decorators';
 
 export * from './tokens';
 
-export type { IOutboxEventsHandler } from './interfaces/outbox-events-handler.interface';
+export type { IOutboxEventHandler } from './interfaces/outbox-event-handler.interface';
 
 export * from './dispatcher/outbox-event-publisher';
 export * from './dispatcher/data-source-outbox-publisher';

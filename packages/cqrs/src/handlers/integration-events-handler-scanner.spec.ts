@@ -16,7 +16,7 @@ import {
   type DispatcherListenerMetadata,
   TransactionalEventDispatcher,
 } from '../event-dispatcher/event-dispatcher';
-import type { IIntegrationEventsHandler } from '../interfaces/integration-events-handler.interface';
+import type { IIntegrationEventHandler } from '../interfaces/integration-event-handler.interface';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
 import { IntegrationEventsHandlerScanner } from './integration-events-handler-scanner';
@@ -63,7 +63,7 @@ class OrderCancelledEvent {
 
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent)
-class ShippingHandler implements IIntegrationEventsHandler<OrderPlacedEvent> {
+class ShippingHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
   invocations: OrderPlacedEvent[] = [];
   async handle(event: OrderPlacedEvent): Promise<void> {
     this.invocations.push(event);
@@ -72,14 +72,14 @@ class ShippingHandler implements IIntegrationEventsHandler<OrderPlacedEvent> {
 
 @Injectable()
 @IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'shipping.stable-id' })
-class ShippingHandlerWithId implements IIntegrationEventsHandler<OrderPlacedEvent> {
+class ShippingHandlerWithId implements IIntegrationEventHandler<OrderPlacedEvent> {
   async handle(_event: OrderPlacedEvent): Promise<void> {}
 }
 
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 class MultiEventHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent | OrderCancelledEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent | OrderCancelledEvent>
 {
   async handle(_event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {}
 }

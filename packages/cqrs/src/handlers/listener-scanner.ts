@@ -13,7 +13,7 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
  *
  * Scanning is class-level only. The handler class must expose a
  * `handle(event): void | Promise<void>` method (enforce this at the
- * type level by implementing `ITransactionalEventsHandler`).
+ * type level by implementing `ITransactionalEventHandler`).
  *
  * `@IntegrationEventsHandler` is NOT processed here —
  * `IntegrationEventsHandlerScanner` owns it, with smart routing to

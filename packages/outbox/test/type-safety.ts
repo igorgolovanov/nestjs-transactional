@@ -1,6 +1,6 @@
 /**
  * Compile-time proof that `@OutboxEventsHandler` +
- * `IOutboxEventsHandler` enforce sensible type constraints. Not a
+ * `IOutboxEventHandler` enforce sensible type constraints. Not a
  * runtime test — jest's `testRegex` is `.*\.spec\.ts$`, so this
  * file is not executed.
  *
@@ -12,7 +12,7 @@
  */
 
 import {
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventsHandler,
 } from '../src';
 
@@ -30,7 +30,7 @@ class OrderCancelledEvent {
 
 // 1. Short form with a single event.
 @OutboxEventsHandler(OrderPlacedEvent)
-export class SingleEventHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+export class SingleEventHandler implements IOutboxEventHandler<OrderPlacedEvent> {
   async handle(event: OrderPlacedEvent): Promise<void> {
     void event;
   }
@@ -39,7 +39,7 @@ export class SingleEventHandler implements IOutboxEventsHandler<OrderPlacedEvent
 // 2. Short form with multiple events, narrowed generic to their union.
 @OutboxEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 export class MultiEventHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent | OrderCancelledEvent>
+  implements IOutboxEventHandler<OrderPlacedEvent | OrderCancelledEvent>
 {
   async handle(event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {
     void event;
@@ -52,18 +52,18 @@ export class MultiEventHandler
   id: 'stable-id',
   newTransaction: false,
 })
-export class NoTxHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+export class NoTxHandler implements IOutboxEventHandler<OrderPlacedEvent> {
   async handle(event: OrderPlacedEvent): Promise<void> {
     void event;
   }
 }
 
 // 4. Default generic parameter — implements the interface without
-//    narrowing, which is allowed because `IOutboxEventsHandler`
+//    narrowing, which is allowed because `IOutboxEventHandler`
 //    defaults to `any`. Consumers coming from `@nestjs/cqrs`'s
 //    `implements IEventHandler` habits get the same ergonomics.
 @OutboxEventsHandler(OrderPlacedEvent)
-export class LooselyTypedHandler implements IOutboxEventsHandler {
+export class LooselyTypedHandler implements IOutboxEventHandler {
   async handle(event: OrderPlacedEvent): Promise<void> {
     void event;
   }
@@ -76,12 +76,12 @@ export class LooselyTypedHandler implements IOutboxEventsHandler {
 // N1. Missing `handle` method.
 // @ts-expect-error — `implements` requires a `handle` method.
 export class MissingHandleHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent> {}
+  implements IOutboxEventHandler<OrderPlacedEvent> {}
 
 // N2. `handle` returning `void` (sync) instead of `Promise<void>`.
-//     `IOutboxEventsHandler` is async-only — handlers run from the
+//     `IOutboxEventHandler` is async-only — handlers run from the
 //     worker loop, which awaits the returned promise.
-export class SyncHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
+export class SyncHandler implements IOutboxEventHandler<OrderPlacedEvent> {
   // @ts-expect-error — handle must return Promise<void>, not void.
   handle(event: OrderPlacedEvent): void {
     void event;
@@ -90,7 +90,7 @@ export class SyncHandler implements IOutboxEventsHandler<OrderPlacedEvent> {
 
 // N3. `handle` returning a non-void-resolving Promise.
 export class WrongResolvedTypeHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent>
+  implements IOutboxEventHandler<OrderPlacedEvent>
 {
   // @ts-expect-error — handle must resolve to void, not a string.
   async handle(event: OrderPlacedEvent): Promise<string> {

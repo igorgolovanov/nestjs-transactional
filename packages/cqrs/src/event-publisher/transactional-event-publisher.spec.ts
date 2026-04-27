@@ -25,7 +25,7 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
 import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
 import { CQRS_HANDLER_WRAPPER_OPTIONS, CqrsHandlerWrapper } from '../handlers/handler-wrapper';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner';
-import type { ITransactionalEventsHandler } from '../interfaces/transactional-events-handler.interface';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
 import { TransactionPhase } from '../types/transactional-listener.types';
 
 import { TransactionalEventPublisher } from './transactional-event-publisher';
@@ -138,7 +138,7 @@ class PlaceOrderClassHandler implements ICommandHandler<PlaceOrderClassCommand, 
 
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
-class OrderCommittedHandler implements ITransactionalEventsHandler<OrderPlacedEvent> {
+class OrderCommittedHandler implements ITransactionalEventHandler<OrderPlacedEvent> {
   afterCommit: OrderPlacedEvent[] = [];
 
   handle(event: OrderPlacedEvent): void {
@@ -151,7 +151,7 @@ class OrderCommittedHandler implements ITransactionalEventsHandler<OrderPlacedEv
   events: [OrderPlacedEvent],
   phase: TransactionPhase.AFTER_ROLLBACK,
 })
-class OrderRollbackHandler implements ITransactionalEventsHandler<OrderPlacedEvent> {
+class OrderRollbackHandler implements ITransactionalEventHandler<OrderPlacedEvent> {
   afterRollback: { event: OrderPlacedEvent; error: unknown }[] = [];
 
   handle(event: OrderPlacedEvent, error?: unknown): void {

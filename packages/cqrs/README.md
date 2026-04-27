@@ -11,7 +11,7 @@ phases without forking `@nestjs/cqrs` (see ADR-003).
 - **`@TransactionalEventsHandler(...events)`** — class-level event
   handler decorator with Spring-compatible phases: `BEFORE_COMMIT`,
   `AFTER_COMMIT` (default), `AFTER_ROLLBACK`, `AFTER_COMPLETION`. The
-  decorated class implements `ITransactionalEventsHandler<T>` and
+  decorated class implements `ITransactionalEventHandler<T>` and
   exposes a single `handle(event)` method. Matches the ergonomics of
   `@nestjs/cqrs`'s own `@EventsHandler` (see ADR-014).
 - **`@IntegrationEventsHandler(...events)`** — class-level smart
@@ -152,7 +152,7 @@ export class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, voi
 // order.projection.ts
 import { Injectable } from '@nestjs/common';
 import {
-  type ITransactionalEventsHandler,
+  type ITransactionalEventHandler,
   TransactionPhase,
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
@@ -161,7 +161,7 @@ import { OrderPlacedEvent } from './aggregate';
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
 export class OrderCommittedProjection
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     // Runs AFTER the transaction commits, not before. Safe to do side
@@ -175,7 +175,7 @@ export class OrderCommittedProjection
   phase: TransactionPhase.AFTER_ROLLBACK,
 })
 export class OrderRollbackProjection
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   handle(event: OrderPlacedEvent, error?: unknown): void {
     // Compensating action; receives the rollback cause as the second
@@ -367,7 +367,7 @@ handler fires exactly once.
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent)
 export class InventoryReservationHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     // with outbox wired: runs from the worker, retried on failure.

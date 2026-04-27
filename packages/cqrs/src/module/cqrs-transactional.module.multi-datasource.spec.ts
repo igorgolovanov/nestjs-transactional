@@ -20,7 +20,7 @@ import {
 } from '@nestjs-transactional/core';
 import {
   EventPublicationProcessor,
-  type IOutboxEventsHandler,
+  type IOutboxEventHandler,
   OutboxEventPublisher,
   OutboxEventsHandler,
   OutboxListenerRegistry,
@@ -34,7 +34,7 @@ import {
 import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
 import { OUTBOX_PUBLICATION_SCHEDULER } from '../event-publisher/hybrid-event-publisher';
 import { OUTBOX_LISTENER_REGISTRAR } from '../handlers/outbox-listener-registrar';
-import type { ITransactionalEventsHandler } from '../interfaces/transactional-events-handler.interface';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
 
 import { CqrsTransactionalModule } from './cqrs-transactional.module';
 
@@ -153,7 +153,7 @@ class PlaceBillingHandler implements ICommandHandler<PlaceBillingCommand, void> 
  */
 @Injectable()
 @TransactionalEventsHandler(DefaultEvent, BillingEvent)
-class InMemoryRecorder implements ITransactionalEventsHandler<DefaultEvent | BillingEvent> {
+class InMemoryRecorder implements ITransactionalEventHandler<DefaultEvent | BillingEvent> {
   received: (DefaultEvent | BillingEvent)[] = [];
   handle(event: DefaultEvent | BillingEvent): void {
     this.received.push(event);
@@ -167,7 +167,7 @@ class InMemoryRecorder implements ITransactionalEventsHandler<DefaultEvent | Bil
  */
 @Injectable()
 @OutboxEventsHandler({ events: [DefaultEvent], newTransaction: false })
-class DefaultPersistentListener implements IOutboxEventsHandler<DefaultEvent> {
+class DefaultPersistentListener implements IOutboxEventHandler<DefaultEvent> {
   received: DefaultEvent[] = [];
   async handle(event: DefaultEvent): Promise<void> {
     this.received.push(event);
@@ -176,7 +176,7 @@ class DefaultPersistentListener implements IOutboxEventsHandler<DefaultEvent> {
 
 @Injectable()
 @OutboxEventsHandler({ events: [BillingEvent], newTransaction: false })
-class BillingPersistentListener implements IOutboxEventsHandler<BillingEvent> {
+class BillingPersistentListener implements IOutboxEventHandler<BillingEvent> {
   received: BillingEvent[] = [];
   async handle(event: BillingEvent): Promise<void> {
     this.received.push(event);

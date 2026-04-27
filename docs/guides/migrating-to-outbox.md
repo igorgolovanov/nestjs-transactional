@@ -215,7 +215,7 @@ what kind of delivery it needs.
 // Unchanged:
 @TransactionalEventsHandler(OrderPlacedEvent)
 export class OrderPlacedMetrics
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   handle(event: OrderPlacedEvent): void {
     this.metrics.increment('orders.placed');
@@ -234,7 +234,7 @@ export class OrderPlacedMetrics
 // Before:
 @TransactionalEventsHandler(OrderPlacedEvent)
 export class SendConfirmationHandler
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     await this.emailer.send(event);
@@ -244,7 +244,7 @@ export class SendConfirmationHandler
 // After:
 @IntegrationEventsHandler(OrderPlacedEvent)
 export class SendConfirmationHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     await this.emailer.send(event);
@@ -275,7 +275,7 @@ outbox.
   id: 'Inventory.stable-id',
 })
 export class InventoryReservationHandler
-  implements IOutboxEventsHandler<OrderPlacedEvent>
+  implements IOutboxEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     await this.inventory.reserve(event.orderId);
@@ -354,7 +354,7 @@ class NotificationHandlers {
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
 class OrderPlacedMetrics
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   handle(event: OrderPlacedEvent): void {
     this.metrics.increment('orders.placed');
@@ -364,7 +364,7 @@ class OrderPlacedMetrics
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent)
 class ShipOrderHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent>
 {
   async handle(event: OrderPlacedEvent): Promise<void> {
     await this.shipping.createShipment(event.orderId);

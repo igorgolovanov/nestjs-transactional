@@ -169,7 +169,7 @@ class PlaceOrderHandler {
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
 class OrderPlacedMetrics
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   constructor(private readonly metrics: Metrics) {}
   handle(e: OrderPlacedEvent): void {
@@ -180,7 +180,7 @@ class OrderPlacedMetrics
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent)
 class ShipOrderHandler
-  implements IIntegrationEventsHandler<OrderPlacedEvent>
+  implements IIntegrationEventHandler<OrderPlacedEvent>
 {
   constructor(private readonly shipping: ShippingClient) {}
   async handle(e: OrderPlacedEvent): Promise<void> {

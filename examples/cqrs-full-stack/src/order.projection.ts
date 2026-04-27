@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  type ITransactionalEventsHandler,
+  type ITransactionalEventHandler,
   TransactionPhase,
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
@@ -15,7 +15,7 @@ import { OrderPlacedEvent } from './order.aggregate';
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
 export class OrderCommittedProjection
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   private readonly logger = new Logger(OrderCommittedProjection.name);
 
@@ -38,7 +38,7 @@ export class OrderCommittedProjection
   phase: TransactionPhase.AFTER_ROLLBACK,
 })
 export class OrderRollbackProjection
-  implements ITransactionalEventsHandler<OrderPlacedEvent>
+  implements ITransactionalEventHandler<OrderPlacedEvent>
 {
   private readonly logger = new Logger(OrderRollbackProjection.name);
 
