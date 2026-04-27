@@ -81,6 +81,84 @@ export class AdapterRegistry {
   }
 
   /**
+   * Look up an adapter by its public dataSource name (DD-020). Iterates
+   * the registered entries and returns the one whose `instanceName`
+   * matches `dataSource` — there is exactly one per dataSource by
+   * convention.
+   *
+   * If multiple registrations share the same `instanceName` across
+   * different adapter types (e.g. `typeorm:billing` AND
+   * `prisma:billing`), throws — that configuration is ambiguous and
+   * the user must disambiguate via the `adapter` + `adapterInstance`
+   * options instead.
+   *
+   * @throws {IllegalTransactionStateError} If two or more adapters share
+   *   the same dataSource name.
+   * @throws {TransactionAdapterNotFoundError} If no adapter is registered
+   *   under this dataSource.
+   */
+  getByDataSource(dataSource: string): TransactionAdapter {
+    const matches: { adapterName: string; adapter: TransactionAdapter }[] = [];
+
+    for (const [key, adapter] of this.adapters) {
+      const colon = key.indexOf(':');
+      const adapterName = key.slice(0, colon);
+      const instanceName = key.slice(colon + 1);
+      if (instanceName === dataSource) {
+        matches.push({ adapterName, adapter });
+      }
+    }
+
+    if (matches.length === 0) {
+      throw new TransactionAdapterNotFoundError('*', dataSource);
+    }
+    if (matches.length > 1) {
+      const names = matches.map((m) => `${m.adapterName}:${dataSource}`).join(', ');
+      throw new IllegalTransactionStateError(
+        `Multiple adapters registered for dataSource '${dataSource}' (${names}). ` +
+          `Use the explicit \`adapter\` + \`adapterInstance\` options to disambiguate.`,
+      );
+    }
+    // Length is exactly 1 here (checked above) — non-null is provably safe.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return matches[0]!.adapter;
+  }
+
+  /**
+   * Find the adapter type name (`'typeorm'`, `'prisma'`, ...) registered
+   * under the given dataSource. Used by the manager to compose the
+   * composite Map key when only the dataSource name is known.
+   *
+   * Same disambiguation rules as {@link getByDataSource}.
+   */
+  getAdapterNameByDataSource(dataSource: string): string {
+    const matches: string[] = [];
+
+    for (const key of this.adapters.keys()) {
+      const colon = key.indexOf(':');
+      const adapterName = key.slice(0, colon);
+      const instanceName = key.slice(colon + 1);
+      if (instanceName === dataSource) {
+        matches.push(adapterName);
+      }
+    }
+
+    if (matches.length === 0) {
+      throw new TransactionAdapterNotFoundError('*', dataSource);
+    }
+    if (matches.length > 1) {
+      const names = matches.map((n) => `${n}:${dataSource}`).join(', ');
+      throw new IllegalTransactionStateError(
+        `Multiple adapters registered for dataSource '${dataSource}' (${names}). ` +
+          `Use the explicit \`adapter\` + \`adapterInstance\` options to disambiguate.`,
+      );
+    }
+    // Length is exactly 1 here (checked above) — non-null is provably safe.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return matches[0]!;
+  }
+
+  /**
    * Return the name of the adapter type currently marked default.
    *
    * @throws {IllegalTransactionStateError} If no adapter has been registered

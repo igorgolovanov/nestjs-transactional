@@ -64,6 +64,20 @@ const als = new AsyncLocalStorage<TransactionContextStore>();
  * foundation of the module — every decorator, interceptor, and adapter helper
  * ultimately asks this class whether a transaction is live on the current
  * async chain.
+ *
+ * **Internal Map key format**: `${adapterName}:${instanceName}` (composite)
+ * for historical reasons and cross-package compatibility — typeorm
+ * helpers, the CQRS dispatcher, and the outbox publisher all consume
+ * this format directly via {@link getActiveTransaction}. The composite
+ * key is also the format `TransactionManager` writes under.
+ *
+ * **Public dataSource-name access**:
+ * {@link getActiveTransactionByDataSource} provides dataSource-name
+ * lookup for Phase 14.2+ multi-adapter consumers — it scans the Map
+ * for the entry whose `adapterInstanceName === dataSource`. Both
+ * access patterns coexist; future cleanup is possible once
+ * cross-package consumers migrate to the dataSource-name lookup and
+ * no backwards-compatibility constraints remain.
  */
 export class TransactionContext {
   /**
@@ -98,6 +112,37 @@ export class TransactionContext {
   /** Return the active transaction registered under `adapterInstanceName`, or `undefined`. */
   static getActiveTransaction(adapterInstanceName: string): ActiveTransaction | undefined {
     return als.getStore()?.activeTransactions.get(adapterInstanceName);
+  }
+
+  /**
+   * Return the active transaction whose adapter instance was
+   * registered under the given dataSource name (DD-020 / DD-023).
+   * Scans the active-transactions Map for the entry whose
+   * `adapterInstanceName === dataSource`.
+   *
+   * Returns the first match — there is exactly one active transaction
+   * per dataSource by construction (multiple adapters sharing the
+   * same dataSource name is rejected at the registry level by
+   * {@link AdapterRegistry.getByDataSource}).
+   *
+   * Used by {@link TransactionContextView} and by smart-facade
+   * publishers to answer "is there an active transaction for *my*
+   * dataSource?" without needing to know the adapter type that owns
+   * the dataSource.
+   */
+  static getActiveTransactionByDataSource(
+    dataSource: string,
+  ): ActiveTransaction | undefined {
+    const store = als.getStore();
+    if (store === undefined) {
+      return undefined;
+    }
+    for (const tx of store.activeTransactions.values()) {
+      if (tx.adapterInstanceName === dataSource) {
+        return tx;
+      }
+    }
+    return undefined;
   }
 
   /**

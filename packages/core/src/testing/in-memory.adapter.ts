@@ -52,6 +52,17 @@ export interface InMemoryRolledBackSavepointRecord extends InMemorySavepointReco
 export class InMemoryTransactionAdapter implements TransactionAdapter<InMemoryTransactionHandle> {
   readonly name = 'in-memory';
 
+  /**
+   * dataSource name this adapter is bound to (DD-021). Defaults to
+   * `'default'`; override via the constructor to register multiple
+   * in-memory adapters under distinct dataSource names in tests.
+   */
+  readonly dataSourceName: string;
+
+  constructor(dataSourceName = 'default') {
+    this.dataSourceName = dataSourceName;
+  }
+
   committedTransactions: InMemoryCommittedTransaction[] = [];
   rolledBackTransactions: InMemoryRolledBackTransaction[] = [];
   savepointsCreated: InMemorySavepointRecord[] = [];

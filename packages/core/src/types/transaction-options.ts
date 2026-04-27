@@ -53,8 +53,27 @@ export interface ExtendedTransactionOptions extends TransactionOptions {
    * `'billing'`. Used for multi-datasource setups where the same adapter
    * type is registered against multiple DataSources. If omitted, the
    * instance registered with `isDefault: true` is used.
+   *
+   * Prefer {@link ExtendedTransactionOptions.dataSource} for new code —
+   * it identifies the dataSource directly without needing to also know
+   * the adapter type. `adapterInstance` is preserved for backwards
+   * compatibility with single-adapter call sites.
    */
   readonly adapterInstance?: string;
+
+  /**
+   * Public dataSource name to target (DD-020). When set, the manager
+   * resolves the adapter via {@link AdapterRegistry.getByDataSource}
+   * and uses this name as the active-transaction Map key suffix —
+   * cross-dataSource enrolment is structurally impossible (DD-023).
+   *
+   * Mutually exclusive with the `adapter` / `adapterInstance` pair —
+   * if `dataSource` is set, the others are ignored. If omitted, the
+   * legacy resolution path (`adapter` + `adapterInstance`, falling
+   * back to registry defaults) is used. Single-adapter consumers
+   * never need to set this explicitly.
+   */
+  readonly dataSource?: string;
 
   /**
    * How this transaction should relate to an already-active transaction
