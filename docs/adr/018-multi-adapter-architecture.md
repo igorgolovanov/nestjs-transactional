@@ -46,6 +46,40 @@
 > `forRoot` call with an `adapters: [...]` array) introduced
 > relative to the `OutboxModule` rework.
 
+> **Note (Phase 14.10 + 14.11 cleanup, 2026-04-27):** The
+> Phase 14.3.2 forward-reference above has now landed.
+>
+> **Phase 14.10** rewrote `TransactionalModule.forRoot` to the
+> multi-`forRoot` shape. The `adapters: [...]` array form (Phase
+> 14.2 Q1.B) is removed entirely; each adapter-bearing call
+> registers exactly one dataSource. Static class storage
+> (`TransactionalModule.registrations` Map +
+> `infrastructureRegistered` flag) coordinates singletons across
+> calls — the same mechanism Phase 14.3.2 introduced for
+> `OutboxModule` per ADR-019. The default `isGlobal` flips from
+> `false` to `true` to match `OutboxModule` and unblock multi-
+> call cross-DI visibility (without the flip, sibling
+> `DynamicModule`s cannot see the first call's
+> `TransactionManager` / `AdapterRegistry`). The
+> infrastructure-only shorthand `TransactionalModule.forRoot({})`
+> (no adapter) is preserved — `TypeOrmTransactionalModule.forFeature`
+> remains a valid adapter-source path that registers
+> imperatively into the AdapterRegistry.
+>
+> **Phase 14.11** removed the deprecated
+> `TypeOrmTransactionalOptions.instanceName` alias introduced in
+> Phase 14.4. The canonical `dataSourceName` field remains;
+> dual-read logic is gone. The alias was retained for one phase
+> boundary so consumers had time to migrate; pre-release
+> cleanup eliminates the carry-over.
+>
+> Cumulative effect: a single coherent multi-adapter API
+> surface across `core`, `typeorm`, and `outbox` packages, all
+> using per-dataSource per-call registration. Item 1 in the
+> "Migration to multi-adapter" section of CLAUDE.md describes
+> the `forRoot` signature change in past tense; item 8 reflects
+> Phase 14.11's alias removal.
+
 ## Context
 
 The current architecture supports a single transactional adapter

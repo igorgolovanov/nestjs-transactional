@@ -415,12 +415,12 @@ async generateInvoice() { ... }
 parameter), but without this, users cannot realistically use the package in
 multi-database projects.
 
-**Phase 14 alignment** (Phase 14.4, 2026-04-27):
+**Phase 14 alignment** (Phase 14.4 → 14.11, 2026-04-27):
 The `@nestjs-transactional/typeorm` package is fully aligned with the
 Phase 14 multi-adapter conventions. `TypeOrmTransactionalOptions`
-gains the `dataSourceName` field as the canonical identifier;
-`instanceName` is preserved as a permanent `@deprecated` alias for
-backwards compatibility (`dataSourceName` wins when both are set).
+exposes the `dataSourceName` field as the canonical identifier
+(introduced Phase 14.4; the deprecated `instanceName` alias was
+removed in Phase 14.11 — one-phase carry-over for migration).
 Phase 14.2 introduced `@Transactional({ dataSource: 'billing' })`
 as the user-facing identifier syntax; the legacy
 `@Transactional({ adapterInstance: 'billing' })` continues to work
@@ -428,8 +428,11 @@ through the same `AdapterRegistry` lookup. Phase 14.4 closed the
 verification gap by adding integration tests against real Postgres
 that exercise both syntaxes side-by-side, plus cross-dataSource
 transaction isolation tests honouring DD-023's keyed-Map guarantee.
-See ADR-018 for the multi-adapter architecture and its breaking-
-changes list.
+Phase 14.10 reworked `TransactionalModule.forRoot` to the multi-
+`forRoot` shape (one call per dataSource, mirroring Phase 14.3.2
+`OutboxModule` per ADR-019). See ADR-018 for the multi-adapter
+architecture and its breaking-changes list, plus the Phase 14.10
++ 14.11 addendum at the top of that ADR for the cleanup record.
 
 ### DD-006: Jest over Vitest
 
@@ -1036,7 +1039,7 @@ TypeOrmTransactionHandle extends TransactionHandle
 // Module
 TypeOrmTransactionalModule.forFeature(options): DynamicModule
   options: {
-    instanceName?: string,
+    dataSourceName?: string,
     dataSource: DataSource | (() => Promise<DataSource> | DataSource),
     isDefault?: boolean,
   }
@@ -1824,6 +1827,43 @@ scanners share fix shape; dispatcher fix is closely related.
   in user code)
 - Multi-adapter example end-to-end against real Postgres
 
+**14.10: TransactionalModule cleanup (shipped 2026-04-27)**
+
+Pre-release cleanup unifying `TransactionalModule.forRoot` with the
+Phase 14.3.2 `OutboxModule` multi-`forRoot` pattern (ADR-019).
+Removes the `adapters: [...]` array form (Phase 14.2 Q1.B
+compromise) in favour of one `forRoot` call per dataSource. Static
+class storage (`TransactionalModule.registrations` Map +
+`infrastructureRegistered` flag) coordinates singletons across
+calls. Default `isGlobal` flips from `false` to `true` to match
+`OutboxModule` and unblock multi-call cross-DI visibility.
+Infrastructure-only `forRoot({})` preserved — the call wires
+process-wide singletons and integration packages' `forFeature`
+continue to register adapters into `AdapterRegistry` imperatively.
+ADR-018 second addendum captures the landing record.
+
+**14.11: typeorm `instanceName` removal (shipped 2026-04-27)**
+
+Pre-release cleanup completing Phase 14.4 vocabulary alignment.
+`TypeOrmTransactionalOptions.instanceName` deprecated alias
+removed; canonical `dataSourceName` field remains. Dual-read
+logic (`options.dataSourceName ?? options.instanceName ?? 'default'`)
+simplified to `options.dataSourceName ?? 'default'`. The alias
+was retained for one phase boundary so consumers had time to
+migrate.
+
+Distinct from core's `AdapterRegistration.instanceName` field
+(unchanged — different concept) and from
+`TypeOrmTransactionAdapter`'s constructor parameter named
+`instanceName` (adapter-internal, also unchanged).
+
+**14.12: outbox-typeorm `adapterInstance` removal (planned)**
+
+Mirror cleanup for `outbox-typeorm`. The `OutboxTypeOrmModule.forFeature`
+options carry an `adapterInstance` deprecated alias next to the
+canonical `dataSourceName` (same shape as the typeorm package
+pre-Phase-14.11). One-phase carry-over closes here.
+
 ### Future phases (not scheduled)
 
 - **@nestjs-transactional/outbox-prisma**: Prisma persistence backend
@@ -1863,7 +1903,9 @@ re-discovering the surface.
 - `TransactionalTypeOrmAdapter` — constructor takes a dataSource
   name (DD-021); resolves the actual TypeORM `DataSource` via DI.
 - `TypeOrmTransactionalModule.forFeature` — `instanceName` field
-  renamed to `dataSource` for cross-package consistency.
+  renamed to `dataSourceName` for cross-package consistency
+  (Phase 14.4 introduced `dataSourceName`; Phase 14.11 removed
+  the deprecated `instanceName` alias).
 - `getCurrentEntityManager(dataSource?: string, fallback?)` —
   default `'default'`.
 
@@ -1934,11 +1976,19 @@ re-discovering the surface.
 
 Acceptable because no package has shipped a stable release yet.
 
-1. `TransactionalModule.forRoot` signature changes: now expects
-   `{ adapter, dataSource?, ... }` where `adapter` is an instance
-   produced by an adapter package
-   (`new TransactionalTypeOrmAdapter('billing')`). Replaces today's
-   per-module config of `adapters: [...]`.
+1. `TransactionalModule.forRoot` signature changed (Phase 14.10):
+   accepts a single `{ adapter, ... }` per call. Multi-adapter
+   setups call `forRoot` once per dataSource. The `adapters: [...]`
+   array form (Phase 14.2 Q1.B compromise) was removed; cross-call
+   coordination of singletons happens through static class storage
+   on `TransactionalModule` itself, mirroring the Phase 14.3.2
+   `OutboxModule` mechanism per ADR-019. Default `isGlobal` flipped
+   from `false` to `true` to match `OutboxModule` and unblock
+   multi-call cross-DI visibility. Infrastructure-only
+   `forRoot({})` (no adapter) preserved — the call wires the
+   process-wide singletons and integration packages' `forFeature`
+   continue to register adapters into the `AdapterRegistry`
+   imperatively.
 2. `@Transactional` decorator gains a `dataSource` option.
    `@Transactional({ dataSource: 'billing' })`. Default unchanged.
 3. `OutboxModule.forRoot` and `OutboxModule.forFeature` accept a
@@ -1951,12 +2001,13 @@ Acceptable because no package has shipped a stable release yet.
 7. `getCurrentEntityManager(dataSource?: string, fallback?)` —
    parameter renamed from `instanceName` to `dataSource`. Same
    semantics; the rename is for cross-package consistency.
-8. `TypeOrmTransactionalModule.forFeature` — gains `dataSourceName`
-   field as the canonical identifier (`instanceName` retained as a
-   permanent `@deprecated` alias; `dataSourceName` wins when both
-   are set). The existing `dataSource` field continues to hold the
-   actual TypeORM `DataSource` instance — see ADR-018 "Vocabulary
-   asymmetry" for why both names coexist. Same semantics throughout.
+8. `TypeOrmTransactionalModule.forFeature` — `dataSourceName` is
+   the canonical identifier (introduced Phase 14.4). The
+   deprecated `instanceName` alias was removed in Phase 14.11 —
+   one-phase carry-over for migration. The existing `dataSource`
+   field continues to hold the actual TypeORM `DataSource`
+   instance — see ADR-018 "Vocabulary asymmetry" for why both
+   names coexist. Same semantics throughout.
 9. New inject decorators (`@InjectTransactionManager`, etc.) ship.
    Strictly additive — `@Inject(TransactionManager)` (class token)
    continues to work for the default dataSource via a class-token
@@ -2119,13 +2170,16 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-26 (Phase 11, Iteration 11.5a shipped —
-ADR-015 accepted, `docs/architecture/event-externalization.md`
-created, `outbox-microservices` and `outbox` READMEs polished
-with ADR cross-links, root README packages list and roadmap
-updated, deferred doc-wide `@ApplicationModuleHandler` →
-`@IntegrationEventsHandler` rename sweep completed across all
-READMEs / architecture docs / migration guide / examples).
+**Last updated**: 2026-04-27 (Phase 14.10 + 14.11 cleanup shipped
+— `TransactionalModule.forRoot` aligned to multi-`forRoot`
+pattern (ADR-019 mechanism applied to core), `adapters: [...]`
+array form removed, default `isGlobal` flipped to `true`;
+`TypeOrmTransactionalOptions.instanceName` deprecated alias
+removed (`dataSourceName` remains canonical). ADR-018 second
+addendum captures the landing record for both phases.
+Phase 14.3.2 ADR-019 docs catch-up shipped 8318a64 earlier same
+day. Process learning entry #11 added — two-commit phases
+require verification of both commits before closure).
 
 ### Completed
 
@@ -2313,10 +2367,17 @@ READMEs / architecture docs / migration guide / examples).
    previously listed it under "Not Exposed". See § "Exported but
    typically wired via `TransactionalModule`" above.
 
-3. **`TransactionalModule.forRoot({ isGlobal: true })` is required when
-   pairing with `TypeOrmTransactionalModule`.** Otherwise
-   `AdapterRegistry` is not visible in the typeorm module's provider
-   scope and DI fails at init.
+3. **`TransactionalModule.forRoot({ isGlobal: true })` is the default
+   from Phase 14.10 onwards.** Single-call setups pairing with
+   `TypeOrmTransactionalModule` rely on `isGlobal: true` so that
+   `AdapterRegistry` is visible in the typeorm module's provider
+   scope; multi-`forRoot` setups additionally rely on it for the
+   second-and-later calls' per-DS providers to find the singletons
+   the first call registered. Phase 14.10 flipped the option's
+   default from `false` to `true` to match `OutboxModule` and
+   remove a common-case footgun. Users who genuinely want a
+   non-global module pass `isGlobal: false` explicitly and accept
+   the per-import constraint.
 
 4. **Test file layout is inconsistent across packages.** Core colocates
    `.spec.ts` next to source. TypeORM uses `test/unit/`,
@@ -2388,3 +2449,19 @@ READMEs / architecture docs / migration guide / examples).
     cross-dataSource consistency goes through the outbox, see
     ADR-018. Phase 14 lands the implementation; Phase 14.0 is the
     documentation-only preparation iteration.
+
+11. **Two-commit phases must verify both commits before closure.**
+    Phases that ship in two commits (code + docs) require explicit
+    verification that BOTH commits landed before the phase is marked
+    complete. "Done" reported on the code commit alone is incomplete
+    — the docs commit drifts into the next phase's session and gets
+    forgotten. Pattern observed: Phase 14.3.2 (code shipped 0ecb0e4
+    on 2026-04-27, ADR-019 docs ~10h later as 8318a64); Phase 14.10
+    (code shipped fd477fa on 2026-04-27, docs deferred and
+    eventually bundled with Phase 14.11 as a single docs commit).
+    Mitigation: end-of-phase checklist explicitly asks "did the
+    docs commit land?" before moving on. Bundling consecutive
+    cleanup phases' docs into one commit (this commit, for example)
+    is acceptable once both code commits have shipped — but the
+    bundle must still happen before another non-cleanup phase
+    starts, otherwise it slips again.
