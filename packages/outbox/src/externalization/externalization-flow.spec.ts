@@ -125,6 +125,7 @@ describe('Externalization end-to-end (OutboxModule + mock externalizer)', () => 
   }
 
   beforeEach(() => {
+    OutboxModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -240,6 +241,7 @@ describe('Externalization end-to-end (OutboxModule without an externalizer)', ()
   let module: TestingModule;
 
   beforeEach(() => {
+    OutboxModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

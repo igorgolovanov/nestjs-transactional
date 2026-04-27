@@ -48,6 +48,7 @@ describe('OutboxProcessingModule', () => {
   let monitorStop: jest.SpyInstance;
 
   beforeEach(async () => {
+    OutboxModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
 
     module = await Test.createTestingModule({

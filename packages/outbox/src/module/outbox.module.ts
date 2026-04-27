@@ -7,7 +7,7 @@ import {
   type Provider,
   type Type,
 } from '@nestjs/common';
-import { DiscoveryModule } from '@nestjs/core';
+import { DiscoveryModule, ModuleRef } from '@nestjs/core';
 import { TransactionManager } from '@nestjs-transactional/core';
 
 import { CompletedEventPublications } from '../api/completed-event-publications';
@@ -15,7 +15,10 @@ import { FailedEventPublications } from '../api/failed-event-publications';
 import { IncompleteEventPublications } from '../api/incomplete-event-publications';
 import { DataSourceOutboxPublisher } from '../dispatcher/data-source-outbox-publisher';
 import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
-import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
+import {
+  OUTBOX_DATA_SOURCE_NAMES,
+  OutboxEventPublisher,
+} from '../dispatcher/outbox-event-publisher';
 import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
@@ -58,21 +61,42 @@ import { DEFAULT_STALENESS_CONFIG, type StalenessConfig } from '../types/stalene
 const DEFAULT_DATA_SOURCE = 'default';
 
 /**
- * Per-dataSource configuration block accepted inside
- * {@link OutboxModuleOptions.dataSources}. Each block produces a
- * complete set of per-dataSource providers under deterministic
- * tokens (`getXxxToken(dataSource)`); the per-dataSource publisher,
- * registry, processor, monitor, and recovery service are independent
- * across dataSources.
+ * Synchronous options for {@link OutboxModule.forRoot}.
+ *
+ * Multi-dataSource deployments call `forRoot` once per dataSource:
+ *
+ * ```ts
+ * OutboxModule.forRoot({})                              // default
+ * OutboxModule.forRoot({ dataSource: 'billing' })       // billing
+ * OutboxModule.forRoot({ dataSource: 'inventory' })     // inventory
+ * ```
+ *
+ * Matches the convention used by `TypeOrmModule`, `MongooseModule`,
+ * `ClientsModule`, and others — each `forRoot` call registers a
+ * complete provider matrix for one dataSource. Cross-call
+ * coordination of the singleton facade / scanner / processing bundle
+ * happens through {@link OutboxModule.registrations} (static class
+ * storage, mirroring `@nestjs/typeorm`'s `EntitiesMetadataStorage`).
+ *
+ * Calling `forRoot` twice with the same `dataSource` (or twice with
+ * `dataSource` omitted, which both default to `'default'`) throws at
+ * module-definition time — dataSource names must be unique across a
+ * process.
+ *
+ * Tests that build multiple modules in sequence must reset the
+ * static storage between cases — call {@link OutboxModule.resetForTesting}
+ * in `beforeEach` (or `afterEach`).
  */
-export interface OutboxDataSourceOptions {
+export interface OutboxModuleOptions {
   /** dataSource name. Defaults to `'default'`. */
   readonly dataSource?: string;
+  /** Register the module as `@Global()`. Default: `true`. */
+  readonly isGlobal?: boolean;
+
   readonly processor?: Partial<EventPublicationProcessorOptions>;
   readonly staleness?: Partial<StalenessConfig>;
   readonly republishOnStartup?: boolean;
   readonly startupBatchSize?: number;
-  /** Convenience shortcut — also fills `processor.completionMode`. */
   readonly completionMode?: CompletionMode;
   /**
    * Provider for the event serializer. The Provider's `provide` field
@@ -91,60 +115,9 @@ export interface OutboxDataSourceOptions {
 }
 
 /**
- * Synchronous options for {@link OutboxModule.forRoot}. Two shapes
- * supported:
- *
- *  1. **Single-dataSource** (default, backwards-compatible): all
- *     options at the top level apply to the `'default'` dataSource.
- *  2. **Multi-dataSource**: pass {@link dataSources} — an array of
- *     {@link OutboxDataSourceOptions} blocks. Each entry registers a
- *     full per-dataSource provider matrix.
- *
- * **Multi-dataSource via multiple `forRoot()` calls is NOT supported.**
- * NestJS provider deduplication on shared Symbol tokens would make
- * the second call clobber the first. Use `dataSources: [...]` instead.
- *
- * Top-level `processor` / `staleness` / etc. apply ONLY in single-DS
- * mode. When `dataSources` is provided, top-level options are ignored
- * — every dataSource's options come from its block in the array.
- */
-export interface OutboxModuleOptions {
-  /** Register the module as `@Global()`. Default: `true`. */
-  readonly isGlobal?: boolean;
-
-  /**
-   * Multi-dataSource configuration. Each entry produces a complete
-   * set of per-dataSource providers. Must contain a `'default'` entry
-   * (explicit or implicit) for class-token aliases
-   * (e.g. `EventPublicationRegistry`, `OutboxEventPublisher`) to
-   * remain wired — see {@link OutboxDataSourceOptions} for the
-   * per-DS shape.
-   */
-  readonly dataSources?: readonly OutboxDataSourceOptions[];
-
-  // --- Single-dataSource shortcut: the following options apply to
-  //     the `'default'` dataSource when `dataSources` is omitted. ---
-
-  readonly processor?: Partial<EventPublicationProcessorOptions>;
-  readonly staleness?: Partial<StalenessConfig>;
-  readonly republishOnStartup?: boolean;
-  readonly startupBatchSize?: number;
-  readonly completionMode?: CompletionMode;
-  readonly serializer?: Provider;
-  readonly repository?: Provider;
-}
-
-/**
- * Subset of {@link OutboxModuleOptions} that can be resolved
- * asynchronously via {@link OutboxModule.forRootAsync}. Provider-valued
- * fields (`serializer`, `repository`) stay static because providers
- * must be known at module-definition time.
- *
- * **Single-dataSource only.** Multi-dataSource is not supported via
- * `forRootAsync` because the dataSource list must be known at module
- * registration time to declare static providers, while the async
- * factory only resolves later. Multi-dataSource deployments use the
- * synchronous `forRoot({ dataSources: [...] })`.
+ * Result shape resolved by {@link OutboxModuleAsyncOptions.useFactory}.
+ * Provider-valued fields (`serializer`, `repository`) stay static
+ * because providers must be known at module-definition time.
  */
 export interface OutboxModuleAsyncFactoryResult {
   readonly processor?: Partial<EventPublicationProcessorOptions>;
@@ -154,7 +127,14 @@ export interface OutboxModuleAsyncFactoryResult {
   readonly completionMode?: CompletionMode;
 }
 
+/**
+ * Asynchronous options for {@link OutboxModule.forRootAsync}. Each
+ * call registers a single dataSource's outbox stack with config
+ * resolved asynchronously. Multi-dataSource deployments call
+ * `forRootAsync` once per dataSource (symmetric with `forRoot`).
+ */
 export interface OutboxModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+  readonly dataSource?: string;
   readonly isGlobal?: boolean;
   readonly serializer?: Provider;
   readonly repository?: Provider;
@@ -178,9 +158,9 @@ export const OUTBOX_STALENESS_CONFIG = Symbol('OUTBOX_STALENESS_CONFIG');
 export const OUTBOX_PROCESSING_BUNDLE = Symbol('OUTBOX_PROCESSING_BUNDLE');
 
 /**
- * Shape of the processing bundle. Both arrays are dataSource-aligned
- * (same length, same order); index `i` describes the i-th dataSource
- * registered with `forRoot`.
+ * Shape of the processing bundle. The three arrays are aligned by
+ * index — `processors[i]` / `monitors[i]` / `recoveryServices[i]`
+ * all belong to the same dataSource.
  */
 export interface OutboxProcessingBundle {
   readonly processors: readonly EventPublicationProcessor[];
@@ -188,7 +168,20 @@ export interface OutboxProcessingBundle {
   readonly recoveryServices: readonly StartupRecoveryService[];
 }
 
-const ASYNC_OPTIONS_TOKEN = Symbol('OUTBOX_ASYNC_OPTIONS');
+/**
+ * Internal record of a registered dataSource's resolved options.
+ * Stored in {@link OutboxModule.registrations} so singleton factories
+ * can enumerate every registered dataSource at injection time.
+ */
+interface OutboxRegistrationRecord {
+  readonly dataSource: string;
+  readonly processorOptions: EventPublicationProcessorOptions;
+  readonly stalenessConfig: StalenessConfig;
+  readonly recoveryOptions: OutboxRecoveryOptions;
+}
+
+const ASYNC_OPTIONS_TOKEN = (ds: string): symbol =>
+  Symbol(`OUTBOX_ASYNC_OPTIONS[${ds}]`);
 
 function resolveProcessorOptions(
   processor: Partial<EventPublicationProcessorOptions> | undefined,
@@ -217,42 +210,6 @@ function resolveRecoveryOptions(
 }
 
 /**
- * Resolve user-facing options into a normalised list of per-dataSource
- * config blocks. Multi-DS users supply `dataSources: [...]`; single-DS
- * users supply top-level options that we wrap into a single
- * implicit block under `'default'`.
- */
-function resolveDataSourceConfigs(
-  options: OutboxModuleOptions,
-): readonly OutboxDataSourceOptions[] {
-  if (options.dataSources !== undefined && options.dataSources.length > 0) {
-    return options.dataSources.map((ds) => ({
-      dataSource: ds.dataSource ?? DEFAULT_DATA_SOURCE,
-      processor: ds.processor,
-      staleness: ds.staleness,
-      republishOnStartup: ds.republishOnStartup,
-      startupBatchSize: ds.startupBatchSize,
-      completionMode: ds.completionMode,
-      serializer: ds.serializer,
-      repository: ds.repository,
-    }));
-  }
-
-  return [
-    {
-      dataSource: DEFAULT_DATA_SOURCE,
-      processor: options.processor,
-      staleness: options.staleness,
-      republishOnStartup: options.republishOnStartup,
-      startupBatchSize: options.startupBatchSize,
-      completionMode: options.completionMode,
-      serializer: options.serializer,
-      repository: options.repository,
-    },
-  ];
-}
-
-/**
  * Re-bind a Provider's `provide` field to a per-dataSource token.
  * Users supply repository / serializer providers with whatever
  * `provide` value they want (typically the historical singleton
@@ -267,15 +224,21 @@ function reBindProvider(provider: Provider, token: InjectionToken): Provider {
 }
 
 /**
- * NestJS module that wires the Event Publication Registry. Phase 14.3
- * extended `forRoot` to register a complete per-dataSource provider
- * matrix when {@link OutboxModuleOptions.dataSources} is given —
- * single-dataSource deployments continue to use the top-level options
- * shorthand (everything binds to dataSource `'default'`).
+ * NestJS module that wires the Event Publication Registry. ADR-019
+ * shape — multi-dataSource deployments call {@link forRoot} once per
+ * dataSource. The first call registers process-wide singletons (smart
+ * facade, listener scanner, processing bundle); subsequent calls only
+ * register per-dataSource providers. Default-DS class-token aliases
+ * are registered by whichever call has `dataSource: 'default'` (or
+ * `dataSource` omitted).
+ *
+ * Cross-call state lives in {@link registrations} — a static class
+ * storage keyed by dataSource name. Mirrors `@nestjs/typeorm`'s
+ * `EntitiesMetadataStorage` pattern.
  *
  * Does NOT start the processor or staleness monitor automatically —
  * import {@link OutboxProcessingModule} in the worker process to
- * auto-start every configured per-dataSource loop on
+ * auto-start every registered per-dataSource loop on
  * `OnApplicationBootstrap`.
  *
  * Requires `TransactionalModule.forRoot({ isGlobal: true })` registered
@@ -284,35 +247,74 @@ function reBindProvider(provider: Provider, token: InjectionToken): Provider {
  */
 @Module({})
 export class OutboxModule {
+  /**
+   * @internal
+   * Process-wide registry of every dataSource that has called
+   * {@link forRoot} or {@link forRootAsync}. Singleton factories
+   * (smart facade, processing bundle) close over this Map and
+   * enumerate it at injection time, after every `forRoot` has been
+   * evaluated synchronously.
+   *
+   * Tests that build multiple modules sequentially MUST call
+   * {@link resetForTesting} between cases — otherwise residual
+   * registrations from earlier tests collide with later ones.
+   */
+  private static readonly registrations = new Map<string, OutboxRegistrationRecord>();
+
+  /**
+   * Test-only — drop every registration so a subsequent `forRoot`
+   * starts from a clean slate. Mirrors the cleanup pattern used with
+   * `EntitiesMetadataStorage` in `@nestjs/typeorm` test suites.
+   *
+   * Production code should never call this. Calling at runtime
+   * after the module has been initialised would NOT clear the
+   * provider tree NestJS already built — it only clears the
+   * registration record that drives subsequent `forRoot` calls.
+   *
+   * @internal
+   */
+  static resetForTesting(): void {
+    this.registrations.clear();
+  }
+
   static forRoot(options: OutboxModuleOptions = {}): DynamicModule {
-    const dsConfigs = resolveDataSourceConfigs(options);
-    // resolveDataSourceConfigs guarantees `dataSource` is set for
-    // every entry — non-null is provably safe here.
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const dsNames = dsConfigs.map((d) => d.dataSource!);
-
-    const providers: Provider[] = [];
-    const exportTokens: InjectionToken[] = [];
-
-    // Per-dataSource provider matrix. Each iteration registers the
-    // full set of providers (event-type registry, repository,
-    // serializer, publication registry, listener registry,
-    // externalization registry, processor, staleness monitor, startup
-    // recovery, per-dataSource publisher, operator query APIs) under
-    // dataSource-derived tokens.
-    for (const dsConfig of dsConfigs) {
-      providers.push(...buildPerDataSourceProviders(dsConfig));
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      exportTokens.push(...perDataSourceExports(dsConfig.dataSource!));
+    const ds = options.dataSource ?? DEFAULT_DATA_SOURCE;
+    if (this.registrations.has(ds)) {
+      throw new Error(
+        `OutboxModule.forRoot('${ds}') called twice — dataSource names must be unique. ` +
+          `If this is a test, call OutboxModule.resetForTesting() between cases.`,
+      );
     }
 
-    // Class-token / singleton-token aliases for the `'default'`
-    // dataSource. Preserves the historical contract where
-    // `module.get(EventPublicationRegistry)` and
-    // `@Inject(EVENT_PUBLICATION_REPOSITORY)` resolve to the
-    // single-dataSource instance. Operator APIs follow because they
-    // inject from the EVENT_PUBLICATION_REPOSITORY alias above.
-    if (dsNames.includes(DEFAULT_DATA_SOURCE)) {
+    const isFirstRegistration = this.registrations.size === 0;
+
+    const processorOpts = resolveProcessorOptions(options.processor, options.completionMode);
+    const stalenessCfg = resolveStalenessConfig(options.staleness);
+    const recoveryOpts = resolveRecoveryOptions(
+      options.republishOnStartup,
+      options.startupBatchSize,
+    );
+
+    this.registrations.set(ds, {
+      dataSource: ds,
+      processorOptions: processorOpts,
+      stalenessConfig: stalenessCfg,
+      recoveryOptions: recoveryOpts,
+    });
+
+    const providers: Provider[] = [
+      ...buildPerDataSourceProviders(
+        ds,
+        options.repository,
+        options.serializer,
+        processorOpts,
+        stalenessCfg,
+        recoveryOpts,
+      ),
+    ];
+    const exportTokens: InjectionToken[] = [...perDataSourceExports(ds)];
+
+    if (ds === DEFAULT_DATA_SOURCE) {
       providers.push(...buildDefaultDataSourceAliases());
       providers.push(
         FailedEventPublications,
@@ -329,23 +331,210 @@ export class OutboxModule {
       );
     }
 
-    // Smart facade publisher (DD-024). Constructed via factory
-    // injecting every per-dataSource publisher and event-type
-    // registry — the facade builds Maps keyed by dataSource name.
-    providers.push(buildFacadePublisherProvider(dsNames));
-    exportTokens.push(OutboxEventPublisher);
-
-    // Module-wide singletons that don't vary per-dataSource.
-    providers.push(OutboxListenerScanner);
-
-    // Processing bundle exposed for OutboxProcessingModule.
-    providers.push(buildProcessingBundleProvider(dsNames));
-    exportTokens.push(OUTBOX_PROCESSING_BUNDLE);
+    if (isFirstRegistration) {
+      // Process-wide singletons. Their factories close over this
+      // class's `registrations` Map and read it at injection time —
+      // by then every other forRoot has already pushed its record in
+      // (forRoot bodies run synchronously at module-definition time).
+      providers.push(...buildFacadePublisherProvider(OutboxModule));
+      providers.push(buildProcessingBundleProvider(OutboxModule));
+      providers.push(OutboxListenerScanner);
+      exportTokens.push(OutboxEventPublisher);
+      exportTokens.push(OUTBOX_PROCESSING_BUNDLE);
+    }
 
     return {
       module: OutboxModule,
       global: options.isGlobal ?? true,
       imports: [DiscoveryModule],
+      providers,
+      exports: exportTokens,
+    };
+  }
+
+  /**
+   * Asynchronous registration of one dataSource's outbox stack.
+   * Symmetric with {@link forRoot} — call once per dataSource;
+   * provider-valued fields (`serializer`, `repository`) stay static
+   * because providers must be known at module-definition time, while
+   * `processor` / `staleness` / etc. resolve via the async factory.
+   */
+  static forRootAsync(options: OutboxModuleAsyncOptions): DynamicModule {
+    const ds = options.dataSource ?? DEFAULT_DATA_SOURCE;
+    if (this.registrations.has(ds)) {
+      throw new Error(
+        `OutboxModule.forRootAsync('${ds}') called twice — dataSource names must be unique. ` +
+          `If this is a test, call OutboxModule.resetForTesting() between cases.`,
+      );
+    }
+
+    const isFirstRegistration = this.registrations.size === 0;
+
+    // Stub the registration record with defaults — async factory hasn't
+    // run yet, so concrete options are filled in by per-DS factory
+    // providers below. Singletons that read the Map at injection time
+    // only consume `dataSource`, so this stub is sufficient.
+    this.registrations.set(ds, {
+      dataSource: ds,
+      processorOptions: resolveProcessorOptions(undefined, undefined),
+      stalenessConfig: resolveStalenessConfig(undefined),
+      recoveryOptions: resolveRecoveryOptions(undefined, undefined),
+    });
+
+    const asyncToken = ASYNC_OPTIONS_TOKEN(ds);
+    const asyncOptionsProvider: FactoryProvider = {
+      provide: asyncToken,
+      useFactory: options.useFactory,
+      inject: options.inject ? [...options.inject] : undefined,
+    };
+
+    const eventTypeRegistryToken = getEventTypeRegistryToken(ds);
+    const repositoryToken = getEventPublicationRepositoryToken(ds);
+    const serializerToken = getOutboxEventSerializerToken(ds);
+    const listenerRegistryToken = getOutboxListenerRegistryToken(ds);
+    const publicationRegistryToken = getEventPublicationRegistryToken(ds);
+    const externalizationRegistryToken = getExternalizationRegistryToken(ds);
+    const processorToken = getEventPublicationProcessorToken(ds);
+    const publisherToken = getOutboxPublisherToken(ds);
+    const stalenessToken = perDsStalenessMonitorToken(ds);
+    const recoveryToken = perDsStartupRecoveryToken(ds);
+    const processorOptionsToken = perDsProcessorOptionsToken(ds);
+    const stalenessConfigToken = perDsStalenessConfigToken(ds);
+    const recoveryOptionsToken = perDsRecoveryOptionsToken(ds);
+
+    const providers: Provider[] = [
+      asyncOptionsProvider,
+
+      { provide: eventTypeRegistryToken, useFactory: (): EventTypeRegistry => new EventTypeRegistry() },
+
+      options.repository
+        ? reBindProvider(options.repository, repositoryToken)
+        : { provide: repositoryToken, useClass: InMemoryEventPublicationRepository },
+
+      options.serializer
+        ? reBindProvider(options.serializer, serializerToken)
+        : {
+            provide: serializerToken,
+            useFactory: (registry: EventTypeRegistry): EventSerializer =>
+              new JsonEventSerializer(registry),
+            inject: [eventTypeRegistryToken],
+          },
+
+      {
+        provide: listenerRegistryToken,
+        useFactory: (): OutboxListenerRegistry => new OutboxListenerRegistry(),
+      },
+
+      {
+        provide: publicationRegistryToken,
+        useFactory: (
+          repo: EventPublicationRepository,
+          serializer: EventSerializer,
+        ): EventPublicationRegistry => new EventPublicationRegistry(repo, serializer),
+        inject: [repositoryToken, serializerToken],
+      },
+
+      {
+        provide: externalizationRegistryToken,
+        useFactory: (etr: EventTypeRegistry): ExternalizationRegistry =>
+          new ExternalizationRegistry(etr),
+        inject: [eventTypeRegistryToken],
+      },
+
+      {
+        provide: processorOptionsToken,
+        useFactory: (opts: OutboxModuleAsyncFactoryResult): EventPublicationProcessorOptions =>
+          resolveProcessorOptions(opts.processor, opts.completionMode),
+        inject: [asyncToken],
+      },
+      {
+        provide: processorToken,
+        useFactory: (
+          registry: EventPublicationRegistry,
+          listeners: OutboxListenerRegistry,
+          opts: EventPublicationProcessorOptions,
+          externalizer: EventExternalizer | undefined,
+          externalizationRegistry: ExternalizationRegistry,
+        ): EventPublicationProcessor =>
+          new EventPublicationProcessor(
+            registry,
+            listeners,
+            opts,
+            externalizer,
+            externalizationRegistry,
+          ),
+        inject: [
+          publicationRegistryToken,
+          listenerRegistryToken,
+          processorOptionsToken,
+          { token: EVENT_EXTERNALIZER, optional: true },
+          externalizationRegistryToken,
+        ],
+      },
+
+      {
+        provide: stalenessConfigToken,
+        useFactory: (opts: OutboxModuleAsyncFactoryResult): StalenessConfig =>
+          resolveStalenessConfig(opts.staleness),
+        inject: [asyncToken],
+      },
+      {
+        provide: stalenessToken,
+        useFactory: (repo: EventPublicationRepository, cfg: StalenessConfig): StalenessMonitor =>
+          new StalenessMonitor(repo, cfg),
+        inject: [repositoryToken, stalenessConfigToken],
+      },
+
+      {
+        provide: recoveryOptionsToken,
+        useFactory: (opts: OutboxModuleAsyncFactoryResult): OutboxRecoveryOptions =>
+          resolveRecoveryOptions(opts.republishOnStartup, opts.startupBatchSize),
+        inject: [asyncToken],
+      },
+
+      {
+        provide: publisherToken,
+        useFactory: (
+          publicationRegistry: EventPublicationRegistry,
+          listenerRegistry: OutboxListenerRegistry,
+        ): DataSourceOutboxPublisher =>
+          new DataSourceOutboxPublisher(ds, publicationRegistry, listenerRegistry),
+        inject: [publicationRegistryToken, listenerRegistryToken],
+      },
+    ];
+
+    const exportTokens: InjectionToken[] = [...perDataSourceExports(ds)];
+
+    if (ds === DEFAULT_DATA_SOURCE) {
+      providers.push(
+        { provide: recoveryToken, useExisting: StartupRecoveryService },
+        ...buildDefaultDataSourceAliases(),
+        FailedEventPublications,
+        IncompleteEventPublications,
+        CompletedEventPublications,
+        StartupRecoveryService,
+      );
+      exportTokens.push(...defaultDataSourceAliasTokens());
+      exportTokens.push(
+        FailedEventPublications,
+        IncompleteEventPublications,
+        CompletedEventPublications,
+        StartupRecoveryService,
+      );
+    }
+
+    if (isFirstRegistration) {
+      providers.push(...buildFacadePublisherProvider(OutboxModule));
+      providers.push(buildProcessingBundleProvider(OutboxModule));
+      providers.push(OutboxListenerScanner);
+      exportTokens.push(OutboxEventPublisher);
+      exportTokens.push(OUTBOX_PROCESSING_BUNDLE);
+    }
+
+    return {
+      module: OutboxModule,
+      global: options.isGlobal ?? true,
+      imports: [DiscoveryModule, ...(options.imports ?? [])],
       providers,
       exports: exportTokens,
     };
@@ -368,7 +557,7 @@ export class OutboxModule {
    * OutboxModule.forFeature([OrderPlacedEvent, OrderShippedEvent])
    * ```
    *
-   * @example Multi-dataSource (Phase 14.3)
+   * @example Multi-dataSource
    * ```ts
    * OutboxModule.forFeature([BillingEvent], { dataSource: 'billing' })
    * OutboxModule.forFeature([InventoryEvent], { dataSource: 'inventory' })
@@ -406,202 +595,36 @@ export class OutboxModule {
       ],
     };
   }
-
-  /**
-   * Asynchronous registration. **Single-dataSource only** —
-   * multi-dataSource deployments must use the synchronous
-   * `forRoot({ dataSources: [...] })`. The async factory result
-   * cannot declare provider tokens because providers must be known
-   * at module-definition time, while the factory only runs later.
-   */
-  static forRootAsync(options: OutboxModuleAsyncOptions): DynamicModule {
-    const asyncOptionsProvider: FactoryProvider = {
-      provide: ASYNC_OPTIONS_TOKEN,
-      useFactory: options.useFactory,
-      inject: options.inject ? [...options.inject] : undefined,
-    };
-
-    const ds = DEFAULT_DATA_SOURCE;
-    const eventTypeRegistryToken = getEventTypeRegistryToken(ds);
-    const repositoryToken = getEventPublicationRepositoryToken(ds);
-    const serializerToken = getOutboxEventSerializerToken(ds);
-    const listenerRegistryToken = getOutboxListenerRegistryToken(ds);
-    const publicationRegistryToken = getEventPublicationRegistryToken(ds);
-    const externalizationRegistryToken = getExternalizationRegistryToken(ds);
-    const processorToken = getEventPublicationProcessorToken(ds);
-    const publisherToken = getOutboxPublisherToken(ds);
-    const stalenessToken = `${ds}StalenessMonitor`;
-    const recoveryToken = `${ds}StartupRecoveryService`;
-    const processorOptionsToken = `${ds}ProcessorOptions`;
-    const stalenessConfigToken = `${ds}StalenessConfig`;
-    const recoveryOptionsToken = `${ds}RecoveryOptions`;
-
-    const providers: Provider[] = [
-      asyncOptionsProvider,
-
-      // Per-DS event type registry
-      {
-        provide: eventTypeRegistryToken,
-        useFactory: (): EventTypeRegistry => new EventTypeRegistry(),
-      },
-
-      // Repository (per-DS)
-      options.repository
-        ? reBindProvider(options.repository, repositoryToken)
-        : { provide: repositoryToken, useClass: InMemoryEventPublicationRepository },
-
-      // Serializer (per-DS)
-      options.serializer
-        ? reBindProvider(options.serializer, serializerToken)
-        : {
-            provide: serializerToken,
-            useFactory: (registry: EventTypeRegistry): EventSerializer =>
-              new JsonEventSerializer(registry),
-            inject: [eventTypeRegistryToken],
-          },
-
-      // Listener registry (per-DS)
-      {
-        provide: listenerRegistryToken,
-        useFactory: (): OutboxListenerRegistry => new OutboxListenerRegistry(),
-      },
-
-      // Publication registry (per-DS)
-      {
-        provide: publicationRegistryToken,
-        useFactory: (
-          repo: EventPublicationRepository,
-          serializer: EventSerializer,
-        ): EventPublicationRegistry => new EventPublicationRegistry(repo, serializer),
-        inject: [repositoryToken, serializerToken],
-      },
-
-      // Externalization registry (per-DS)
-      {
-        provide: externalizationRegistryToken,
-        useFactory: (etr: EventTypeRegistry): ExternalizationRegistry =>
-          new ExternalizationRegistry(etr),
-        inject: [eventTypeRegistryToken],
-      },
-
-      // Processor options resolved from async factory
-      {
-        provide: processorOptionsToken,
-        useFactory: (opts: OutboxModuleAsyncFactoryResult): EventPublicationProcessorOptions =>
-          resolveProcessorOptions(opts.processor, opts.completionMode),
-        inject: [ASYNC_OPTIONS_TOKEN],
-      },
-
-      // Processor (per-DS)
-      {
-        provide: processorToken,
-        useFactory: (
-          registry: EventPublicationRegistry,
-          listeners: OutboxListenerRegistry,
-          opts: EventPublicationProcessorOptions,
-          externalizer: EventExternalizer | undefined,
-          externalizationRegistry: ExternalizationRegistry,
-        ): EventPublicationProcessor =>
-          new EventPublicationProcessor(
-            registry,
-            listeners,
-            opts,
-            externalizer,
-            externalizationRegistry,
-          ),
-        inject: [
-          publicationRegistryToken,
-          listenerRegistryToken,
-          processorOptionsToken,
-          { token: EVENT_EXTERNALIZER, optional: true },
-          externalizationRegistryToken,
-        ],
-      },
-
-      // Staleness config / monitor (per-DS)
-      {
-        provide: stalenessConfigToken,
-        useFactory: (opts: OutboxModuleAsyncFactoryResult): StalenessConfig =>
-          resolveStalenessConfig(opts.staleness),
-        inject: [ASYNC_OPTIONS_TOKEN],
-      },
-      {
-        provide: stalenessToken,
-        useFactory: (repo: EventPublicationRepository, cfg: StalenessConfig): StalenessMonitor =>
-          new StalenessMonitor(repo, cfg),
-        inject: [repositoryToken, stalenessConfigToken],
-      },
-
-      // Recovery options / service (per-DS).
-      // StartupRecoveryService is registered as a class via the
-      // default-DS alias path below — it injects
-      // IncompleteEventPublications + OUTBOX_RECOVERY_OPTIONS (both
-      // class-token aliased), so NestJS handles construction.
-      {
-        provide: recoveryOptionsToken,
-        useFactory: (opts: OutboxModuleAsyncFactoryResult): OutboxRecoveryOptions =>
-          resolveRecoveryOptions(opts.republishOnStartup, opts.startupBatchSize),
-        inject: [ASYNC_OPTIONS_TOKEN],
-      },
-      { provide: recoveryToken, useExisting: StartupRecoveryService },
-
-      // Per-DS internal publisher
-      {
-        provide: publisherToken,
-        useFactory: (
-          publicationRegistry: EventPublicationRegistry,
-          listenerRegistry: OutboxListenerRegistry,
-        ): DataSourceOutboxPublisher =>
-          new DataSourceOutboxPublisher(ds, publicationRegistry, listenerRegistry),
-        inject: [publicationRegistryToken, listenerRegistryToken],
-      },
-
-      // Class-token aliases for backwards compatibility — these
-      // include the EVENT_PUBLICATION_REPOSITORY alias the operator
-      // APIs below inject from.
-      ...buildDefaultDataSourceAliases(),
-
-      // Operator APIs + StartupRecoveryService — registered as
-      // classes so NestJS resolves their dependencies via DI from
-      // the default-DS alias above.
-      FailedEventPublications,
-      IncompleteEventPublications,
-      CompletedEventPublications,
-      StartupRecoveryService,
-
-      // Module-wide singletons
-      OutboxListenerScanner,
-
-      // Smart facade publisher
-      buildFacadePublisherProvider([ds]),
-
-      // Processing bundle
-      buildProcessingBundleProvider([ds]),
-    ];
-
-    return {
-      module: OutboxModule,
-      global: options.isGlobal ?? true,
-      imports: [DiscoveryModule, ...(options.imports ?? [])],
-      providers,
-      exports: [
-        ...perDataSourceExports(ds),
-        ...defaultDataSourceAliasTokens(),
-        OutboxEventPublisher,
-        OUTBOX_PROCESSING_BUNDLE,
-      ],
-    };
-  }
 }
 
 // ---------------------------------------------------------------------------
 // Per-dataSource provider helpers
 // ---------------------------------------------------------------------------
 
-function buildPerDataSourceProviders(dsConfig: OutboxDataSourceOptions): Provider[] {
-  // dsConfig.dataSource is filled in by resolveDataSourceConfigs.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const ds = dsConfig.dataSource!;
+function perDsStalenessMonitorToken(ds: string): string {
+  return `${ds}StalenessMonitor`;
+}
+function perDsStartupRecoveryToken(ds: string): string {
+  return `${ds}StartupRecoveryService`;
+}
+function perDsProcessorOptionsToken(ds: string): string {
+  return `${ds}ProcessorOptions`;
+}
+function perDsStalenessConfigToken(ds: string): string {
+  return `${ds}StalenessConfig`;
+}
+function perDsRecoveryOptionsToken(ds: string): string {
+  return `${ds}RecoveryOptions`;
+}
+
+function buildPerDataSourceProviders(
+  ds: string,
+  repository: Provider | undefined,
+  serializer: Provider | undefined,
+  processorOpts: EventPublicationProcessorOptions,
+  stalenessCfg: StalenessConfig,
+  recoveryOpts: OutboxRecoveryOptions,
+): Provider[] {
   const eventTypeRegistryToken = getEventTypeRegistryToken(ds);
   const repositoryToken = getEventPublicationRepositoryToken(ds);
   const serializerToken = getOutboxEventSerializerToken(ds);
@@ -610,32 +633,21 @@ function buildPerDataSourceProviders(dsConfig: OutboxDataSourceOptions): Provide
   const externalizationRegistryToken = getExternalizationRegistryToken(ds);
   const processorToken = getEventPublicationProcessorToken(ds);
   const publisherToken = getOutboxPublisherToken(ds);
-  // Internal-only string tokens for per-DS components without a
-  // dedicated `getXxxToken` utility (staleness, recovery, options).
-  // Not part of the public token-utility surface — Phase 14.x can
-  // promote them later if a real injection use case emerges.
-  const stalenessToken = `${ds}StalenessMonitor`;
-  const recoveryToken = `${ds}StartupRecoveryService`;
-  const processorOptionsToken = `${ds}ProcessorOptions`;
-  const stalenessConfigToken = `${ds}StalenessConfig`;
-  const recoveryOptionsToken = `${ds}RecoveryOptions`;
-
-  const processorOpts = resolveProcessorOptions(dsConfig.processor, dsConfig.completionMode);
-  const stalenessCfg = resolveStalenessConfig(dsConfig.staleness);
-  const recoveryOpts = resolveRecoveryOptions(
-    dsConfig.republishOnStartup,
-    dsConfig.startupBatchSize,
-  );
+  const stalenessToken = perDsStalenessMonitorToken(ds);
+  const recoveryToken = perDsStartupRecoveryToken(ds);
+  const processorOptionsToken = perDsProcessorOptionsToken(ds);
+  const stalenessConfigToken = perDsStalenessConfigToken(ds);
+  const recoveryOptionsToken = perDsRecoveryOptionsToken(ds);
 
   return [
     { provide: eventTypeRegistryToken, useFactory: (): EventTypeRegistry => new EventTypeRegistry() },
 
-    dsConfig.repository
-      ? reBindProvider(dsConfig.repository, repositoryToken)
+    repository
+      ? reBindProvider(repository, repositoryToken)
       : { provide: repositoryToken, useClass: InMemoryEventPublicationRepository },
 
-    dsConfig.serializer
-      ? reBindProvider(dsConfig.serializer, serializerToken)
+    serializer
+      ? reBindProvider(serializer, serializerToken)
       : {
           provide: serializerToken,
           useFactory: (registry: EventTypeRegistry): EventSerializer =>
@@ -652,8 +664,8 @@ function buildPerDataSourceProviders(dsConfig: OutboxDataSourceOptions): Provide
       provide: publicationRegistryToken,
       useFactory: (
         repo: EventPublicationRepository,
-        serializer: EventSerializer,
-      ): EventPublicationRegistry => new EventPublicationRegistry(repo, serializer),
+        s: EventSerializer,
+      ): EventPublicationRegistry => new EventPublicationRegistry(repo, s),
       inject: [repositoryToken, serializerToken],
     },
 
@@ -699,13 +711,15 @@ function buildPerDataSourceProviders(dsConfig: OutboxDataSourceOptions): Provide
     },
 
     { provide: recoveryOptionsToken, useValue: recoveryOpts },
-    // StartupRecoveryService takes IncompleteEventPublications +
-    // OutboxRecoveryOptions, both class-token-aliased to the default
-    // DS. Register as class so NestJS resolves both via DI.
-    {
-      provide: recoveryToken,
-      useExisting: StartupRecoveryService,
-    },
+    // StartupRecoveryService for non-default dataSources alias to the
+    // class-token instance registered by the default-DS forRoot. The
+    // class-token instance reads IncompleteEventPublications +
+    // OUTBOX_RECOVERY_OPTIONS — both bound to the default-DS
+    // repository. For multi-DS recovery to fire per-dataSource we'd
+    // need a per-DS StartupRecoveryService class; deferred to a later
+    // phase when multi-DS recovery is exercised. Today's behaviour:
+    // recovery runs on the default-DS only.
+    { provide: recoveryToken, useExisting: StartupRecoveryService },
 
     {
       provide: publisherToken,
@@ -734,11 +748,11 @@ function perDataSourceExports(ds: string): InjectionToken[] {
 
 /**
  * Class-token / singleton-token aliases for the `'default'` dataSource.
- * These exist so that historical injection sites
- * (`@Inject(EVENT_PUBLICATION_REPOSITORY)`,
- * `module.get(EventPublicationRegistry)`, etc.) keep working when
- * the only configured dataSource is `'default'` — the typical
- * single-DS deployment.
+ * Registered only when the default DS itself is registered via a
+ * `forRoot`/`forRootAsync` call. Preserves the historical contract
+ * where `module.get(EventPublicationRegistry)` and
+ * `@Inject(EVENT_PUBLICATION_REPOSITORY)` resolve to the
+ * single-dataSource instance.
  */
 function buildDefaultDataSourceAliases(): Provider[] {
   const ds = DEFAULT_DATA_SOURCE;
@@ -751,11 +765,10 @@ function buildDefaultDataSourceAliases(): Provider[] {
     { provide: EventPublicationRegistry, useExisting: getEventPublicationRegistryToken(ds) },
     { provide: ExternalizationRegistry, useExisting: getExternalizationRegistryToken(ds) },
     { provide: EventPublicationProcessor, useExisting: getEventPublicationProcessorToken(ds) },
-    { provide: StalenessMonitor, useExisting: `${ds}StalenessMonitor` },
-    { provide: StartupRecoveryService, useExisting: `${ds}StartupRecoveryService` },
-    { provide: OUTBOX_PROCESSOR_OPTIONS, useExisting: `${ds}ProcessorOptions` },
-    { provide: OUTBOX_STALENESS_CONFIG, useExisting: `${ds}StalenessConfig` },
-    { provide: OUTBOX_RECOVERY_OPTIONS, useExisting: `${ds}RecoveryOptions` },
+    { provide: StalenessMonitor, useExisting: perDsStalenessMonitorToken(ds) },
+    { provide: OUTBOX_PROCESSOR_OPTIONS, useExisting: perDsProcessorOptionsToken(ds) },
+    { provide: OUTBOX_STALENESS_CONFIG, useExisting: perDsStalenessConfigToken(ds) },
+    { provide: OUTBOX_RECOVERY_OPTIONS, useExisting: perDsRecoveryOptionsToken(ds) },
   ];
 }
 
@@ -770,7 +783,6 @@ function defaultDataSourceAliasTokens(): InjectionToken[] {
     ExternalizationRegistry,
     EventPublicationProcessor,
     StalenessMonitor,
-    StartupRecoveryService,
     OUTBOX_PROCESSOR_OPTIONS,
     OUTBOX_STALENESS_CONFIG,
     OUTBOX_RECOVERY_OPTIONS,
@@ -778,54 +790,75 @@ function defaultDataSourceAliasTokens(): InjectionToken[] {
 }
 
 /**
- * Factory provider for the smart-facade {@link OutboxEventPublisher}.
- * Injects every per-dataSource publisher and event-type registry,
- * builds Maps keyed by dataSource name, and constructs the facade.
+ * Build the providers that register the smart facade publisher and
+ * the {@link OUTBOX_DATA_SOURCE_NAMES} value provider that carries a
+ * live reference to {@link OutboxModule.registrations}. The facade
+ * itself uses {@link OnModuleInit} to late-bind per-DS publishers /
+ * event-type registries via `ModuleRef` — by the time `OnModuleInit`
+ * fires, every per-DS provider across every `forRoot` has been
+ * instantiated.
  */
-function buildFacadePublisherProvider(dsNames: readonly string[]): Provider {
-  const publisherTokens = dsNames.map((ds) => getOutboxPublisherToken(ds));
-  const eventTypeRegistryTokens = dsNames.map((ds) => getEventTypeRegistryToken(ds));
-
-  return {
-    provide: OutboxEventPublisher,
-    useFactory: (...args: unknown[]): OutboxEventPublisher => {
-      const publishers = new Map<string, DataSourceOutboxPublisher>();
-      const registries = new Map<string, EventTypeRegistry>();
-      for (let i = 0; i < dsNames.length; i++) {
-        const name = dsNames[i];
-        if (name === undefined) continue;
-        publishers.set(name, args[i] as DataSourceOutboxPublisher);
-        registries.set(name, args[dsNames.length + i] as EventTypeRegistry);
-      }
-      return new OutboxEventPublisher(publishers, registries);
+function buildFacadePublisherProvider(moduleClass: typeof OutboxModule): Provider[] {
+  return [
+    OutboxEventPublisher,
+    {
+      provide: OUTBOX_DATA_SOURCE_NAMES,
+      useValue: privateRegistrations(moduleClass),
     },
-    inject: [...publisherTokens, ...eventTypeRegistryTokens],
+  ];
+}
+
+/**
+ * Build the {@link OUTBOX_PROCESSING_BUNDLE} provider. Same late-bind
+ * via `OnModuleInit` pattern: the bundle is materialised as an empty
+ * shape at injection time, then {@link OutboxProcessingModule}
+ * resolves per-DS processors / monitors / recovery services from
+ * `ModuleRef` in its lifecycle hook.
+ */
+function buildProcessingBundleProvider(moduleClass: typeof OutboxModule): Provider {
+  return {
+    provide: OUTBOX_PROCESSING_BUNDLE,
+    useFactory: (moduleRef: ModuleRef): OutboxProcessingBundle => {
+      const dsNames = Array.from(privateRegistrations(moduleClass).keys());
+      // Resolve lazily by capturing dsNames + moduleRef in closure. The
+      // OutboxProcessingModule's lifecycle hooks call .start() / .stop()
+      // on each entry — by the time those run, every per-DS provider
+      // has been instantiated and resolvable via ModuleRef.
+      const get = <T>(token: string): T => moduleRef.get<T>(token, { strict: false });
+      return {
+        get processors(): readonly EventPublicationProcessor[] {
+          return dsNames.map((ds) =>
+            get<EventPublicationProcessor>(getEventPublicationProcessorToken(ds)),
+          );
+        },
+        get monitors(): readonly StalenessMonitor[] {
+          return dsNames.map((ds) => get<StalenessMonitor>(perDsStalenessMonitorToken(ds)));
+        },
+        get recoveryServices(): readonly StartupRecoveryService[] {
+          return dsNames.map((ds) =>
+            get<StartupRecoveryService>(perDsStartupRecoveryToken(ds)),
+          );
+        },
+      };
+    },
+    inject: [ModuleRef],
   };
 }
 
 /**
- * Factory provider for {@link OUTBOX_PROCESSING_BUNDLE}. The bundle
- * is read by {@link OutboxProcessingModule} on bootstrap to start
- * every configured per-dataSource processor / monitor / recovery
- * service.
+ * Read the private static `registrations` Map from outside the class.
+ * The Map is `private` so external code can't mutate it, but our own
+ * factories living in this file need read access. By the time these
+ * factories run (lazily, at provider-resolution time), every
+ * synchronous `forRoot` body has populated the Map.
+ *
+ * @internal
  */
-function buildProcessingBundleProvider(dsNames: readonly string[]): Provider {
-  const processorTokens = dsNames.map((ds) => getEventPublicationProcessorToken(ds));
-  const monitorTokens = dsNames.map((ds) => `${ds}StalenessMonitor`);
-  const recoveryTokens = dsNames.map((ds) => `${ds}StartupRecoveryService`);
-
-  return {
-    provide: OUTBOX_PROCESSING_BUNDLE,
-    useFactory: (...args: unknown[]): OutboxProcessingBundle => {
-      const n = dsNames.length;
-      return {
-        processors: args.slice(0, n) as EventPublicationProcessor[],
-        monitors: args.slice(n, 2 * n) as StalenessMonitor[],
-        recoveryServices: args.slice(2 * n, 3 * n) as StartupRecoveryService[],
-      };
-    },
-    inject: [...processorTokens, ...monitorTokens, ...recoveryTokens],
-  };
+function privateRegistrations(
+  moduleClass: typeof OutboxModule,
+): Map<string, OutboxRegistrationRecord> {
+  return (moduleClass as unknown as { registrations: Map<string, OutboxRegistrationRecord> })
+    .registrations;
 }
 
 // `TransactionManager` referenced for documentation completeness;
