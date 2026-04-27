@@ -16,6 +16,9 @@ export * from './registry/listener-registry';
 export * from './registry/outbox-listener-scanner';
 
 export * from './decorators/outbox-events-handler.decorator';
+export * from './decorators/inject-decorators';
+
+export * from './tokens';
 
 export type { IOutboxEventsHandler } from './interfaces/outbox-events-handler.interface';
 

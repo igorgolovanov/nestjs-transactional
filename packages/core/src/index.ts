@@ -11,6 +11,9 @@ export * from './manager/adapter.registry';
 export * from './manager/transaction.manager';
 
 export * from './decorators/transactional.decorator';
+export * from './decorators/inject-decorators';
+
+export * from './tokens';
 
 export * from './interceptor/transactional.interceptor';
 export * from './bootstrap/transactional-methods.bootstrap';
