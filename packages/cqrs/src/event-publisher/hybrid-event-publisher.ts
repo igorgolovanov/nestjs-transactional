@@ -60,6 +60,16 @@ export const OUTBOX_PUBLICATION_SCHEDULER = Symbol('OUTBOX_PUBLICATION_SCHEDULER
  * await the DB write here. Errors raised while the `beforeCommit`
  * hook flushes the buffer DO bubble up — they cause the transaction
  * to roll back, which is the intended behavior.
+ *
+ * **Multi-dataSource (Phase 14.7).** The outbox scheduler is the
+ * smart-facade `OutboxEventPublisher` (DD-024). When wired,
+ * AggregateRoot events are routed to the per-dataSource publisher
+ * that owns the event class — the same routing semantics as
+ * `OutboxEventPublisher.publish()`. Multi-DS apps with multiple
+ * outbox stacks (one `OutboxModule.forRoot()` per dataSource per
+ * ADR-019) bind `OUTBOX_PUBLICATION_SCHEDULER` to the smart facade
+ * via `useExisting: OutboxEventPublisher`; the facade's internal
+ * Map fans out to the correct per-DS publisher.
  */
 @Injectable()
 export class HybridEventPublisher implements IEventPublisher {

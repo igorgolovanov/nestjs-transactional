@@ -86,6 +86,17 @@ export interface TransactionalEventsHandlerMetadata {
  * dispatcher registration happens at application bootstrap via
  * `TransactionalListenerScanner`.
  *
+ * **Multi-dataSource semantics.** The dispatcher attaches phase hooks
+ * to the *current* transaction via `TransactionManager.registerBeforeCommit`
+ * (and siblings), which iterates the active-transactions Map and picks
+ * the first entry. With cross-dataSource simultaneous transactions on
+ * the same async stack, this is non-deterministic — the handler may
+ * fire on a transaction it does not conceptually belong to. For
+ * cross-DS event flow use `@OutboxEventsHandler` / `@IntegrationEventsHandler`
+ * instead — outbox routing is per-dataSource by event registration
+ * (Phase 14.3.2). See CLAUDE.md "Known Limitations (Phase 14)" for
+ * the planned Phase 14.3.1 fix.
+ *
  * @throws {Error} If no event types are supplied.
  */
 export function TransactionalEventsHandler(...events: Type[]): ClassDecorator;

@@ -1721,6 +1721,48 @@ rationale and DD-020..DD-024 for the design decisions.
 - `EventPublicationProcessor` and `StalenessMonitor` bound per
   dataSource
 
+**14.3.1: Per-DS scanner routing fix
+  (`@nestjs-transactional/outbox`, `@nestjs-transactional/cqrs`)**
+
+Surfaced during Phase 14.5–14.7 verification. Three handler scanners
+inject a single registry by class token, which is aliased only to
+the `'default'` dataSource's registry — every decorator-driven
+handler registers with the default-DS registry regardless of which
+dataSource owns the events the handler subscribes to. Plus a fourth
+related issue in the cqrs in-memory dispatcher: hooks attach to the
+"first active transaction" rather than to a dataSource-specific
+transaction. Decorator-driven multi-DS handler registration is
+consequently broken end-to-end in all four code paths; multi-DS
+deployments must register listeners manually via the per-DS
+registry token (see "Known Limitations (Phase 14)" below) until
+this lands.
+
+Scanners affected:
+- `OutboxListenerScanner` (`@OutboxEventsHandler`) — `@nestjs-transactional/outbox`
+- `TransactionalListenerScanner` (`@TransactionalEventsHandler`) — `@nestjs-transactional/cqrs`
+- `IntegrationEventsHandlerScanner` (`@IntegrationEventsHandler`) — `@nestjs-transactional/cqrs`
+
+Dispatcher issue:
+- `TransactionalEventDispatcher` calls `TransactionManager.registerBeforeCommit`
+  / `registerAfterCommit` etc., which `currentTransaction()` resolves
+  by returning the FIRST entry in the active-transactions Map.
+  Non-deterministic with cross-DS simultaneous transactions.
+
+Scope:
+- Audit all four code paths together (single architectural pattern,
+  same fix shape across them).
+- Design per-DS routing — likely: derive the dataSource from each
+  event class's per-DS `EventTypeRegistry` registration; the scanner
+  / dispatcher then registers / dispatches against the matching
+  per-DS registry / per-DS active-transaction's hook lists.
+- Implement scanner changes + dispatcher hook-attachment change.
+- Integration test confirming decorator-driven multi-DS routing
+  works end-to-end (real Postgres + two DataSources).
+- ADR if architectural change involved.
+
+Estimated: medium phase (1-2 days post-audit). Bundled because the
+scanners share fix shape; dispatcher fix is closely related.
+
 **14.4: TypeORM adapter migration (`@nestjs-transactional/typeorm`)**
 - `TransactionalTypeOrmAdapter` constructor accepts a dataSource
   name (DD-021); resolves the actual TypeORM `DataSource` via DI
@@ -1928,6 +1970,92 @@ anywhere sees no source-code change beyond the constructor-as-
 adapter shape (`new TransactionalTypeOrmAdapter()`). The
 constructor-shape change is the one item that touches every
 single-adapter consumer.
+
+---
+
+## Known Limitations (Phase 14)
+
+Limitations of the multi-adapter implementation that are surfaced
+in real multi-DS use but do not yet have a planned fix in the
+shipping iteration. Each entry names the phase in which it is
+slated for resolution. Single-adapter (default-DS) deployments are
+unaffected by these limitations.
+
+### Decorator-driven handler registration in multi-DS deployments
+
+Four code paths share the same root issue: they read the active
+"current" registry / transaction by class token / first-element
+iteration, which resolves to the default dataSource only.
+
+1. **`@OutboxEventsHandler` decorator + multi-DS routing.**
+   `OutboxListenerScanner` injects `OutboxListenerRegistry` by
+   class token, aliased only to the `'default'` dataSource's
+   registry. Every annotated class registers with the default-DS
+   registry regardless of which dataSource owns the events. In a
+   multi-DS deployment, events published to a non-default
+   dataSource land in that dataSource's `event_publication`
+   table but have no listeners registered to drive their
+   delivery — the publication remains `PUBLISHED` indefinitely.
+2. **`@TransactionalEventsHandler` decorator + multi-DS dispatch.**
+   `TransactionalEventDispatcher` attaches phase hooks via
+   `TransactionManager.registerBeforeCommit` /
+   `registerAfterCommit` etc., which target the FIRST active
+   transaction on the current async context. With cross-DS
+   simultaneous transactions, the handler may fire on a
+   transaction it does not conceptually belong to.
+3. **`@IntegrationEventsHandler` decorator + multi-DS routing.**
+   `IntegrationEventsHandlerScanner` injects a single
+   `OutboxListenerRegistrar` (resolves to default-DS via the
+   `useExisting: OutboxListenerRegistry` bridge). Multi-DS apps
+   wanting non-default-DS persistent integration handlers face
+   the same registration gap as (1).
+4. **In-memory listener-scanner side of (2).** The cqrs
+   `TransactionalListenerScanner` walks providers and registers
+   them with the single `TransactionalEventDispatcher`. The
+   scanner itself is single-instance, but the dispatch-time
+   "first active transaction" resolution is the latent issue —
+   the same root cause as (2).
+
+**Workaround until Phase 14.3.1 (bundled fix for all four):**
+
+Manual per-DS listener registration with the dataSource-aware
+token utility:
+
+```ts
+import {
+  composeListenerId,
+  getOutboxListenerRegistryToken,
+} from '@nestjs-transactional/outbox';
+
+const billingRegistry = app.get(
+  getOutboxListenerRegistryToken('billing'),
+);
+billingRegistry.register({
+  id: composeListenerId('BillingListener', BillingEvent),
+  eventType: BillingEvent.name,
+  invoke: async (event) => { /* ... */ },
+});
+```
+
+For cross-DS in-memory event handling, prefer the outbox path
+(`@OutboxEventsHandler` / `@IntegrationEventsHandler` with the
+outbox bound) — outbox routing is per-dataSource by event-class
+registration (Phase 14.3.2), so this gap doesn't bite as long as
+listener registration is manual.
+
+Programmatic registration is a supported usage pattern by design
+— scanners are convenience layers, not the only binding mechanism.
+
+**Fix:** Phase 14.3.1 (see Roadmap) — bundled scope across the
+three scanners (`OutboxListenerScanner`,
+`TransactionalListenerScanner`,
+`IntegrationEventsHandlerScanner`) plus the dispatcher's
+hook-attachment path. Single architectural pattern (derive
+dataSource from each event class's per-DS `EventTypeRegistry`
+registration; scanners then register with the matching per-DS
+registry; dispatcher pushes hooks onto the matching dataSource's
+active-transaction directly, bypassing
+`registerBeforeCommit`'s "first active" semantics).
 
 ---
 
