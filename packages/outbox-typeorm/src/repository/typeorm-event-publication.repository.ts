@@ -47,9 +47,9 @@ import { EventPublicationEntity } from '../entity/event-publication.entity';
  * on. With small worker counts (typical: 1–3) the duplicate-fetch
  * cost is negligible.
  *
- * The repository is adapter-instance-aware: pass a non-default
- * `adapterInstance` when the application uses multiple DataSources
- * (`'primary'`, `'billing'`, ...). The fallback {@link DataSource}
+ * The repository is dataSource-aware: pass a non-default
+ * `dataSourceName` when the application uses multiple DataSources
+ * (`'billing'`, `'inventory'`, ...). The fallback {@link DataSource}
  * passed to the constructor is used when `getCurrentEntityManager` is
  * called outside any active transaction — typical for operator-facing
  * read APIs.
@@ -58,11 +58,11 @@ import { EventPublicationEntity } from '../entity/event-publication.entity';
 export class TypeOrmEventPublicationRepository implements EventPublicationRepository {
   constructor(
     private readonly dataSource: DataSource,
-    private readonly adapterInstance = 'default',
+    private readonly dataSourceName = 'default',
   ) {}
 
   private get em(): EntityManager {
-    return getCurrentEntityManager(this.adapterInstance, this.dataSource);
+    return getCurrentEntityManager(this.dataSourceName, this.dataSource);
   }
 
   async createAll(inputs: NewEventPublication[]): Promise<EventPublication[]> {

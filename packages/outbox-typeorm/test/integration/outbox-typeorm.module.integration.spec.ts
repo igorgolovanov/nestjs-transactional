@@ -79,7 +79,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
           dataSource: ctx.dataSource,
         }),
         OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider,
+          repository: typeOrmEventPublicationRepositoryProvider(),
           ...outboxOverrides,
         }),
         OutboxModule.forFeature([OrderPlacedEvent]),
@@ -102,6 +102,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
   });
 
   beforeEach(async () => {
+    OutboxModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -206,6 +207,12 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
     // StartupRecoveryService fires on OnApplicationBootstrap and
     // transitions every incomplete publication to RESUBMITTED. Then
     // we drive one processor batch and expect delivery.
+    //
+    // ADR-019 multi-forRoot: between the simulated crash and the
+    // restart we drop the static `OutboxModule.registrations` Map
+    // — within a single process the second `buildApp` would
+    // otherwise hit the duplicate-dataSource guard.
+    OutboxModule.resetForTesting();
     const secondApp = await buildApp({ republishOnStartup: true });
     try {
       const afterBootstrap = await ctx.dataSource

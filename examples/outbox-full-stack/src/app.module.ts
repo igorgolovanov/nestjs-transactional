@@ -104,7 +104,7 @@ export class AppModule {
           schemaInitialization: { enabled: false },
         }),
         OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider,
+          repository: typeOrmEventPublicationRepositoryProvider(),
           republishOnStartup: true,
           processor: { pollingInterval: 500, batchSize: 50 },
           staleness: { processing: 30_000, monitorInterval: 60_000 },
