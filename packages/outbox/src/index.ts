@@ -23,6 +23,7 @@ export * from './tokens';
 export type { IOutboxEventsHandler } from './interfaces/outbox-events-handler.interface';
 
 export * from './dispatcher/outbox-event-publisher';
+export * from './dispatcher/data-source-outbox-publisher';
 export * from './dispatcher/event-publication-processor';
 export * from './dispatcher/processor-options';
 

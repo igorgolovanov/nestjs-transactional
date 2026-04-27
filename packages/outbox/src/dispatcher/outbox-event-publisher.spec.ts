@@ -5,6 +5,7 @@ import {
   AdapterRegistry,
   IllegalTransactionStateError,
   PropagationMode,
+  TransactionContext,
   TransactionManager,
   type TransactionAdapter,
   type TransactionHandle,
@@ -18,7 +19,7 @@ import { JsonEventSerializer } from '../serialization/json-event-serializer';
 import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
 import { PublicationStatus } from '../types/publication-status';
 
-import { OutboxEventPublisher } from './outbox-event-publisher';
+import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -27,6 +28,7 @@ interface FakeHandle extends TransactionHandle {
 
 class FakeAdapter implements TransactionAdapter<FakeHandle> {
   readonly name = 'in-memory';
+  readonly dataSourceName = 'default';
 
   async runInTransaction<T>(
     _options: TransactionOptions,
@@ -50,11 +52,11 @@ class OrderPlacedEvent {
 
 class UnusedEvent {}
 
-describe('OutboxEventPublisher', () => {
+describe('DataSourceOutboxPublisher', () => {
   let manager: TransactionManager;
   let repo: InMemoryEventPublicationRepository;
   let listenerRegistry: OutboxListenerRegistry;
-  let publisher: OutboxEventPublisher;
+  let publisher: DataSourceOutboxPublisher;
 
   beforeEach(() => {
     const adapter = new FakeAdapter();
@@ -67,7 +69,11 @@ describe('OutboxEventPublisher', () => {
       new JsonEventSerializer(new EventTypeRegistry()),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new OutboxEventPublisher(publicationRegistry, listenerRegistry, manager);
+    publisher = new DataSourceOutboxPublisher(
+      'default',
+      publicationRegistry,
+      listenerRegistry,
+    );
   });
 
   it('persists a publication per registered listener and the record survives commit', async () => {
@@ -197,7 +203,12 @@ describe('OutboxEventPublisher', () => {
     });
 
     it('buffers events inside a transaction and flushes them via a single beforeCommit hook', async () => {
-      const registerBeforeCommitSpy = jest.spyOn(manager, 'registerBeforeCommit');
+      // Phase 14.3: the per-DS publisher pushes the hook directly
+      // onto `tx.beforeCommitHooks` (not via
+      // `manager.registerBeforeCommit`, which targets only the
+      // first-active transaction — wrong in multi-DS scenarios).
+      // Verify by counting hooks attached to the active transaction.
+      let attachedHookCount = -1;
 
       await manager.run({}, async () => {
         publisher.scheduleForPublication(new OrderPlacedEvent('order-1'));
@@ -206,6 +217,12 @@ describe('OutboxEventPublisher', () => {
 
         // Not yet flushed — the beforeCommit hook has not fired.
         expect(repo.count()).toBe(0);
+
+        // Capture how many hooks the publisher attached. Single
+        // hook regardless of how many events were scheduled.
+        const store = TransactionContext.getStore()!;
+        const tx = Array.from(store.activeTransactions.values())[0]!;
+        attachedHookCount = tx.beforeCommitHooks.length;
       });
 
       // After commit the hook has flushed the buffer.
@@ -217,7 +234,7 @@ describe('OutboxEventPublisher', () => {
       ]);
 
       // One hook per transaction, not one per event.
-      expect(registerBeforeCommitSpy).toHaveBeenCalledTimes(1);
+      expect(attachedHookCount).toBe(1);
     });
 
     it('flushes nothing when the transaction rolls back', async () => {
@@ -268,7 +285,10 @@ describe('OutboxEventPublisher', () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
 
       expect(errorSpy).toHaveBeenCalledTimes(1);
-      expect(errorSpy.mock.calls[0]![0]).toContain('scheduleForPublication outside a transaction');
+      // Phase 14.3: error message names the dataSource explicitly.
+      expect(errorSpy.mock.calls[0]![0]).toContain(
+        "scheduleForPublication outside an active 'default' transaction",
+      );
       expect(repo.count()).toBe(0);
     });
   });

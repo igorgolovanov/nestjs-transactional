@@ -9,8 +9,8 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
+import { DataSourceOutboxPublisher } from '../dispatcher/data-source-outbox-publisher';
 import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
-import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
 import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
@@ -34,6 +34,7 @@ interface FakeHandle extends TransactionHandle {
 
 class FakeAdapter implements TransactionAdapter<FakeHandle> {
   readonly name = 'in-memory';
+  readonly dataSourceName = 'default';
 
   async runInTransaction<T>(
     _options: TransactionOptions,
@@ -78,7 +79,7 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
   let manager: TransactionManager;
   let repo: InMemoryEventPublicationRepository;
   let listenerRegistry: OutboxListenerRegistry;
-  let publisher: OutboxEventPublisher;
+  let publisher: DataSourceOutboxPublisher;
   let processor: EventPublicationProcessor;
   let externalizer: jest.Mocked<EventExternalizer>;
 
@@ -108,7 +109,11 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
       new JsonEventSerializer(eventTypes),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new OutboxEventPublisher(publicationRegistry, listenerRegistry, manager);
+    publisher = new DataSourceOutboxPublisher(
+      'default',
+      publicationRegistry,
+      listenerRegistry,
+    );
     externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
     processor = new EventPublicationProcessor(
       publicationRegistry,
@@ -181,7 +186,7 @@ describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wire
   let manager: TransactionManager;
   let repo: InMemoryEventPublicationRepository;
   let listenerRegistry: OutboxListenerRegistry;
-  let publisher: OutboxEventPublisher;
+  let publisher: DataSourceOutboxPublisher;
   let processor: EventPublicationProcessor;
   let externalizer: jest.Mocked<EventExternalizer>;
 
@@ -215,7 +220,11 @@ describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wire
       new JsonEventSerializer(eventTypes),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new OutboxEventPublisher(publicationRegistry, listenerRegistry, manager);
+    publisher = new DataSourceOutboxPublisher(
+      'default',
+      publicationRegistry,
+      listenerRegistry,
+    );
     externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
     processor = new EventPublicationProcessor(
       publicationRegistry,
@@ -353,7 +362,11 @@ describe('EventPublicationProcessor (without externalizer — backward compatibl
       new JsonEventSerializer(eventTypes),
     );
     const listenerRegistry = new OutboxListenerRegistry();
-    const publisher = new OutboxEventPublisher(publicationRegistry, listenerRegistry, manager);
+    const publisher = new DataSourceOutboxPublisher(
+      'default',
+      publicationRegistry,
+      listenerRegistry,
+    );
 
     listenerRegistry.register({
       id: 'Inventory.onOrderPlaced',

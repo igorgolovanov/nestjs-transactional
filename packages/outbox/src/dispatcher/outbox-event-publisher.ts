@@ -1,156 +1,189 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  type ActiveTransaction,
-  IllegalTransactionStateError,
-  TransactionContext,
-  TransactionManager,
-} from '@nestjs-transactional/core';
 
-import { EventPublicationRegistry } from '../registry/event-publication-registry';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
+import { EventTypeRegistry } from '../serialization/event-type-registry';
+import { OutboxError } from '../types/errors';
+
+import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
 
 /**
- * High-level API that business code uses to publish events.
+ * Optional override accepted by the facade `OutboxEventPublisher`'s
+ * publish methods to target a specific dataSource explicitly.
  *
- * For a given event, looks up every `@OutboxEventsHandler` currently
- * registered for that event type and asks the
- * {@link EventPublicationRegistry} to persist one publication per
- * listener — atomically with the ambient transaction.
+ * When omitted, the facade routes by event-type registration: the
+ * event class is looked up in each per-dataSource
+ * {@link EventTypeRegistry}, and the dataSource that registered it
+ * owns the publication.
+ */
+export interface OutboxPublishOptions {
+  /**
+   * Public dataSource name to publish to. Always wins over event-type
+   * routing when set. Useful for events that are registered in
+   * multiple dataSources, or for explicit cross-dataSource routing.
+   */
+  readonly dataSource?: string;
+}
+
+/**
+ * High-level smart-facade publisher (DD-024). The single user-facing
+ * publisher class — application code injects `OutboxEventPublisher`
+ * and the facade routes publications to the per-dataSource
+ * {@link DataSourceOutboxPublisher} that owns the event class.
  *
- * Delivery itself happens asynchronously after commit, via the
- * `EventPublicationProcessor`.
+ * **Routing algorithm** (in order):
+ *  1. If `options.dataSource` is provided, route to that dataSource.
+ *  2. Else, look up `event.constructor.name` in each registered
+ *     per-dataSource {@link EventTypeRegistry}; the registry that
+ *     contains the event determines the destination.
+ *  3. If no registry contains the event, throw {@link OutboxError}.
  *
- * {@link publish} refuses to run outside a transaction: publications
- * must be committed with the business write, and calling
- * `publish` outside a transaction is almost always a bug.
+ * **Cross-dataSource publishing** is allowed: the routing decision is
+ * about the event's *registered* dataSource, NOT about which
+ * transactions are currently active. With Phase 14.2's cross-DS
+ * simultaneous transactions, a billing event published from inside an
+ * outer-billing / inner-inventory async stack still routes to billing
+ * (because that's where the event class is registered) and validates
+ * its atomicity against the billing transaction.
  *
- * {@link scheduleForPublication} is a synchronous sibling: it buffers
- * events inside the current transaction and flushes them in a
- * `beforeCommit` hook. Intended for sync callers such as
- * `@nestjs/cqrs`'s `AggregateRoot.commit()` pathway.
+ * **Single-dataSource deployments** see no behavioural change: there
+ * is one per-DS publisher (named `'default'`), one event-type
+ * registry, and the facade transparently delegates to it.
+ *
+ * Replaces the pre-Phase-14.3 publisher whose internal
+ * `findCurrentTransaction()` returned an arbitrary first-active
+ * transaction — non-deterministic with multiple active transactions.
+ * No backwards-compatibility shim: callers always inject
+ * `OutboxEventPublisher` and receive routing semantics consistent
+ * with the registered event-type ownership.
  */
 @Injectable()
 export class OutboxEventPublisher {
   private readonly logger = new Logger(OutboxEventPublisher.name);
 
-  // Per-transaction buffer of events awaiting flush. Keyed by the
-  // ActiveTransaction object itself so the entry is GC'd with the
-  // transaction — no cleanup code to maintain, and no risk of
-  // cross-transaction leakage.
-  private readonly pending = new WeakMap<ActiveTransaction, unknown[]>();
-
   constructor(
-    private readonly registry: EventPublicationRegistry,
-    private readonly listenerRegistry: OutboxListenerRegistry,
-    private readonly transactionManager: TransactionManager,
+    /**
+     * Map of `dataSource → DataSourceOutboxPublisher`. Built at
+     * module-config time by `OutboxModule.forRoot` (Q3.A —
+     * module-build-time configuration). Read-only — facade does no
+     * mutation.
+     */
+    private readonly publishers: ReadonlyMap<string, DataSourceOutboxPublisher>,
+    /**
+     * Map of `dataSource → EventTypeRegistry`. Used to resolve event
+     * class → dataSource via `registry.has(event.constructor.name)`.
+     */
+    private readonly eventTypeRegistries: ReadonlyMap<string, EventTypeRegistry>,
   ) {}
 
   /**
-   * Publish a single event. Must be called inside an active
-   * transaction — an `IllegalTransactionStateError` is thrown
-   * otherwise.
+   * Publish a single event. Routing per the class JSDoc:
+   * `options.dataSource` (explicit) > event-type registration
+   * (implicit) > {@link OutboxError}.
    *
-   * Creates one {@link EventPublication} per listener registered for
-   * the event type. When no listeners are registered, the call is a
-   * silent no-op (but the transaction check still applies — consistency
-   * over leniency).
+   * Must be called inside an active transaction *for the resolved
+   * dataSource* — `DataSourceOutboxPublisher.publish` enforces this
+   * with a clear error message naming the dataSource.
    */
-  async publish(event: unknown): Promise<void> {
-    this.ensureInTransaction();
+  async publish(event: unknown, options: OutboxPublishOptions = {}): Promise<void> {
+    const dataSource = this.resolveDataSource(event, options);
+    const publisher = this.requirePublisher(dataSource);
+    await publisher.publish(event);
+  }
+
+  /**
+   * Publish a batch of events. Each event is routed independently, so
+   * a mixed-dataSource batch (e.g. one billing event and one
+   * inventory event in the same call) routes each to its own
+   * dataSource publisher.
+   */
+  async publishAll(events: readonly unknown[], options: OutboxPublishOptions = {}): Promise<void> {
+    for (const event of events) {
+      await this.publish(event, options);
+    }
+  }
+
+  /**
+   * Synchronous scheduling sibling of {@link publish}. Designed for
+   * sync callers such as `@nestjs/cqrs`'s `AggregateRoot.commit()`
+   * pathway. Same routing rules apply.
+   *
+   * Inside the resolved dataSource's active transaction: events are
+   * buffered and flushed in a `beforeCommit` hook
+   * (see {@link DataSourceOutboxPublisher.scheduleForPublication}).
+   * Outside any transaction: fire-and-forget {@link publish}, errors
+   * logged because there is no caller to propagate to.
+   *
+   * If the event cannot be routed (no matching registration), the
+   * call is logged-and-dropped — sync paths cannot raise.
+   */
+  scheduleForPublication(event: unknown, options: OutboxPublishOptions = {}): void {
+    let dataSource: string;
+    try {
+      dataSource = this.resolveDataSource(event, options);
+    } catch (err) {
+      this.logger.error(
+        `scheduleForPublication: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return;
+    }
+
+    const publisher = this.publishers.get(dataSource);
+    if (publisher === undefined) {
+      this.logger.error(
+        `scheduleForPublication: no outbox publisher registered for dataSource '${dataSource}'`,
+      );
+      return;
+    }
+    publisher.scheduleForPublication(event);
+  }
+
+  /**
+   * Read-only snapshot of the dataSources this facade routes to.
+   * Useful for diagnostics and tests.
+   */
+  getRegisteredDataSources(): readonly string[] {
+    return Array.from(this.publishers.keys());
+  }
+
+  private resolveDataSource(event: unknown, options: OutboxPublishOptions): string {
+    if (options.dataSource !== undefined) {
+      return options.dataSource;
+    }
 
     const eventType = (event as object).constructor.name;
-    const listeners = this.listenerRegistry.getByEventType(eventType);
-
-    if (listeners.length === 0) {
-      return;
+    const matches: string[] = [];
+    for (const [dataSource, registry] of this.eventTypeRegistries) {
+      if (registry.has(eventType)) {
+        matches.push(dataSource);
+      }
     }
 
-    const listenerIds = listeners.map((l) => l.id);
-    await this.registry.publish(event, listenerIds);
-  }
-
-  /**
-   * Publish a batch of events inside the same transaction. Each event
-   * is routed through {@link publish} — same semantics, same
-   * transaction check.
-   */
-  async publishAll(events: readonly unknown[]): Promise<void> {
-    for (const event of events) {
-      await this.publish(event);
-    }
-  }
-
-  /**
-   * Synchronous scheduling of an event for later publication. Designed
-   * for sync callers that cannot await — notably
-   * `@nestjs/cqrs`'s `AggregateRoot.commit()` which invokes publishers
-   * via `IEventPublisher.publish`.
-   *
-   * Inside a transaction: the event is buffered per-transaction. The
-   * first call per transaction registers a `beforeCommit` hook that
-   * flushes the entire buffer via {@link publishAll} — a single hook
-   * per transaction, not one per event. If the transaction rolls
-   * back, the hook never fires and no publication rows are written —
-   * this is the core guarantee of the outbox pattern.
-   *
-   * Outside a transaction: falls back to a fire-and-forget
-   * {@link publish}. Errors are logged but not propagated (there is
-   * no caller to propagate to on a sync path).
-   */
-  scheduleForPublication(event: unknown): void {
-    const tx = findCurrentTransaction();
-    if (tx === null) {
-      void this.publish(event).catch((err) => {
-        this.logger.error(
-          `scheduleForPublication outside a transaction failed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-          err instanceof Error ? err.stack : undefined,
-        );
-      });
-      return;
-    }
-
-    let buffer = this.pending.get(tx);
-    if (buffer === undefined) {
-      buffer = [];
-      this.pending.set(tx, buffer);
-
-      this.transactionManager.registerBeforeCommit(async () => {
-        const toFlush = this.pending.get(tx);
-        this.pending.delete(tx);
-        if (toFlush !== undefined && toFlush.length > 0) {
-          await this.publishAll(toFlush);
-        }
-      });
-    }
-    buffer.push(event);
-  }
-
-  private ensureInTransaction(): void {
-    const store = TransactionContext.getStore();
-    if (store === undefined || store.activeTransactions.size === 0) {
-      throw new IllegalTransactionStateError(
-        'OutboxEventPublisher.publish must be called inside an active transaction — ' +
-          'publications must be committed atomically with the business write.',
+    if (matches.length === 0) {
+      throw new OutboxError(
+        `Event type '${eventType}' is not registered in any dataSource. ` +
+          `Add it to OutboxModule.forFeature([...], { dataSource: '...' }) ` +
+          `in the feature module that owns the event class.`,
       );
     }
+    if (matches.length > 1) {
+      throw new OutboxError(
+        `Event type '${eventType}' is registered in multiple dataSources ` +
+          `(${matches.join(', ')}). Pass an explicit { dataSource } option to ` +
+          `disambiguate, or register the event in only one dataSource.`,
+      );
+    }
+    // Length is exactly 1 here (checked above); narrowing safe.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return matches[0]!;
   }
-}
 
-/**
- * Look up the innermost currently-active {@link ActiveTransaction} on
- * the async context, or return `null` when no transaction is active.
- * Mirrors `TransactionManager.currentTransaction()` — private in the
- * core package — without having to expose it.
- */
-function findCurrentTransaction(): ActiveTransaction | null {
-  const store = TransactionContext.getStore();
-  if (store === undefined) {
-    return null;
+  private requirePublisher(dataSource: string): DataSourceOutboxPublisher {
+    const publisher = this.publishers.get(dataSource);
+    if (publisher === undefined) {
+      throw new OutboxError(
+        `No outbox configured for dataSource '${dataSource}'. ` +
+          `Add a matching entry to OutboxModule.forRoot({ dataSources: [...] }).`,
+      );
+    }
+    return publisher;
   }
-  for (const tx of store.activeTransactions.values()) {
-    return tx;
-  }
-  return null;
 }
