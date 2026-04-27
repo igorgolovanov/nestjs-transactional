@@ -13,6 +13,20 @@
   - DD-023 (independent transaction contexts per dataSource)
   - DD-024 (smart `OutboxEventPublisher` facade)
 
+> **Note (Phase 14.2 scope refinement, 2026-04-27):** Point 7
+> ("Independent transaction contexts") originally read "each
+> dataSource gets its own `AsyncLocalStorage` instance". During
+> Phase 14.2 implementation planning we discovered the existing
+> core architecture already provides the same *semantic* guarantee
+> through a single shared `AsyncLocalStorage` whose store carries a
+> `Map` keyed by dataSource name — cross-dataSource enrolment is
+> structurally impossible because the keys are disjoint. Migrating
+> to literal per-dataSource ALS instances would have cascaded
+> through every consumer of `TransactionContext`'s static API
+> (typeorm helpers, CQRS dispatcher, outbox publisher, ~487 tests)
+> for no functional benefit. Section 7 below has been rewritten to
+> describe what we ship; CLAUDE.md DD-023 carries the same revision.
+
 ## Context
 
 The current architecture supports a single transactional adapter
@@ -161,10 +175,21 @@ manager's `run()`. Without `dataSource`, the default manager is used.
 
 ### 7. Independent transaction contexts
 
-Each dataSource gets its own `AsyncLocalStorage` instance. Crossing a
-dataSource boundary inside a single async call stack creates a
-*separate* transaction; there is no automatic enrolment of the second
-manager into the first manager's transaction.
+A single shared `AsyncLocalStorage` carries a per-scope store whose
+active-transaction `Map` is keyed by dataSource name. Cross-dataSource
+enrolment is structurally impossible because the keys are disjoint
+namespaces — code looking up `'billing'` cannot retrieve a transaction
+registered under `'inventory'`. Crossing a dataSource boundary inside a
+single async call stack creates a *separate* `Map` entry; there is no
+automatic enrolment of the second manager into the first manager's
+transaction.
+
+The keying-not-multiple-ALS shape is deliberate. Spinning up a
+dedicated `AsyncLocalStorage` instance per dataSource would deliver
+the same guarantee (disjoint state) at the cost of cascading the
+static→instance migration of `TransactionContext` through every
+consumer (adapter helpers, CQRS dispatcher, outbox publisher) — for no
+behavioural improvement.
 
 This is deliberate. Distributed transactions across heterogeneous
 stores would force XA or 2PC into the design — see "Alternatives
