@@ -55,7 +55,7 @@ describe('TypeOrmTransactionalModule.forFeature', () => {
         TransactionalModule.forRoot({ isGlobal: true }),
         TypeOrmTransactionalModule.forFeature({
           dataSource: () => Promise.resolve(ds),
-          instanceName: 'custom',
+          dataSourceName: 'custom',
         }),
       ],
     }).compile();
@@ -75,11 +75,11 @@ describe('TypeOrmTransactionalModule.forFeature', () => {
           TransactionalModule.forRoot({ isGlobal: true }),
           TypeOrmTransactionalModule.forFeature({
             dataSource: ds,
-            instanceName: 'primary',
+            dataSourceName: 'primary',
           }),
           TypeOrmTransactionalModule.forFeature({
             dataSource: other,
-            instanceName: 'billing',
+            dataSourceName: 'billing',
             isDefault: true,
           }),
         ],

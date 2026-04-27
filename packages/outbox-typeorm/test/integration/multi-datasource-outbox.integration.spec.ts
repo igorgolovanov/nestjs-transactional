@@ -118,12 +118,10 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
           registerMethodsBootstrap: true,
         }),
         // Two TypeORM adapters under distinct dataSource names. The
-        // 'default' adapter uses the deprecated `instanceName` alias
-        // here on purpose — proves Phase 14.4's alias still works
-        // alongside Phase 14.5's new `dataSourceName` field.
+        // first omits `dataSourceName` to exercise the implicit
+        // `'default'` behaviour; the second passes it explicitly.
         TypeOrmTransactionalModule.forFeature({
           dataSource: ctx.dataSource,
-          instanceName: 'default',
           isDefault: true,
         }),
         TypeOrmTransactionalModule.forFeature({

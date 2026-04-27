@@ -9,8 +9,8 @@ Provides:
 - `TypeOrmTransactionAdapter` — implements the core `TransactionAdapter` port over TypeORM's `DataSource`. Handles BEGIN / COMMIT / ROLLBACK via `DataSource.transaction(...)` and issues raw `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` / `RELEASE SAVEPOINT` SQL for nested transactions.
 - `getCurrentEntityManager(adapterInstance?, fallback?)` — helper that returns the transaction-aware `EntityManager` from the current async context, or falls back to `dataSource.manager` outside a transaction.
 - `isInTransaction(adapterInstance?)` — predicate for the current context.
-- `TypeOrmTransactionalModule.forFeature({ instanceName, dataSource, isDefault })` — NestJS dynamic module that registers an adapter instance with the core `AdapterRegistry`.
-- Multi-datasource: register multiple `forFeature` entries under distinct `instanceName`s.
+- `TypeOrmTransactionalModule.forFeature({ dataSourceName, dataSource, isDefault })` — NestJS dynamic module that registers an adapter instance with the core `AdapterRegistry`.
+- Multi-datasource: register multiple `forFeature` entries under distinct `dataSourceName`s.
 
 ## Installation
 
@@ -92,12 +92,12 @@ export class OrderService {
   imports: [
     TransactionalModule.forRoot({ isGlobal: true }),
     TypeOrmTransactionalModule.forFeature({
-      instanceName: 'primary',
+      dataSourceName: 'primary',
       dataSource: primaryDs,
       isDefault: true,
     }),
     TypeOrmTransactionalModule.forFeature({
-      instanceName: 'billing',
+      dataSourceName: 'billing',
       dataSource: billingDs,
     }),
   ],
@@ -120,7 +120,7 @@ export class BillingService {
 }
 ```
 
-Each `forFeature` call registers its adapter under `typeorm:${instanceName}` in the core `AdapterRegistry`. `TransactionManager` routes based on `options.adapterInstance`.
+Each `forFeature` call registers its adapter under `typeorm:${dataSourceName}` in the core `AdapterRegistry`. `TransactionManager` routes based on `options.dataSource` (Phase 14.2 syntax) or the legacy `options.adapterInstance`.
 
 ## Testing
 

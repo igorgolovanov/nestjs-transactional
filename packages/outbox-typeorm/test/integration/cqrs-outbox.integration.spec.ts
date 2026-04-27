@@ -167,7 +167,6 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
         }),
         TypeOrmTransactionalModule.forFeature({
           dataSource: ctx.dataSource,
-          instanceName: 'default',
           isDefault: true,
         }),
         OutboxTypeOrmModule.forFeature({

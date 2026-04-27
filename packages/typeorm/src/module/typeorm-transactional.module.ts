@@ -35,13 +35,6 @@ export interface TypeOrmTransactionalOptions {
   readonly dataSourceName?: string;
 
   /**
-   * @deprecated Use {@link dataSourceName} — kept as a permanent alias
-   * for backwards compatibility. When both are set, `dataSourceName`
-   * wins. Removal deferred to a future major version.
-   */
-  readonly instanceName?: string;
-
-  /**
    * DataSource to bind, either directly or through a factory. The factory
    * allows async resolution (e.g. reading from configuration) and runs
    * once at module-init time.
@@ -69,7 +62,7 @@ export interface TypeOrmTransactionalOptions {
  *     TransactionalModule.forRoot({ isGlobal: true }),
  *     TypeOrmTransactionalModule.forFeature({ dataSource: primaryDs }),
  *     TypeOrmTransactionalModule.forFeature({
- *       instanceName: 'billing',
+ *       dataSourceName: 'billing',
  *       dataSource: () => billingDs,
  *     }),
  *   ],
@@ -85,9 +78,7 @@ export interface TypeOrmTransactionalOptions {
 @Module({})
 export class TypeOrmTransactionalModule {
   static forFeature(options: TypeOrmTransactionalOptions): DynamicModule {
-    // dataSourceName takes precedence over the deprecated instanceName.
-    // Both default to 'default' when omitted.
-    const dataSourceName = options.dataSourceName ?? options.instanceName ?? 'default';
+    const dataSourceName = options.dataSourceName ?? 'default';
     const providerToken = `TYPEORM_ADAPTER_${dataSourceName}`;
 
     return {
