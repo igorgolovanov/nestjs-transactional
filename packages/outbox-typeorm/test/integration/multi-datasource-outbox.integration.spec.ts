@@ -145,14 +145,12 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
         // `'default'` behaviour; the second passes it explicitly.
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
         TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
-        // Two outbox-typeorm features — the 'default' one omits
-        // `dataSourceName` to verify the implicit default behaviour;
-        // the 'billing' one passes it explicitly.
-        OutboxTypeOrmModule.forFeature({ dataSource: ctx.dataSource }),
-        OutboxTypeOrmModule.forFeature({
-          dataSourceName: 'billing',
-          dataSource: billingDs,
-        }),
+        // Two outbox-typeorm forRoot calls — the 'default' one omits
+        // `dataSource` to verify the implicit default behaviour;
+        // the 'billing' one passes it explicitly. Each resolves the
+        // actual DataSource via @nestjs/typeorm getDataSourceToken.
+        OutboxTypeOrmModule.forRoot(),
+        OutboxTypeOrmModule.forRoot({ dataSource: 'billing' }),
         // Outbox multi-dataSource configuration (ADR-019 multi-forRoot
         // pattern). One forRoot per dataSource, each with its own
         // repository aliased to the per-DS TypeORM repository.
@@ -311,77 +309,12 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
     expect(billingRows).toHaveLength(0);
   });
 
-  it("the deprecated 'adapterInstance' alias still resolves to the same dataSource as 'dataSourceName'", async () => {
-    // Spin up a tiny test-only module configured via the deprecated
-    // `adapterInstance` alias and verify the per-DS token registers
-    // correctly under the same dataSource name.
-    //
-    // Note: this test isolates from the outer `beforeAll` static
-    // state by resetting before building its own probe module.
-    TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
-
-    const probe = await Test.createTestingModule({
-      imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        buildFakeTypeOrmModule([
-          { provide: getDataSourceToken('probe'), useValue: ctx.dataSource },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ]) as any,
-        TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot({ dataSource: 'probe' }),
-        OutboxTypeOrmModule.forFeature({
-          dataSource: ctx.dataSource,
-          adapterInstance: 'probe',
-        }),
-      ],
-    }).compile();
-    await probe.init();
-
-    try {
-      const repo = probe.get<TypeOrmEventPublicationRepository>(
-        // Private per-DS token name. Inlined since the helper is not
-        // exported. Stable contract per Phase 14.5.
-        'OUTBOX_TYPEORM_REPOSITORY_probe',
-      );
-      expect(repo).toBeInstanceOf(TypeOrmEventPublicationRepository);
-    } finally {
-      await probe.close();
-    }
-  });
-
-  it('dataSourceName takes precedence when both dataSourceName and adapterInstance are supplied', async () => {
-    TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
-
-    const probe = await Test.createTestingModule({
-      imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        buildFakeTypeOrmModule([
-          { provide: getDataSourceToken('wins'), useValue: ctx.dataSource },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ]) as any,
-        TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot({ dataSource: 'wins' }),
-        OutboxTypeOrmModule.forFeature({
-          dataSource: ctx.dataSource,
-          dataSourceName: 'wins',
-          adapterInstance: 'loses',
-        }),
-      ],
-    }).compile();
-    await probe.init();
-
-    try {
-      const winsRepo = probe.get<TypeOrmEventPublicationRepository>(
-        'OUTBOX_TYPEORM_REPOSITORY_wins',
-      );
-      expect(winsRepo).toBeInstanceOf(TypeOrmEventPublicationRepository);
-      expect(() =>
-        probe.get<TypeOrmEventPublicationRepository>('OUTBOX_TYPEORM_REPOSITORY_loses'),
-      ).toThrow();
-    } finally {
-      await probe.close();
-    }
-  });
+  // Phase 14.21 removed the `dataSourceName` and `adapterInstance`
+  // option fields entirely (both replaced by the unified `dataSource`
+  // string identifier). The two tests that previously verified the
+  // deprecated `adapterInstance` alias behaviour and its precedence
+  // against `dataSourceName` are gone — neither field exists on
+  // `OutboxTypeOrmOptions` anymore. The `dataSource` field's
+  // happy-path use is exercised by the surrounding multi-DS tests
+  // (default + 'billing').
 });

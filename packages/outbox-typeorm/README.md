@@ -115,10 +115,17 @@ const dataSource = new DataSource({
     //    transactional Repository dispatch.
     TypeOrmTransactionalModule.forRoot({ isDefault: true }),
 
-    // 3. TypeORM persistence backend for the outbox. Registers the
-    //    TypeOrm repository class token and SchemaInitializer.
-    OutboxTypeOrmModule.forFeature({
-      dataSource,
+    // 3. Outbox-typeorm registration. Phase 14.21: forRoot
+    //    resolves the DataSource from DI (same pattern as
+    //    TypeOrmTransactionalModule). Registers the
+    //    `TypeOrmEventPublicationRepository` under a private
+    //    per-DS token; the cross-module bridge
+    //    `typeOrmEventPublicationRepositoryProvider()` (passed to
+    //    `OutboxModule.forRoot` below) aliases the official outbox
+    //    token to that private one. The `SchemaInitializer` is
+    //    instantiated per-DS — production should disable it and
+    //    apply the shipped TypeORM migration instead.
+    OutboxTypeOrmModule.forRoot({
       schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
     }),
 
@@ -126,7 +133,7 @@ const dataSource = new DataSource({
     //    aliasing Provider so outbox does NOT install its
     //    InMemory default.
     OutboxModule.forRoot({
-      repository: typeOrmEventPublicationRepositoryProvider,
+      repository: typeOrmEventPublicationRepositoryProvider(),
       republishOnStartup: true,
       processor: { pollingInterval: 1000, batchSize: 100 },
       staleness: { processing: 60_000, monitorInterval: 30_000 },

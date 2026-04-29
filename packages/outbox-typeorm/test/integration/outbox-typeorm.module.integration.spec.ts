@@ -93,9 +93,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
           registerMethodsBootstrap: true,
         }),
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-        OutboxTypeOrmModule.forFeature({
-          dataSource: ctx.dataSource,
-        }),
+        OutboxTypeOrmModule.forRoot(),
         OutboxModule.forRoot({
           repository: typeOrmEventPublicationRepositoryProvider(),
           ...outboxOverrides,

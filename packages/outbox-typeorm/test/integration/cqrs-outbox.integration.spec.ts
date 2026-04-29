@@ -187,9 +187,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
           registerMethodsBootstrap: true,
         }),
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-        OutboxTypeOrmModule.forFeature({
-          dataSource: ctx.dataSource,
-        }),
+        OutboxTypeOrmModule.forRoot(),
         OutboxModule.forRoot({
           repository: typeOrmEventPublicationRepositoryProvider(),
         }),

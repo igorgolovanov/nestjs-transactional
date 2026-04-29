@@ -190,6 +190,83 @@
 > plus `getDataSourceToken()` provider registration to satisfy
 > the new DI-resolution contract.
 
+> **Note (Phase 14.21 OutboxTypeOrmModule reshape, 2026-04-29):**
+> Phase 14.20's `TypeOrmTransactionalModule.forRoot` pattern applied
+> to the `outbox-typeorm` package. `OutboxTypeOrmModule.forFeature`
+> renamed to `forRoot`; the options shape changed from
+> `{ dataSource: DataSource | factory, dataSourceName?, adapterInstance? }`
+> to `{ dataSource?: string }`. The actual `DataSource` is resolved
+> from DI via `@nestjs/typeorm`'s `getDataSourceToken(name)` —
+> consistent with Phase 14.20.
+>
+> **Phase 14.12 cleanup bundled** — the deprecated `adapterInstance`
+> alias was removed in this same iteration (originally scheduled as
+> a separate phase). The two integration tests that verified the
+> deprecated alias and its precedence-vs-`dataSourceName` rule were
+> deleted; the surrounding multi-DS suite covers the canonical
+> `dataSource` field's happy path.
+>
+> **Critical architectural finding from the audit** — `OutboxModule.forRoot`
+> ALWAYS registers something under the per-DS
+> `getEventPublicationRepositoryToken(dataSourceName)` token (defaults
+> to `InMemoryEventPublicationRepository` when no `repository` option
+> is passed). `OutboxTypeOrmModule.forRoot` cannot register under THE
+> SAME token directly — both modules are `@Global()` and a duplicate
+> `@Global()` provider for the same token causes NestJS DI conflicts.
+>
+> Consequence: `typeOrmEventPublicationRepositoryProvider` (the
+> bridge function returning a `useExisting` Provider) is preserved
+> as the cross-module aliasing mechanism. Three options were
+> considered during audit:
+>
+> 1. **Keep the bridge function** (chosen) — small, well-documented,
+>    preserves architectural separation (outbox-core does not import
+>    outbox-typeorm). User code carries one extra Provider call per
+>    dataSource.
+> 2. **Remove the bridge** — would require dropping `OutboxModule.forRoot`'s
+>    in-memory default; 14+ outbox unit tests rely on
+>    `OutboxModule.forRoot({})` defaulting to in-memory. Rejected on
+>    test-migration burden grounds.
+> 3. **Static-state coupling** — `OutboxTypeOrmModule.forRoot`
+>    registers in a static map; `OutboxModule.forRoot`'s repository
+>    factory reads it. Rejected on architectural-debt grounds (cross-
+>    package static-state coupling violates the layered architecture).
+>
+> Phase 14.21's other simplifications:
+>
+> - `forRootAsync` added (parallel to `forRoot`). The `dataSource`
+>   name is statically declared in the async options object; only
+>   `schemaInitialization` and `isGlobal` are async-resolved through
+>   the factory. Documented limitation: per-DS provider tokens
+>   require synchronous name resolution.
+> - `TypeOrmEventPublicationRepository` constructor unchanged
+>   (`(dataSource: DataSource, dataSourceName = 'default')`). The
+>   module factory passes both arguments after resolving the
+>   DataSource via DI.
+> - `SchemaInitializer` per-DS lifecycle preserved (zero behavioural
+>   change) — module factory just resolves DataSource via DI instead
+>   of from the option.
+>
+> **Atomicity invariant verified** — the outbox pattern's
+> fundamental contract (business INSERT and `event_publication`
+> INSERT inside a `@Transactional()` method commit atomically, and
+> rollback discards both) holds via two parallel mechanisms:
+>
+> 1. Phase 14.20 patched `Repository.prototype.manager` getter on
+>    the `@InjectRepository` business Repository → routes through
+>    the active transactional `EntityManager`.
+> 2. `TypeOrmEventPublicationRepository`'s explicit
+>    `getCurrentEntityManager(dataSourceName, fallback)` call →
+>    routes through the same active EM via `TransactionContext`.
+>
+> Both reach the SAME active EM through the SAME context — parallel
+> doors to the same room. Phase 14.21 ships a dedicated
+> `atomicity.integration.spec.ts` regression net (3 tests) pinning
+> the contract against real Postgres.
+>
+> Cross-package migrations: 4 outbox-typeorm integration spec files
+> + 1 example (mechanical, ~40 LoC delta).
+
 ## Context
 
 The current architecture supports a single transactional adapter
