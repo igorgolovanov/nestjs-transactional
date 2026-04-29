@@ -1,4 +1,5 @@
-import { Global, Injectable, Logger, Module } from '@nestjs/common';
+import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import {
   AggregateRoot,
   CommandBus,
@@ -39,6 +40,21 @@ import {
   startPostgresContainer,
   stopPostgresContainer,
 } from '../setup-testcontainers';
+
+/**
+ * Phase 14.20: stand-in for `TypeOrmModule.forRoot(...)` registers
+ * the `getDataSourceToken()` provider in a `@Global()` module so
+ * `TypeOrmTransactionalModule.forRoot` can resolve it from DI.
+ */
+function buildFakeTypeOrmModule(providers: Provider[]): unknown {
+  @Global()
+  @Module({
+    providers,
+    exports: providers.map((p) => (typeof p === 'object' && 'provide' in p ? p.provide : p)),
+  })
+  class FakeTypeOrmModule {}
+  return FakeTypeOrmModule;
+}
 
 // --- Domain under test ---
 
@@ -160,15 +176,17 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
   async function buildApp(): Promise<TestingModule> {
     const app = await Test.createTestingModule({
       imports: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildFakeTypeOrmModule([
+          { provide: getDataSourceToken(), useValue: ctx.dataSource },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]) as any,
         TransactionalModule.forRoot({
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: true,
         }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: ctx.dataSource,
-          isDefault: true,
-        }),
+        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
         OutboxTypeOrmModule.forFeature({
           dataSource: ctx.dataSource,
         }),
@@ -209,6 +227,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
   beforeEach(async () => {
     OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

@@ -1,4 +1,5 @@
 import { type DynamicModule, Global, Module } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import {
   CqrsTransactionalModule,
@@ -95,7 +96,7 @@ export class AppModule {
       module: AppModule,
       imports: [
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forFeature({ dataSource, isDefault: true }),
+        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
         OutboxTypeOrmModule.forFeature({
           dataSource,
           // Explicitly off because the example already uses
@@ -128,6 +129,11 @@ export class AppModule {
         OutboxCqrsBridgeModule,
       ],
       providers: [
+        // Phase 14.20: typeorm forRoot resolves the DataSource via
+        // `getDataSourceToken()`. Provide it under both the
+        // standard `@nestjs/typeorm` token and the `DataSource`
+        // class token (the latter for direct `@InjectDataSource()`).
+        { provide: getDataSourceToken(), useValue: dataSource },
         { provide: DataSource, useValue: dataSource },
         OrderRepository,
         PlaceOrderHandler,

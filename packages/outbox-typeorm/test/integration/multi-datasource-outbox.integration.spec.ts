@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
@@ -28,6 +29,21 @@ import {
   startPostgresContainer,
   stopPostgresContainer,
 } from '../setup-testcontainers';
+
+/**
+ * Phase 14.20: stand-in for `TypeOrmModule.forRoot(...)` registers
+ * the per-DS `getDataSourceToken(name)` providers in a `@Global()`
+ * module so `TypeOrmTransactionalModule.forRoot` can resolve them.
+ */
+function buildFakeTypeOrmModule(providers: Provider[]): unknown {
+  @Global()
+  @Module({
+    providers,
+    exports: providers.map((p) => (typeof p === 'object' && 'provide' in p ? p.provide : p)),
+  })
+  class FakeTypeOrmModule {}
+  return FakeTypeOrmModule;
+}
 
 class DefaultEvent {
   constructor(readonly id: string) {}
@@ -100,6 +116,7 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
   beforeAll(async () => {
     OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
 
     ctx = await startPostgresContainer({
       entities: [EventPublicationEntity, EventPublicationArchiveEntity],
@@ -112,22 +129,22 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
 
     app = await Test.createTestingModule({
       imports: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildFakeTypeOrmModule([
+          { provide: getDataSourceToken(), useValue: ctx.dataSource },
+          { provide: getDataSourceToken('billing'), useValue: billingDs },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]) as any,
         TransactionalModule.forRoot({
           isGlobal: true,
           registerInterceptor: false,
           registerMethodsBootstrap: true,
         }),
         // Two TypeORM adapters under distinct dataSource names. The
-        // first omits `dataSourceName` to exercise the implicit
+        // first omits `dataSource` to exercise the implicit
         // `'default'` behaviour; the second passes it explicitly.
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: ctx.dataSource,
-          isDefault: true,
-        }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: billingDs,
-          dataSourceName: 'billing',
-        }),
+        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+        TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
         // Two outbox-typeorm features — the 'default' one omits
         // `dataSourceName` to verify the implicit default behaviour;
         // the 'billing' one passes it explicitly.
@@ -298,13 +315,21 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
     // Spin up a tiny test-only module configured via the deprecated
     // `adapterInstance` alias and verify the per-DS token registers
     // correctly under the same dataSource name.
+    //
+    // Note: this test isolates from the outer `beforeAll` static
+    // state by resetting before building its own probe module.
+    TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
+
     const probe = await Test.createTestingModule({
       imports: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildFakeTypeOrmModule([
+          { provide: getDataSourceToken('probe'), useValue: ctx.dataSource },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]) as any,
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: ctx.dataSource,
-          dataSourceName: 'probe',
-        }),
+        TypeOrmTransactionalModule.forRoot({ dataSource: 'probe' }),
         OutboxTypeOrmModule.forFeature({
           dataSource: ctx.dataSource,
           adapterInstance: 'probe',
@@ -326,13 +351,18 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
   });
 
   it('dataSourceName takes precedence when both dataSourceName and adapterInstance are supplied', async () => {
+    TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
+
     const probe = await Test.createTestingModule({
       imports: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildFakeTypeOrmModule([
+          { provide: getDataSourceToken('wins'), useValue: ctx.dataSource },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]) as any,
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSource: ctx.dataSource,
-          dataSourceName: 'wins',
-        }),
+        TypeOrmTransactionalModule.forRoot({ dataSource: 'wins' }),
         OutboxTypeOrmModule.forFeature({
           dataSource: ctx.dataSource,
           dataSourceName: 'wins',

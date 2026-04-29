@@ -1864,6 +1864,102 @@ options carry an `adapterInstance` deprecated alias next to the
 canonical `dataSourceName` (same shape as the typeorm package
 pre-Phase-14.11). One-phase carry-over closes here.
 
+**14.20: Transparent transactional repositories (shipped 2026-04-29)**
+
+Spring-style transparent transactional behaviour for
+`@nestjs-transactional/typeorm`. Once `TypeOrmTransactionalModule`
+is imported, every `Repository` reachable through the standard
+`@nestjs/typeorm` injection paths (`@InjectRepository`,
+`@InjectEntityManager() em.getRepository(E)`,
+`@InjectDataSource() ds.getRepository(E)`,
+`ds.manager.save(...)`, custom Repositories via `Repository.extend`,
+TreeRepository, etc.) automatically dispatches through the active
+`@Transactional()` scope's `EntityManager` — no
+`getCurrentEntityManager()` calls in user code. Modelled on the
+`typeorm-transactional` library pattern (~166K weekly npm
+downloads).
+
+Architecture:
+
+- **Single Repository.prototype.manager getter/setter pair**
+  covers all 30+ Repository operations via TypeORM's natural
+  `this.manager.<method>(target, ...)` delegation. The setter
+  intercepts the constructor's `this.manager = manager` and
+  stashes the original under a `Symbol.for(...)` key; the getter
+  consults `TransactionContext.getActiveTransactionByDataSource(name)`
+  and returns the active transactional EM (or the captured
+  original on autocommit).
+- **EntityManager.prototype.getRepository wrapper** stamps
+  freshly-resolved repositories so they dispatch correctly even
+  when reached through `@InjectEntityManager()`.
+- **Repository.prototype.extend wrapper** preserves the stamp on
+  custom repository chains.
+- **Per-instance DataSource patches** (`manager` getter, `query`,
+  `createQueryBuilder`) — instance-level because TypeORM sets
+  these as own-properties; idempotent via a `Symbol.for(...)`
+  marker.
+- **Module-load-time activation**: patches install on
+  `import '@nestjs-transactional/typeorm'`, NOT during
+  `forRoot`'s factory. Reason: NestJS resolves providers in
+  dependency order; a `useFactory` calling `ds.getRepository(E)`
+  may run BEFORE the typeorm module's factory, and a Repository
+  constructed pre-patch gets `this.manager` as an own-property
+  that permanently shadows the prototype getter. Module-load
+  side effect guarantees patches are in place before any DI
+  factory observes `Repository.prototype`.
+- **Install-once, no revert**: `TypeOrmTransactionalModule.resetForTesting`
+  resets the managed-DataSource WeakSet only — prototype patches
+  stay installed for the process lifetime. Reverting would
+  silently break Repository instances constructed under the
+  patched setter (no own-property `manager`; deletion leaves
+  `repo.manager === undefined`). Tests destroy and recreate the
+  DataSource between cases.
+
+API change (BREAKING, pre-release acceptable):
+
+- `TypeOrmTransactionalModule.forFeature({ dataSource: DataSource | factory, ... })`
+  → `TypeOrmTransactionalModule.forRoot({ dataSource?: string, isDefault? })`.
+  The actual `DataSource` instance is now resolved from DI under
+  `getDataSourceToken(dataSource)` (same convention `@nestjs/typeorm`
+  uses for `@InjectRepository(E, dataSource)`). Multi-DS
+  deployments call `forRoot` once per dataSource, mirroring
+  Phase 14.10 (`TransactionalModule`) and Phase 14.3.2
+  (`OutboxModule` per ADR-019).
+- `forRootAsync` introduced for async-config use cases (e.g.
+  `ConfigService`-driven dataSource selection) with the same
+  documented per-DS-token limitation as Phase 14.10.
+
+Documented limitations:
+
+- `@InjectEntityManager() em.save(Entity, ...)` direct call is
+  NOT transactional. The patched
+  `EntityManager.prototype.getRepository` covers
+  `em.getRepository(E).save(...)`, but
+  `EntityManager.prototype.save` itself is not patched. Escape
+  hatches: use the Repository pattern, or call
+  `getCurrentEntityManager()`.
+- `BaseEntity` static methods (`User.save(...)` etc.) are NOT
+  supported. The `BaseEntity.useDataSource(...)` API stores a
+  captured DataSource reference that bypasses the patches.
+
+Cross-DS isolation (DD-023) is preserved end-to-end: a Repository
+bound to dataSource A inside a `@Transactional({ dataSource: 'B' })`
+method autocommits — its `manager` getter looks up active
+transaction for dataSource A, finds none, and falls back to
+its captured original manager. Distributed transactions across
+dataSources remain unsupported.
+
+Tests: 30 unit tests (patches dispatch, idempotency, Q1 Option A
+coverage proof, cached-repo invariant) + 11 single-DS integration
++ 8 multi-DS integration against real Postgres via testcontainers.
+ADR-018 carries a Phase 14.20 addendum documenting the
+architectural addition.
+
+Cross-package consumers (cqrs, outbox-typeorm) and example apps
+were migrated mechanically — same `forFeature → forRoot` rename
+plus `getDataSourceToken()` provider registration to satisfy the
+new DI-resolution contract.
+
 ### Future phases (not scheduled)
 
 - **@nestjs-transactional/outbox-prisma**: Prisma persistence backend
@@ -2109,6 +2205,64 @@ registry; dispatcher pushes hooks onto the matching dataSource's
 active-transaction directly, bypassing
 `registerBeforeCommit`'s "first active" semantics).
 
+### Phase 14.20 transparent transactional repositories — escape-hatch
+patterns
+
+Two patterns are NOT covered by the prototype patches and require
+the user to fall back to `getCurrentEntityManager()` or use a
+Repository instead.
+
+1. **`@InjectEntityManager() em.save(Entity, ...)` direct call**
+   is NOT transactional. The patched
+   `EntityManager.prototype.getRepository` covers
+   `em.getRepository(E).save(...)` (Q1 Option A coverage proof
+   in the integration tests), but
+   `EntityManager.prototype.save` itself is NOT patched. Reason:
+   patching the ~14 EntityManager DB methods would require
+   per-method recursion-avoidance logic (the active EM is itself
+   an EntityManager, so dispatching every method redirects back
+   into the same patched code) and a meaningful expansion of
+   the patch surface. Trade-off rejected for v1 — the typical
+   user pattern is `@InjectRepository`, not raw `EntityManager`
+   `.save()`.
+
+   Workaround:
+
+   ```ts
+   @Injectable()
+   class MyService {
+     constructor(@InjectEntityManager() private em: EntityManager) {}
+
+     @Transactional()
+     async createUser(name: string) {
+       // Option A: use em.getRepository — works transactionally.
+       return this.em.getRepository(User).save({ name });
+
+       // Option B: escape hatch — getCurrentEntityManager.
+       // const em = getCurrentEntityManager();
+       // return em.save(User, { name });
+     }
+   }
+   ```
+
+2. **`BaseEntity` static methods** (`User.save(...)` etc.) are
+   NOT supported. The `BaseEntity.useDataSource(...)` API stores
+   a captured DataSource reference that bypasses the patched
+   `Repository.prototype.manager` getter. typeorm-transactional
+   has the same limitation (undocumented). Use the Repository
+   pattern instead.
+
+Documented in `packages/typeorm/src/module/typeorm-transactional.module.ts`
+JSDoc and surfaces in the `transparent-transactional.integration.spec.ts`
+integration test as an explicit "documented limitation" canary —
+ensures the limitation stays visible through future refactors.
+
+**Fix:** none currently planned. Future iterations may add a
+configurable opt-in `EntityManager.prototype` patching mode if
+demand emerges, but the recursion-avoidance complexity makes it
+opt-in rather than default behaviour. Tracking under "future
+phases (not scheduled)".
+
 ---
 
 ## Quality Gates
@@ -2170,8 +2324,25 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-27 (Phase 14.10 + 14.11 cleanup shipped
-— `TransactionalModule.forRoot` aligned to multi-`forRoot`
+**Last updated**: 2026-04-29 (Phase 14.20 transparent transactional
+repositories shipped — `TypeOrmTransactionalModule.forFeature`
+renamed to `forRoot` with `{ dataSource?: string }` shape, DataSource
+resolved via `@nestjs/typeorm`'s `getDataSourceToken`. Three prototype
+patches (`Repository.prototype.manager` getter/setter,
+`EntityManager.prototype.getRepository` wrapper,
+`Repository.prototype.extend` wrapper) plus per-instance DataSource
+patches activate at module-load time so `@InjectRepository` and
+related patterns dispatch transparently through the active
+`@Transactional` scope. Two documented limitations:
+`@InjectEntityManager() em.save()` direct call NOT transactional
+(use Repository or `getCurrentEntityManager()`); BaseEntity static
+methods NOT supported. 30 unit + 11 single-DS + 8 multi-DS
+integration tests against real Postgres. ADR-018 carries the
+Phase 14.20 addendum. Cross-package consumers (cqrs,
+outbox-typeorm, examples) migrated mechanically.
+
+Earlier 2026-04-27 (Phase 14.10 + 14.11 cleanup shipped —
+`TransactionalModule.forRoot` aligned to multi-`forRoot`
 pattern (ADR-019 mechanism applied to core), `adapters: [...]`
 array form removed, default `isGlobal` flipped to `true`;
 `TypeOrmTransactionalOptions.instanceName` deprecated alias
@@ -2299,6 +2470,25 @@ require verification of both commits before closure).
   migration guide, and ADR-006. ADR-014 keeps its accepted-text
   body intact and gains a top note pointing at the second-pass
   rename.
+- Phase 14.20 (transparent transactional repositories): three
+  prototype patches and per-instance DataSource patches in
+  `@nestjs-transactional/typeorm` make `@InjectRepository`
+  Repositories, `@InjectEntityManager() em.getRepository(E)`,
+  `@InjectDataSource() ds.manager.save(...)`, custom `Repository.extend`
+  classes, and `ds.getRepository(E).save(...)` all dispatch
+  through the active `@Transactional()` scope automatically.
+  Patches install at module-load time (idempotent install-once
+  flags) before any DI factory observes `Repository.prototype`.
+  `TypeOrmTransactionalModule.forFeature` renamed to `forRoot`
+  with `{ dataSource?: string }` shape; DataSource resolved via
+  `@nestjs/typeorm`'s `getDataSourceToken`. Two documented
+  limitations: `@InjectEntityManager() em.save()` direct call
+  NOT transactional (use Repository or
+  `getCurrentEntityManager()`); `BaseEntity` static methods NOT
+  supported. 30 unit + 11 single-DS + 8 multi-DS integration
+  tests against real Postgres. ADR-018 carries the Phase 14.20
+  addendum. Cross-package consumers (cqrs, outbox-typeorm,
+  examples) migrated mechanically.
 
 ### Blocked / Awaiting
 
@@ -2352,6 +2542,18 @@ require verification of both commits before closure).
   externalizer layer; production users have three documented
   mitigation strategies, and broker-aware externalizers under the
   same SPI remain a future option
+- Phase 14.20 transparent transactional repositories ship via
+  prototype patching pattern (typeorm-transactional library
+  reference, ~166K weekly downloads) — single
+  `Repository.prototype.manager` getter/setter pair covers all
+  30+ Repository methods through TypeORM's natural `this.manager`
+  delegation. Module-load-time activation guarantees patches
+  install before any DI factory observes `Repository.prototype`.
+  Install-once, no revert — `resetForTesting` only resets the
+  managed-DataSource WeakSet (deletion of the prototype getter
+  would silently break Repository instances constructed under
+  the patched setter). Two documented limitations: direct
+  `EntityManager.save()` and `BaseEntity` static methods.
 
 ### Conventions finalised during implementation (not in the Design Decisions section above)
 
@@ -2465,3 +2667,38 @@ require verification of both commits before closure).
     is acceptable once both code commits have shipped — but the
     bundle must still happen before another non-cleanup phase
     starts, otherwise it slips again.
+
+12. **Patches in `@nestjs-transactional/typeorm` install at
+    module-load time, NOT at `forRoot` factory time** (Phase 14.20).
+    Importing `@nestjs-transactional/typeorm` triggers
+    `applyAllPatches()` as a side effect of evaluating
+    `typeorm-transactional.module.ts`. Reason: NestJS resolves
+    providers in dependency order; a `useFactory` provider that
+    calls `dataSource.getRepository(Entity)` (e.g.
+    `@InjectRepository`'s internal factory) may run BEFORE
+    `TypeOrmTransactionalModule.forRoot`'s factory if it has no
+    DI dependency on the latter. A Repository constructed before
+    patches are installed gets `this.manager = manager` as an
+    own-property, which permanently shadows the prototype getter
+    we install later. Module-load activation guarantees patches
+    are in place before any DI factory observes
+    `Repository.prototype`. Pattern matches typeorm-transactional's
+    `initializeTransactionalContext()` semantics — make the
+    import itself the activation point. Idempotent: install-once
+    flags inside each patch module make re-imports (e.g. via
+    pnpm hoisting glitches) safe.
+
+13. **`TypeOrmTransactionalModule.resetForTesting` resets the
+    managed-DataSource WeakSet only — prototype patches stay
+    installed for the process lifetime** (Phase 14.20). Reverting
+    a prototype patch by deleting the descriptor would silently
+    break Repository instances constructed under the patched
+    setter (those have no own-property `manager`; deletion leaves
+    `repo.manager === undefined`). The WeakSet flip is the safe
+    isolation lever — cached repositories from a prior test fall
+    through the patched getter to their captured original manager
+    (autocommit). Tests that need full isolation destroy and
+    recreate the `DataSource` between cases (the typical pattern).
+    Same trade-off documented in typeorm-transactional issues
+    #34/#51; we make the trade-off survivable instead of silent
+    via the install-once contract.

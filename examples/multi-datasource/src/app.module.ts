@@ -1,4 +1,5 @@
 import { type DynamicModule, Module } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 import { DataSource } from 'typeorm';
@@ -33,14 +34,22 @@ export class AppModule {
       module: AppModule,
       imports: [
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        // The first forFeature becomes the default adapter (instance name 'default').
-        TypeOrmTransactionalModule.forFeature({ dataSource: primary }),
-        TypeOrmTransactionalModule.forFeature({
-          dataSourceName: 'billing',
-          dataSource: billing,
-        }),
+        // Phase 14.20: one `forRoot` per dataSource. The first
+        // becomes the default adapter; the second registers under
+        // its named identifier.
+        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+        TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
       ],
       providers: [
+        // Phase 14.20: the typeorm forRoot factory resolves each
+        // DataSource via `getDataSourceToken(name)` — wire both
+        // names. In a real app `TypeOrmModule.forRoot({ name })`
+        // registers these globally; for the example we declare them
+        // inline.
+        { provide: getDataSourceToken(), useValue: primary },
+        { provide: getDataSourceToken('billing'), useValue: billing },
+        // Custom string tokens used by the example services for
+        // direct injection.
         { provide: PRIMARY_DS, useValue: primary },
         { provide: BILLING_DS, useValue: billing },
         OrderService,

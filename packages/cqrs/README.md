@@ -62,7 +62,7 @@ import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
 @Module({
   imports: [
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forFeature({ dataSource: myDataSource }),
+    TypeOrmTransactionalModule.forRoot(),
     CqrsTransactionalModule.forRoot({
       // every option has a sensible default — shown here for completeness
       wrapCommandHandlers: true,

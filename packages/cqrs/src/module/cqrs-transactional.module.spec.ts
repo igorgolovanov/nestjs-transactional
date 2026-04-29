@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Global, Injectable, Module, type Provider } from '@nestjs/common';
 import {
   AggregateRoot,
   CommandBus,
@@ -7,6 +7,7 @@ import {
   type ICommandHandler,
 } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule, Transactional } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule, getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
@@ -129,14 +130,33 @@ class OrderProjection implements ITransactionalEventHandler<OrderPlacedEvent> {
 
 // --- Harness ---
 
+/**
+ * Phase 14.20: `TypeOrmTransactionalModule.forRoot` resolves the
+ * actual TypeORM `DataSource` via `@nestjs/typeorm`'s
+ * `getDataSourceToken`. For unit tests we provide that token via a
+ * `@Global()` fixture (in production `TypeOrmModule.forRoot(...)`
+ * does this). Same pattern used in the typeorm package's specs.
+ */
+function buildFakeTypeOrmModule(providers: Provider[]): unknown {
+  @Global()
+  @Module({
+    providers,
+    exports: providers.map((p) => (typeof p === 'object' && 'provide' in p ? p.provide : p)),
+  })
+  class FakeTypeOrmModule {}
+  return FakeTypeOrmModule;
+}
+
 const buildModule = async (ds: DataSource): Promise<TestingModule> => {
   const module = await Test.createTestingModule({
     imports: [
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      buildFakeTypeOrmModule([{ provide: getDataSourceToken(), useValue: ds }]) as any,
       TransactionalModule.forRoot({
         isGlobal: true,
         registerInterceptor: false,
       }),
-      TypeOrmTransactionalModule.forFeature({ dataSource: ds }),
+      TypeOrmTransactionalModule.forRoot(),
       CqrsTransactionalModule.forRoot(),
     ],
     providers: [OrderRepository, AuditTrail, PlaceOrderHandler, OrderProjection],
@@ -152,6 +172,7 @@ describe('CqrsTransactionalModule (E2E: TypeORM + CQRS + Transactional)', () => 
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
+    TypeOrmTransactionalModule.resetForTesting();
     ds = await createSqlJsDataSource();
   });
 

@@ -1,4 +1,5 @@
 import { type DynamicModule, Module } from '@nestjs/common';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 import { DataSource } from 'typeorm';
@@ -23,9 +24,19 @@ export class AppModule {
       module: AppModule,
       imports: [
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forFeature({ dataSource }),
+        TypeOrmTransactionalModule.forRoot(),
       ],
-      providers: [{ provide: DataSource, useValue: dataSource }, UserService],
+      providers: [
+        // Phase 14.20: `TypeOrmTransactionalModule.forRoot` resolves
+        // the DataSource via `@nestjs/typeorm`'s `getDataSourceToken`.
+        // In a real app `TypeOrmModule.forRoot(...)` registers this;
+        // for the example we wire it manually under both the standard
+        // `getDataSourceToken()` and the `DataSource` class token (the
+        // latter for direct `@InjectDataSource()` usage).
+        { provide: getDataSourceToken(), useValue: dataSource },
+        { provide: DataSource, useValue: dataSource },
+        UserService,
+      ],
     };
   }
 }
