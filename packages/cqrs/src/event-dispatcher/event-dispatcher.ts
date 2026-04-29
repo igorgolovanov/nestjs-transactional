@@ -1,5 +1,10 @@
 import { Injectable, Logger, type Type } from '@nestjs/common';
-import { TransactionContext, TransactionManager } from '@nestjs-transactional/core';
+import {
+  type ActiveTransaction,
+  DEFAULT_DATA_SOURCE_NAME,
+  TransactionContext,
+  TransactionManager,
+} from '@nestjs-transactional/core';
 
 import { TransactionPhase } from '../types/transactional-listener.types';
 
@@ -14,6 +19,13 @@ export interface DispatcherListenerMetadata {
   readonly phase: TransactionPhase;
   readonly fallbackExecution: boolean;
   readonly async: boolean;
+  /**
+   * dataSource the listener's phase hooks attach to (Phase 14.3.1).
+   * Optional for backward compatibility — when omitted, defaults to
+   * `'default'`. Scanners normalise from decorator metadata before
+   * calling {@link TransactionalEventDispatcher.registerListener}.
+   */
+  readonly dataSource?: string;
 }
 
 /**
@@ -62,26 +74,35 @@ interface RegisteredListener {
  *   their failures are logged but never reach the enclosing
  *   transaction, even in BEFORE_COMMIT phase.
  *
- * **Multi-dataSource note (Phase 14.7).** Hook attachment goes
- * through `TransactionManager.registerBeforeCommit` /
- * `registerAfterCommit` etc., which target the FIRST active
- * transaction on the current async context. With cross-dataSource
- * simultaneous transactions (one per dataSource) the handler may
- * fire on a transaction it doesn't conceptually belong to. This is
- * acceptable for single-dataSource apps (the only scenario where
- * the cqrs in-memory dispatcher is exercised today) and for handlers
- * that don't care about a specific dataSource. For cross-DS event
- * routing prefer the outbox path (`@OutboxEventsHandler` /
- * `@IntegrationEventsHandler` with the outbox bound) — outbox
- * routing is per-dataSource by event registration (Phase 14.3.2). A
- * dataSource-aware dispatcher path is part of the planned Phase
- * 14.3.1 follow-up; see CLAUDE.md "Known Limitations (Phase 14)".
+ * **Multi-dataSource (Phase 14.3.1).** Hook attachment is per-dataSource:
+ * the dispatcher resolves the listener's bound dataSource via
+ * `TransactionContext.getActiveTransactionByDataSource(dataSource)`
+ * and pushes hooks directly onto that transaction's hook list,
+ * bypassing `TransactionManager.registerBeforeCommit`'s first-active-tx
+ * semantics. The dataSource comes from the listener metadata (defaults
+ * to `'default'`); scanners populate it from the
+ * `@TransactionalEventsHandler({ dataSource })` /
+ * `@IntegrationEventsHandler({ dataSource })` option. Cross-DS
+ * simultaneous transactions therefore route deterministically — a
+ * billing-bound handler attaches to the billing transaction's hooks
+ * even when an inventory transaction is also active on the same
+ * async stack.
  */
 @Injectable()
 export class TransactionalEventDispatcher {
   private readonly logger = new Logger(TransactionalEventDispatcher.name);
   private readonly listenersByType = new Map<string, RegisteredListener[]>();
 
+  /**
+   * `manager` is no longer consulted after Phase 14.3.1 — the
+   * dispatcher pushes hooks directly onto the per-dataSource
+   * `ActiveTransaction` resolved via `TransactionContext`. The
+   * parameter is preserved as a constructor argument so existing
+   * `new TransactionalEventDispatcher(manager)` callsites in tests
+   * keep compiling. NestJS DI continues to inject the manager
+   * automatically. A future cleanup phase may drop it.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(private readonly manager: TransactionManager) {}
 
   /**
@@ -143,46 +164,71 @@ export class TransactionalEventDispatcher {
     }
 
     const store = TransactionContext.getStore();
-    const inTransaction = store !== undefined && store.activeTransactions.size > 0;
+    const anyTxActive = store !== undefined && store.activeTransactions.size > 0;
 
-    if (!inTransaction) {
-      for (const listener of listeners) {
-        if (listener.metadata.fallbackExecution) {
+    for (const listener of listeners) {
+      const dataSource = listener.metadata.dataSource ?? DEFAULT_DATA_SOURCE_NAME;
+      const tx = TransactionContext.getActiveTransactionByDataSource(dataSource);
+
+      if (tx === undefined) {
+        // No active transaction for this listener's dataSource. Two
+        // sub-cases:
+        //  - There IS at least one active tx (just not for this DS):
+        //    the event is "in a transaction" only for some other DS.
+        //    A listener bound to a different DS has no business
+        //    firing — skip silently. This preserves DD-023's
+        //    independent-context semantics (cross-dataSource calls
+        //    do not silently enrol).
+        //  - No active tx anywhere: classic out-of-transaction case —
+        //    fallbackExecution: true fires immediately, others warn
+        //    and drop.
+        if (!anyTxActive && listener.metadata.fallbackExecution) {
           this.scheduleFallback(listener, event);
-        } else {
+        } else if (!anyTxActive) {
           this.logger.warn(
             `Event ${typeName} published outside a transaction; handler ` +
               `${listener.instanceLabel}.${listener.methodName} has no ` +
               `fallbackExecution=true — skipping.`,
           );
+        } else {
+          this.logger.debug(
+            `Event ${typeName}: handler ${listener.instanceLabel}.${listener.methodName} ` +
+              `bound to dataSource '${dataSource}' has no matching active transaction — skipping.`,
+          );
         }
+        continue;
       }
-      return;
-    }
 
-    for (const listener of listeners) {
-      this.attachHook(listener, event);
+      this.attachHookToTransaction(listener, event, tx);
     }
   }
 
-  private attachHook(listener: RegisteredListener, event: object): void {
+  private attachHookToTransaction(
+    listener: RegisteredListener,
+    event: object,
+    tx: ActiveTransaction,
+  ): void {
     const invoke = (): Promise<void> => this.invokeListener(listener, event);
     const invokeWithError = (error: unknown): Promise<void> =>
       this.invokeListener(listener, event, error);
 
+    // Push hooks directly onto THIS specific transaction's hook lists,
+    // bypassing TransactionManager.registerBeforeCommit's
+    // first-active-tx resolution. Same pattern as
+    // DataSourceOutboxPublisher.scheduleForPublication (Phase 14.3).
     switch (listener.metadata.phase) {
       case TransactionPhase.BEFORE_COMMIT:
-        this.manager.registerBeforeCommit(invoke);
+        tx.beforeCommitHooks.push(invoke);
         return;
       case TransactionPhase.AFTER_COMMIT:
-        this.manager.registerAfterCommit(invoke);
+        tx.afterCommitHooks.push(invoke);
         return;
       case TransactionPhase.AFTER_ROLLBACK:
-        this.manager.registerAfterRollback(invokeWithError);
+        tx.afterRollbackHooks.push(invokeWithError);
         return;
       case TransactionPhase.AFTER_COMPLETION:
-        this.manager.registerAfterCommit(invoke);
-        this.manager.registerAfterRollback(invokeWithError);
+        tx.afterCommitHooks.push(invoke);
+        tx.afterRollbackHooks.push(invokeWithError);
         return;
     }
   }

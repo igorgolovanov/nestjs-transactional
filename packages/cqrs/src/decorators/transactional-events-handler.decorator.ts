@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { type Type } from '@nestjs/common';
+import { DEFAULT_DATA_SOURCE_NAME } from '@nestjs-transactional/core';
 
 import { TransactionPhase } from '../types/transactional-listener.types';
 
@@ -45,6 +46,28 @@ export interface TransactionalEventsHandlerOptions {
    * When `false` (default), such events are dropped with a warning.
    */
   readonly fallbackExecution?: boolean;
+  /**
+   * dataSource the handler's phase hooks attach to (Phase 14.3.1).
+   * Defaults to {@link DEFAULT_DATA_SOURCE_NAME} (`'default'`) —
+   * single-dataSource apps can omit it.
+   *
+   * Multi-dataSource apps with handlers belonging to a non-default
+   * dataSource MUST set this — the dispatcher uses it to find the
+   * matching active transaction via
+   * `TransactionContext.getActiveTransactionByDataSource(dataSource)`
+   * and pushes phase hooks directly onto that transaction's hook
+   * lists. Without it, the dispatcher falls back to `'default'` and
+   * the handler may attach to the wrong transaction (or none at all
+   * if the default-DS has no active tx in the current async context).
+   *
+   * Unlike `@OutboxEventsHandler` and `@IntegrationEventsHandler`'s
+   * outbox path — both of which auto-resolve the dataSource by
+   * walking per-DS event-type registries — the in-memory dispatcher
+   * has no event-type registry to consult. The cqrs package is
+   * decoupled from outbox by design (Phase 14.7), so the dataSource
+   * is declared explicitly on the decorator.
+   */
+  readonly dataSource?: string;
 }
 
 /**
@@ -57,6 +80,7 @@ export interface TransactionalEventsHandlerMetadata {
   readonly phase: TransactionPhase;
   readonly async: boolean;
   readonly fallbackExecution: boolean;
+  readonly dataSource: string;
 }
 
 /**
@@ -86,16 +110,27 @@ export interface TransactionalEventsHandlerMetadata {
  * dispatcher registration happens at application bootstrap via
  * `TransactionalListenerScanner`.
  *
- * **Multi-dataSource semantics.** The dispatcher attaches phase hooks
- * to the *current* transaction via `TransactionManager.registerBeforeCommit`
- * (and siblings), which iterates the active-transactions Map and picks
- * the first entry. With cross-dataSource simultaneous transactions on
- * the same async stack, this is non-deterministic — the handler may
- * fire on a transaction it does not conceptually belong to. For
- * cross-DS event flow use `@OutboxEventsHandler` / `@IntegrationEventsHandler`
- * instead — outbox routing is per-dataSource by event registration
- * (Phase 14.3.2). See CLAUDE.md "Known Limitations (Phase 14)" for
- * the planned Phase 14.3.1 fix.
+ * **Multi-dataSource semantics (Phase 14.3.1).** The dispatcher pushes
+ * phase hooks directly onto the per-dataSource active transaction
+ * resolved via
+ * `TransactionContext.getActiveTransactionByDataSource(dataSource)`,
+ * bypassing `TransactionManager.registerBeforeCommit`'s first-active-tx
+ * semantics. The dataSource defaults to `'default'`; multi-DS apps
+ * pass `dataSource: 'billing'` (or similar) on the long form to attach
+ * the handler to a specific dataSource's transaction:
+ *
+ * ```ts
+ * @TransactionalEventsHandler({
+ *   events: [BillingEvent],
+ *   dataSource: 'billing',
+ * })
+ * class BillingHandler { handle(event: BillingEvent) {} }
+ * ```
+ *
+ * Unlike `@OutboxEventsHandler` (which auto-resolves the dataSource
+ * by walking per-DS event-type registries), the in-memory dispatcher
+ * has no event-type registry — the dataSource is declared explicitly
+ * on the decorator.
  *
  * @throws {Error} If no event types are supplied.
  */
@@ -130,6 +165,7 @@ function resolveMetadata(
       phase: options.phase ?? TransactionPhase.AFTER_COMMIT,
       async: options.async ?? false,
       fallbackExecution: options.fallbackExecution ?? false,
+      dataSource: options.dataSource ?? DEFAULT_DATA_SOURCE_NAME,
     };
   }
 
@@ -138,6 +174,7 @@ function resolveMetadata(
     phase: TransactionPhase.AFTER_COMMIT,
     async: false,
     fallbackExecution: false,
+    dataSource: DEFAULT_DATA_SOURCE_NAME,
   };
 }
 

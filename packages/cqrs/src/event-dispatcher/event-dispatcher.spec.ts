@@ -373,4 +373,180 @@ describe('TransactionalEventDispatcher', () => {
       expect(adapter.committedTransactions).toHaveLength(1);
     });
   });
+
+  // -----------------------------------------------------------------
+  // Phase 14.3.1 — per-dataSource hook attachment.
+  //
+  // Listeners declare `metadata.dataSource`; the dispatcher resolves
+  // the matching active transaction and pushes hooks directly onto
+  // its hook lists, bypassing TransactionManager.registerBeforeCommit's
+  // first-active-tx semantics.
+  // -----------------------------------------------------------------
+  describe('multi-dataSource hook attachment (Phase 14.3.1)', () => {
+    let billingAdapter: FakeAdapter;
+    let multiDsManager: TransactionManager;
+    let multiDsDispatcher: TransactionalEventDispatcher;
+
+    beforeEach(() => {
+      // Two adapters, distinct dataSourceName per instance.
+      class NamedFakeAdapter implements TransactionAdapter<FakeHandle> {
+        readonly name = 'in-memory';
+        committedTransactions: FakeCommit[] = [];
+        rolledBackTransactions: FakeRollback[] = [];
+
+        constructor(readonly dataSourceName: string) {}
+
+        async runInTransaction<T>(
+          options: TransactionOptions,
+          fn: (handle: FakeHandle) => Promise<T>,
+        ): Promise<T> {
+          const handle: FakeHandle = { id: randomUUID(), adapterName: this.name };
+          try {
+            const result = await fn(handle);
+            this.committedTransactions.push({ id: handle.id, options });
+            return result;
+          } catch (error) {
+            this.rolledBackTransactions.push({ id: handle.id, options, error });
+            throw error;
+          }
+        }
+
+        async runInSavepoint<T>(
+          parent: FakeHandle,
+          fn: (handle: FakeHandle) => Promise<T>,
+        ): Promise<T> {
+          return fn(parent);
+        }
+      }
+
+      const defaultAdapter = new NamedFakeAdapter('default');
+      billingAdapter = new NamedFakeAdapter('billing') as unknown as FakeAdapter;
+
+      const multiRegistry = new AdapterRegistry();
+      multiRegistry.register({
+        adapterName: 'in-memory',
+        instanceName: 'default',
+        adapter: defaultAdapter,
+      });
+      multiRegistry.register({
+        adapterName: 'in-memory',
+        instanceName: 'billing',
+        adapter: billingAdapter,
+      });
+
+      multiDsManager = new TransactionManager(multiRegistry);
+      multiDsDispatcher = new TransactionalEventDispatcher(multiDsManager);
+    });
+
+    it('listener with dataSource="billing" attaches to the billing transaction', async () => {
+      const calls: string[] = [];
+      const host = {
+        onPlaced: jest.fn(() => {
+          calls.push(`tx#${billingAdapter.committedTransactions.length}`);
+        }),
+      };
+      multiDsDispatcher.registerListener(
+        host,
+        'onPlaced',
+        metadata(TransactionPhase.BEFORE_COMMIT, { dataSource: 'billing' }),
+      );
+
+      await multiDsManager.run({ dataSource: 'billing' }, async () => {
+        multiDsDispatcher.scheduleDispatch(new OrderPlaced());
+      });
+
+      expect(host.onPlaced).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual(['tx#0']); // ran BEFORE the billing commit
+      expect(billingAdapter.committedTransactions).toHaveLength(1);
+    });
+
+    it("does NOT fire when only the other dataSource's transaction is active", async () => {
+      const debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+
+      const host = { onPlaced: jest.fn() };
+      // listener bound to 'billing'
+      multiDsDispatcher.registerListener(
+        host,
+        'onPlaced',
+        metadata(TransactionPhase.AFTER_COMMIT, { dataSource: 'billing' }),
+      );
+
+      // run a 'default' transaction — billing-bound listener should
+      // skip silently (debug-logged, not warned, not invoked).
+      await multiDsManager.run({ dataSource: 'default' }, async () => {
+        multiDsDispatcher.scheduleDispatch(new OrderPlaced());
+      });
+
+      expect(host.onPlaced).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining("bound to dataSource 'billing'"),
+      );
+    });
+
+    it('cross-DS simultaneous transactions — each dataSource fires its own listener only', async () => {
+      const defaultHost = { onPlaced: jest.fn() };
+      const billingHost = { onPlaced: jest.fn() };
+
+      multiDsDispatcher.registerListener(
+        defaultHost,
+        'onPlaced',
+        metadata(TransactionPhase.AFTER_COMMIT, { dataSource: 'default' }),
+      );
+      multiDsDispatcher.registerListener(
+        billingHost,
+        'onPlaced',
+        metadata(TransactionPhase.AFTER_COMMIT, { dataSource: 'billing' }),
+      );
+
+      await multiDsManager.run({ dataSource: 'default' }, async () => {
+        await multiDsManager.run({ dataSource: 'billing' }, async () => {
+          // Both default and billing transactions are active in this scope.
+          multiDsDispatcher.scheduleDispatch(new OrderPlaced('via-billing'));
+        });
+        // After billing commit, schedule one more dispatch — only
+        // default-DS hook should attach.
+        multiDsDispatcher.scheduleDispatch(new OrderPlaced('via-default'));
+      });
+
+      // Each listener fired exactly once on its own dataSource's tx.
+      expect(billingHost.onPlaced).toHaveBeenCalledTimes(1);
+      const billingCallArg = billingHost.onPlaced.mock.calls[0]?.[0] as { orderId: string };
+      expect(billingCallArg.orderId).toBe('via-billing');
+      // Default-DS listener fires twice: once for 'via-billing' (the
+      // outer default tx is also active) and once for 'via-default'.
+      expect(defaultHost.onPlaced).toHaveBeenCalledTimes(2);
+    });
+
+    it('listener defaults to dataSource="default" when metadata omits it', async () => {
+      const host = { onPlaced: jest.fn() };
+
+      // metadata WITHOUT dataSource — should default to 'default'.
+      multiDsDispatcher.registerListener(host, 'onPlaced', metadata(TransactionPhase.AFTER_COMMIT));
+
+      await multiDsManager.run({ dataSource: 'default' }, async () => {
+        multiDsDispatcher.scheduleDispatch(new OrderPlaced());
+      });
+
+      expect(host.onPlaced).toHaveBeenCalledTimes(1);
+    });
+
+    it('fallbackExecution still fires when no transactions are active anywhere', async () => {
+      const host = { onPlaced: jest.fn() };
+      multiDsDispatcher.registerListener(
+        host,
+        'onPlaced',
+        metadata(TransactionPhase.AFTER_COMMIT, {
+          dataSource: 'billing',
+          fallbackExecution: true,
+        }),
+      );
+
+      multiDsDispatcher.scheduleDispatch(new OrderPlaced());
+      await flushMicrotasks();
+
+      // No transaction was active for ANY dataSource → fallbackExecution
+      // path takes over.
+      expect(host.onPlaced).toHaveBeenCalledTimes(1);
+    });
+  });
 });

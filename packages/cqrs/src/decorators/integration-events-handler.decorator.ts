@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { type Type } from '@nestjs/common';
+import { DEFAULT_DATA_SOURCE_NAME } from '@nestjs-transactional/core';
 
 /**
  * Metadata key under which {@link IntegrationEventsHandlerMetadata} is
@@ -30,6 +31,18 @@ export interface IntegrationEventsHandlerOptions {
    * declared, the scanner appends `#${EventName}` to the supplied id.
    */
   readonly id?: string;
+  /**
+   * dataSource the in-memory dispatcher fallback path attaches phase
+   * hooks to (Phase 14.3.1). Only consulted when the outbox is NOT
+   * wired (no `OUTBOX_LISTENER_REGISTRAR` binding) — the outbox path
+   * auto-resolves the dataSource by walking per-DS event-type
+   * registries.
+   *
+   * Defaults to `'default'`. Multi-dataSource apps using the
+   * dispatcher fallback declare it explicitly on a non-default
+   * handler.
+   */
+  readonly dataSource?: string;
 }
 
 /**
@@ -38,6 +51,7 @@ export interface IntegrationEventsHandlerOptions {
 export interface IntegrationEventsHandlerMetadata {
   readonly eventTypes: Type[];
   readonly id?: string;
+  readonly dataSource: string;
 }
 
 /**
@@ -137,11 +151,13 @@ function resolveMetadata(
     return {
       eventTypes: [...options.events],
       id: options.id,
+      dataSource: options.dataSource ?? DEFAULT_DATA_SOURCE_NAME,
     };
   }
 
   return {
     eventTypes: args as Type[],
+    dataSource: DEFAULT_DATA_SOURCE_NAME,
   };
 }
 

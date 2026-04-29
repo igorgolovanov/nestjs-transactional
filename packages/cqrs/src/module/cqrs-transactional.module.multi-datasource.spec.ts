@@ -146,16 +146,27 @@ class PlaceBillingHandler implements ICommandHandler<PlaceBillingCommand, void> 
 }
 
 /**
- * In-memory listener — fires on AFTER_COMMIT via the cqrs
- * dispatcher. DataSource-agnostic; the dispatcher's "first active
- * transaction" semantics are documented in
- * `event-dispatcher.ts` JSDoc.
+ * In-memory listeners — fire on AFTER_COMMIT via the cqrs
+ * dispatcher. Phase 14.3.1: dispatcher hooks attach to a *specific*
+ * dataSource's active transaction (resolved via
+ * `TransactionContext.getActiveTransactionByDataSource`), so handlers
+ * declare the dataSource they belong to. Single class can NOT cover
+ * multiple dataSources — one handler per dataSource.
  */
 @Injectable()
-@TransactionalEventsHandler(DefaultEvent, BillingEvent)
-class InMemoryRecorder implements ITransactionalEventHandler<DefaultEvent | BillingEvent> {
-  received: (DefaultEvent | BillingEvent)[] = [];
-  handle(event: DefaultEvent | BillingEvent): void {
+@TransactionalEventsHandler(DefaultEvent) // dataSource defaults to 'default'
+class DefaultInMemoryRecorder implements ITransactionalEventHandler<DefaultEvent> {
+  received: DefaultEvent[] = [];
+  handle(event: DefaultEvent): void {
+    this.received.push(event);
+  }
+}
+
+@Injectable()
+@TransactionalEventsHandler({ events: [BillingEvent], dataSource: 'billing' })
+class BillingInMemoryRecorder implements ITransactionalEventHandler<BillingEvent> {
+  received: BillingEvent[] = [];
+  handle(event: BillingEvent): void {
     this.received.push(event);
   }
 }
@@ -226,7 +237,8 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
 
   describe('runtime — single CqrsTransactionalModule.forRoot routes events through multi-DS outbox', () => {
     let module: TestingModule;
-    let inMemoryRecorder: InMemoryRecorder;
+    let defaultRecorder: DefaultInMemoryRecorder;
+    let billingRecorder: BillingInMemoryRecorder;
     let defaultListener: DefaultPersistentListener;
     let billingListener: BillingPersistentListener;
 
@@ -264,14 +276,16 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
         providers: [
           PlaceDefaultHandler,
           PlaceBillingHandler,
-          InMemoryRecorder,
+          DefaultInMemoryRecorder,
+          BillingInMemoryRecorder,
           DefaultPersistentListener,
           BillingPersistentListener,
         ],
       }).compile();
       await module.init();
 
-      inMemoryRecorder = module.get(InMemoryRecorder);
+      defaultRecorder = module.get(DefaultInMemoryRecorder);
+      billingRecorder = module.get(BillingInMemoryRecorder);
       defaultListener = module.get(DefaultPersistentListener);
       billingListener = module.get(BillingPersistentListener);
 
@@ -294,8 +308,10 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
 
       // Hybrid publisher routed the AggregateRoot event to BOTH the
       // in-memory dispatcher (AFTER_COMMIT — already fired) AND the
-      // outbox smart facade.
-      expect(inMemoryRecorder.received.map((e) => e.constructor.name)).toEqual(['DefaultEvent']);
+      // outbox smart facade. Phase 14.3.1 — only the default-DS-bound
+      // recorder fires for DefaultEvent.
+      expect(defaultRecorder.received.map((e) => e.constructor.name)).toEqual(['DefaultEvent']);
+      expect(billingRecorder.received).toHaveLength(0);
 
       const defaultProcessor = module.get<EventPublicationProcessor>(
         getEventPublicationProcessorToken('default'),
@@ -321,7 +337,11 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       await commandBus.execute(new PlaceBillingCommand('inv-42'));
       await flushMicrotasks();
 
-      expect(inMemoryRecorder.received.map((e) => e.constructor.name)).toEqual(['BillingEvent']);
+      // Phase 14.3.1 — only the billing-DS-bound recorder fires for
+      // BillingEvent; the default-DS recorder skips because no
+      // default-DS transaction was active when the event was published.
+      expect(billingRecorder.received.map((e) => e.constructor.name)).toEqual(['BillingEvent']);
+      expect(defaultRecorder.received).toHaveLength(0);
 
       const billingProcessor = module.get<EventPublicationProcessor>(
         getEventPublicationProcessorToken('billing'),
@@ -350,6 +370,11 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       await commandBus.execute(new PlaceDefaultCommand('order-A'));
       await commandBus.execute(new PlaceBillingCommand('inv-A'));
       await flushMicrotasks();
+
+      // Phase 14.3.1 — both in-memory recorders fire on their own DS
+      // independently, with no cross-DS bleed.
+      expect(defaultRecorder.received.map((e) => e.id)).toEqual(['order-A']);
+      expect(billingRecorder.received.map((e) => e.invoiceId)).toEqual(['inv-A']);
 
       const defaultProcessor = module.get<EventPublicationProcessor>(
         getEventPublicationProcessorToken('default'),
