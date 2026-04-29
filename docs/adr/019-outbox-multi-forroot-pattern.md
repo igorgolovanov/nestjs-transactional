@@ -1,16 +1,16 @@
 # ADR-019: OutboxModule multi-`forRoot` registration pattern
 
-- **Status**: Accepted
-- **Date**: 2026-04-27 (Phase 14.3.2)
+- **Status**: Accepted (final form after Phase 14.10 / 14.21 alignment)
+- **Date**: 2026-04-27
 - **Related**:
   - ADR-018 (multi-adapter architecture, dataSource-name-keyed registration)
   - DD-020 (multi-adapter through dataSource-name identifier)
   - DD-024 (smart `OutboxEventPublisher` facade)
+  - Phase 14 roadmap entry: [`docs/roadmap/README.md`](../roadmap/README.md)
 
 ## Context
 
-Phase 14.3 (2026-04-26) shipped multi-adapter `OutboxModule` with an array
-API:
+Phase 14.3 shipped multi-adapter `OutboxModule` with an array API:
 
 ```ts
 OutboxModule.forRoot({
@@ -267,19 +267,21 @@ here.
 
 ### Neutral
 
-- **Sets the precedent for `TransactionalModule`**. Phase 14.10
-  applies the same static-Map / first-call-special / `OnModuleInit`
+- **Set the precedent for the rest of the family**. Phase 14.10
+  applied the same static-Map / first-call-special / `OnModuleInit`
   pattern to `TransactionalModule.forRoot` — closing the
-  inconsistency where `TransactionalModule` still accepts an
-  `adapters: [...]` array (Phase 14.2 Q1.B) while every other
-  multi-DS module shipped multi-`forRoot`. ADR-018 carries an
-  addendum noting this alignment; ADR-019 itself is the design
-  reference.
-- **Future packages adopt the same pattern**. New ORM-backed
-  outbox packages (`outbox-prisma`, `outbox-mongodb`) follow
-  multi-`forRoot` from day one. The static-Map mechanism is the
-  pattern of record for "register one dataSource's stack per call,
-  coordinate singletons across calls" in this codebase.
+  inconsistency where `TransactionalModule` previously accepted an
+  `adapters: [...]` array (Phase 14.2 Q1.B). Phase 14.20 / 14.21
+  applied the per-call shape to `TypeOrmTransactionalModule.forRoot`
+  and `OutboxTypeOrmModule.forRoot` (DataSource resolved from DI
+  rather than passed as a connection instance). ADR-018 records the
+  full architecture; ADR-019 itself is the design reference for
+  the registration mechanism.
+- **Future packages adopt the same pattern**. New ORM-backed outbox
+  packages (`outbox-prisma`, `outbox-mongodb`) follow multi-`forRoot`
+  from day one. The static-Map mechanism is the pattern of record
+  for "register one dataSource's stack per call, coordinate
+  singletons across calls" in this codebase.
 
 ## Implementation reference
 
@@ -303,7 +305,39 @@ Key surfaces:
   publishers and event-type registries via `ModuleRef.get`.
 
 Test infrastructure precedent:
-`packages/outbox/src/module/outbox.module.multi-datasource.spec.ts`
+[`packages/outbox/src/module/outbox.module.multi-datasource.spec.ts`](../../packages/outbox/src/module/outbox.module.multi-datasource.spec.ts)
 demonstrates the multi-`forRoot` pattern end-to-end with three
-dataSources, including manual per-DS listener registration as a
-workaround for the Phase 14.3.1 scanner gap.
+dataSources. Decorator-driven per-DS handler registration shipped in
+Phase 14.3.1 (Categories A / B), so the manual workaround the
+original spec showed is no longer needed — both
+[`OutboxModule.forFeature`](../../packages/outbox/src/module/outbox.module.ts)
+auto-registration and the
+[`@TransactionalEventsHandler({ dataSource })`](../../packages/cqrs/src/handlers/decorators/transactional-events-handler.ts)
+per-DS option route handlers to the right dataSource transparently.
+
+The end-to-end multi-DS architecture is exercised in production
+realism by
+[`examples/e-commerce-orders`](../../examples/e-commerce-orders/)
+(three Postgres DataSources, per-DS outbox stacks); smaller axis
+demonstrations in
+[`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/)
+and
+[`examples/shared-database-modular-monolith`](../../examples/shared-database-modular-monolith/).
+
+## Revision history
+
+Phase-anchored. Each entry corresponds to a roadmap iteration in
+[`docs/roadmap/README.md`](../roadmap/README.md).
+
+- **Phase 14.3.2** — original ADR drafted. Replaced the Phase 14.3
+  single-`forRoot({ dataSources: [...] })` array API with the
+  multi-`forRoot` mechanism described in § 1–5.
+- **Phase 14.10** — same pattern applied to
+  `TransactionalModule.forRoot`. Default `isGlobal` flipped to
+  `true` for cross-call DI visibility.
+- **Phase 14.20 / 14.21** — same per-call shape applied to
+  `TypeOrmTransactionalModule.forRoot` and
+  `OutboxTypeOrmModule.forRoot` with DataSource resolved from DI.
+- **Phase 14.8f doc sweep** — Phase 14.3.1 scanner-gap workaround
+  note removed (gap closed); this Revision history section added;
+  cross-references to the example library refreshed.
