@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 
 import { EventTypeRegistry } from '../serialization/event-type-registry';
+import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
 import {
   getEventTypeRegistryToken,
   getOutboxPublisherToken,
@@ -185,31 +186,12 @@ export class OutboxEventPublisher implements OnModuleInit {
       return options.dataSource;
     }
 
+    // Phase 14.3.1 — same helper used by `OutboxListenerScanner` and
+    // `MultiDsOutboxListenerRegistrar` so the routing policy (one
+    // owning DS per event class, throw on 0 or many matches) stays
+    // consistent across publish and listener-registration paths.
     const eventType = (event as object).constructor.name;
-    const matches: string[] = [];
-    for (const [dataSource, registry] of this.eventTypeRegistries) {
-      if (registry.has(eventType)) {
-        matches.push(dataSource);
-      }
-    }
-
-    if (matches.length === 0) {
-      throw new OutboxError(
-        `Event type '${eventType}' is not registered in any dataSource. ` +
-          `Add it to OutboxModule.forFeature([...], { dataSource: '...' }) ` +
-          `in the feature module that owns the event class.`,
-      );
-    }
-    if (matches.length > 1) {
-      throw new OutboxError(
-        `Event type '${eventType}' is registered in multiple dataSources ` +
-          `(${matches.join(', ')}). Pass an explicit { dataSource } option to ` +
-          `disambiguate, or register the event in only one dataSource.`,
-      );
-    }
-    // Length is exactly 1 here (checked above); narrowing safe.
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return matches[0]!;
+    return resolveDataSourceByEventTypeName(eventType, this.eventTypeRegistries);
   }
 
   private requirePublisher(dataSource: string): DataSourceOutboxPublisher {

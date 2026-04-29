@@ -184,22 +184,21 @@ class BillingPersistentListener implements IOutboxEventHandler<BillingEvent> {
 }
 
 /**
- * Bridge module — binds the cqrs structural ports to the outbox
- * smart-facade publisher and (default-DS) listener registry. The
- * billing-DS listener registry is wired separately below per-test
- * via `getOutboxListenerRegistryToken('billing')`.
+ * Bridge module — binds the cqrs structural port for the
+ * AggregateRoot publisher path. The listener registrar
+ * (`OUTBOX_LISTENER_REGISTRAR`) is auto-bound by `OutboxModule.forRoot`
+ * to `MultiDsOutboxListenerRegistrar` (Phase 14.3.1) — no manual
+ * binding required.
  *
- * `@Global()` because the consumers (HybridEventPublisher inside
- * CqrsTransactionalModule, IntegrationEventsHandlerScanner inside
- * CqrsTransactionalModule) live in another module's DI scope.
+ * `@Global()` because the consumer (`HybridEventPublisher` inside
+ * `CqrsTransactionalModule`) lives in another module's DI scope.
  */
 @Global()
 @Module({
   providers: [
     { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-    { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
   ],
-  exports: [OUTBOX_PUBLICATION_SCHEDULER, OUTBOX_LISTENER_REGISTRAR],
+  exports: [OUTBOX_PUBLICATION_SCHEDULER],
 })
 class OutboxCqrsBridge {}
 
@@ -276,21 +275,12 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       defaultListener = module.get(DefaultPersistentListener);
       billingListener = module.get(BillingPersistentListener);
 
-      // Phase 14.3.1 scanner-gap workaround: register the
-      // billing-DS persistent listener with the billing registry
-      // explicitly. The default-DS listener is already registered
-      // by `OutboxListenerScanner` (which sees `OutboxListenerRegistry`
-      // class token, aliased to default-DS).
-      const billingRegistry = module.get<OutboxListenerRegistry>(
-        getOutboxListenerRegistryToken('billing'),
-      );
-      billingRegistry.register({
-        id: composeListenerId(BillingPersistentListener.name, BillingEvent),
-        eventType: BillingEvent.name,
-        invoke: async (event) => {
-          await billingListener.handle(event as BillingEvent);
-        },
-      });
+      // Phase 14.3.1 — `OutboxListenerScanner` auto-routes
+      // `BillingPersistentListener` to the billing-DS registry by
+      // walking the per-DS event-type registries. The pre-Phase-14.3.1
+      // workaround (manual `billingRegistry.register(...)`) is gone —
+      // it would now collide with the scanner's registration with a
+      // `DuplicateListenerIdError`.
     });
 
     afterEach(async () => {
@@ -384,9 +374,37 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       const facade = module.get(OutboxEventPublisher);
       expect(scheduler).toBe(facade);
 
-      const registrar = module.get(OUTBOX_LISTENER_REGISTRAR);
-      const defaultRegistry = module.get(OutboxListenerRegistry);
-      expect(registrar).toBe(defaultRegistry);
+      // Phase 14.3.1 — `OUTBOX_LISTENER_REGISTRAR` resolves to
+      // outbox's `MultiDsOutboxListenerRegistrar` via `Symbol.for`
+      // sharing (no source-level cqrs→outbox import). The class
+      // identity is exposed only by structural shape — we test
+      // behaviour: the registrar must possess a `register(...)`
+      // method, and feeding it a billing event must land in the
+      // billing-DS registry without further wiring.
+      const registrar = module.get<{ register: (l: { id: string; eventType: string; invoke: (e: unknown) => Promise<void> }) => void }>(
+        OUTBOX_LISTENER_REGISTRAR,
+        { strict: false },
+      );
+      expect(typeof registrar.register).toBe('function');
+
+      // Sanity check on the auto-routing: scanner already registered
+      // BillingPersistentListener with the billing-DS registry.
+      const billingRegistry = module.get<OutboxListenerRegistry>(
+        getOutboxListenerRegistryToken('billing'),
+      );
+      const defaultRegistry = module.get<OutboxListenerRegistry>(
+        getOutboxListenerRegistryToken('default'),
+      );
+      expect(
+        billingRegistry.getById(
+          composeListenerId(BillingPersistentListener.name, BillingEvent),
+        ),
+      ).toBeDefined();
+      expect(
+        defaultRegistry.getById(
+          composeListenerId(BillingPersistentListener.name, BillingEvent),
+        ),
+      ).toBeUndefined();
     });
   });
 });

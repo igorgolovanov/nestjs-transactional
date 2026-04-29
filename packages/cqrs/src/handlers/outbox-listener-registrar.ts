@@ -6,31 +6,25 @@
  *
  * `@nestjs-transactional/outbox`'s `OutboxListenerRegistry`
  * satisfies this interface structurally (its `register` method
- * accepts exactly this shape). Wire the token in the host application
- * when the outbox is enabled:
+ * accepts exactly this shape). The outbox package's
+ * `MultiDsOutboxListenerRegistrar` (Phase 14.3.1) is a smarter
+ * implementation that walks every per-dataSource event-type registry
+ * to resolve which dataSource owns each listener's event class and
+ * routes the registration to the matching per-DS registry — so a
+ * single binding handles arbitrary multi-dataSource deployments.
  *
- * ```ts
- * providers: [
- *   {
- *     provide: OUTBOX_LISTENER_REGISTRAR,
- *     useExisting: OutboxListenerRegistry,
- *   },
- * ]
- * ```
+ * **Auto-binding (Phase 14.3.1).** `OutboxModule.forRoot` binds this
+ * token to `MultiDsOutboxListenerRegistrar` automatically on the
+ * first `forRoot` call. Consumers do NOT need to declare the binding
+ * themselves; the registrar is in place by the time the cqrs
+ * `IntegrationEventsHandlerScanner` runs its `onModuleInit`. Manual
+ * binding remains supported for advanced cases (custom routing
+ * policy, structural decoupling tests).
  *
- * `OutboxModule` from outbox binds this automatically once
- * wired — consumers who construct the registry manually need to
- * declare the binding themselves.
- *
- * **Multi-dataSource (Phase 14.7).** `OutboxListenerRegistry` is
- * registered per-dataSource (one per `OutboxModule.forRoot()` —
- * ADR-019). For multi-DS deployments with non-default-DS handlers,
- * resolve the per-DS registry token explicitly and bridge it via
- * `useExisting: getOutboxListenerRegistryToken('billing')` (or
- * similar). The default-DS registry remains aliased under the
- * `OutboxListenerRegistry` class token. See CLAUDE.md "Known
- * Limitations (Phase 14)" — the bundled scanner gap (Phase 14.3.1
- * follow-up) covers automating this.
+ * Cross-package token identity is via `Symbol.for(...)` so the cqrs
+ * declaration and the outbox auto-binding refer to the same Symbol
+ * without either package importing from the other (Convention #8 —
+ * mirrors `WRAPPED_MARKER`).
  */
 export interface OutboxListenerRegistrar {
   register(listener: {
@@ -45,5 +39,13 @@ export interface OutboxListenerRegistrar {
  * into `IntegrationEventsHandlerScanner`. When unbound, the scanner
  * falls back to in-memory registration via
  * {@link TransactionalEventDispatcher}.
+ *
+ * `Symbol.for(...)` (not `Symbol(...)`) — Phase 14.3.1: the outbox
+ * package auto-binds this token to its `MultiDsOutboxListenerRegistrar`
+ * via `Symbol.for` lookup on the same key. Both packages thereby
+ * refer to the same Symbol identity without a direct import in
+ * either direction.
  */
-export const OUTBOX_LISTENER_REGISTRAR = Symbol('OUTBOX_LISTENER_REGISTRAR');
+export const OUTBOX_LISTENER_REGISTRAR = Symbol.for(
+  '@nestjs-transactional/cqrs/outbox-listener-registrar',
+);

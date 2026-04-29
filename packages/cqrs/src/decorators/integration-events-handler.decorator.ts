@@ -96,15 +96,15 @@ export interface IntegrationEventsHandlerMetadata {
  * (a DI concept), and (b) "Integration events" is the established
  * DDD/microservices term for cross-module/cross-service event flow.
  *
- * **Multi-dataSource setups.** When the outbox path is wired, routing
- * to the correct per-DS outbox stack is decided by the
- * `useExisting` target the application binds to
- * `OUTBOX_LISTENER_REGISTRAR`. The handler itself stays
- * dataSource-agnostic in this decorator. Note that
- * `IntegrationEventsHandlerScanner` currently injects a single
- * registrar (Phase 14.3.1 follow-up) — for now, multi-DS deployments
- * with non-default-DS handlers may need to bridge per-DS registries
- * manually. See CLAUDE.md "Known Limitations (Phase 14)".
+ * **Multi-dataSource setups (Phase 14.3.1).** When the outbox path
+ * is wired, `OutboxModule.forRoot` auto-binds
+ * `OUTBOX_LISTENER_REGISTRAR` to a smart
+ * `MultiDsOutboxListenerRegistrar` that walks per-dataSource
+ * `EventTypeRegistry` instances to find which dataSource owns each
+ * handler's events and registers the listener with the matching
+ * per-DS registry — automatic, no decorator option required.
+ * Handlers subscribing to events across multiple dataSources are
+ * rejected at bootstrap (handlers must be dataSource-scoped).
  *
  * @throws {Error} If no event types are supplied.
  */

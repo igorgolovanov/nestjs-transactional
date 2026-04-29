@@ -17,13 +17,10 @@ import {
   type IOutboxEventHandler,
   OutboxEventPublisher,
   OutboxEventsHandler,
-  OutboxListenerRegistry,
   OutboxModule,
   PublicationStatus,
-  composeListenerId,
   getEventPublicationProcessorToken,
   getEventPublicationRepositoryToken,
-  getOutboxListenerRegistryToken,
 } from '@nestjs-transactional/outbox';
 import { of } from 'rxjs';
 
@@ -231,20 +228,11 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
     }).compile();
     await module.init();
 
-    // Manual per-DS listener registration. The OutboxListenerScanner
-    // (Phase 14.3) registers every `@OutboxEventsHandler` with the
-    // default-DS listener registry only — the Phase 14.3.1 scanner gap
-    // documented in CLAUDE.md "Known Limitations". Until that lands,
-    // multi-DS deployments register listeners manually with the
-    // per-DS registry. This is a supported pattern by design — the
-    // scanner is a convenience layer.
-    registerOutboxListenerOnDataSource(module, 'billing', BillingEvent, BillingListener);
-    registerOutboxListenerOnDataSource(
-      module,
-      'inventory',
-      InventoryEvent,
-      InventoryListener,
-    );
+    // Phase 14.3.1 — `OutboxListenerScanner` auto-routes every
+    // `@OutboxEventsHandler` class to the per-DS registry whose
+    // dataSource owns the decorated event class. The pre-Phase-14.3.1
+    // workaround (`registerOutboxListenerOnDataSource(...)`) is gone —
+    // it would now collide with the scanner's registration.
   });
 
   afterEach(async () => {
@@ -415,26 +403,3 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
   });
 });
 
-// ---------------------------------------------------------------------------
-// Helper — manual per-DS listener registration (workaround for the
-// Phase 14.3.1 scanner gap, documented in CLAUDE.md "Known Limitations").
-// ---------------------------------------------------------------------------
-
-function registerOutboxListenerOnDataSource<E extends object>(
-  module: TestingModule,
-  dataSource: string,
-  eventClass: new (...args: never[]) => E,
-  listenerClass: new (...args: never[]) => IOutboxEventHandler<E>,
-): void {
-  const registry = module.get<OutboxListenerRegistry>(
-    getOutboxListenerRegistryToken(dataSource),
-  );
-  const listenerInstance = module.get(listenerClass);
-  registry.register({
-    id: composeListenerId(listenerClass.name, eventClass),
-    eventType: eventClass.name,
-    invoke: async (event) => {
-      await listenerInstance.handle(event as E);
-    },
-  });
-}

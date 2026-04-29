@@ -3,12 +3,10 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import {
   CqrsTransactionalModule,
-  OUTBOX_LISTENER_REGISTRAR,
   OUTBOX_PUBLICATION_SCHEDULER,
 } from '@nestjs-transactional/cqrs';
 import {
   OutboxEventPublisher,
-  OutboxListenerRegistry,
   OutboxModule,
   OutboxProcessingModule,
 } from '@nestjs-transactional/outbox';
@@ -62,30 +60,30 @@ export async function createDataSource(config: PostgresConfig): Promise<DataSour
 }
 
 /**
- * Bridges the outbox stack into the cqrs package's structural ports.
+ * Bridges the outbox stack into the cqrs package's
+ * `OUTBOX_PUBLICATION_SCHEDULER` structural port — `HybridEventPublisher`'s
+ * `@Optional()` injection picks `OutboxEventPublisher` up and routes
+ * aggregate-emitted events through both the in-memory dispatcher AND
+ * the outbox.
  *
- * - Binds `OutboxEventPublisher` under `OUTBOX_PUBLICATION_SCHEDULER`
- *   so `HybridEventPublisher`'s `@Optional()` injection picks it up
- *   and routes aggregate-emitted events through both the in-memory
- *   dispatcher AND the outbox.
- * - Binds `OutboxListenerRegistry` under `OUTBOX_LISTENER_REGISTRAR`
- *   so `IntegrationEventsHandlerScanner` routes
- *   `@IntegrationEventsHandler` classes through the outbox for
- *   durable delivery. Without this binding the scanner falls back
- *   to in-memory `AFTER_COMMIT` dispatch.
+ * The companion `OUTBOX_LISTENER_REGISTRAR` token is auto-bound by
+ * `OutboxModule.forRoot` to `MultiDsOutboxListenerRegistrar`
+ * (Phase 14.3.1) — the bridge does NOT need to declare it.
+ * `IntegrationEventsHandlerScanner` resolves the smart registrar via
+ * the auto-binding and routes `@IntegrationEventsHandler` classes to
+ * the per-DS registry whose dataSource owns each handler's events.
  *
- * `@Global()` + explicit `exports` are required: the consumers of
- * these tokens live INSIDE `CqrsTransactionalModule`, which has its
- * own DI scope and cannot see plain `providers` declared on the
- * application module.
+ * `@Global()` + explicit `exports` are required: the consumer of
+ * `OUTBOX_PUBLICATION_SCHEDULER` lives INSIDE `CqrsTransactionalModule`,
+ * which has its own DI scope and cannot see plain `providers`
+ * declared on the application module.
  */
 @Global()
 @Module({
   providers: [
     { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-    { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
   ],
-  exports: [OUTBOX_PUBLICATION_SCHEDULER, OUTBOX_LISTENER_REGISTRAR],
+  exports: [OUTBOX_PUBLICATION_SCHEDULER],
 })
 class OutboxCqrsBridgeModule {}
 

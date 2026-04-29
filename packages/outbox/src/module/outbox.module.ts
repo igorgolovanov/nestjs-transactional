@@ -36,6 +36,10 @@ import {
 } from '../recovery/startup-recovery';
 import { EventPublicationRegistry } from '../registry/event-publication-registry';
 import { OutboxListenerRegistry } from '../registry/listener-registry';
+import {
+  MultiDsOutboxListenerRegistrar,
+  OUTBOX_LISTENER_REGISTRAR_TOKEN,
+} from '../registry/multi-ds-listener-registrar';
 import { OutboxListenerScanner } from '../registry/outbox-listener-scanner';
 import {
   EVENT_PUBLICATION_REPOSITORY,
@@ -339,8 +343,11 @@ export class OutboxModule {
       providers.push(...buildFacadePublisherProvider(OutboxModule));
       providers.push(buildProcessingBundleProvider(OutboxModule));
       providers.push(OutboxListenerScanner);
+      providers.push(...buildMultiDsRegistrarProviders());
       exportTokens.push(OutboxEventPublisher);
       exportTokens.push(OUTBOX_PROCESSING_BUNDLE);
+      exportTokens.push(MultiDsOutboxListenerRegistrar);
+      exportTokens.push(OUTBOX_LISTENER_REGISTRAR_TOKEN);
     }
 
     return {
@@ -527,8 +534,11 @@ export class OutboxModule {
       providers.push(...buildFacadePublisherProvider(OutboxModule));
       providers.push(buildProcessingBundleProvider(OutboxModule));
       providers.push(OutboxListenerScanner);
+      providers.push(...buildMultiDsRegistrarProviders());
       exportTokens.push(OutboxEventPublisher);
       exportTokens.push(OUTBOX_PROCESSING_BUNDLE);
+      exportTokens.push(MultiDsOutboxListenerRegistrar);
+      exportTokens.push(OUTBOX_LISTENER_REGISTRAR_TOKEN);
     }
 
     return {
@@ -804,6 +814,31 @@ function buildFacadePublisherProvider(moduleClass: typeof OutboxModule): Provide
     {
       provide: OUTBOX_DATA_SOURCE_NAMES,
       useValue: privateRegistrations(moduleClass),
+    },
+  ];
+}
+
+/**
+ * Build the providers wiring the {@link MultiDsOutboxListenerRegistrar}
+ * (Phase 14.3.1). Registered in the first-registration block so the
+ * cqrs package's `IntegrationEventsHandlerScanner` picks the smart
+ * registrar up via its `@Optional() @Inject(OUTBOX_LISTENER_REGISTRAR)`
+ * — without any consumer-side wiring. The structural-port token
+ * binding goes through {@link OUTBOX_LISTENER_REGISTRAR_TOKEN}
+ * (a `Symbol.for(...)` whose key matches cqrs's
+ * `OUTBOX_LISTENER_REGISTRAR`) so neither package imports from the
+ * other (Convention #8).
+ *
+ * Class-token registration (`MultiDsOutboxListenerRegistrar` itself)
+ * is preserved alongside the alias so tests and advanced consumers
+ * can resolve the registrar by class as well.
+ */
+function buildMultiDsRegistrarProviders(): Provider[] {
+  return [
+    MultiDsOutboxListenerRegistrar,
+    {
+      provide: OUTBOX_LISTENER_REGISTRAR_TOKEN,
+      useExisting: MultiDsOutboxListenerRegistrar,
     },
   ];
 }
