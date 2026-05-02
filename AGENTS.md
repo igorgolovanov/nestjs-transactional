@@ -84,7 +84,6 @@ the linked docs for depth.
 | Multi-adapter migration guide | [docs/migration/multi-adapter.md](docs/migration/multi-adapter.md) |
 | Migrating to outbox (user-facing) | [docs/guides/migrating-to-outbox.md](docs/guides/migrating-to-outbox.md) |
 | Known limitations | [docs/known-limitations.md](docs/known-limitations.md) |
-| Session handoff notes | [docs/sessions/](docs/sessions/) |
 | Per-package public API + usage | each package's `README.md` |
 | Example library | [examples/README.md](examples/README.md) |
 

@@ -43,10 +43,13 @@ session.
    — historical, can be moved to match). Pick one per package and stay
    consistent within the package.
 
-5. **Session handoff notes live under `docs/sessions/`.** Read
-   `docs/sessions/phase-2-complete.md` first when resuming after a
-   long gap — it lists current state, open issues, and the next-session
-   prompt sequence in more detail than this status block.
+5. **(Retired)** ~~Session handoff notes live under `docs/sessions/`.~~
+   The `docs/sessions/` folder was removed from history during the
+   Phase 14.8f follow-up cleanup; per-phase retrospectives under
+   [`docs/status/`](.) plus the `**Last update**` block in
+   [`AGENTS.md`](../../AGENTS.md) are the canonical resume-context
+   surfaces. Convention number kept stable; #6+ retain their numbers
+   so cross-references elsewhere stay valid.
 
 6. **Do NOT import `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.**
    The transactional module imports `CqrsModule` internally and overrides
