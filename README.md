@@ -183,7 +183,8 @@ export class InventoryReservationHandler
 | 8 — Testing utilities | ✅ done (alpha) | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
 | 9 — Documentation & release | 🟡 in progress | Architecture docs, ADRs, migration guide, full-stack example, first 0.x release |
 | 10 — Class-level handler API + naming refinement | ✅ done | Method-level → class-level migration (ADR-014); second pass renamed `@ApplicationModuleHandler` → `@IntegrationEventsHandler` |
-| 11 — Event externalization | 🟡 in progress | `EventExternalizer` SPI, `@Externalized` decorator, `outbox-microservices` package, ADR-015, ADR-016 (reliability semantics) |
+| 11 — Event externalization | ✅ done (alpha) | `EventExternalizer` SPI, `@Externalized` decorator, `outbox-microservices` package, ADR-015, ADR-016 (silent-success reliability finding), Phase 14.8c example library coverage |
+| 14 — Multi-adapter architecture | ✅ done (alpha) | dataSource-name-keyed registration, multi-`forRoot` pattern (ADR-019), transparent transactional repositories (Phase 14.20), `OutboxTypeOrmModule` reshape (Phase 14.21), Phase 14.8 Tier 1–5 example library, ADR-018 |
 | *(future)* | 🗓 not scheduled | Broker-aware externalizers (native `kafkajs` / `amqplib` / `nats` under the same SPI for stricter delivery — see ADR-016), outbox-prisma, outbox-mongodb, OpenTelemetry, ESM dual packaging |
 
 ## Examples
