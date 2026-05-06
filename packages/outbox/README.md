@@ -1,5 +1,8 @@
 # @nestjs-transactional/outbox
 
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
+
 Persistent Event Publication Registry for NestJS — an ORM-agnostic core
 that brings Spring Modulith-equivalent delivery guarantees to the
 `@nestjs-transactional` family of packages.

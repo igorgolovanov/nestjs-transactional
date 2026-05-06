@@ -1,5 +1,8 @@
 # @nestjs-transactional/core
 
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
+
 Core primitives for declarative Spring-style transaction management in NestJS.
 
 ## Overview

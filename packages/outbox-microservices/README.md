@@ -1,5 +1,8 @@
 # @nestjs-transactional/outbox-microservices
 
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
+
 > Spring Modulith `@Externalized` parity for NestJS — durable,
 > retryable delivery of outbox events to external message brokers via
 > the `@nestjs/microservices` `ClientProxy` abstraction.
