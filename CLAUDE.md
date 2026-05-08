@@ -1822,20 +1822,125 @@ ADR-018 carries Phase 14.3.1 addendum.
 - `HybridEventPublisher` wraps the smart facade so AggregateRoot
   events route correctly in multi-adapter mode
 
-**14.8: Examples and documentation**
-- New `examples/multi-adapter-typeorm/` — two TypeORM dataSources,
-  separate outboxes, durable cross-DB integration via events
-- (Stretch) `examples/multi-adapter-mixed/` — TypeORM + a stub
-  second adapter, demonstrating the cross-ORM contract once a
-  second adapter package exists
-- Update existing examples (`outbox-full-stack`, `cqrs-full-stack`,
-  etc.) to use the explicit `dataSource: 'default'` form once and
-  then leave it implicit, so users can see the default-vs-explicit
-  contrast
-- Migration guide section: "Single adapter → multi-adapter" —
-  step-by-step path
-- Per-package README updates with multi-adapter examples
-- ADR-018 cross-linked from architecture docs
+**14.8: Examples documentation (Tier 1–5 sub-phases)**
+
+Comprehensive example library covering five tiers — foundational
+through production-realism. Each sub-phase shippable independently;
+each Tier 2+ example ships in its own commit (Convention #14).
+
+**14.8a — Tier 1: Foundational (4 examples, shipped 2026-05-08)**
+
+- `basic-transactional` — single DataSource, only `@Transactional`
+  decorator, no outbox/CQRS, demonstrates Phase 14.20 transparent
+  repositories, ~50 lines service code.
+  Goal: simplest possible setup, declarative transactions без extras.
+- `basic-outbox` — single DataSource, `@Transactional` + outbox
+  (in-memory persistence), no externalization, `@OutboxEventsHandler`
+  for event consumption.
+  Goal: outbox pattern intro без TypeORM persistence complexity.
+- `basic-typeorm-outbox` — single DataSource, `@Transactional` +
+  outbox + outbox-typeorm, real Postgres persistence,
+  `@OutboxEventsHandler` local consumption.
+  Goal: production-realistic single-DS setup.
+- `basic-cqrs` — single DataSource, `@nestjs/cqrs` integration,
+  `@Transactional` + Commands / Queries / Events,
+  `@TransactionalEventsHandler`.
+  Goal: CQRS integration без outbox complexity.
+
+Shipped in 4 commits: b38f4b8, d947632, ce5bb99, 3a6082b. 12 tests
+(9 unit + 3 testcontainers integration). `examples/README.md` index
+introduced.
+
+**14.8b — Tier 2: Multi-DataSource (4 examples, next)**
+
+- `multi-datasource-basic` — two DataSources (billing + inventory),
+  `@Transactional({ dataSource })`, no outbox/CQRS, cross-DS
+  independence demonstrated.
+  Goal: multi-DS transactional concept без outbox complexity. Что
+  happens when you have two databases.
+- `multi-datasource-outbox` — two DataSources each with own outbox,
+  per-DS event types via `forFeature({ dataSource })`,
+  decorator-driven handler registration (Phase 14.3.1), real Postgres
+  per-DS `event_publication` tables.
+  Goal: production multi-DS setup. Atomicity invariant demonstrated
+  — outbox in same DB as business data.
+- `multi-datasource-cqrs` — two DataSources, CQRS handlers с
+  dataSource option (Phase 14.3.1 Category B), per-DS transaction
+  context.
+  Goal: CQRS + multi-DS combination.
+- `shared-database-modular-monolith` — same Postgres, different
+  schemas / logical separation, Spring Modulith-style architecture,
+  module-per-domain с separate outbox per module.
+  Goal: modular monolith pattern. Different namespace, same
+  infrastructure.
+
+**14.8c — Tier 3: Externalization (4 examples)**
+
+- `externalization-kafka` — single DataSource, outbox +
+  outbox-microservices с Kafka, `@Externalized` events, real Kafka
+  integration via testcontainers if applicable.
+  Goal: standard outbox-to-message-broker pattern.
+- `externalization-multi-broker` — single DataSource, multiple
+  brokers (Kafka + RabbitMQ + Redis), per-event
+  `@Externalized({ client: 'KAFKA' })` routing.
+  Goal: event routing к different brokers, Phase 11 architecture
+  demonstration.
+- `externalization-multi-datasource` — multi-DS + multi-broker,
+  different events from different DataSources go to different
+  brokers, combined complexity.
+  Goal: real production scenario. Service с billing-DS events to
+  Kafka, inventory-DS events to internal queue.
+- `externalization-with-fallback` — externalization с reliability
+  concerns (ADR-016), documented limitations exposed, fallback
+  patterns demonstrated.
+  Goal: honest about externalization limits. User understands what
+  works/doesn't.
+
+**14.8d — Tier 4: Advanced patterns (4 examples)**
+
+- `saga-pattern` — long-running transaction across multiple steps,
+  compensating actions on failure, outbox for inter-step
+  coordination.
+  Goal: distributed transaction alternative. How to coordinate
+  multi-step processes.
+- `audit-logging` — `@Transactional` на business operations,
+  separate audit dataSource, audit events через outbox в audit-DS.
+  Goal: common architectural pattern. Business data + audit trail
+  separation.
+- `read-write-separation` — master/replica DataSource setup,
+  `@Transactional` для writes (master), read queries from replica,
+  `@InjectRepository(Entity, 'replica')` для reads.
+  Goal: common scaling pattern. Не CQRS necessarily, just read
+  replicas.
+- `testing-patterns` — mock adapter usage, testcontainers
+  integration tests, in-memory outbox для fast tests, comprehensive
+  test setup demonstration.
+  Goal: how к test apps using framework. Critical для adoption.
+
+**14.8e — Tier 5: Production realism (3 examples)**
+
+- `e-commerce-orders` — realistic domain (Order, Product, Customer),
+  multi-DS (orders, inventory, payments separate), outbox для
+  inter-service communication, externalization к Kafka, CQRS для
+  read/write.
+  Goal: complete realistic application. End-to-end demonstration.
+- `async-config-from-environment` — `forRootAsync` с `ConfigService`,
+  environment-based DataSource configuration, different configs для
+  dev/staging/prod, production-ready setup.
+  Goal: how к structure for real deployments. Static config
+  insufficient.
+- `graceful-shutdown` — outbox processor draining, in-flight
+  transaction completion, connection cleanup, `@nestjs/common`
+  lifecycle hooks integration.
+  Goal: production deployment concerns. Shutdown handling matters.
+
+**14.8f — Comprehensive documentation pass**
+
+- Examples top-level README polish (after Tier 5 lands)
+- Per-package README sync with full example library cross-references
+- Migration guide updates referencing the new examples
+- ADR-018 / ADR-019 final-form review
+- CLAUDE.md update consolidating Phase 14.8 narrative
 
 **14.9: Final verification**
 - All builds, type-check, lint, unit, integration green
@@ -2353,7 +2458,38 @@ CLAUDE.md — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-04-29 (Phase 14.3.1 — both categories closed.
+**Last updated**: 2026-05-08 (Phase 14.8a Tier 1 — foundational
+examples shipped. Four examples cover the canonical entry points:
+
+1. `basic-transactional` (rewrite of obsolete `basic-usage`) — single
+   DataSource, `@Transactional` only, demonstrates Phase 14.20
+   transparent repositories via `@InjectRepository`.
+2. `basic-outbox` — `@OutboxEventsHandler` + `OutboxEventPublisher`
+   with the in-memory test adapter, no DB.
+3. `basic-typeorm-outbox` — production-shape outbox with real
+   Postgres via testcontainers, atomicity invariant pinned by 3
+   integration tests.
+4. `basic-cqrs` — `@CommandHandler` + `@QueryHandler` (auto-wrapped
+   in readonly tx) + `@TransactionalEventsHandler` AFTER_COMMIT, all
+   three handler types from `@nestjs/cqrs`. In-memory adapter, no DB.
+
+Shipped in 4 commits (b38f4b8, d947632, ce5bb99, 3a6082b — last one
+the QueryHandler gap-fill before phase closure). 12 tests (9 unit +
+3 testcontainers integration). `examples/README.md` index
+introduced. 591/591 package baseline preserved throughout.
+
+Conventions established for the example library:
+- Each example has standalone `jest.config.js` (not shared base)
+- `test` and `test:integration` scripts on examples; root `pnpm test`
+  excludes `examples/*` to keep the dev loop fast
+- Examples needing `@nestjs-transactional/core/testing` subpath set
+  `module: Node16 / moduleResolution: Node16 / isolatedModules: true`
+  in their `tsconfig.json` (basic-outbox, basic-cqrs)
+- Tier 2+ examples ship 1-per-commit (Convention #14)
+- README pattern extends existing shape: When-to-use, What-it-shows,
+  Key-files, Common-pitfalls, Related-examples, Further-reading
+
+Earlier 2026-04-29 (Phase 14.3.1 — both categories closed.
 Decorator-driven multi-DS handler registration now works
 transparently across all three scanners and the cqrs in-memory
 dispatcher. Two commits:
@@ -2610,6 +2746,22 @@ require verification of both commits before closure).
   tests against real Postgres. ADR-018 carries the Phase 14.20
   addendum. Cross-package consumers (cqrs, outbox-typeorm,
   examples) migrated mechanically.
+- Phase 14.8a (Tier 1 — Foundational examples): four examples
+  covering the canonical entry points — `basic-transactional`
+  (rewrite of obsolete `basic-usage`, demonstrates Phase 14.20
+  transparent repositories), `basic-outbox` (in-memory outbox API
+  surface), `basic-typeorm-outbox` (Postgres + atomicity pinned by
+  testcontainers integration tests), `basic-cqrs` (Command + Query
+  + Events all three handler types). Shipped in 4 commits
+  (b38f4b8 + d947632 + ce5bb99 + 3a6082b), 12 tests (9 unit + 3
+  integration). New `examples/README.md` top-level index;
+  per-tier renovation notes for existing Tier 2+ examples
+  (`multi-datasource`, `cqrs-full-stack`, `outbox-full-stack`).
+  591/591 package baseline preserved across all four commits.
+  Example-library conventions established (standalone jest configs,
+  Node16 module resolution для `/testing` subpath imports, root
+  `pnpm test` excludes `examples/*`). Convention #14 inscribed —
+  Tier 2+ examples ship 1-per-commit.
 
 ### Blocked / Awaiting
 
@@ -2618,12 +2770,23 @@ require verification of both commits before closure).
 
 ### Next
 
+- Phase 14.8b (Tier 2 — Multi-DataSource): four examples shipping
+  one-per-commit (Convention #14). `multi-datasource-basic`,
+  `multi-datasource-outbox`, `multi-datasource-cqrs`,
+  `shared-database-modular-monolith`. See Phase 14.8 master plan
+  above for per-example specs.
+- Phase 14.8c (Tier 3 — Externalization), 14.8d (Tier 4 —
+  Advanced patterns), 14.8e (Tier 5 — Production realism), 14.8f
+  (Comprehensive doc sweep) — sequential per master plan.
 - Phase 11.5b: working example in `examples/outbox-externalization/`
   — full Postgres + Kafka stack via docker-compose, NestJS app
   demonstrating the publish → outbox → externalize flow plus the
   ADR-016 reliability limitation in action ("stop the broker,
-  observe COMPLETED"). Verified-running end-to-end against the
-  docker-compose stack.
+  observe COMPLETED"). Subsumed into Phase 14.8c
+  (`externalization-kafka`) — the Phase 14.8 spec covers Kafka
+  externalization end-to-end with the ADR-016 caveat baked into
+  `externalization-with-fallback`. Phase 11.5b kept here as a
+  pointer to the planned coverage; closed when Phase 14.8c ships.
 - Phase 9 iteration 9.3: release automation for the outbox
   packages — changeset entries, CI matrix tweaks if needed,
   first 0.1.0-alpha release.
@@ -2837,3 +3000,16 @@ require verification of both commits before closure).
     Same trade-off documented in typeorm-transactional issues
     #34/#51; we make the trade-off survivable instead of silent
     via the install-once contract.
+
+14. **Tier 2+ examples ship one-per-commit** (Phase 14.8a closure,
+    decided 2026-05-08). Tier 1 (Phase 14.8a) bundled 2 examples
+    per commit because three of the four were small (~+400 LoC
+    each) and naturally paired (basic-transactional/basic-outbox in
+    Commit 1; basic-typeorm-outbox alone in Commit 2; basic-cqrs +
+    examples/README.md index in Commit 3; QueryHandler gap-fill in
+    Commit 4). Tier 2+ examples are larger (multi-DS / Kafka /
+    docker-compose stacks) and benefit from independent review
+    granularity. Pattern: audit at the start of each tier, then
+    one example per commit, then a closing docs commit recording
+    the tier completion. The +900 LoC cap stays in force per
+    commit — single-example commits should land well under it.
