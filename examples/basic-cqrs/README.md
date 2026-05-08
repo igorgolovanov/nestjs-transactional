@@ -1,11 +1,17 @@
 # basic-cqrs
 
-Foundational CQRS example: a `@CommandHandler` decorated with
-`@Transactional()` plus a `@TransactionalEventsHandler` listener firing
-**only after the surrounding transaction commits**.
+Foundational CQRS example covering all three handler types from
+`@nestjs/cqrs`:
+
+- `@CommandHandler` decorated with `@Transactional()` (write path)
+- `@QueryHandler` auto-wrapped in a read-only transaction by
+  `CqrsTransactionalModule`
+- `@TransactionalEventsHandler` firing **only after the surrounding
+  transaction commits**
 
 In-memory test adapter, no database — the focus is the
-phase-aware-delivery lifecycle, not persistence.
+phase-aware-delivery lifecycle and the three handler types working
+together, not persistence.
 
 ## When to use this example
 
@@ -46,12 +52,17 @@ Or from this directory: `pnpm start` / `pnpm test`.
 4. On `shouldFail: true`, the handler throws AFTER `order.commit()` —
    the transaction rolls back, the AFTER_COMMIT hook is discarded,
    `NotificationHandler.handle` is **never invoked**.
+5. `GetNotifiedOrdersQuery` is dispatched via `QueryBus`. Its handler
+   is auto-wrapped by `CqrsHandlerWrapper` in a `@Transactional()`
+   call honouring `defaultQueryOptions: { readOnly: true }` — the
+   read-only flag is a hint downstream adapters (TypeORM, Prisma,
+   ...) can use to optimize or to refuse writes.
 
 Expected `pnpm start` output:
 
 ```
 [...] LOG [TransactionalMethodsBootstrap] Wrapped 0 @Transactional methods
-[...] LOG [CqrsHandlerWrapper] Wrapped 1 CQRS handler with @Transactional
+[...] LOG [CqrsHandlerWrapper] Wrapped 2 CQRS handlers with @Transactional
 === basic-cqrs ===
 1) PlaceOrderCommand("o-1") — succeeds
 [...] LOG [NotificationHandler] AFTER_COMMIT — notifying customer for order o-1
@@ -60,6 +71,8 @@ Expected `pnpm start` output:
    caught: simulated failure — transaction rolls back, AFTER_COMMIT skipped
    notified (still): [ 'o-1' ]
    expected: o-2 is NOT in the list — AFTER_COMMIT skipped on rollback
+3) GetNotifiedOrdersQuery — auto-wrapped in readOnly tx
+   query result: [ 'o-1' ]
 ```
 
 ## Key files
@@ -69,6 +82,8 @@ Expected `pnpm start` output:
 - [`src/place-order.handler.ts`](src/place-order.handler.ts) —
   `@CommandHandler` with `@Transactional()` and
   `EventPublisher.mergeObjectContext` + `aggregate.commit()`.
+- [`src/get-notified-orders.query.ts`](src/get-notified-orders.query.ts)
+  — `@QueryHandler` auto-wrapped in a read-only transaction.
 - [`src/notification.handler.ts`](src/notification.handler.ts) —
   `@TransactionalEventsHandler(OrderPlacedEvent)` (default phase
   `AFTER_COMMIT`).
