@@ -2,18 +2,17 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule, createDataSource } from './app.module';
+import { AppModule } from './app.module';
 import { UserService } from './user.service';
 
 async function main(): Promise<void> {
-  const dataSource = await createDataSource();
-  const app = await NestFactory.createApplicationContext(AppModule.forDataSource(dataSource), {
+  const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn', 'log'],
   });
 
   const users = app.get(UserService);
 
-  console.log('=== basic-usage ===');
+  console.log('=== basic-transactional ===');
 
   console.log('1) createUser("alice") inside @Transactional');
   await users.createUser('alice', 'Alice');
@@ -30,7 +29,6 @@ async function main(): Promise<void> {
   console.log('   expected: bob is NOT in the list — write rolled back');
 
   await app.close();
-  await dataSource.destroy();
 }
 
 main().catch((err: unknown) => {
