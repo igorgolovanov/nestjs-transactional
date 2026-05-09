@@ -33,18 +33,34 @@ matching your need; the four cover the canonical entry points.
   per-module NestJS sub-modules, per-schema outbox stacks. Spring
   Modulith-style architecture.
 
-## Tier 3 — Externalization (Phase 14.8c, planned)
+## Tier 3 — Externalization (Phase 14.8c, shipped)
 
-- `externalization-kafka` — single DataSource, outbox +
-  outbox-microservices с Kafka, `@Externalized` events.
-- `externalization-multi-broker` — single DataSource, multiple
-  brokers (Kafka + RabbitMQ + Redis), per-event
-  `@Externalized({ client })` routing.
-- `externalization-multi-datasource` — multi-DS + multi-broker,
-  combined complexity, real production scenario.
-- `externalization-with-fallback` — externalization с ADR-016
-  reliability concerns, documented limitations exposed, fallback
-  patterns.
+- [`externalization-kafka`](externalization-kafka) **— shipped.**
+  Single DataSource + single Kafka broker via `@nestjs/microservices`
+  `ClientProxy`. The canonical Phase 11 baseline:
+  `@Externalized({ target, routingKey, headers })` on event class,
+  `OutboxMicroservicesModule.forRoot({ defaultClient })` wiring,
+  testcontainers Postgres + mocked ClientProxy + docker-compose
+  Kafka KRaft for the visual demo.
+- [`externalization-multi-broker`](externalization-multi-broker)
+  **— shipped.** Single DataSource, three brokers (Kafka topic +
+  RabbitMQ queue + Redis pub/sub channel). Per-event
+  `@Externalized({ client })` routing, single global externalizer.
+  Tests pin per-event routing isolation and per-publication failure
+  isolation across brokers.
+- [`externalization-multi-datasource`](externalization-multi-datasource)
+  **— shipped.** Two physical Postgres DBs × two ClientProxy
+  registrations on a single RabbitMQ broker. Combines Tier 2 multi-DS
+  outbox (ADR-019 per-DS forRoot) with Tier 3 externalization. The
+  two routing axes (per-DS publication, per-event broker) are
+  orthogonal — DD-023 cross-DS isolation extended end-to-end.
+- [`externalization-with-fallback`](externalization-with-fallback)
+  **— shipped.** ADR-016 silent-success demonstration plus the three
+  production mitigation patterns. Mocked-emit silent-success contract
+  pinned; consumer-side inbox / dedup template (real code, two tests);
+  `FailedEventPublications.resubmit` recovery flow (single + batch).
+  Visual demo includes manual `docker-compose stop rabbitmq` so the
+  ADR-016 limitation is observable on a real broker.
 
 ## Tier 4 — Advanced patterns (Phase 14.8d, planned)
 
@@ -94,9 +110,10 @@ pnpm -C examples/<name> test                 # jest unit/integration tests
 pnpm -C examples/<name> test:integration     # testcontainers integration (where applicable)
 ```
 
-Each example honours these scripts; `test:integration` only exists in
-examples that require Docker (currently `basic-typeorm-outbox` and
-`outbox-full-stack`).
+Each example honours these scripts; `test:integration` exists in
+examples that require Docker — currently `basic-typeorm-outbox`,
+`outbox-full-stack`, every Tier 2 multi-DataSource example except
+`multi-datasource-basic`, and every Tier 3 externalization example.
 
 The root `pnpm test` deliberately excludes `examples/*` to keep the
 default dev loop fast — run the example tests directly when you change
