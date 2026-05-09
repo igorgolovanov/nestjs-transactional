@@ -224,22 +224,36 @@ Design Decisions section below:
 - **ADR-005**: Method wrapping strategy — `docs/adr/005-method-wrapping-strategy.md`
 - **ADR-006**: Outbox pattern rationale — `docs/adr/006-outbox-pattern.md`
 - **ADR-007**: Outbox architecture (core + typeorm split) — `docs/adr/007-outbox-architecture.md`
+- **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md`
+- **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md`
 - **ADR-014**: Class-level handler API redesign — `docs/adr/014-handler-api-redesign.md`
 - **ADR-015**: Event externalization architecture — `docs/adr/015-event-externalization-architecture.md`
 - **ADR-016**: Externalization reliability semantics with `@nestjs/microservices` — `docs/adr/016-externalization-reliability-semantics.md`
 - **ADR-018**: Multi-adapter architecture (dataSource-name-keyed registration) — `docs/adr/018-multi-adapter-architecture.md`
 - **ADR-019**: OutboxModule multi-`forRoot` registration pattern (Phase 14.3.2) — `docs/adr/019-outbox-multi-forroot-pattern.md`
 
-Planned (not yet written):
+Superseded / Skipped (number reserved, not reused):
 
-- **ADR-008**: Event serialization strategy — `docs/adr/008-event-serialization.md`
-- **ADR-009**: Listener ID stability — `docs/adr/009-listener-id-stability.md`
-- **ADR-010**: Hybrid event publishing — `docs/adr/010-hybrid-event-publishing.md` *(the design was absorbed into ADR-014 — see Supersedes note there)*
+- **ADR-010**: Hybrid event publishing — superseded by ADR-014.
+  `docs/adr/010-hybrid-event-publishing.md` is a pointer stub.
+- **ADR-011**, **ADR-012**, **ADR-013**: Skipped — numbers
+  reserved during Phase 8/9 iterations for decisions that ended
+  up absorbed into ADR-014 or recorded as DDs (DD-011, DD-012,
+  DD-013) in CLAUDE.md. `docs/adr/{011,012,013}-skipped.md`
+  preserve the numbering contract.
+- **ADR-017**: Skipped — number reserved during Phase 12/13
+  (the Phase 12 outbox-core → outbox package rename was
+  cosmetic and recorded as inline notes on ADR-006/007;
+  Phase 13 in-flight threads were absorbed into ADR-018).
+  `docs/adr/017-skipped.md` is a pointer stub.
 
 Process: every significant architectural decision gets a new ADR numbered n+1.
 The discussion is captured; the status is one of accepted / rejected /
-superseded. An accepted ADR can only be changed by a new ADR that references
-it with `supersedes NNN`.
+superseded / skipped. An accepted ADR can only be changed by a new ADR
+that references it with `supersedes NNN`. ADR numbers are monotonic and
+never reused — a slot reserved during a phase iteration that doesn't
+materialize gets a "Skipped" stub rather than being filled with later
+content.
 
 ---
 
@@ -344,599 +358,51 @@ hooks for the appropriate phase.
 
 ## Design Decisions
 
-### DD-001: AsyncLocalStorage as the foundation
-
-**Alternatives**:
-- continuation-local-storage (cls-hooked) — legacy, deprecated
-- Passing context explicitly through parameters — breaks the API surface
-
-**Choice**: AsyncLocalStorage from Node.js core. Stable since Node 14,
-performant, correct across async boundaries.
-
-**Trade-off**: there is a small performance overhead (<5% on typical
-operations), but it is real. For critical hot paths, the programmatic API
-`manager.run()` can be used in place of the decorator.
-
-### DD-002: We do not fork @nestjs/cqrs
-
-**Alternatives**:
-- Fork @nestjs/cqrs with our changes
-- Our own CQRS-like package
-
-**Choice**: work on top of the original `@nestjs/cqrs` via:
-- Runtime wrapping of handlers (replacing the `execute` method on instances)
-- Override of EventPublisher through DI
-- Our own TransactionalEventDispatcher alongside the original EventBus
-
-**Trade-off**: we depend on `@nestjs/cqrs` internals (they can change). But
-we don't have to maintain a fork, and users get the normal upgrade path.
-
-### DD-003: One package, one responsibility
-
-**Alternatives**:
-- A monolithic `@nestjs-transactional` package with optional parts
-- Core + a single "integrations" package
-
-**Choice**: three separate packages. Users install only what they need:
-- Transactions without CQRS → core + typeorm
-- CQRS without TypeORM (e.g. Prisma, once that adapter exists) →
-  core + cqrs + prisma
-
-**Trade-off**: more release overhead (multiple package versions), but a
-cleaner architecture and smaller bundle size.
-
-### DD-004: Adapter as interface, not base class
-
-**Alternatives**:
-- An abstract `TransactionAdapter` base class with shared logic
-- An interface with implementation rules documented
-
-**Choice**: pure interface. All shared logic lives in TransactionManager;
-adapters are minimal ORM-specific implementations.
-
-**Trade-off**: adapters must implement two methods (`runInTransaction`,
-`runInSavepoint`). That's the minimum, and it's easy to add new adapters.
-
-### DD-005: Multiple datasources as a first-class feature
-
-**Alternatives**:
-- A single DataSource per app (simpler API)
-- Multiple DataSources through a separate package
-
-**Choice**: multi-DataSource support from day one. Each adapter is registered
-under a dataSource name (e.g. `'default'`, `'billing'`).
-
-```typescript
-@Transactional({ dataSource: 'billing' })
-async generateInvoice() { ... }
-```
-
-**Trade-off**: the API is slightly more complex (the `dataSource`
-parameter), but without this, users cannot realistically use the package in
-multi-database projects.
-
-**Phase 14 alignment** (Phase 14.4 → 14.11, 2026-04-27):
-The `@nestjs-transactional/typeorm` package is fully aligned with the
-Phase 14 multi-adapter conventions. `TypeOrmTransactionalOptions`
-exposes the `dataSourceName` field as the canonical identifier
-(introduced Phase 14.4; the deprecated `instanceName` alias was
-removed in Phase 14.11 — one-phase carry-over for migration).
-Phase 14.2 introduced `@Transactional({ dataSource: 'billing' })`
-as the user-facing identifier syntax; the legacy
-`@Transactional({ adapterInstance: 'billing' })` continues to work
-through the same `AdapterRegistry` lookup. Phase 14.4 closed the
-verification gap by adding integration tests against real Postgres
-that exercise both syntaxes side-by-side, plus cross-dataSource
-transaction isolation tests honouring DD-023's keyed-Map guarantee.
-Phase 14.10 reworked `TransactionalModule.forRoot` to the multi-
-`forRoot` shape (one call per dataSource, mirroring Phase 14.3.2
-`OutboxModule` per ADR-019). See ADR-018 for the multi-adapter
-architecture and its breaking-changes list, plus the Phase 14.10
-+ 14.11 addendum at the top of that ADR for the cleanup record.
-
-### DD-006: Jest over Vitest
-
-**Rationale**: Jest is the NestJS default; all documentation and examples
-use it, and `@nestjs/testing` integrates natively. Vitest is faster, but
-for library-level testing the difference is not critical.
-
-### DD-007: Legacy decorators + reflect-metadata
-
-**Context**: the entire NestJS ecosystem (core, TypeORM, @nestjs/cqrs)
-runs on legacy decorators with the `reflect-metadata` polyfill. TC39
-stage-3 decorators are incompatible: there are no parameter decorators
-(critical for `@Inject`), different metadata rules, and a different
-decorator return type.
-
-**Alternatives**:
-- TC39 stage-3 decorators (TypeScript 5.0+) — incompatible with NestJS
-- Runtime DI only, no decorators — changes the entire API and loses the
-  NestJS integration patterns
-
-**Choice**: `experimentalDecorators: true`, `emitDecoratorMetadata: true`,
-peer dependency `reflect-metadata ^0.1.13 || ^0.2.0`.
-
-**Consequences**: compatibility with NestJS 10 and 11. If NestJS migrates
-to stage-3 (not expected in the next 1–2 years) we will follow, but that
-is a breaking change for the entire ecosystem.
-
-### DD-008: Method wrapping via a triad of mechanisms
-
-**See also**: `docs/adr/005-method-wrapping-strategy.md` for detailed
-rationale.
-
-**Context**: `@Transactional()` must work on controller methods, regular
-`@Injectable` services, and CQRS handlers. No single NestJS mechanism
-covers all cases:
-- Interceptors via `APP_INTERCEPTOR` only fire at the request boundary
-- Prototype wrapping inside the decorator has no access to DI (nowhere to
-  get TransactionManager from)
-- Runtime wrapping via `DiscoveryService` requires a post-bootstrap hook
-
-**Choice**: the `@Transactional` decorator is metadata-only (via
-`Reflect.defineMetadata`). Wrapping is performed by three coordinated
-mechanisms:
-
-1. **TransactionalInterceptor** (`APP_INTERCEPTOR`) — for controllers,
-   resolvers, gateways, and message patterns (request boundary)
-2. **TransactionalMethodsBootstrap** (`OnApplicationBootstrap`) — for
-   regular `@Injectable` services via `DiscoveryService`
-3. **CqrsHandlerWrapper** (`OnApplicationBootstrap` in the cqrs package)
-   — for `@CommandHandler` / `@QueryHandler` / `@EventsHandler` with
-   `TransactionalEventPublisher` integration
-
-**Coordination**: a marker via `Reflect.defineMetadata(WRAPPED_MARKER,
-true, wrapped)` where `WRAPPED_MARKER =
-Symbol.for('@nestjs-transactional/wrapped')`. This double-wrap guard is
-stateless and safe across tests that call `Test.createTestingModule()`
-frequently.
-
-**Fallback**: if a method is accidentally wrapped twice, propagation
-REQUIRED handles it — the existing transaction is reused rather than a
-second one being started.
-
-**Trade-off**: more infrastructure code (three components instead of one).
-Debugging requires familiarity with all three mechanisms. Mitigation:
-a detailed ADR-005, debug-level logging at wrap time, and a clear file
-layout with obvious names.
-
-### DD-009: Implement full Event Publication Registry (Spring Modulith parity)
-
-**Context**: Scope reassessment after detailed comparison with Spring
-Modulith 2.0.5. Our existing `@TransactionalEventsHandler` provides
-phase-based dispatching (like Spring Framework core) but lacks the
-persistent event log, retry, recovery, and delivery guarantees that
-Spring Modulith provides for production systems.
-
-**Alternatives considered**:
-- Keep current scope (Spring Framework only), mention gap in documentation.
-  Rejected: insufficient for production event-driven architectures.
-- Recommend an external outbox library. Rejected: fragments the ecosystem,
-  each library has different semantics from @nestjs-transactional packages.
-- Implement as a single pattern inside the cqrs package. Rejected: couples
-  persistence concerns to CQRS, prevents use of outbox without CQRS.
-
-**Decision**: Implement full Event Publication Registry equivalent as
-separate `outbox` + `outbox-typeorm` packages. Integration with cqrs
-via `HybridEventPublisher` and the `@IntegrationEventsHandler` decorator.
-
-**Consequences**:
-- Significant scope expansion (~3 weeks of work).
-- Production-ready delivery guarantees.
-- Clear migration path from in-memory `@TransactionalEventsHandler` to
-  persistent `@OutboxEventsHandler`.
-- Larger surface area to maintain.
-
-### DD-010: Split outbox into core + persistence packages
-
-**Context**: Need to support multiple persistence backends (TypeORM now,
-Prisma / MikroORM / MongoDB in future).
-
-**Alternatives considered**:
-- Single `@nestjs-transactional/outbox` package with TypeORM baked in.
-  Rejected: forces users to adopt TypeORM.
-- `@nestjs-transactional/outbox-{backend}` monolithic packages (one per
-  backend). Rejected: duplicates core logic.
-
-**Decision**: `outbox` with an `EventPublicationRepository` SPI plus
-separate `outbox-{backend}` packages implementing the SPI. Follows the
-existing pattern (core + typeorm).
-
-**Consequences**: Clean separation, easy to add backends. Users must
-install two packages, slightly more setup.
-
-### DD-011: Hybrid event publishing (in-memory + persistent coexistence)
-
-**Context**: The cqrs package currently publishes events via the in-memory
-`TransactionalEventDispatcher`. Events also need to be routed to the
-outbox for persistence when the outbox is available, without breaking
-existing behavior.
-
-**Alternatives considered**:
-- Replace the in-memory dispatcher entirely with the outbox. Rejected:
-  breaking change; the in-memory path has valid use cases (cache
-  invalidation, metrics).
-- Make users choose per listener. Rejected: usability nightmare.
-
-**Decision**: `HybridEventPublisher` delegates to both paths —
-`TransactionalEventDispatcher` (for `@TransactionalEventsHandler`
-classes) and, when the `OUTBOX_PUBLICATION_SCHEDULER` token is bound,
-`OutboxEventPublisher.scheduleForPublication` (for durable delivery).
-`@IntegrationEventsHandler` is routed by a separate smart scanner
-(see DD-013 and ADR-014) — the old "two metadata keys + skip logic"
-approach from the original design has been removed.
-
-**Consequences**: Seamless coexistence. Developers must understand
-which decorator provides which guarantees — see "Delivery guarantees
-at a glance" in `packages/cqrs/README.md`.
-
-### DD-012: @IntegrationEventsHandler as smart default
-
-**Context**: Spring Modulith's `@ApplicationModuleListener` is the
-recommended default for cross-module integration. It combines
-AFTER_COMMIT, async execution, a new transaction, and persistence. Users
-should not need to manually compose 3–4 decorators for the common case.
-
-**Alternatives considered**:
-- Only provide `@OutboxEventsHandler`, let users compose with
-  `@Transactional` when needed. Rejected: does not match Spring Modulith
-  DX.
-- Make it a composite decorator that works without the outbox. Done
-  partially (see Decision below).
-
-**Decision**: `@IntegrationEventsHandler` is a standalone class-level
-decorator in the cqrs package. A dedicated
-`IntegrationEventsHandlerScanner` decides the delivery path at
-bootstrap by inspecting the `OUTBOX_LISTENER_REGISTRAR` DI token: when
-bound, registers with the outbox registry (durable,
-at-least-once, retried). When unbound, registers with
-`TransactionalEventDispatcher` as `AFTER_COMMIT` + `async: true`,
-wrapped in a fresh transaction. Behavior in both modes is documented
-explicitly.
-
-**Consequences**: Matches Spring Modulith DX. Behavior differs based on
-config — must be clearly documented to avoid surprises.
-
-### DD-013: Class-level handler API aligned with `@nestjs/cqrs`
-
-**Context**: The original listener decorators were method-level —
-annotate any method with `@TransactionalEventsListener(EventType)` and
-it becomes a handler. That diverged from `@nestjs/cqrs`'s class-level
-`@EventsHandler` / `@CommandHandler` / `@QueryHandler` convention, tied
-listener ids to method names (breaking on rename), and left the handler
-method signature unconstrained at the type level.
-
-**Alternatives considered**:
-- Extend method-level decorators with `Type[]` support for multi-event
-  handlers. Rejected: still asymmetric with `@nestjs/cqrs`.
-- Dual API (class-level + method-level). Rejected: two ways to do the
-  same thing doubles maintenance and confuses users.
-- Keep method-level with deprecation warnings. Rejected: pre-release,
-  no users, no cost to a clean break.
-
-**Decision**: Class-level only —
-`@TransactionalEventsHandler(Event1, Event2, ...)`,
-`@OutboxEventsHandler(Event1, Event2, ...)`,
-`@IntegrationEventsHandler(Event1, Event2, ...)`. Each decorator also
-accepts a long-form options object. Handler classes implement
-`ITransactionalEventHandler<T>` / `IOutboxEventHandler<T>` /
-`IIntegrationEventHandler<T>` and expose a single `handle(event)`
-method. Listener ids are composed as `${baseId}#${EventName}` (baseId
-defaults to the class name, can be overridden via `options.id`) — a
-method rename inside a handler class no longer invalidates stored
-publications.
-
-**Consequences**: Mental-model symmetry with `@nestjs/cqrs`. Enforced
-single-responsibility per handler class (a class handles one
-cross-module integration concern). Breaking change vs. any pre-release
-snapshot; migration is mechanical but required before upgrading past
-this point. See ADR-014 for the full design rationale.
-
-### DD-016: Implement event externalization (Phase 11)
-
-**Context**: Spring Modulith provides `@Externalized` for routing events
-to external message brokers (Kafka, RabbitMQ, JMS, AMQP, ...). Our
-existing scope (Phases 5–9) covers internal eventing through the outbox
-but does not bridge events to external systems. Production deployments
-with microservice architectures need durable, retryable cross-process
-delivery — without this, `@nestjs-transactional` falls short of the
-production use cases Spring Modulith targets.
-
-**Alternatives considered**:
-- Separate per-broker packages (`outbox-kafka`, `outbox-rabbitmq`,
-  `outbox-nats`). Rejected: code duplication, more packages to version
-  and maintain, fragmented user experience.
-- Spring Modulith-style `EventExternalizationConfiguration` builder API.
-  Rejected: not idiomatic NestJS — DI + decorator composition is the
-  conventional pattern.
-- Native broker libraries (`kafkajs`, `amqplib`) directly, bypassing
-  `ClientProxy`. Rejected: forces us to manage transport-specific
-  connection lifecycle, retries, and serialization for each broker;
-  `@nestjs/microservices` already solves this.
-
-**Decision**: Externalization is a first-class feature, implemented as:
-- An optional `EventExternalizer` SPI added to `outbox`.
-- A new `@nestjs-transactional/outbox-microservices` package that
-  provides one `EventExternalizer` implementation backed by
-  `@nestjs/microservices` `ClientProxy` — covering every transport
-  `@nestjs/microservices` supports (Kafka, RabbitMQ, NATS, JMS, gRPC,
-  custom).
-
-**Consequences**:
-- One externalization package replaces planned per-broker variants —
-  fewer packages to maintain, one mental model for users.
-- Reliability (retry, recovery, staleness monitor) inherited from
-  `outbox`.
-- Naturally composes with the existing NestJS `ClientsModule` pattern
-  (see DD-017).
-- Future native (broker-specific) implementations can register under the
-  same SPI if fine-grained control is needed later.
-
-### DD-017: Reuse `ClientsModule` for `ClientProxy` registration
-
-**Context**: Most consumers of `outbox-microservices` already register
-`ClientProxy` instances via `ClientsModule.register()` /
-`registerAsync()` for other reasons (consuming inbound messages,
-emitting events outside the outbox, RPC). Re-registering the same proxy
-through our module would duplicate connection pools and create two
-competing patterns for the same concept.
-
-**Alternatives considered**:
-- Provide a parallel registration API inside
-  `OutboxMicroservicesModule.forRoot()`. Rejected: duplication, two
-  mental models for the same concept, two connection pools.
-- Hybrid (support both registering through our module and reusing
-  existing). Rejected: ambiguity about which path takes precedence and
-  more configuration surface.
-- Auto-detection (pick the only `ClientProxy` from the DI context if
-  exactly one is bound). Rejected for the first version: explicit better
-  than implicit; auto-detection breaks once a second client appears.
-
-**Decision**: `OutboxMicroservicesModule.forRoot({ defaultClient: TOKEN })`
-accepts the DI token of an existing `ClientProxy` registered by the user
-via standard `@nestjs/microservices` `ClientsModule`. The package does
-not register any clients itself.
-
-**Consequences**:
-- Less boilerplate for users with an existing `ClientsModule` setup.
-- Standard testing patterns continue to work (`overrideProvider`,
-  `registerAsync` with `ConfigService`).
-- Documentation must explicitly list `ClientsModule` registration as a
-  prerequisite.
-- Multiple clients (one per broker) supported through `ClientsModule`'s
-  own multi-registration pattern; per-event client selection is a
-  follow-up iteration.
-
-### DD-018: `EventExternalizer` SPI as a structural port
-
-**Context**: `outbox` should not import a specific externalization
-implementation at compile time, since externalization is optional and
-may have multiple backends. We need an abstraction that supports the
-same `@Optional()` injection pattern already used for
-`OUTBOX_LISTENER_REGISTRAR` and `OUTBOX_PUBLICATION_SCHEDULER`.
-
-**Alternatives considered**:
-- Dynamic `require()` at runtime to load the externalization package if
-  installed. Rejected: breaks bundlers (webpack, esbuild, Vite), creates
-  hidden dependencies, awkward error handling, non-idiomatic for NestJS
-  DI.
-- Hard compile-time dependency on a concrete implementation. Rejected:
-  forces every `outbox` user to install `@nestjs/microservices`
-  even when they only need internal eventing.
-
-**Decision**: `outbox` defines an `EventExternalizer` interface
-and an `EVENT_EXTERNALIZER` DI token (Symbol). Concrete implementations
-(e.g. `MicroservicesEventExternalizer`) register themselves under this
-token via `useClass` or `useExisting`. `EventPublicationProcessor`
-injects it with `@Optional()` — when no externalizer is bound, the
-outbox runs in internal-only mode.
-
-**Consequences**:
-- Consistent with the existing structural-port pattern
-  (`OUTBOX_LISTENER_REGISTRAR` per DD-012,
-  `OUTBOX_PUBLICATION_SCHEDULER` per DD-011).
-- Externalization is genuinely optional; the outbox works without it.
-- Easy to add alternative externalizer implementations (native Kafka,
-  native AMQP, custom transports) without touching `outbox`.
-- Bundler-friendly: no dynamic require, no hidden module resolution.
-
-### DD-019: Atomicity unit and execution order for hybrid delivery
-
-**Context**: A single event may have local handlers
-(`@TransactionalEventsHandler` / `@OutboxEventsHandler` /
-`@IntegrationEventsHandler`) AND an `@Externalized` mapping. We must
-define what happens when local delivery succeeds but external publish
-fails (or vice versa) — without a clear atomicity contract,
-partial-success states leak into user code as surprising bugs.
-
-**Alternatives considered**:
-- Track partial success per channel (separate publication entries for
-  local and external delivery). Rejected: significantly increases
-  publication-row volume and processing complexity for marginal benefit.
-- External-first, local handlers second. Rejected: errors in local
-  handlers are usually faster and cheaper to detect than broker-side
-  failures; failing fast on local errors avoids needless broker traffic.
-- Multi-row publication (one row per delivery target). Rejected:
-  overcomplicated model, harder operator APIs, marginal benefit over
-  single-unit semantics.
-
-**Decision**:
-- **Single unit atomicity**: one publication row covers ALL deliveries
-  for the event. The row's status (`COMPLETED`, `FAILED`) reflects the
-  whole unit — either every channel succeeded, or the row is retried.
-- **Execution order**: local handlers run first, externalization runs
-  after.
-- **Idempotency requirement**: handlers and broker consumers must be
-  idempotent — the at-least-once guarantee inherent to retry means a
-  handler may run more than once if a later step in the same publication
-  fails.
-
-**Consequences**:
-- Simple mental model for users: one event = one publication row.
-- Clear documentation requirement around idempotency for both local
-  handlers and downstream consumers of externalized events.
-- Possible double execution of a local handler if externalization fails
-  after a successful local handler run — acceptable trade-off given
-  idempotency is already required for at-least-once semantics.
-- Operator APIs (`FailedEventPublications`, `IncompleteEventPublications`)
-  work uniformly across local-only, external-only, and hybrid setups.
-
-### DD-020: Multi-adapter through dataSource-name identifier
-
-**Context**: Phase 14 introduces support for multiple `DataSource`s
-(possibly across different ORMs) in a single process — modular
-monolith, audit-store split, ORM migration scenarios. We need a way
-to distinguish adapter *instances* in DI without conflating the ORM
-type and the database identity.
-
-**Alternatives considered**:
-- Adapter type (e.g. `'typeorm'`, `'prisma'`) as identifier. Rejected:
-  cannot represent two TypeORM-backed dataSources (the most common
-  multi-adapter case).
-- Composite identifier (e.g. `'typeorm:billing'`). Rejected: forces
-  users to think in our internal taxonomy ("which adapter
-  implementation") rather than their domain ("which database").
-
-**Decision**: dataSource name is the primary identifier across every
-package. Default `'default'` preserves single-adapter ergonomics.
-Tokens are deterministically derived from the dataSource name —
-e.g. `getTransactionManagerToken('billing')` → a stable string used
-in `@Inject(...)`. Matches `@nestjs/typeorm`'s
-`getRepositoryToken(Entity, dataSource)` /
-`getDataSourceToken(name)` conventions.
-
-**Consequences**: Token utilities live in
-`@nestjs-transactional/core` so all packages produce identical token
-strings. Single-adapter users see no change. See ADR-018 for the
-full design rationale.
-
-### DD-021: Adapter constructor accepts dataSource name
-
-**Context**: With multi-adapter support, a package must know which
-specific dataSource its adapter is bound to. The current shape
-(adapter as singleton, dataSource looked up via registry) does not
-generalise to "two TypeORM dataSources, two adapter instances".
-
-**Alternatives considered**:
-- Adapter as singleton, dataSource passed per call. Rejected: forces
-  every caller to know the dataSource, defeats the encapsulation
-  purpose of having an adapter at all.
-- Adapter accepts a `DataSource` instance directly (the actual
-  TypeORM `DataSource` object). Rejected: couples the adapter
-  constructor to TypeORM's class shape, breaks the cross-ORM
-  contract — Prisma's "dataSource" is not the same shape as
-  TypeORM's.
-
-**Decision**: Adapter constructor accepts a string dataSource name.
-`new TransactionalTypeOrmAdapter('billing')`. The adapter resolves
-the actual ORM-specific resource (the TypeORM `DataSource` instance,
-the Prisma client, etc.) internally — typically via DI tokens
-derived from the dataSource name.
-
-**Consequences**: Multiple adapter instances of the same class are
-first-class. Adapter packages must follow a consistent constructor
-contract `(dataSource: string)`, making it easier to author new
-adapters. See ADR-018.
-
-### DD-022: Inject decorators accept a dataSource parameter
-
-**Context**: Token-based DI works (`@Inject(getTransactionManagerToken('billing'))`
-is valid), but it is verbose and not discoverable in IDE autocomplete.
-Users coming from `@nestjs/typeorm` expect an
-`@InjectXxx(dataSource?)` shorthand.
-
-**Alternatives considered**:
-- Token-based `@Inject` only. Rejected: poor discoverability,
-  inconsistent with `@nestjs/typeorm`'s `@InjectRepository` /
-  `@InjectDataSource`.
-- Mandatory dataSource argument. Rejected: breaks single-adapter
-  ergonomics — every consumer would have to type `'default'`.
-
-**Decision**: Provide
-`@InjectTransactionManager(dataSource?)`,
-`@InjectOutboxPublisher(dataSource?)`,
-`@InjectEventPublicationRepository(dataSource?)`,
-etc. Default argument is `'default'`. They are thin wrappers over
-`@Inject(token)` where `token = getXxxToken(dataSource)`.
-
-**Consequences**: Idiomatic NestJS DX. Single-adapter consumers
-write `@InjectTransactionManager()` exactly as they would have
-written `@Inject(TransactionManager)` before — no token strings in
-user code.
-
-### DD-023: Independent transaction contexts per dataSource
-
-**Context**: Code asking "is there an active transaction *for
-billing*?" must not be confused by "is there an active transaction
-*for inventory*?". Crossing a dataSource boundary must not silently
-enrol the second adapter into the first adapter's transaction —
-that would imply distributed-transaction semantics we do not provide.
-
-**Alternatives considered**:
-- Per-dataSource `AsyncLocalStorage` instance. Rejected during
-  Phase 14.2 planning: delivers the same semantic guarantee
-  (disjoint state per dataSource) but cascades a static→instance
-  migration of `TransactionContext` through every consumer
-  (adapter helpers, CQRS dispatcher, outbox publisher,
-  approximately 487 tests). No behavioural improvement over keying
-  on a shared ALS.
-- XA / 2PC across dataSources. Rejected — see ADR-018 "Alternatives
-  considered" for the full reasoning. Briefly: poor Node.js driver
-  support, divergent semantics across stores, operational cost of
-  XA-aware infrastructure unjustified for the patterns this ADR
-  targets.
-
-**Decision**: A single shared `AsyncLocalStorage` carries a
-per-scope store whose active-transaction `Map` is keyed by
-dataSource name. Separation is enforced through the key namespace —
-cross-dataSource enrolment is structurally impossible because the
-keys are disjoint. This extends the existing DD-005 architecture
-(composite `${adapterName}:${instanceName}` keys) by standardising
-on the dataSource name as the single identifier going forward.
-Distributed transactions are explicitly NOT supported.
-
-**Consequences**: Cross-dataSource consistency is an
-*application-level* concern. The recommended pattern is "write to
-dataSource A, publish a durable event, consume the event on
-dataSource B" — i.e. the outbox stack is the consistency boundary
-between dataSources. Documented prominently in the migration
-guide. The single-unit atomicity contract from DD-019 applies to
-each dataSource independently. `TransactionContext`'s static API
-remains intact — Phase 14.2 does not refactor it.
-
-### DD-024: Smart `OutboxEventPublisher` facade
-
-**Context**: With multiple outbox stacks (one per dataSource),
-naively-injected `OutboxEventPublisher` becomes ambiguous — which
-one? Forcing every call site to inject and select would cripple
-single-adapter ergonomics.
-
-**Alternatives considered**:
-- Multiple injection tokens, no facade. Rejected: every business
-  service that publishes events grows a per-dataSource constructor
-  parameter. Punishes single-adapter users with no benefit.
-- Auto-detection only, no override. Rejected: breaks down at the
-  edges (no active transaction, two dataSources active at once via
-  nested `@Transactional`, bootstrap code, tests).
-
-**Decision**: A facade `OutboxEventPublisher` (the default-injected
-publisher) inspects the active per-dataSource transaction context
-and routes the event to the corresponding underlying publisher.
-Explicit override is supported via a second argument:
-
-```ts
-this.publisher.publish(event);                            // implicit
-this.publisher.publish(event, { dataSource: 'billing' }); // explicit
-```
-
-When no transaction is active and no explicit override is given,
-the facade falls back to `'default'`.
-
-**Consequences**: Single import works for both single-adapter and
-multi-adapter consumers. The facade is a small piece of composition
-on top of the per-dataSource publishers; it does not introduce new
-state. See ADR-018 point 8.
-
+Design Decisions (DDs) capture decisions taken during phase iterations
+that don't carry enough architectural weight to merit their own ADR.
+Each DD lives in its own file under `docs/dd/`; this section is the
+index. Many DDs cross-reference an ADR that captures the same decision
+in greater depth; the cross-link is on the DD's own page.
+
+### Index
+
+- [DD-001](docs/dd/001-async-local-storage.md) — AsyncLocalStorage as the foundation. Cross-link: [ADR-001](docs/adr/001-async-local-storage.md).
+- [DD-002](docs/dd/002-no-fork-nestjs-cqrs.md) — We do not fork @nestjs/cqrs. Cross-link: [ADR-003](docs/adr/003-not-patching-nestjs-cqrs.md).
+- [DD-003](docs/dd/003-one-package-one-responsibility.md) — One package, one responsibility.
+- [DD-004](docs/dd/004-adapter-as-interface.md) — Adapter as interface, not base class.
+- [DD-005](docs/dd/005-multi-datasource-first-class.md) — Multiple datasources as a first-class feature.
+- [DD-006](docs/dd/006-jest-over-vitest.md) — Jest over Vitest.
+- [DD-007](docs/dd/007-legacy-decorators.md) — Legacy decorators + reflect-metadata.
+- [DD-008](docs/dd/008-method-wrapping-triad.md) — Method wrapping via a triad of mechanisms. Cross-link: [ADR-005](docs/adr/005-method-wrapping-strategy.md).
+- [DD-009](docs/dd/009-event-publication-registry.md) — Implement full Event Publication Registry (Spring Modulith parity). Cross-link: [ADR-006](docs/adr/006-outbox-pattern.md).
+- [DD-010](docs/dd/010-outbox-core-persistence-split.md) — Split outbox into core + persistence packages. Cross-link: [ADR-007](docs/adr/007-outbox-architecture.md).
+- [DD-011](docs/dd/011-hybrid-event-publishing.md) — Hybrid event publishing (in-memory + persistent coexistence).
+- [DD-012](docs/dd/012-integration-events-handler.md) — `@IntegrationEventsHandler` as smart default.
+- [DD-013](docs/dd/013-class-level-handler-api.md) — Class-level handler API aligned with `@nestjs/cqrs`. Cross-link: [ADR-014](docs/adr/014-handler-api-redesign.md).
+- [DD-014](docs/dd/014-skipped.md) — Skipped (number reserved during Phase 9/10 iteration).
+- [DD-015](docs/dd/015-skipped.md) — Skipped (number reserved during Phase 9/10 iteration).
+- [DD-016](docs/dd/016-event-externalization.md) — Implement event externalization (Phase 11). Cross-links: [ADR-015](docs/adr/015-event-externalization-architecture.md), [ADR-016](docs/adr/016-externalization-reliability-semantics.md).
+- [DD-017](docs/dd/017-reuse-clients-module.md) — Reuse `ClientsModule` for `ClientProxy` registration.
+- [DD-018](docs/dd/018-event-externalizer-spi.md) — `EventExternalizer` SPI as a structural port.
+- [DD-019](docs/dd/019-hybrid-delivery-atomicity.md) — Atomicity unit and execution order for hybrid delivery.
+- [DD-020](docs/dd/020-multi-adapter-datasource-name.md) — Multi-adapter through dataSource-name identifier. Cross-link: [ADR-018](docs/adr/018-multi-adapter-architecture.md).
+- [DD-021](docs/dd/021-adapter-constructor-datasource.md) — Adapter constructor accepts dataSource name.
+- [DD-022](docs/dd/022-inject-decorators-datasource.md) — Inject decorators accept a dataSource parameter.
+- [DD-023](docs/dd/023-independent-tx-contexts-per-ds.md) — Independent transaction contexts per dataSource.
+- [DD-024](docs/dd/024-outbox-publisher-facade.md) — Smart `OutboxEventPublisher` facade.
+
+### Process
+
+DD numbers are monotonic and never reused. A slot reserved during a
+phase iteration that doesn't materialize gets a "Skipped" stub in
+`docs/dd/` rather than being filled with later content (same convention
+as ADRs — see DD-014 / DD-015 for examples).
+
+Promotion from DD to ADR happens when a decision needs more room than
+the DD format affords (typically: detailed alternatives matrix, multiple
+follow-on decisions that depend on it, supersession history). Promoted
+decisions keep their DD entry as a brief record with a cross-link to
+the ADR — they are NOT deleted from `docs/dd/`.
 ---
 
 ## Core Package (@nestjs-transactional/core)

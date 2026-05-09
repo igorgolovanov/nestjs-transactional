@@ -19,8 +19,9 @@ import {
  *
  * Values must match the strings in
  * `node_modules/@nestjs/cqrs/dist/decorators/constants.js`. Coupling to
- * `@nestjs/cqrs` internals is explicitly accepted per CLAUDE.md DD-002
- * (we prefer wrapping to forking).
+ * `@nestjs/cqrs` internals is explicitly accepted per DD-002
+ * (`docs/dd/002-no-fork-nestjs-cqrs.md`) — we prefer wrapping
+ * to forking.
  */
 const COMMAND_HANDLER_METADATA = '__commandHandler__';
 const QUERY_HANDLER_METADATA = '__queryHandler__';

@@ -401,8 +401,9 @@ publications unless `options.id` is set.
   an aggregate instead.
 - `@nestjs/cqrs`'s handler-metadata constants are read via hardcoded
   string literals (`__commandHandler__`, etc.) because `@nestjs/cqrs`
-  does not re-export them. See `handler-wrapper.ts` — CLAUDE.md DD-002
-  documents this coupling.
+  does not re-export them. See `handler-wrapper.ts` —
+  [DD-002](../../docs/dd/002-no-fork-nestjs-cqrs.md) documents this
+  coupling.
 
 ## Status
 
