@@ -1,0 +1,42 @@
+# Visual demo stack: Postgres (with two databases pre-created via init
+# script) + RabbitMQ.
+#
+#   docker-compose up -d
+#   pnpm -C examples/externalization-multi-datasource start
+#   docker-compose down -v
+#
+# `pnpm test:integration` does NOT need this stack — testcontainers
+# spins up Postgres and creates the second database via the admin
+# connection; the two ClientProxy instances are mocked in jest.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: billing
+      POSTGRES_MULTIPLE_DATABASES: 'billing,inventory'
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./docker-init-postgres.sh:/docker-entrypoint-initdb.d/init.sh
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ['CMD-SHELL', 'rabbitmq-diagnostics -q ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
