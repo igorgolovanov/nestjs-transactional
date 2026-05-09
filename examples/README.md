@@ -28,9 +28,10 @@ matching your need; the four cover the canonical entry points.
 - [`multi-datasource-cqrs`](multi-datasource-cqrs) **— shipped.**
   Two DataSources, CQRS handlers с dataSource option (Phase 14.3.1
   Category B), per-DS transaction context.
-- `shared-database-modular-monolith` *(planned)* — same Postgres,
-  different schemas / logical separation, Spring Modulith-style
-  architecture.
+- [`shared-database-modular-monolith`](shared-database-modular-monolith)
+  **— shipped.** One Postgres, two schemas (billing + inventory),
+  per-module NestJS sub-modules, per-schema outbox stacks. Spring
+  Modulith-style architecture.
 
 ## Tier 3 — Externalization (Phase 14.8c, planned)
 
