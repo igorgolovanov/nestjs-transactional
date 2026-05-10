@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/outbox-typeorm",
-  "version": "0.0.0",
+  "version": "1.0.0-alpha.0",
   "description": "TypeORM persistence backend for @nestjs-transactional/outbox — event_publication table, FOR UPDATE SKIP LOCKED worker safety",
   "license": "MIT",
   "author": "Igor Golovanov",
