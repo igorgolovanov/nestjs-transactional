@@ -135,7 +135,8 @@ semantics) — same pattern as
   `CqrsTransactionalModule.forRoot()`.** The transactional module
   imports `CqrsModule` internally and overrides the `EventPublisher`
   DI token; a duplicate import shadows the override and aggregate
-  events bypass the dispatcher (CLAUDE.md convention #6).
+  events bypass the dispatcher
+  ([docs/status/conventions.md](../../docs/status/conventions.md) #6).
 - **Listeners that subscribe to events from a non-default DS MUST
   pass `dataSource` explicitly.** Without it the dispatcher attaches
   to the default DS's transaction — wrong target. A default-DS
@@ -181,8 +182,7 @@ semantics) — same pattern as
 
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
   (Phase 14.3.1 addendum documents Category A/B framing)
-- [DD-023 — independent transaction contexts per
-  dataSource](../../CLAUDE.md)
+- [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [`docs/architecture/cqrs-integration.md`](../../docs/architecture/cqrs-integration.md)
 - Multi-DS cqrs regression test at the package level:
   [`packages/cqrs/src/module/cqrs-transactional.module.multi-datasource.spec.ts`](../../packages/cqrs/src/module/cqrs-transactional.module.multi-datasource.spec.ts).

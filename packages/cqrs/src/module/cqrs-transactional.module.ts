@@ -98,8 +98,7 @@ export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
  * which target the first-active transaction on the current async
  * context (non-deterministic across simultaneously-active
  * cross-dataSource transactions). For cross-DS event handling
- * prefer the outbox path — see CLAUDE.md "Known Limitations
- * (Phase 14)".
+ * prefer the outbox path — see `docs/known-limitations.md`.
  */
 @Module({})
 export class CqrsTransactionalModule {

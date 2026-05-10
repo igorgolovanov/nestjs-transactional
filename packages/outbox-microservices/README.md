@@ -46,7 +46,7 @@ payload — see *Limitations* below.
 
 **Read this before adopting the package in production.** The
 `@nestjs/microservices` `ClientProxy.emit()` API this package depends
-on (per [DD-017](../../CLAUDE.md)) does NOT propagate broker-side
+on (per [DD-017](../../docs/dd/017-reuse-clients-module.md)) does NOT propagate broker-side
 delivery failures in a way the externalizer can observe. In
 fire-and-forget mode the Observable returned by `emit()` completes
 when the proxy considers the dispatch *handed off to the transport*,
@@ -183,7 +183,7 @@ listeners run first; once they succeed the externalizer calls
 `KAFKA_CLIENT.emit('orders.placed', event)`. Failures (broker down,
 client misconfigured, ...) mark the publication `FAILED` and surface
 through `FailedEventPublications.resubmit()` — single-unit atomicity
-per [DD-019](../../CLAUDE.md).
+per [DD-019](../../docs/dd/019-hybrid-delivery-atomicity.md).
 
 ## Multiple clients
 

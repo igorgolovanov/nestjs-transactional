@@ -123,7 +123,7 @@ export class AppModule {
         // CqrsTransactionalModule — the latter imports the former
         // internally and overrides the EventPublisher DI token. A
         // duplicate import shadows the override and aggregate events
-        // bypass the dispatcher (CLAUDE.md convention #6).
+        // bypass the dispatcher (docs/status/conventions.md #6).
         CqrsTransactionalModule.forRoot(),
         OutboxCqrsBridgeModule,
       ],

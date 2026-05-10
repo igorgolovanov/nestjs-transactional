@@ -66,7 +66,7 @@ core + adapter shape:
   DataSource. Depends on `outbox`, `core`, and `typeorm`.
 
 The split follows the same rules the rest of the monorepo lives
-under (CLAUDE.md § "Architectural Principles"):
+under ([docs/architecture/principles.md](../architecture/principles.md)):
 
 - `outbox` does not import TypeORM or any other ORM.
 - `outbox-typeorm` does not import `@nestjs/cqrs`.

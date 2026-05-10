@@ -163,5 +163,6 @@ example code.
 - [Architecture documents](../docs/architecture/)
 - [Architecture Decision Records](../docs/adr/)
 - [Migrating to outbox guide](../docs/guides/migrating-to-outbox.md)
-- The repo root [`CLAUDE.md`](../CLAUDE.md) has the full state record
-  (Phase 14 history, conventions, decisions).
+- [Implementation roadmap](../docs/roadmap/README.md) (per-phase
+  history) and [per-phase status retrospectives](../docs/status/).
+- [Conventions discovered during implementation](../docs/status/conventions.md).

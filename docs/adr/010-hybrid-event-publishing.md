@@ -7,7 +7,8 @@ Superseded by [ADR-014](014-handler-api-redesign.md) — 2026-04-27.
 ## Context
 
 This ADR slot was reserved during Phase 7 (CQRS ↔ outbox
-integration, see CLAUDE.md "Phase 7" entry) to capture the
+integration, see [`docs/roadmap/README.md`](../roadmap/README.md)
+"Phase 7" entry) to capture the
 "hybrid event publisher" design — a single `HybridEventPublisher`
 that fans `AggregateRoot` events to BOTH the in-memory
 transactional dispatcher (`TransactionalEventDispatcher`) AND the

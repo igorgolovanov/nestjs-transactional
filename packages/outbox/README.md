@@ -360,8 +360,9 @@ same API for free.
 part of Phase 5 of the monorepo roadmap. The public API is not yet
 stable and will change between 0.x releases.
 
-Tracking issue and design notes: see the repository root `CLAUDE.md`
-and `docs/adr/006-outbox-pattern.md`.
+Tracking issue and design notes: see
+[`docs/roadmap/README.md`](../../docs/roadmap/README.md) and
+[`docs/adr/006-outbox-pattern.md`](../../docs/adr/006-outbox-pattern.md).
 
 ## Inspired by Spring Modulith
 

@@ -15,7 +15,8 @@ import { PlaceOrderHandler } from './place-order.handler';
  * Important: do NOT import `@nestjs/cqrs`'s `CqrsModule` directly.
  * `CqrsTransactionalModule` imports it internally and overrides the
  * `EventPublisher` DI token; a duplicate import shadows the override
- * and aggregate events bypass the dispatcher (CLAUDE.md convention #6).
+ * and aggregate events bypass the dispatcher
+ * (`docs/status/conventions.md` #6).
  */
 @Module({
   imports: [

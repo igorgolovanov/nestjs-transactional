@@ -188,7 +188,7 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
         // CqrsTransactionalModule. CqrsTransactionalModule imports
         // CqrsModule internally and overrides the EventPublisher DI
         // token; a duplicate import shadows the override and aggregate
-        // events bypass the dispatcher (CLAUDE.md convention #6).
+        // events bypass the dispatcher (docs/status/conventions.md #6).
         CqrsTransactionalModule.forRoot(),
         OutboxCqrsBridge,
       ],

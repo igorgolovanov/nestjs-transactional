@@ -75,7 +75,8 @@ scope (Phase 7):
   and no skip-logic is needed.
 
 The repository positioning updates from "Spring Framework
-equivalent" to "Spring Modulith equivalent" (see CLAUDE.md).
+equivalent" to "Spring Modulith equivalent" (see
+[`docs/architecture/spring-modulith-parity.md`](../architecture/spring-modulith-parity.md)).
 
 ## Alternatives considered
 
@@ -133,7 +134,7 @@ rest of the library.
 
 - ~3 weeks of incremental work (Phase 5 through Phase 9) before
   any user sees the feature in a release. Spread across 30+
-  iterations, tracked in CLAUDE.md's Phase sections.
+  iterations, tracked in [`docs/roadmap/README.md`](../roadmap/README.md).
 - Two new packages to maintain, release, and document. Each
   release event now touches four to five packages instead of
   three.
@@ -151,10 +152,12 @@ rest of the library.
 
 ### Neutral
 
-- The scope statement in `CLAUDE.md` rewrites from
-  "Spring Framework" to "Spring Modulith". The library is no
-  longer "just `@Transactional`"; it is "the Spring-equivalent
-  transactional + event-delivery infrastructure for NestJS".
+- The scope statement in
+  [`docs/architecture/spring-modulith-parity.md`](../architecture/spring-modulith-parity.md)
+  rewrites from "Spring Framework" to "Spring Modulith". The
+  library is no longer "just `@Transactional`"; it is "the
+  Spring-equivalent transactional + event-delivery infrastructure
+  for NestJS".
 
 ## See also
 

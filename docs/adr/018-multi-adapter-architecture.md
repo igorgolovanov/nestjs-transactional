@@ -77,7 +77,7 @@
 > Cumulative effect: a single coherent multi-adapter API
 > surface across `core`, `typeorm`, and `outbox` packages, all
 > using per-dataSource per-call registration. Item 1 in the
-> "Migration to multi-adapter" section of CLAUDE.md describes
+> [`docs/migration/multi-adapter.md`](../migration/multi-adapter.md) describes
 > the `forRoot` signature change in past tense; item 8 reflects
 > Phase 14.11's alias removal.
 
@@ -547,8 +547,9 @@ add a thin discoverable surface on top.
 
 - Significant API refactoring across every package
   (`core`, `typeorm`, `cqrs`, `outbox`, `outbox-typeorm`,
-  `outbox-microservices`) — see "Migration to multi-adapter" in
-  CLAUDE.md for the file-level impact list.
+  `outbox-microservices`) — see
+  [`docs/migration/multi-adapter.md`](../migration/multi-adapter.md)
+  for the file-level impact list.
 - Verbose configuration for multi-database setups —
   `TransactionalModule.forRoot()` repeated per dataSource,
   `OutboxModule.forRoot({ dataSource })` repeated per dataSource,
@@ -637,12 +638,16 @@ of doc (this section) prevents new-contributor confusion.
 
 ## Migration
 
-The Phase 14 implementation roadmap (CLAUDE.md) sequences the
+The Phase 14 implementation roadmap
+([docs/roadmap/README.md](../roadmap/README.md)) sequences the
 migration as 14.0–14.9: token utilities → core multi-adapter →
 outbox multi-adapter → adapter package migrations → CQRS migration →
-examples + docs → final verification.
+examples + docs → final verification. The breaking-changes list and
+file-level migration impact live in
+[docs/migration/multi-adapter.md](../migration/multi-adapter.md).
 
-Breaking changes are itemised in CLAUDE.md's "Migration to
-multi-adapter" section. Packages are not yet published, so accepting
-the breakage now is materially cheaper than introducing a parallel
-single-adapter API and supporting both forever.
+Breaking changes are itemised in
+[`docs/migration/multi-adapter.md`](../migration/multi-adapter.md).
+Packages are not yet published, so accepting the breakage now is
+materially cheaper than introducing a parallel single-adapter API
+and supporting both forever.

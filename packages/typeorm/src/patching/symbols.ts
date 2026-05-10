@@ -8,7 +8,7 @@
  * hoisting glitches or in monorepos with mixed dependency trees. Cross-
  * realm safety is the documented justification (matches the convention
  * used by `Symbol.for('@nestjs-transactional/wrapped')` in the core
- * package — see CLAUDE.md "Conventions finalised" §8).
+ * package — see `docs/status/conventions.md` #8).
  *
  * Namespaced strings prevent collision with arbitrary user code that
  * might assign symbols on TypeORM internals.

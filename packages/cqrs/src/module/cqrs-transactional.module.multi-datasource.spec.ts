@@ -61,7 +61,7 @@ import { CqrsTransactionalModule } from './cqrs-transactional.module';
  *     via the public token utility — multi-DS deployments register
  *     `@IntegrationEventsHandler` listeners against the right DS
  *     manually until the Phase 14.3.1 scanner-gap fix lands (see
- *     CLAUDE.md "Known Limitations (Phase 14)").
+ *     `docs/known-limitations.md`).
  */
 
 class NamedFakeAdapter
