@@ -257,16 +257,20 @@ historical context.
 
 ### Blocked / Awaiting
 
-- *(none — release pipeline ready; first 0.1.0-alpha.0 publish
+- *(none — release pipeline ready; first `1.0.0-alpha.0` publish
   imminent.)*
 
 ### Next
 
-- **First `0.1.0-alpha.0` publish**: `pnpm changeset version`
-  produces the version bumps and `CHANGELOG.md` entries, then
-  `release.yml`'s `changesets/action@v1` step opens (or directly
-  publishes) the alpha. NPM_TOKEN secret is configured; the six
-  initial changesets are committed and ready.
+- **First `1.0.0-alpha.0` publish**: `release.yml`'s
+  `changesets/action@v1` step opens the "Version Packages" PR with
+  `0.0.0 → 1.0.0-alpha.0` bumps for the six framework packages
+  (linked cohort, alpha pre-release mode). Merging the PR triggers
+  the actual `npm publish` with `alpha` dist-tag. NPM_TOKEN secret
+  is configured. The `1.0.0-alpha.0` start (rather than
+  `0.1.0-alpha.0`) is changesets's standard behaviour for `0.0.0`
+  initial versions in pre-release mode + linked config; the alpha
+  series leads naturally into a future stable `1.0.0`.
 - Future phases (not scheduled): broker-aware externalizers
   (native `kafkajs` / `amqplib` / `nats`), outbox-prisma,
   outbox-mongodb, OpenTelemetry integration, ESM dual packaging.

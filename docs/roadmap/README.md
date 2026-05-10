@@ -153,7 +153,7 @@ Documentation tracks:
 Release tracks remaining:
 
 - Changeset entries for the outbox packages.
-- First 0.1.0-alpha release.
+- First `1.0.0-alpha.0` release.
 - CI matrix tweaks for Docker integration tests, NPM_TOKEN setup.
 
 ## Era 2 — Handler API maturation (Phase 10, shipped)
