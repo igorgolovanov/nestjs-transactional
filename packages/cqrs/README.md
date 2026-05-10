@@ -108,14 +108,21 @@ export class Order extends AggregateRoot {
 ```ts
 // order.repository.ts
 import { Injectable } from '@nestjs/common';
-import { getCurrentEntityManager } from '@nestjs-transactional/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { OrderRow } from './order.entity';
 
 @Injectable()
 export class OrderRepository {
+  constructor(
+    @InjectRepository(OrderRow) private readonly rows: Repository<OrderRow>,
+  ) {}
+
   async save(order: { id: string }): Promise<void> {
-    const em = getCurrentEntityManager('default');
-    await em.save(OrderRow, { id: order.id });
+    // Phase 14.20: the @InjectRepository instance auto-dispatches
+    // through the active @Transactional() scope's EntityManager —
+    // no getCurrentEntityManager() boilerplate needed.
+    await this.rows.save({ id: order.id });
   }
 }
 ```
@@ -202,9 +209,10 @@ dispatched:
    dispatcher attaches `OrderCommittedProjection.handle` as an
    `AFTER_COMMIT` hook on the current transaction, and
    `OrderRollbackProjection.handle` as an `AFTER_ROLLBACK` hook.
-3. The repository's `getCurrentEntityManager('default')` resolves to
-   the transaction's own `EntityManager` — both writes go through the
-   same DB connection.
+3. The repository's `@InjectRepository(OrderRow)` Repository
+   auto-dispatches through the active transaction (Phase 14.20
+   transparent transactional repositories) — both writes go through
+   the same DB connection.
 4. `execute` resolves; `TransactionManager` commits the transaction;
    the adapter flushes to the database.
 5. After the commit succeeds, the manager runs `AFTER_COMMIT` hooks —
@@ -388,6 +396,15 @@ Supply a stable `id` when the class name might change:
 The listener id format is `${baseId}#${EventName}` where baseId
 defaults to the class name — so class renames invalidate stored
 publications unless `options.id` is set.
+
+## Worked examples
+
+- [`basic-cqrs`](../../examples/basic-cqrs) — Command + Query (auto-readonly) + AFTER_COMMIT `@TransactionalEventsHandler`, no DB.
+- [`multi-datasource-cqrs`](../../examples/multi-datasource-cqrs) — `@Transactional({ dataSource })` per handler (Phase 14.3.1 Category B per-DS hook attachment).
+- [`saga-pattern`](../../examples/saga-pattern), [`audit-logging`](../../examples/audit-logging) — `@TransactionalEventsHandler` + `@OutboxEventsHandler` against the same event class.
+- [`e-commerce-orders`](../../examples/e-commerce-orders) — full CQRS + REST controller + outbox-driven saga + multi-DS.
+
+Full catalogue: [examples/README.md](../../examples/README.md).
 
 ## Limitations
 

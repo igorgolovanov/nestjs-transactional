@@ -8,12 +8,24 @@ NestJS module wiring.
 
 ## Status
 
-**Alpha / in development.** Iteration 6.2 delivered the entities and
-the repository implementation; Iteration 6.3 added the schema
-migration and a `SchemaInitializer` for development-time auto-init;
-Iteration 6.4 adds `OutboxTypeOrmModule` so the pieces compose as a
-single NestJS module. The public API is not yet stable and will
-change between 0.x releases.
+**Alpha / in development.** Public API not yet stable and may change
+between 0.x releases. Current shape:
+
+- `EventPublicationEntity` / `EventPublicationArchiveEntity` schema
+  with all four indexes for worker / operator / cleanup paths.
+- `TypeOrmEventPublicationRepository` integrates through the
+  Phase 14.20 transparent repository patches — every read and
+  write commits atomically with the business transaction.
+- `OutboxTypeOrmModule.forRoot({ dataSource?, isDefault? })` and
+  `forRootAsync({...})` — DataSource is resolved from DI via
+  `@nestjs/typeorm`'s `getDataSourceToken(name)` (Phase 14.21
+  reshape, mirroring `TypeOrmTransactionalModule`).
+- `SchemaInitializer` for development-time auto-init plus the
+  shipped TypeORM migration `CreateEventPublication1700000000000`.
+
+Phase history: [`docs/roadmap/README.md`](../../docs/roadmap/README.md),
+[ADR-006](../../docs/adr/006-outbox-pattern.md),
+[ADR-019](../../docs/adr/019-multi-forroot-pattern.md).
 
 ## What ships today
 
@@ -316,6 +328,16 @@ pnpm --filter @nestjs-transactional/outbox-typeorm test:integration
 
 Unit-test-only runs (`pnpm test`) skip the integration suite per the
 shared Jest base config.
+
+## Worked examples
+
+- [`basic-typeorm-outbox`](../../examples/basic-typeorm-outbox) — single-DS outbox with Postgres, atomicity proven by testcontainers.
+- [`multi-datasource-outbox`](../../examples/multi-datasource-outbox) — per-DS `event_publication` tables (ADR-019 multi-`forRoot`).
+- [`shared-database-modular-monolith`](../../examples/shared-database-modular-monolith) — one Postgres, multi-schema, per-module outbox stacks.
+- [`saga-pattern`](../../examples/saga-pattern), [`audit-logging`](../../examples/audit-logging) — outbox-driven business saga and asymmetric audit-DS sink.
+- [`e-commerce-orders`](../../examples/e-commerce-orders) — three-DataSource flagship using `OutboxTypeOrmModule.forRoot` per DS.
+
+Full catalogue: [examples/README.md](../../examples/README.md).
 
 ## License
 

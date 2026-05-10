@@ -354,14 +354,27 @@ works out of the box for unit-level tests. Integration tests that use
 `@nestjs-transactional/outbox-typeorm` with a real Postgres get the
 same API for free.
 
+## Worked examples
+
+- [`basic-outbox`](../../examples/basic-outbox) — `@OutboxEventsHandler` + `OutboxEventPublisher`, in-memory test repository.
+- [`basic-typeorm-outbox`](../../examples/basic-typeorm-outbox) — production-shape outbox with Postgres, atomicity proven via testcontainers.
+- [`multi-datasource-outbox`](../../examples/multi-datasource-outbox) — per-DS `event_publication` tables (ADR-019 multi-`forRoot`).
+- [`shared-database-modular-monolith`](../../examples/shared-database-modular-monolith) — one Postgres, multi-schema, per-module outbox stacks.
+- [`saga-pattern`](../../examples/saga-pattern) — choreographed multi-step business saga over outbox events.
+- [`audit-logging`](../../examples/audit-logging) — cross-DS audit trail with idempotency on the consumer.
+- [`e-commerce-orders`](../../examples/e-commerce-orders) — three-bounded-context flagship wired through outbox integration events.
+
+Full catalogue: [examples/README.md](../../examples/README.md).
+
 ## Status
 
-**Alpha / in development.** This package is being built iteratively as
-part of Phase 5 of the monorepo roadmap. The public API is not yet
-stable and will change between 0.x releases.
+**Alpha / in development.** Public API not yet stable and may change
+between 0.x releases. Current functionality is exercised end-to-end
+through the Phase 14.8 worked-example library — see
+[`examples/README.md`](../../examples/README.md).
 
-Tracking issue and design notes: see
-[`docs/roadmap/README.md`](../../docs/roadmap/README.md) and
+Phase history and design notes:
+[`docs/roadmap/README.md`](../../docs/roadmap/README.md),
 [`docs/adr/006-outbox-pattern.md`](../../docs/adr/006-outbox-pattern.md).
 
 ## Inspired by Spring Modulith

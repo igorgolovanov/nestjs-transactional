@@ -37,10 +37,13 @@ architecture doc above.
 
 ## Status
 
-**Alpha / Phase 11.3 of the monorepo roadmap.** The public API is not
-yet stable and will change between 0.x releases. Headers / routingKey
-are accepted on `@Externalized` but not yet applied to the wire
-payload — see *Limitations* below.
+**Alpha / in development.** Public API not yet stable and may change
+between 0.x releases. Headers / `routingKey` are accepted on
+`@Externalized` but not yet applied to the wire payload — see
+*Limitations* below. End-to-end coverage lives in the Phase 14.8c
+externalization tier examples and the Phase 14.8e flagship
+[`e-commerce-orders`](../../examples/e-commerce-orders) — see
+[Worked examples](#worked-examples).
 
 ## Important: reliability semantics (read before production use)
 
@@ -285,6 +288,16 @@ const moduleRef = await Test.createTestingModule({
   .useValue({ emit: jest.fn(() => of(undefined)) })
   .compile();
 ```
+
+## Worked examples
+
+- [`externalization-kafka`](../../examples/externalization-kafka) — single DataSource + single Kafka broker, the canonical Phase 11 baseline.
+- [`externalization-multi-broker`](../../examples/externalization-multi-broker) — Kafka + RabbitMQ + Redis pub/sub routed per event via `@Externalized({ client })`.
+- [`externalization-multi-datasource`](../../examples/externalization-multi-datasource) — two physical Postgres × two `ClientProxy` registrations on a single broker.
+- [`externalization-with-fallback`](../../examples/externalization-with-fallback) — ADR-016 silent-success demo + the three production mitigation patterns + `FailedEventPublications.resubmit` recovery flow.
+- [`e-commerce-orders`](../../examples/e-commerce-orders) — Phase 14.8e flagship; externalization is the terminal step of the order saga.
+
+Full catalogue: [examples/README.md](../../examples/README.md).
 
 ## License
 

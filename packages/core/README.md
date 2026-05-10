@@ -195,6 +195,13 @@ expect(adapter.savepointsReleased).toHaveLength(0);
 
 `adapter.reset()` clears all observation arrays between tests when you keep a single adapter instance across cases.
 
+## Worked examples
+
+- [`basic-transactional`](../../examples/basic-transactional) — `@Transactional()` on a plain service.
+- [`testing-patterns`](../../examples/testing-patterns) — `InMemoryTransactionAdapter` from `core/testing` plus the outbox / integration tiers.
+
+Full catalogue: [examples/README.md](../../examples/README.md).
+
 ## Status
 
 Work in progress. Not yet published to npm.
