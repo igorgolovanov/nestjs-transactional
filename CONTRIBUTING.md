@@ -54,12 +54,14 @@ pnpm --filter @nestjs-transactional/core test:watch
 pnpm --filter @nestjs-transactional/typeorm build
 ```
 
-Running an example:
+Running an example (full Tier 1–5 catalogue lives under
+[`examples/`](examples/) — see
+[`examples/README.md`](examples/README.md) for the index):
 
 ```bash
-pnpm -C examples/basic-usage start
-pnpm -C examples/multi-datasource start
-pnpm -C examples/cqrs-full-stack start
+pnpm -C examples/basic-transactional start
+pnpm -C examples/multi-datasource-basic start
+pnpm -C examples/e-commerce-orders start
 ```
 
 ## Creating a changeset for your PR

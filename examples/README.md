@@ -121,22 +121,6 @@ matching your need; the four cover the canonical entry points.
   cleanup hooks. 4 integration tests including mid-handler
   shutdown and mid-tx atomicity.
 
-## Existing examples (slated for retirement or absorption during Phase 14.8f)
-
-These predate the tier framework and overlap with planned Tier 2+
-examples. They remain runnable for now; the Phase 14.8f doc sweep
-will retire / refactor / absorb them based on the realised Tier
-2–5 coverage:
-
-- [`cqrs-full-stack`](cqrs-full-stack) — TypeORM + `AggregateRoot`
-  + multiple phase listeners + `Query` handler. Persistence side
-  may be partially absorbed into `basic-typeorm-outbox` follow-ups
-  or `e-commerce-orders` (Phase 14.8e).
-- [`outbox-full-stack`](outbox-full-stack) — TypeORM + outbox +
-  CQRS + worker, real Postgres via docker-compose. Likely
-  superseded by `e-commerce-orders` (Phase 14.8e) which targets
-  the same complete-realistic-application audience.
-
 ## How to run
 
 From the monorepo root after `pnpm install`:
@@ -149,13 +133,12 @@ pnpm -C examples/<name> test:integration     # testcontainers integration (where
 
 Each example honours these scripts; `test:integration` exists in
 examples that require Docker — currently `basic-typeorm-outbox`,
-`outbox-full-stack`, every Tier 2 multi-DataSource example except
-`multi-datasource-basic`, every Tier 3 externalization example,
-every Tier 4 example (the unit-only branches of `testing-patterns`
-run under plain `pnpm test`), and every Tier 5 example
-(`e-commerce-orders` additionally pulls a Kafka KRaft image for
-its `pnpm start` visual demo, the integration tests use a mocked
-`ClientProxy` instead).
+every Tier 2 multi-DataSource example except `multi-datasource-basic`,
+every Tier 3 externalization example, every Tier 4 example (the
+unit-only branches of `testing-patterns` run under plain `pnpm
+test`), and every Tier 5 example (`e-commerce-orders` additionally
+pulls a Kafka KRaft image for its `pnpm start` visual demo; the
+integration tests use a mocked `ClientProxy` instead).
 
 The root `pnpm test` deliberately excludes `examples/*` to keep the
 default dev loop fast — run the example tests directly when you change
@@ -194,11 +177,6 @@ example code.
   cooperate with transactions" → [`basic-cqrs`](basic-cqrs)
 - "I need multiple DataSources" →
   [`multi-datasource-basic`](multi-datasource-basic)
-- "Full TypeORM + CQRS + multiple phases" →
-  [`cqrs-full-stack`](cqrs-full-stack)
-- "Full TypeORM + outbox + CQRS + worker + Postgres" →
-  [`outbox-full-stack`](outbox-full-stack) (pre-tier;
-  superseded by `e-commerce-orders`)
 - "End-to-end realistic application — multi-DS saga + Kafka +
   CQRS + REST" → [`e-commerce-orders`](e-commerce-orders)
 - "`forRootAsync` + `ConfigService` + per-environment .env

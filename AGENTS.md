@@ -264,9 +264,10 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   full example library cross-references, migration-guide updates
   referencing the new examples, ADR-018 / ADR-019 final-form
   review, roadmap consolidation of the Phase 14.8 narrative.
-  Optional: retire / refactor / absorb the two pre-tier
-  `cqrs-full-stack` and `outbox-full-stack` examples (the latter
-  was already flagged as superseded by `e-commerce-orders`).
+  Pre-tier `cqrs-full-stack` and `outbox-full-stack` examples
+  retired (their coverage is fully absorbed by `basic-cqrs`,
+  `basic-typeorm-outbox`, and the Tier 5 `e-commerce-orders`
+  flagship).
 - **Phase 9 iteration 9.3**: release automation for the outbox
   packages — changeset entries, CI matrix tweaks, first
   0.1.0-alpha release.

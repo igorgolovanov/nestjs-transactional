@@ -16,7 +16,8 @@ export class GetOrderQuery {
  * not a separate denormalized projection. That keeps the example's
  * data flow at one diagram. A production app might split a
  * `OrderProjectionRow` table updated from `@TransactionalEventsHandler`
- * AFTER_COMMIT projections — see `cqrs-full-stack` for that style.
+ * AFTER_COMMIT projections — see `basic-cqrs` for the projection
+ * style on a smaller scale.
  *
  * `CqrsTransactionalModule` auto-wraps query handlers as readonly
  * (Convention #14 carry-over); the actual lookup runs autocommit

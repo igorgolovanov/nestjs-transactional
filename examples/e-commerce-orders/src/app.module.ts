@@ -79,8 +79,7 @@ export function readConfigFromEnv(): ECommerceConfig {
  * `@Global()` + explicit `exports` are required because
  * `HybridEventPublisher` lives inside `CqrsTransactionalModule`'s
  * own DI scope and cannot see `providers` from another non-global
- * sibling module. Same shape as `outbox-full-stack`'s
- * `OutboxCqrsBridgeModule`.
+ * sibling module.
  */
 @Global()
 @Module({
@@ -117,10 +116,9 @@ class OutboxCqrsBridgeModule {}
  * cqrs handlers) live in AppModule directly because they inject
  * `EventPublisher` from `CqrsTransactionalModule`, and the cqrs
  * EventPublisher override is non-global — sub-modules cannot see
- * it through transitive imports. The same pattern is used by
- * `outbox-full-stack`. The orders folder structure stays as
- * documentation of the bounded context boundary even though
- * NestJS module isolation flattens at AppModule.
+ * it through transitive imports. The orders folder structure
+ * stays as documentation of the bounded context boundary even
+ * though NestJS module isolation flattens at AppModule.
  *
  * Cross-DS coordination is **always** through the outbox (DD-023).
  * No `@Transactional` block in this example spans more than one

@@ -10,11 +10,7 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": [
-    "@nestjs-transactional-examples/basic-usage",
-    "@nestjs-transactional-examples/multi-datasource",
-    "@nestjs-transactional-examples/cqrs-full-stack"
-  ],
+  "ignore": [],
   "privatePackages": {
     "version": false,
     "tag": false

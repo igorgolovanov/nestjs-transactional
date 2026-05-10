@@ -8,8 +8,8 @@ that pins it to the right DS's transaction context — the headline
 demonstration of **Phase 14.3.1 Category B** (cqrs in-memory
 dispatcher per-DS hook attachment).
 
-Backed by SQLite in-memory (via `sql.js`) — same shape as
-`cqrs-full-stack` plus a second DataSource. No Docker required.
+Backed by SQLite in-memory (via `sql.js`) — `basic-cqrs` shape
+extended with a second DataSource. No Docker required.
 
 ## When to use this example
 
@@ -175,8 +175,9 @@ semantics) — same pattern as
 - [`multi-datasource-outbox`](../multi-datasource-outbox) — durable
   variant: each DS has its own outbox + Postgres `event_publication`
   table.
-- [`cqrs-full-stack`](../cqrs-full-stack) — single DS with multiple
-  phase listeners and projection rollback handler.
+- [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
+  with multi-DS CQRS, REST, outbox saga, and Kafka externalization
+  on top of the same per-DS handler-binding pattern.
 
 ## Further reading
 

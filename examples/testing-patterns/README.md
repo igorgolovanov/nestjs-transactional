@@ -144,9 +144,8 @@ pnpm -C examples/testing-patterns test:integration
 - [`basic-cqrs`](../basic-cqrs) — the foundational unit-only
   example using `InMemoryTransactionAdapter` for a CQRS-style
   domain.
-- [`outbox-full-stack`](../outbox-full-stack) — production-shape
-  outbox wiring; a useful reference for the Tier 3 integration
-  test setup.
+- [`basic-typeorm-outbox`](../basic-typeorm-outbox) — production-shape
+  outbox wiring; a useful reference for the integration test setup.
 - [`saga-pattern`](../saga-pattern) — domain-rich integration
   tests with multi-step coordination.
 

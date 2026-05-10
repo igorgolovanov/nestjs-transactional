@@ -74,20 +74,25 @@ nestjs-transactional-monorepo/
 │
 ├── examples/                              # Tier 1–5 example library — see examples/README.md
 │   ├── README.md                          # top-level index
-│   ├── basic-transactional/
-│   ├── basic-outbox/
-│   ├── basic-typeorm-outbox/
-│   ├── basic-cqrs/
-│   ├── multi-datasource-basic/
-│   ├── multi-datasource-outbox/
-│   ├── multi-datasource-cqrs/
-│   ├── shared-database-modular-monolith/
-│   ├── externalization-kafka/
-│   ├── externalization-multi-broker/
-│   ├── externalization-multi-datasource/
-│   ├── externalization-with-fallback/
-│   ├── cqrs-full-stack/                   # pre-tier; absorption pending Phase 14.8f
-│   └── outbox-full-stack/                 # pre-tier; absorption pending Phase 14.8f
+│   ├── basic-transactional/               # Tier 1
+│   ├── basic-outbox/                      # Tier 1
+│   ├── basic-typeorm-outbox/              # Tier 1
+│   ├── basic-cqrs/                        # Tier 1
+│   ├── multi-datasource-basic/            # Tier 2
+│   ├── multi-datasource-outbox/           # Tier 2
+│   ├── multi-datasource-cqrs/             # Tier 2
+│   ├── shared-database-modular-monolith/  # Tier 2
+│   ├── externalization-kafka/             # Tier 3
+│   ├── externalization-multi-broker/      # Tier 3
+│   ├── externalization-multi-datasource/  # Tier 3
+│   ├── externalization-with-fallback/     # Tier 3
+│   ├── saga-pattern/                      # Tier 4
+│   ├── audit-logging/                     # Tier 4
+│   ├── read-write-separation/             # Tier 4
+│   ├── testing-patterns/                  # Tier 4
+│   ├── e-commerce-orders/                 # Tier 5 (flagship)
+│   ├── async-config-from-environment/     # Tier 5
+│   └── graceful-shutdown/                 # Tier 5
 │
 ├── docs/
 │   ├── adr/                               # Architecture Decision Records (NNN-slug.md)

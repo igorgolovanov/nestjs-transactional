@@ -188,23 +188,33 @@ export class InventoryReservationHandler
 
 ## Examples
 
-Four self-contained runnable examples under [`examples/`](examples/):
+A Tier 1–5 example library lives under [`examples/`](examples/) —
+see [`examples/README.md`](examples/README.md) for the full
+catalogue and the "Picking the right starting point" decision
+guide. Quick anchors:
 
-- [`examples/basic-usage`](examples/basic-usage) — one
-  `@Transactional` service, commit and rollback shown.
-- [`examples/multi-datasource`](examples/multi-datasource) —
-  `@Transactional` routing to two independent DataSources.
-- [`examples/cqrs-full-stack`](examples/cqrs-full-stack) — full
-  flow: aggregate → command handler → `AFTER_COMMIT`
-  `@TransactionalEventsHandler` class → `AFTER_ROLLBACK`
-  `@TransactionalEventsHandler` class. In-memory dispatch.
-- [`examples/outbox-full-stack`](examples/outbox-full-stack) —
-  end-to-end outbox: aggregate → command handler → publication
-  row → worker → durable `@IntegrationEventsHandler` class.
-  Real Postgres via `docker-compose`.
+- **Tier 1 — Foundational**: [`basic-transactional`](examples/basic-transactional),
+  [`basic-outbox`](examples/basic-outbox),
+  [`basic-typeorm-outbox`](examples/basic-typeorm-outbox),
+  [`basic-cqrs`](examples/basic-cqrs).
+- **Tier 2 — Multi-DataSource**: [`multi-datasource-basic`](examples/multi-datasource-basic),
+  [`multi-datasource-outbox`](examples/multi-datasource-outbox),
+  [`multi-datasource-cqrs`](examples/multi-datasource-cqrs),
+  [`shared-database-modular-monolith`](examples/shared-database-modular-monolith).
+- **Tier 3 — Externalization**: [`externalization-kafka`](examples/externalization-kafka),
+  [`externalization-multi-broker`](examples/externalization-multi-broker),
+  [`externalization-multi-datasource`](examples/externalization-multi-datasource),
+  [`externalization-with-fallback`](examples/externalization-with-fallback).
+- **Tier 4 — Advanced patterns**: [`saga-pattern`](examples/saga-pattern),
+  [`audit-logging`](examples/audit-logging),
+  [`read-write-separation`](examples/read-write-separation),
+  [`testing-patterns`](examples/testing-patterns).
+- **Tier 5 — Production realism**: [`e-commerce-orders`](examples/e-commerce-orders),
+  [`async-config-from-environment`](examples/async-config-from-environment),
+  [`graceful-shutdown`](examples/graceful-shutdown).
 
 ```bash
-pnpm -C examples/basic-usage start
+pnpm -C examples/basic-transactional start
 ```
 
 ## Documentation
