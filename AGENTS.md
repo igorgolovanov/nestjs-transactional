@@ -243,9 +243,9 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-05-10 — Phase 14.8d Tier 4 (advanced-pattern
-example library) shipped. See
-[`docs/status/2026-05-10-phase-14-8d.md`](docs/status/2026-05-10-phase-14-8d.md)
+**Last updated**: 2026-05-10 — Phase 14.8e Tier 5 (production-
+realism example library) shipped. See
+[`docs/status/2026-05-10-phase-14-8e.md`](docs/status/2026-05-10-phase-14-8e.md)
 for the retrospective. Earlier phase retrospectives in
 [`docs/status/`](docs/status/); the full completed-phases archival
 list is at [`docs/status/completed.md`](docs/status/completed.md).
@@ -257,16 +257,21 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 
 ### Next
 
-- **Phase 14.8e (Tier 5 — Production realism)**: three examples
-  per master plan. `e-commerce-orders` (full realistic stack,
-  multi-DS + outbox + externalization + CQRS),
-  `async-config-from-environment` (`forRootAsync` + ConfigService
-  + dev/staging/prod variants), `graceful-shutdown` (worker
-  draining + lifecycle hooks). Audit estimate anchor: Tier 4
-  closure (LoC range 688-1149; `e-commerce-orders` likely sits at
-  the upper edge given its multi-axis surface).
-- **Phase 14.8f** (Comprehensive doc sweep) — sequential after
-  14.8e per master plan.
+- **Phase 14.8f (Comprehensive doc sweep)**: per master plan,
+  examples top-level README polish, per-package README sync with
+  full example library cross-references, migration-guide updates
+  referencing the new examples, ADR-018 / ADR-019 final-form
+  review, roadmap consolidation of the Phase 14.8 narrative.
+  Optional: retire / refactor / absorb the two pre-tier
+  `cqrs-full-stack` and `outbox-full-stack` examples (the latter
+  was already flagged as superseded by `e-commerce-orders`).
+- **Framework gap from Phase 14.8e**: investigate and fix
+  `TypeOrmTransactionalModule.forRootAsync` bootstrap bug
+  (`this.postgres.Pool is not a constructor` when paired with
+  `TypeOrmModule.forRootAsync`). User-side workaround documented
+  in Convention #22 + tracked as a separate task. Sequential
+  with or before Phase 14.8f to allow the async-config example to
+  drop the workaround.
 - **Phase 9 iteration 9.3**: release automation for the outbox
   packages — changeset entries, CI matrix tweaks, first
   0.1.0-alpha release.
@@ -276,14 +281,33 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 
 ### Five most recent decisions
 
+- Phase 14.8e shipped — Tier 5 production-realism examples
+  (`e-commerce-orders` flagship 3-DS saga + Kafka + CQRS + REST;
+  `async-config-from-environment` `forRootAsync` end-to-end with
+  Joi + .env profiles; `graceful-shutdown` outbox drain +
+  lifecycle hooks). Seven new conventions: #18 inner-method
+  indirection for `@Transactional` inside `@IntegrationEventsHandler`;
+  #19 `@Externalized` events still need a local
+  `@OutboxEventsHandler` to materialise a publication;
+  #20 `CqrsTransactionalModule` does not export `CommandBus` /
+  `QueryBus` (controllers inject handlers directly);
+  #21 `OutboxModule.forRootAsync({ repository })` lives on options,
+  not on the async factory result; #22 framework-bug workaround
+  for `TypeOrmTransactionalModule.forRootAsync` (use sync
+  `forRoot()`); #23 dotenv refuses to overwrite `process.env`
+  (snapshot/restore between tests); #24 user-side
+  `OutboxDrainService` complement to the framework's sync
+  `OutboxProcessingModule.onApplicationShutdown`. Two framework
+  gaps surfaced (one tracked for fix, one accepted as user-side
+  pattern). LoC envelope updated for flagship multi-multi-axis
+  examples (1800–2100 floor).
 - Phase 14.8d shipped — Tier 4 advanced-pattern examples (saga
   with compensation; cross-DS audit through outbox; master/replica
   read-write-separation; meta-example with three test tiers).
   Three new conventions (#15 silent-no-op publish without listener;
   #16 `@TransactionalEventsHandler` does not receive
   `OutboxEventPublisher.publish` events; #17 `Node16` module
-  resolution required for subpath imports). Idempotency-gate
-  pattern repeated consistently across 3 examples.
+  resolution required for subpath imports).
 - Phase 14.8c shipped — ADR-016 silent-success limitation pinned
   by the externalization example library; consumer-side
   inbox/dedup pattern inscribed as code template; three Tier 3
@@ -296,13 +320,6 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   AppModule level when sub-modules are involved).
 - Phase 14.8a shipped — Tier 1 foundational examples; Convention
   #14 inscribed (Tier 2+ examples ship 1-per-commit).
-- Phase 14.21 shipped — `OutboxTypeOrmModule.forFeature` →
-  `forRoot`; Phase 14.12 alias cleanup bundled in. Phase 14.20
-  preceded — transparent transactional repositories via prototype
-  patches (`Repository.prototype.manager` getter + module-load-
-  time activation; two documented limitations:
-  `EntityManager.save()` direct call and `BaseEntity` static
-  methods).
 
 For the full list of completed phases see
 [`docs/status/completed.md`](docs/status/completed.md). For

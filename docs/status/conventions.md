@@ -227,3 +227,129 @@ session.
     `testing-patterns` followed. A future cleanup may flip the
     base config to `Node16` and propagate; out of scope for the
     examples-only Phase 14.8.
+
+18. **Inner-method indirection for `@Transactional({ dataSource })`
+    inside an `@IntegrationEventsHandler`.** Surfaced 2026-05-10 in
+    Phase 14.8e (`e-commerce-orders`). The cqrs scanner captures
+    `instance.handle.bind(instance)` in `OnModuleInit`;
+    `TransactionalMethodsBootstrap` wraps methods at
+    `OnApplicationBootstrap` — strictly later. A naive
+    `@Transactional({ dataSource: 'inventory' })` on the public
+    `handle()` does NOT take effect — the bound reference is the
+    pre-wrap original. **Workaround**: `handle()` (un-decorated)
+    delegates to a private `processInInventoryTx()` (decorated).
+    The `this.processInInventoryTx(event)` call resolves the
+    method at invocation time, by then the wrapped version is
+    installed on the instance. Single-DS handlers (where the
+    worker's outer `REQUIRES_NEW` transaction is on the same DS as
+    the listener target) don't need the indirection — the outer tx
+    already covers the work. Canonical pattern in
+    `examples/e-commerce-orders/src/inventory/release-stock.handler.ts`
+    and `billing/charge-payment.handler.ts`. The framework may
+    rewire scanner timing in a future phase; the indirection is
+    safe regardless and is the recommended pattern for any
+    cross-DS work inside a handler.
+
+19. **`@Externalized` events still need a local
+    `@OutboxEventsHandler` listener to materialise a publication
+    row.** Surfaced 2026-05-10 in Phase 14.8e (`e-commerce-orders`).
+    Convention #15 (silent no-op without listener) extends to
+    externalization: the externalizer pipeline reads from
+    `event_publication`, but the publication is only created when
+    at least one listener is registered for the event class. The
+    `@Externalized` decorator alone is not enough. **Pattern**: a
+    stub `@OutboxEventsHandler` whose `handle()` body is empty (or
+    carries an audit-trail / read-model side effect). Canonical
+    empty-stub form in
+    `examples/e-commerce-orders/src/orders/externalized-event-stub.ts`.
+
+20. **`CqrsTransactionalModule` does NOT export `CommandBus` /
+    `QueryBus` to consumers.** Surfaced 2026-05-10 in Phase 14.8e
+    (`e-commerce-orders`). The module imports `CqrsModule`
+    internally and overrides `EventPublisher` (Convention #6); a
+    duplicate `CqrsModule.forRoot()` in the consumer would shadow
+    the override. Consequently the module deliberately scopes
+    `CqrsModule`'s exports inward — REST controllers and other
+    non-handler consumers cannot inject `CommandBus.execute(...)`.
+    **Pattern**: inject the command and query handlers directly
+    and call `handler.execute(...)` / `handler.handle(...)`.
+    Canonical pattern in
+    `examples/e-commerce-orders/src/orders/orders.controller.ts`.
+
+21. **`OutboxModule.forRootAsync({ repository })` takes
+    `repository` at the OPTIONS level, NOT in the async factory
+    result.** Surfaced 2026-05-10 in Phase 14.8e
+    (`async-config-from-environment`). Provider tokens must be
+    declared at module-build time, so the module reads
+    `repository` (and `serializer`) from the options argument
+    synchronously. The async factory's return shape
+    (`OutboxModuleAsyncFactoryResult`) only carries *runtime
+    tunables* — `processor`, `staleness`, `republishOnStartup`,
+    `startupBatchSize`, `completionMode`. Putting `repository`
+    inside `useFactory`'s return is silently ignored; the module
+    falls back to `InMemoryEventPublicationRepository`, the
+    publication never reaches Postgres, and the worker never
+    delivers anything. The silence is double-layered: misplaced
+    field is dropped without a warning, and `publish` is then a
+    silent no-op for events with no in-memory listener
+    (Convention #15 again). Canonical correct placement in
+    `examples/async-config-from-environment/src/app.module.ts`.
+
+22. **`TypeOrmTransactionalModule.forRootAsync` has a bootstrap
+    bug when combined with `TypeOrmModule.forRootAsync`.**
+    Surfaced 2026-05-10 in Phase 14.8e
+    (`async-config-from-environment`). TypeORM's
+    `PostgresDriver.createPool` raises
+    `TypeError: this.postgres.Pool is not a constructor` and
+    stalls in the `@nestjs/typeorm` connect-retry loop. The error
+    happens inside TypeORM's own DataSource init, BEFORE the
+    registration factory of `TypeOrmTransactionalModule.forRootAsync`
+    runs. Bisected: bug triggered solely by adding the async-
+    variant to imports — sync `forRoot()` of the same module
+    works in the same composition. **Workaround**: call
+    `TypeOrmTransactionalModule.forRoot()` (sync) even when the
+    rest of the stack is `forRootAsync`. The module has no
+    async-resolvable tunables anyway (`dataSource` and `isDefault`
+    are statically declared per the JSDoc on
+    `TypeOrmTransactionalAsyncOptions`), so there is no semantic
+    loss. Tracked as a framework-fix task; ahead of any future
+    example promoting the module to async, cross-referenced in
+    [`docs/known-limitations.md`](../known-limitations.md).
+
+23. **dotenv refuses to overwrite an existing `process.env` key.**
+    Surfaced 2026-05-10 in Phase 14.8e
+    (`async-config-from-environment` integration tests). Two
+    consequences: (a) tests that load multiple `.env` files
+    sequentially in the same Jest worker get cross-contamination —
+    the FIRST file's values mask later files' values. The
+    async-config example snapshots managed env keys at
+    `beforeAll`, restores between tests via a small
+    `restoreEnv(snapshot)` helper. (b) In production, exported
+    shell variables override `.env` files — that's *intended*
+    (secrets-manager-injected env should win over a committed
+    file), but operators sometimes forget. Don't rely on `.env`
+    to "reset" a variable that has already been set in the
+    deployment environment.
+
+24. **Outbox graceful drain requires a user-side
+    `OnApplicationShutdown` complement.** Surfaced 2026-05-10 in
+    Phase 14.8e (`graceful-shutdown`). The framework's
+    `OutboxProcessingModule.onApplicationShutdown` calls
+    `processor.stop()` synchronously — sets `running = false` and
+    cancels the next-poll `setTimeout`. It does NOT await the
+    `processBatch()` Promise that the previous tick already
+    dispatched. NestJS proceeds to dispose the DataSource provider;
+    an in-flight `processOne()` writing
+    `PROCESSING → COMPLETED` can race the pool teardown, leaving
+    the row stuck in `PROCESSING` until the staleness monitor
+    recovers it on the next boot. **Pattern**: a user-side
+    `OutboxDrainService` that implements `OnApplicationShutdown`
+    async, idempotently re-calls `processor.stop()` (safe
+    regardless of NestJS shutdown ordering between sibling
+    providers), then polls
+    `EventPublicationRepository.findIncomplete()` until no row is
+    in `PROCESSING` state or `DRAIN_TIMEOUT_MS` elapses (10 s
+    default — tune to your platform's grace period; Kubernetes
+    default `terminationGracePeriodSeconds` is 30 s, leave 5–10 s
+    margin for the rest of the shutdown chain). Canonical pattern
+    in `examples/graceful-shutdown/src/shutdown/outbox-drain.service.ts`.

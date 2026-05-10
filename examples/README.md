@@ -92,15 +92,34 @@ matching your need; the four cover the canonical entry points.
   Postgres. README pins the gotchas (silent-no-op publish without
   listener, `Node16` module resolution for subpath imports).
 
-## Tier 5 — Production realism (Phase 14.8e, planned)
+## Tier 5 — Production realism (Phase 14.8e, shipped)
 
-- `e-commerce-orders` — realistic domain (Order, Product, Customer),
-  multi-DS, outbox, externalization к Kafka, CQRS for read/write.
-  Complete realistic application end-to-end.
-- `async-config-from-environment` — `forRootAsync` с `ConfigService`,
-  environment-based DataSource configuration, dev/staging/prod variants.
-- `graceful-shutdown` — outbox processor draining, in-flight
-  transaction completion, connection cleanup, lifecycle hooks.
+- [`e-commerce-orders`](e-commerce-orders) **— shipped.** Flagship.
+  Three bounded contexts (Orders / Inventory / Billing) on three
+  Postgres DataSources, each with its own outbox stack. Saga
+  choreographed through outbox integration events
+  (`OrderPlacedEvent → StockReserved → PaymentCharged →
+  OrderConfirmedEvent`). Externalization to Kafka on the terminal
+  event only. CQRS `@CommandHandler` / `@QueryHandler` plus a REST
+  `OrdersController`. Compensation handlers on both failure
+  branches. Idempotency gates everywhere. 8 integration tests via
+  testcontainers Postgres × 3 + mocked Kafka client.
+- [`async-config-from-environment`](async-config-from-environment)
+  **— shipped.** `forRootAsync` end-to-end on three of four
+  framework modules; `TypeOrmTransactionalModule` falls back to
+  sync `forRoot()` per Convention #22. `ConfigModule.forRoot` with
+  Joi validation and `.env.{development,staging,production}`
+  profiles. Outbox tunables flow through `ConfigService` into
+  `OUTBOX_PROCESSOR_OPTIONS`. 5 integration tests including
+  per-profile assertion + Joi-rejection cases.
+- [`graceful-shutdown`](graceful-shutdown) **— shipped.**
+  `app.enableShutdownHooks()` plus a user-side `OutboxDrainService`
+  that polls `findIncomplete()` until no row is in `PROCESSING`
+  state, with a configurable timeout. Plugs the gap in the
+  framework's sync `OutboxProcessingModule.onApplicationShutdown`.
+  Plus an `ExampleCleanupService` stand-in for arbitrary user
+  cleanup hooks. 4 integration tests including mid-handler
+  shutdown and mid-tx atomicity.
 
 ## Existing examples (slated for retirement or absorption during Phase 14.8f)
 
@@ -132,8 +151,11 @@ Each example honours these scripts; `test:integration` exists in
 examples that require Docker — currently `basic-typeorm-outbox`,
 `outbox-full-stack`, every Tier 2 multi-DataSource example except
 `multi-datasource-basic`, every Tier 3 externalization example,
-and every Tier 4 example (the unit-only branches of `testing-patterns`
-run under plain `pnpm test`).
+every Tier 4 example (the unit-only branches of `testing-patterns`
+run under plain `pnpm test`), and every Tier 5 example
+(`e-commerce-orders` additionally pulls a Kafka KRaft image for
+its `pnpm start` visual demo, the integration tests use a mocked
+`ClientProxy` instead).
 
 The root `pnpm test` deliberately excludes `examples/*` to keep the
 default dev loop fast — run the example tests directly when you change
@@ -175,8 +197,15 @@ example code.
 - "Full TypeORM + CQRS + multiple phases" →
   [`cqrs-full-stack`](cqrs-full-stack)
 - "Full TypeORM + outbox + CQRS + worker + Postgres" →
-  [`outbox-full-stack`](outbox-full-stack); `e-commerce-orders`
-  (Phase 14.8e) when shipped
+  [`outbox-full-stack`](outbox-full-stack) (pre-tier;
+  superseded by `e-commerce-orders`)
+- "End-to-end realistic application — multi-DS saga + Kafka +
+  CQRS + REST" → [`e-commerce-orders`](e-commerce-orders)
+- "`forRootAsync` + `ConfigService` + per-environment .env
+  profiles" →
+  [`async-config-from-environment`](async-config-from-environment)
+- "Worker drain + lifecycle hooks for SIGTERM-driven deploys" →
+  [`graceful-shutdown`](graceful-shutdown)
 - "Multi-step business process with compensation" →
   [`saga-pattern`](saga-pattern)
 - "Cross-DataSource audit trail through the outbox" →
