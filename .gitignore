@@ -19,6 +19,9 @@ test-results/
 *.swo
 .DS_Store
 
+# AI agent state (Claude Code etc.) — local-only, never tracked
+.claude/
+
 # Logs
 *.log
 npm-debug.log*
