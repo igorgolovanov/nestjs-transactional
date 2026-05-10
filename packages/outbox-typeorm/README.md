@@ -11,24 +11,24 @@ NestJS module wiring.
 
 ## Status
 
-**Alpha / in development.** Public API not yet stable and may change
-between 0.x releases. Current shape:
+Alpha. Public API may change between 0.x releases. Current shape:
 
 - `EventPublicationEntity` / `EventPublicationArchiveEntity` schema
   with all four indexes for worker / operator / cleanup paths.
 - `TypeOrmEventPublicationRepository` integrates through the
-  Phase 14.20 transparent repository patches — every read and
+  transparent transactional repository patches in
+  [`@nestjs-transactional/typeorm`](../typeorm) — every read and
   write commits atomically with the business transaction.
 - `OutboxTypeOrmModule.forRoot({ dataSource?, isDefault? })` and
   `forRootAsync({...})` — DataSource is resolved from DI via
-  `@nestjs/typeorm`'s `getDataSourceToken(name)` (Phase 14.21
-  reshape, mirroring `TypeOrmTransactionalModule`).
+  `@nestjs/typeorm`'s `getDataSourceToken(name)`, mirroring
+  `TypeOrmTransactionalModule`.
 - `SchemaInitializer` for development-time auto-init plus the
   shipped TypeORM migration `CreateEventPublication1700000000000`.
 
-Phase history: [`docs/roadmap/README.md`](../../docs/roadmap/README.md),
+Design notes: [`docs/roadmap/README.md`](../../docs/roadmap/README.md),
 [ADR-006](../../docs/adr/006-outbox-pattern.md),
-[ADR-019](../../docs/adr/019-multi-forroot-pattern.md).
+[ADR-019](../../docs/adr/019-outbox-multi-forroot-pattern.md).
 
 ## What ships today
 
@@ -123,18 +123,18 @@ const dataSource = new DataSource({
     //    downstream modules can see TransactionManager.
     TransactionalModule.forRoot({ isGlobal: true }),
 
-    // 2. TypeORM adapter registration. Phase 14.20: `forRoot`
-    //    resolves the actual DataSource via @nestjs/typeorm's
+    // 2. TypeORM adapter registration. `forRoot` resolves the
+    //    actual DataSource via @nestjs/typeorm's
     //    `getDataSourceToken(name)` — so `TypeOrmModule.forRoot(...)`
     //    must be imported above this. Activates transparent
     //    transactional Repository dispatch.
     TypeOrmTransactionalModule.forRoot({ isDefault: true }),
 
-    // 3. Outbox-typeorm registration. Phase 14.21: forRoot
-    //    resolves the DataSource from DI (same pattern as
+    // 3. Outbox-typeorm registration. `forRoot` resolves the
+    //    DataSource from DI (same pattern as
     //    TypeOrmTransactionalModule). Registers the
-    //    `TypeOrmEventPublicationRepository` under a private
-    //    per-DS token; the cross-module bridge
+    //    `TypeOrmEventPublicationRepository` under a private per-DS
+    //    token; the cross-module bridge
     //    `typeOrmEventPublicationRepositoryProvider()` (passed to
     //    `OutboxModule.forRoot` below) aliases the official outbox
     //    token to that private one. The `SchemaInitializer` is

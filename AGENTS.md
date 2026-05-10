@@ -257,16 +257,16 @@ historical context.
 
 ### Blocked / Awaiting
 
-- Pre-0.1.0 release blockers: Docker integration tests in CI,
-  NPM_TOKEN setup, first changeset for outbox packages.
+- *(none — release pipeline ready; first 0.1.0-alpha.0 publish
+  imminent.)*
 
 ### Next
 
-- **Phase 9 iteration 9.3** (release automation): changeset
-  entries for the outbox packages, CI matrix tweaks for Docker
-  integration tests, NPM_TOKEN setup, and the first 0.1.0-alpha
-  release. Independent track — does not block further iterations
-  on the framework itself.
+- **First `0.1.0-alpha.0` publish**: `pnpm changeset version`
+  produces the version bumps and `CHANGELOG.md` entries, then
+  `release.yml`'s `changesets/action@v1` step opens (or directly
+  publishes) the alpha. NPM_TOKEN secret is configured; the six
+  initial changesets are committed and ready.
 - Future phases (not scheduled): broker-aware externalizers
   (native `kafkajs` / `amqplib` / `nats`), outbox-prisma,
   outbox-mongodb, OpenTelemetry integration, ESM dual packaging.

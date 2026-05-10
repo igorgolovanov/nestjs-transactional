@@ -3,59 +3,81 @@
 [![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
-Core primitives for declarative Spring-style transaction management in NestJS.
+Core primitives for declarative Spring-style transaction management
+in NestJS.
 
 ## Overview
 
-This package is the adapter-agnostic foundation of the `@nestjs-transactional` family:
+The adapter-agnostic foundation of the `@nestjs-transactional` family:
 
-- `TransactionContext` — `AsyncLocalStorage`-backed carrier that propagates the active transaction across `await` boundaries.
-- `TransactionManager` — runtime with the full Spring propagation semantics (`REQUIRED`, `REQUIRES_NEW`, `NESTED`, `SUPPORTS`, `NOT_SUPPORTED`, `NEVER`, `MANDATORY`) plus `rollbackFor` / `noRollbackFor` rules and before/after commit/rollback hooks.
-- `@Transactional()`, `@ReadOnly()`, `@TransactionalOn(instance)` decorators — metadata-only; wrapping is performed at runtime by coordinated mechanisms (see ADR-005 in the repo root).
-- `TransactionalInterceptor` — wires `@Transactional` on controllers, resolvers, gateways, and microservice handlers via `APP_INTERCEPTOR`.
-- `TransactionalModule.forRoot` / `forRootAsync` — module wiring.
-- `TransactionAdapter<THandle>` port — pure interface for ORM-specific adapters.
-- `InMemoryTransactionAdapter` (via `@nestjs-transactional/core/testing`) — drop-in adapter for unit tests.
+- `TransactionContext` — `AsyncLocalStorage`-backed carrier that
+  propagates the active transaction across `await` boundaries.
+- `TransactionManager` — runtime with the full Spring propagation
+  semantics (`REQUIRED`, `REQUIRES_NEW`, `NESTED`, `SUPPORTS`,
+  `NOT_SUPPORTED`, `NEVER`, `MANDATORY`) plus `rollbackFor` /
+  `noRollbackFor` rules and before / after commit / rollback hooks.
+- `@Transactional()`, `@ReadOnly()`, `@TransactionalOn(instance)`
+  decorators — metadata-only; runtime wrapping is performed by the
+  three coordinated mechanisms documented in
+  [ADR-005](../../docs/adr/005-method-wrapping-strategy.md).
+- `TransactionalInterceptor` — wires `@Transactional` on controllers,
+  resolvers, gateways, and microservice handlers via `APP_INTERCEPTOR`.
+- `TransactionalModule.forRoot` / `forRootAsync` — module wiring,
+  one call per dataSource (multi-`forRoot` pattern, see
+  [ADR-019](../../docs/adr/019-outbox-multi-forroot-pattern.md)).
+- `TransactionAdapter<THandle>` SPI — the port for ORM-specific
+  adapters.
+- `InMemoryTransactionAdapter` (via the `@nestjs-transactional/core/testing`
+  subpath) — drop-in adapter for unit tests.
 
-This package does not depend on any concrete ORM. Install `@nestjs-transactional/typeorm` for TypeORM integration, or implement your own adapter against the `TransactionAdapter` interface.
+This package does not depend on any concrete ORM. Install
+`@nestjs-transactional/typeorm` for TypeORM integration, or implement
+your own adapter against the `TransactionAdapter` interface.
 
 ## Installation
 
 ```bash
-npm install @nestjs-transactional/core reflect-metadata
+pnpm add @nestjs-transactional/core reflect-metadata
 ```
 
-Load `reflect-metadata` once at the application entry point (same as for NestJS itself).
+Load `reflect-metadata` once at the application entry point (same as
+for NestJS itself).
 
 ## Quick start
 
+In typical use this package is imported via an integration package
+(like `@nestjs-transactional/typeorm`) which registers the adapter
+into the `AdapterRegistry` automatically. The minimal application
+shape is:
+
 ```ts
 import { Module } from '@nestjs/common';
-import {
-  TransactionalModule,
-  type TransactionAdapter,
-} from '@nestjs-transactional/core';
-
-// Replace with a real adapter (e.g. from @nestjs-transactional/typeorm).
-const myAdapter: TransactionAdapter = /* ... */;
+import { TransactionalModule } from '@nestjs-transactional/core';
+import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+// ...your TypeORM config
 
 @Module({
   imports: [
-    TransactionalModule.forRoot({
-      isGlobal: true,
-      adapters: [
-        { adapterName: 'typeorm', instanceName: 'default', adapter: myAdapter },
-      ],
-    }),
+    TypeOrmModule.forRoot({ /* ... */ }),
+
+    // Infrastructure-only forRoot — registers TransactionManager,
+    // AdapterRegistry, and the interceptor. No `adapter` here; the
+    // integration package below registers it.
+    TransactionalModule.forRoot({ isGlobal: true }),
+
+    // Integration package registers `TypeOrmTransactionAdapter`
+    // for the default dataSource.
+    TypeOrmTransactionalModule.forRoot(),
   ],
 })
 export class AppModule {}
 ```
 
-Once the module is imported, `@Transactional()` on any controller handler is wrapped in a transaction automatically:
+`@Transactional()` on any controller handler, query handler, or
+service method is then wrapped in a transaction automatically:
 
 ```ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { Transactional } from '@nestjs-transactional/core';
 
 @Controller('orders')
@@ -69,6 +91,30 @@ export class OrdersController {
   }
 }
 ```
+
+### Direct adapter registration (custom backends)
+
+When implementing a new `TransactionAdapter` (Prisma, Mongoose, ...),
+pass it to `forRoot` directly:
+
+```ts
+import { TransactionalModule, type TransactionAdapter } from '@nestjs-transactional/core';
+
+const myAdapter: TransactionAdapter = /* ... */;
+
+@Module({
+  imports: [
+    TransactionalModule.forRoot({
+      isGlobal: true,
+      adapter: myAdapter,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+For multi-dataSource setups, call `forRoot` once per dataSource —
+each call registers exactly one adapter under its dataSource name.
 
 ## Decorator options
 
@@ -97,7 +143,7 @@ class ReportsService {
   @Transactional({ noRollbackFor: [ValidationError] })
   async processBatch() { /* ... */ }
 
-  // Target a specific adapter instance in multi-DataSource setups.
+  // Target a specific dataSource in multi-DataSource setups.
   @TransactionalOn('billing')
   async chargeCard() { /* ... */ }
 }
@@ -118,10 +164,7 @@ Propagation semantics:
 ## Async module configuration
 
 ```ts
-import {
-  TransactionalModule,
-  type AdapterRegistration,
-} from '@nestjs-transactional/core';
+import { TransactionalModule } from '@nestjs-transactional/core';
 
 @Module({
   imports: [
@@ -129,7 +172,7 @@ import {
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        adapters: buildAdaptersFromConfig(config) satisfies AdapterRegistration[],
+        adapter: buildAdapterFromConfig(config),
       }),
     }),
   ],
@@ -137,11 +180,15 @@ import {
 export class AppModule {}
 ```
 
-`isGlobal` and `registerInterceptor` remain static top-level flags — they must be known at module definition time.
+`isGlobal` and `registerInterceptor` remain static top-level flags —
+they must be known at module definition time. The async factory
+returns the per-call configuration (`adapter` and any other
+runtime-resolved options).
 
 ## Lifecycle hooks
 
-Register hooks from inside a transactional method — they fire on the current transaction:
+Register hooks from inside a transactional method — they fire on the
+current transaction:
 
 ```ts
 import { TransactionManager } from '@nestjs-transactional/core';
@@ -168,11 +215,13 @@ export class OrdersService {
 }
 ```
 
-Hook errors are caught and logged via NestJS `Logger` — they do not affect the transaction outcome or prevent sibling hooks from running.
+Hook errors are caught and logged via NestJS `Logger` — they do not
+affect the transaction outcome or prevent sibling hooks from running.
 
 ## Testing
 
-Use the `InMemoryTransactionAdapter` exported from the `/testing` subpath for tests that need adapter-level observability without a real database:
+`InMemoryTransactionAdapter` from the `/testing` subpath gives
+adapter-level observability without a real database:
 
 ```ts
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
@@ -182,11 +231,7 @@ const adapter = new InMemoryTransactionAdapter();
 
 const moduleRef = await Test.createTestingModule({
   imports: [
-    TransactionalModule.forRoot({
-      adapters: [
-        { adapterName: 'in-memory', instanceName: 'default', adapter },
-      ],
-    }),
+    TransactionalModule.forRoot({ isGlobal: true, adapter }),
   ],
 }).compile();
 
@@ -196,15 +241,25 @@ expect(adapter.rolledBackTransactions).toHaveLength(0);
 expect(adapter.savepointsReleased).toHaveLength(0);
 ```
 
-`adapter.reset()` clears all observation arrays between tests when you keep a single adapter instance across cases.
+`adapter.reset()` clears all observation arrays between tests when
+you keep a single adapter instance across cases. For multi-DS test
+setups, pass distinct dataSource names to the constructor:
+
+```ts
+const billing = new InMemoryTransactionAdapter('billing');
+const inventory = new InMemoryTransactionAdapter('inventory');
+```
 
 ## Worked examples
 
-- [`basic-transactional`](../../examples/basic-transactional) — `@Transactional()` on a plain service.
-- [`testing-patterns`](../../examples/testing-patterns) — `InMemoryTransactionAdapter` from `core/testing` plus the outbox / integration tiers.
+- [`basic-transactional`](../../examples/basic-transactional) —
+  `@Transactional()` on a plain service.
+- [`testing-patterns`](../../examples/testing-patterns) —
+  `InMemoryTransactionAdapter` from `core/testing` plus the outbox /
+  integration test layers.
 
 Full catalogue: [examples/README.md](../../examples/README.md).
 
 ## Status
 
-Work in progress. Not yet published to npm.
+Alpha. Public API may change between 0.x releases.

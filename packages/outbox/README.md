@@ -211,13 +211,13 @@ you want stability across renames.
 
 ## Externalization (advanced)
 
-> **Status:** SPI shipped (Phase 11.1–11.2). The
-> `@nestjs/microservices` `ClientProxy`-backed `EventExternalizer`
-> implementation ships as a separate package —
-> [`@nestjs-transactional/outbox-microservices`](../outbox-microservices)
-> (Phase 11.3). Without an externalizer bound, `@Externalized`
-> mappings are recorded but never delivered to a broker — local
-> outbox listeners still run.
+> The `EventExternalizer` SPI lives in this package. The
+> `@nestjs/microservices` `ClientProxy`-backed implementation ships
+> as a separate package —
+> [`@nestjs-transactional/outbox-microservices`](../outbox-microservices).
+> Without an externalizer bound, `@Externalized` mappings are
+> recorded but never delivered to a broker — local outbox listeners
+> still run.
 >
 > Architecture and design rationale:
 > [ADR-015](../../docs/adr/015-event-externalization-architecture.md),
@@ -371,12 +371,11 @@ Full catalogue: [examples/README.md](../../examples/README.md).
 
 ## Status
 
-**Alpha / in development.** Public API not yet stable and may change
-between 0.x releases. Current functionality is exercised end-to-end
-through the Phase 14.8 worked-example library — see
-[`examples/README.md`](../../examples/README.md).
+Alpha. Public API may change between 0.x releases. Current
+functionality is exercised end-to-end through the
+[Tier 1–5 example library](../../examples/README.md).
 
-Phase history and design notes:
+Design notes:
 [`docs/roadmap/README.md`](../../docs/roadmap/README.md),
 [`docs/adr/006-outbox-pattern.md`](../../docs/adr/006-outbox-pattern.md).
 

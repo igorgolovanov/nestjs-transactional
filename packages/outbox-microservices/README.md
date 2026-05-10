@@ -40,13 +40,14 @@ architecture doc above.
 
 ## Status
 
-**Alpha / in development.** Public API not yet stable and may change
-between 0.x releases. Headers / `routingKey` are accepted on
-`@Externalized` but not yet applied to the wire payload — see
-*Limitations* below. End-to-end coverage lives in the Phase 14.8c
-externalization tier examples and the Phase 14.8e flagship
-[`e-commerce-orders`](../../examples/e-commerce-orders) — see
-[Worked examples](#worked-examples).
+Alpha. Public API may change between 0.x releases. Headers /
+`routingKey` are accepted on `@Externalized` but not yet applied to
+the wire payload — see *Limitations* below. End-to-end coverage
+lives in the externalization examples (`externalization-kafka`,
+`externalization-multi-broker`, `externalization-multi-datasource`,
+`externalization-with-fallback`) and the
+[`e-commerce-orders`](../../examples/e-commerce-orders) flagship —
+see [Worked examples](#worked-examples).
 
 ## Important: reliability semantics (read before production use)
 
@@ -258,7 +259,7 @@ processed. Disable with `validateOnBootstrap: false` when the
 finishes after the outbox bootstrap (the lookup is then deferred to
 the first `externalize()` call).
 
-## Limitations (Phase 11.3)
+## Limitations
 
 - **Headers and `routingKey` are accepted but not applied** to the
   wire payload yet. The `@nestjs/microservices` `ClientProxy.emit`
@@ -270,9 +271,12 @@ the first `externalize()` call).
   transport-specific envelope inside your own code if you need them
   before then.
 - **Real-broker integration tests** (Postgres + Kafka / RabbitMQ via
-  testcontainers) ship with Phase 11.4 — the unit and module specs in
-  this package use a mock `ClientProxy` and cover the SPI contract
-  end-to-end without a live broker.
+  testcontainers) are not bundled with this package — the unit and
+  module specs use a mock `ClientProxy` and cover the SPI contract
+  end-to-end without a live broker. The
+  [`externalization-with-fallback`](../../examples/externalization-with-fallback/)
+  example demonstrates a real-broker setup via docker-compose with
+  the ADR-016 silent-success limitation observable end-to-end.
 
 ## Testing
 
@@ -294,11 +298,11 @@ const moduleRef = await Test.createTestingModule({
 
 ## Worked examples
 
-- [`externalization-kafka`](../../examples/externalization-kafka) — single DataSource + single Kafka broker, the canonical Phase 11 baseline.
+- [`externalization-kafka`](../../examples/externalization-kafka) — single DataSource + single Kafka broker, the canonical baseline.
 - [`externalization-multi-broker`](../../examples/externalization-multi-broker) — Kafka + RabbitMQ + Redis pub/sub routed per event via `@Externalized({ client })`.
 - [`externalization-multi-datasource`](../../examples/externalization-multi-datasource) — two physical Postgres × two `ClientProxy` registrations on a single broker.
 - [`externalization-with-fallback`](../../examples/externalization-with-fallback) — ADR-016 silent-success demo + the three production mitigation patterns + `FailedEventPublications.resubmit` recovery flow.
-- [`e-commerce-orders`](../../examples/e-commerce-orders) — Phase 14.8e flagship; externalization is the terminal step of the order saga.
+- [`e-commerce-orders`](../../examples/e-commerce-orders) — flagship application; externalization is the terminal step of the order saga.
 
 Full catalogue: [examples/README.md](../../examples/README.md).
 

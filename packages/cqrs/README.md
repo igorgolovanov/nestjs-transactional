@@ -122,9 +122,9 @@ export class OrderRepository {
   ) {}
 
   async save(order: { id: string }): Promise<void> {
-    // Phase 14.20: the @InjectRepository instance auto-dispatches
-    // through the active @Transactional() scope's EntityManager —
-    // no getCurrentEntityManager() boilerplate needed.
+    // The @InjectRepository instance auto-dispatches through the
+    // active @Transactional() scope's EntityManager — no
+    // getCurrentEntityManager() boilerplate needed.
     await this.rows.save({ id: order.id });
   }
 }
@@ -213,9 +213,10 @@ dispatched:
    `AFTER_COMMIT` hook on the current transaction, and
    `OrderRollbackProjection.handle` as an `AFTER_ROLLBACK` hook.
 3. The repository's `@InjectRepository(OrderRow)` Repository
-   auto-dispatches through the active transaction (Phase 14.20
-   transparent transactional repositories) — both writes go through
-   the same DB connection.
+   auto-dispatches through the active transaction (the transparent
+   transactional repository feature in
+   [`@nestjs-transactional/typeorm`](../typeorm)) — both writes go
+   through the same DB connection.
 4. `execute` resolves; `TransactionManager` commits the transaction;
    the adapter flushes to the database.
 5. After the commit succeeds, the manager runs `AFTER_COMMIT` hooks —
@@ -403,7 +404,7 @@ publications unless `options.id` is set.
 ## Worked examples
 
 - [`basic-cqrs`](../../examples/basic-cqrs) — Command + Query (auto-readonly) + AFTER_COMMIT `@TransactionalEventsHandler`, no DB.
-- [`multi-datasource-cqrs`](../../examples/multi-datasource-cqrs) — `@Transactional({ dataSource })` per handler (Phase 14.3.1 Category B per-DS hook attachment).
+- [`multi-datasource-cqrs`](../../examples/multi-datasource-cqrs) — `@Transactional({ dataSource })` per handler with per-DS hook attachment.
 - [`saga-pattern`](../../examples/saga-pattern), [`audit-logging`](../../examples/audit-logging) — `@TransactionalEventsHandler` + `@OutboxEventsHandler` against the same event class.
 - [`e-commerce-orders`](../../examples/e-commerce-orders) — full CQRS + REST controller + outbox-driven saga + multi-DS.
 
@@ -427,4 +428,4 @@ Full catalogue: [examples/README.md](../../examples/README.md).
 
 ## Status
 
-Work in progress. Not yet published to npm.
+Alpha. Public API may change between 0.x releases.
