@@ -243,12 +243,19 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last updated**: 2026-05-10 — Phase 14.8e Tier 5 (production-
-realism example library) shipped, and the framework fix for
-Convention #22 (`TypeOrmTransactionalModule.forRootAsync` bootstrap
-bug) landed as a same-day follow-up. See
-[`docs/status/2026-05-10-phase-14-8e.md`](docs/status/2026-05-10-phase-14-8e.md)
-for the retrospective. Earlier phase retrospectives in
+**Last update**: Phase 14.8f comprehensive documentation sweep
+shipped (5 commits) — closes Phase 14.8 Tier 1–5 example library
+and the multi-adapter era documentation. Per-package READMEs
+synced with the example catalogue and Phase 14.20/14.21 alignment;
+pre-tier `cqrs-full-stack` and `outbox-full-stack` examples retired;
+ADR-018 / ADR-019 collapsed running addendum history into final-form
+Decision prose; `docs/guides/migrating-to-outbox.md` fully rewritten
+with multi-DataSource and externalization sections;
+[`docs/roadmap/README.md`](docs/roadmap/README.md) restructured
+into an era-based narrative with Phase 14 sub-phases in numerical
+order. See
+[`docs/status/2026-05-10-phase-14-8f.md`](docs/status/2026-05-10-phase-14-8f.md)
+for the retrospective. Earlier phase retrospectives live in
 [`docs/status/`](docs/status/); the full completed-phases archival
 list is at [`docs/status/completed.md`](docs/status/completed.md).
 
@@ -259,32 +266,44 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 
 ### Next
 
-- **Phase 14.8f (Comprehensive doc sweep)**: per master plan,
-  examples top-level README polish, per-package README sync with
-  full example library cross-references, migration-guide updates
-  referencing the new examples, ADR-018 / ADR-019 final-form
-  review, roadmap consolidation of the Phase 14.8 narrative.
-  Pre-tier `cqrs-full-stack` and `outbox-full-stack` examples
-  retired (their coverage is fully absorbed by `basic-cqrs`,
-  `basic-typeorm-outbox`, and the Tier 5 `e-commerce-orders`
-  flagship).
-- **Phase 9 iteration 9.3**: release automation for the outbox
-  packages — changeset entries, CI matrix tweaks, first
-  0.1.0-alpha release.
+- **Phase 9 iteration 9.3** (release automation): changeset
+  entries for the outbox packages, CI matrix tweaks for Docker
+  integration tests, NPM_TOKEN setup, and the first 0.1.0-alpha
+  release. Independent track — does not block further iterations
+  on the framework itself.
+- **Phase 14.8f retrospective** (`docs/status/`): per project
+  convention each shipped phase gets a per-phase status
+  retrospective. Optional follow-up to the closure commit batch.
 - Future phases (not scheduled): broker-aware externalizers
   (native `kafkajs` / `amqplib` / `nats`), outbox-prisma,
   outbox-mongodb, OpenTelemetry integration, ESM dual packaging.
 
 ### Five most recent decisions
 
-- Framework fix landed for Convention #22 (2026-05-10, follow-up
-  to Phase 14.8e closure) — `TypeOrmTransactionalModule.forRootAsync`
-  registration moved from a `useFactory` provider to an
-  `OnModuleInit`-driven `@Injectable()` class generated per
-  `forRootAsync` call. Root cause was `markAsManaged(undefined)`
-  cascading from `moduleRef.get`/`resolve` returning `undefined`
-  while `@nestjs/typeorm`'s async DataSource provider was still
-  pending. Pinned by
+- Phase 14.8f shipped — comprehensive documentation sweep closing
+  the multi-adapter era. Five commits: per-package READMEs synced
+  with the example catalogue + Phase 14.20/14.21 alignment;
+  pre-tier `cqrs-full-stack` and `outbox-full-stack` examples
+  retired (coverage absorbed by `basic-cqrs`, `basic-typeorm-outbox`,
+  Tier 5 `e-commerce-orders`); ADR-018 / ADR-019 deep rewrite
+  collapsed running addendum history into final-form Decision
+  prose; `docs/guides/migrating-to-outbox.md` fully rewritten with
+  multi-DataSource and externalization sections;
+  `docs/roadmap/README.md` restructured into era-based narrative
+  with Phase 14 sub-phases in numerical order. Net delta:
+  +1612 / -2295 LoC (doc corpus contracted thanks to addendum
+  collapse and pre-tier example retirement). Date-discipline rule
+  inscribed mid-flight: ADR `**Date**:` header is convention,
+  inline body and Revision-history bullet dates avoided in favour
+  of phase anchors.
+- Framework fix landed for Convention #22 (follow-up to Phase 14.8e
+  closure) — `TypeOrmTransactionalModule.forRootAsync` registration
+  moved from a `useFactory` provider to an `OnModuleInit`-driven
+  `@Injectable()` class generated per `forRootAsync` call. Root
+  cause was `markAsManaged(undefined)` cascading from
+  `moduleRef.get`/`resolve` returning `undefined` while
+  `@nestjs/typeorm`'s async DataSource provider was still pending.
+  Pinned by
   `packages/typeorm/test/integration/forrootasync.integration.spec.ts`.
   The async-config example reverted its workaround and now uses
   `forRootAsync` for all four framework modules.
@@ -300,9 +319,9 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   `QueryBus` (controllers inject handlers directly);
   #21 `OutboxModule.forRootAsync({ repository })` lives on options,
   not on the async factory result; #22 historical record of the
-  `TypeOrmTransactionalModule.forRootAsync` bug (now fixed —
-  see decision above); #23 dotenv refuses to overwrite
-  `process.env` (snapshot/restore between tests); #24 user-side
+  `TypeOrmTransactionalModule.forRootAsync` bug (now fixed — see
+  decision above); #23 dotenv refuses to overwrite `process.env`
+  (snapshot/restore between tests); #24 user-side
   `OutboxDrainService` complement to the framework's sync
   `OutboxProcessingModule.onApplicationShutdown`. LoC envelope
   updated for flagship multi-multi-axis examples (1800–2100 floor).
@@ -319,10 +338,6 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   examples use class-token `OutboxEventPublisher` DI for smart-
   facade routing; one global externalizer per process (per-broker
   routing via `@Externalized({ client })`).
-- Phase 14.8b shipped — multi-DS examples confirmed two design
-  catches (smart-facade DI requires class-token, not
-  `@InjectOutboxPublisher`; `OutboxModule.forRoot` belongs at
-  AppModule level when sub-modules are involved).
 
 For the full list of completed phases see
 [`docs/status/completed.md`](docs/status/completed.md). For
