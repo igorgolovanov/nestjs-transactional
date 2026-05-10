@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/outbox-microservices",
-  "version": "0.0.0",
+  "version": "1.0.0-alpha.0",
   "description": "Event externalization for @nestjs-transactional/outbox via @nestjs/microservices ClientProxy — Spring Modulith @Externalized parity",
   "license": "MIT",
   "author": "Igor Golovanov",

@@ -28,5 +28,12 @@
     "@nestjs-transactional/outbox-typeorm": "0.0.0",
     "@nestjs-transactional/typeorm": "0.0.0"
   },
-  "changesets": []
+  "changesets": [
+    "release-0-1-0-alpha-core",
+    "release-0-1-0-alpha-cqrs",
+    "release-0-1-0-alpha-outbox-microservices",
+    "release-0-1-0-alpha-outbox-typeorm",
+    "release-0-1-0-alpha-outbox",
+    "release-0-1-0-alpha-typeorm"
+  ]
 }
