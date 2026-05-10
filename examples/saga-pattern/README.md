@@ -181,4 +181,5 @@ pnpm -C examples/saga-pattern start
 
 - [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
 - [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-smart-facade-outbox-publisher.md)
-- [Phase 14.8d Tier 4 status doc](../../docs/status/2026-05-10-phase-14-8d.md)
+- [Convention #26 — idempotency gate at every outbox-driven step](../../docs/status/conventions.md)
+- [Convention #25 — inbox / dedup as consumer-side complement](../../docs/status/conventions.md)

@@ -78,7 +78,6 @@ the linked docs for depth.
 | Architecture Decision Records | [docs/adr/](docs/adr/) — see ADR index below |
 | Design Decisions | [docs/dd/](docs/dd/) — see DD index below |
 | Implementation roadmap (per phase) | [docs/roadmap/README.md](docs/roadmap/README.md) |
-| Per-phase status / retrospectives | [docs/status/](docs/status/) |
 | Empirically-discovered conventions | [docs/status/conventions.md](docs/status/conventions.md) |
 | Coding conventions, testing strategy, dev workflow | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Multi-adapter migration guide | [docs/migration/multi-adapter.md](docs/migration/multi-adapter.md) |
@@ -218,8 +217,9 @@ When starting a new session:
    linked file for any topic the user's request touches; do not
    guess from memory.
 3. Check the current state under [Current Status](#current-status)
-   below — the most-recent phase summary lives there; older
-   per-phase retrospectives live in [`docs/status/`](docs/status/).
+   below — the most-recent phase summary lives there. The full
+   phase-by-phase narrative is in
+   [`docs/roadmap/README.md`](docs/roadmap/README.md).
 4. Confirm your understanding with the user before starting work.
 5. If anything is unclear — ask before writing code.
 
@@ -252,11 +252,8 @@ Decision prose; `docs/guides/migrating-to-outbox.md` fully rewritten
 with multi-DataSource and externalization sections;
 [`docs/roadmap/README.md`](docs/roadmap/README.md) restructured
 into an era-based narrative with Phase 14 sub-phases in numerical
-order. See
-[`docs/status/2026-05-10-phase-14-8f.md`](docs/status/2026-05-10-phase-14-8f.md)
-for the retrospective. Earlier phase retrospectives live in
-[`docs/status/`](docs/status/); the full completed-phases archival
-list is at [`docs/status/completed.md`](docs/status/completed.md).
+order. The phase-by-phase narrative is the canonical source for
+historical context.
 
 ### Blocked / Awaiting
 
@@ -270,9 +267,6 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   integration tests, NPM_TOKEN setup, and the first 0.1.0-alpha
   release. Independent track — does not block further iterations
   on the framework itself.
-- **Phase 14.8f retrospective** (`docs/status/`): per project
-  convention each shipped phase gets a per-phase status
-  retrospective. Optional follow-up to the closure commit batch.
 - Future phases (not scheduled): broker-aware externalizers
   (native `kafkajs` / `amqplib` / `nats`), outbox-prisma,
   outbox-mongodb, OpenTelemetry integration, ESM dual packaging.
@@ -338,7 +332,7 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   facade routing; one global externalizer per process (per-broker
   routing via `@Externalized({ client })`).
 
-For the full list of completed phases see
-[`docs/status/completed.md`](docs/status/completed.md). For
+For the full phase-by-phase narrative see
+[`docs/roadmap/README.md`](docs/roadmap/README.md). For
 empirically-discovered conventions surfaced during implementation
 see [`docs/status/conventions.md`](docs/status/conventions.md).
