@@ -1,285 +1,30 @@
 # ADR-018: Multi-adapter architecture — dataSource-name-keyed registration
 
-- **Status**: Accepted
+- **Status**: Accepted (final form after Phase 14.20 / 14.21)
 - **Date**: 2026-04-27
 - **Related**:
   - ADR-005 (method wrapping strategy)
   - ADR-007 (outbox architecture: core + persistence split)
-  - DD-005 (multi-DataSource as a first-class feature — already partially
-    implemented in `packages/typeorm`)
+  - ADR-019 (`OutboxModule` multi-`forRoot` registration pattern)
+  - DD-005 (multi-DataSource as a first-class feature)
   - DD-020 (multi-adapter through dataSource-name identifier)
   - DD-021 (adapter constructor accepts dataSource name)
   - DD-022 (inject decorators with dataSource parameter)
   - DD-023 (independent transaction contexts per dataSource)
   - DD-024 (smart `OutboxEventPublisher` facade)
-
-> **Note (Phase 14.2 scope refinement, 2026-04-27):** Point 7
-> ("Independent transaction contexts") originally read "each
-> dataSource gets its own `AsyncLocalStorage` instance". During
-> Phase 14.2 implementation planning we discovered the existing
-> core architecture already provides the same *semantic* guarantee
-> through a single shared `AsyncLocalStorage` whose store carries a
-> `Map` keyed by dataSource name — cross-dataSource enrolment is
-> structurally impossible because the keys are disjoint. Migrating
-> to literal per-dataSource ALS instances would have cascaded
-> through every consumer of `TransactionContext`'s static API
-> (typeorm helpers, CQRS dispatcher, outbox publisher, ~487 tests)
-> for no functional benefit. Section 7 below has been rewritten to
-> describe what we ship; [DD-023](../dd/023-independent-tx-contexts-per-ds.md)
-> carries the same revision.
-
-> **Note (Phase 14.3.2 module-registration shape, 2026-04-27):**
-> Point 3 ("Per-dataSource provider registration") shows
-> `TransactionalModule.forRoot` taking a single `{ adapter,
-> dataSource }` per call and is silent on the analogous
-> `OutboxModule.forRoot` shape. Phase 14.3 originally shipped an
-> array API (`OutboxModule.forRoot({ dataSources: [...] })`) that
-> deviated from the per-call pattern. Phase 14.3.2 reworked
-> `OutboxModule` to the multi-`forRoot` shape: each call registers
-> one dataSource's outbox stack; cross-call coordination of
-> singletons (smart facade, processing bundle, listener scanner)
-> happens through static class storage modelled on
-> `@nestjs/typeorm`'s `EntitiesMetadataStorage`. Full design
-> rationale and mechanism in
-> [ADR-019](./019-outbox-multi-forroot-pattern.md). Phase 14.10
-> applies the same pattern to `TransactionalModule.forRoot`,
-> closing the asymmetry that Phase 14.2 Q1.B (single
-> `forRoot` call with an `adapters: [...]` array) introduced
-> relative to the `OutboxModule` rework.
-
-> **Note (Phase 14.10 + 14.11 cleanup, 2026-04-27):** The
-> Phase 14.3.2 forward-reference above has now landed.
->
-> **Phase 14.10** rewrote `TransactionalModule.forRoot` to the
-> multi-`forRoot` shape. The `adapters: [...]` array form (Phase
-> 14.2 Q1.B) is removed entirely; each adapter-bearing call
-> registers exactly one dataSource. Static class storage
-> (`TransactionalModule.registrations` Map +
-> `infrastructureRegistered` flag) coordinates singletons across
-> calls — the same mechanism Phase 14.3.2 introduced for
-> `OutboxModule` per ADR-019. The default `isGlobal` flips from
-> `false` to `true` to match `OutboxModule` and unblock multi-
-> call cross-DI visibility (without the flip, sibling
-> `DynamicModule`s cannot see the first call's
-> `TransactionManager` / `AdapterRegistry`). The
-> infrastructure-only shorthand `TransactionalModule.forRoot({})`
-> (no adapter) is preserved — `TypeOrmTransactionalModule.forFeature`
-> remains a valid adapter-source path that registers
-> imperatively into the AdapterRegistry.
->
-> **Phase 14.11** removed the deprecated
-> `TypeOrmTransactionalOptions.instanceName` alias introduced in
-> Phase 14.4. The canonical `dataSourceName` field remains;
-> dual-read logic is gone. The alias was retained for one phase
-> boundary so consumers had time to migrate; pre-release
-> cleanup eliminates the carry-over.
->
-> Cumulative effect: a single coherent multi-adapter API
-> surface across `core`, `typeorm`, and `outbox` packages, all
-> using per-dataSource per-call registration. Item 1 in the
-> [`docs/migration/multi-adapter.md`](../migration/multi-adapter.md) describes
-> the `forRoot` signature change in past tense; item 8 reflects
-> Phase 14.11's alias removal.
-
-> **Note (Phase 14.20 transparent transactional repositories,
-> 2026-04-29):** The original ADR-018 anticipated a future feature
-> where `@InjectRepository` Repositories automatically dispatch
-> through the active `@Transactional()` scope without users having
-> to call `getCurrentEntityManager()`. Phase 14.20 ships that
-> feature in `@nestjs-transactional/typeorm` via Repository /
-> EntityManager / DataSource prototype patching, modelled on the
-> `typeorm-transactional` library pattern (~166K weekly npm
-> downloads). The architectural addition is summarised here so
-> future readers can place it in the multi-adapter timeline.
->
-> **What changes**
->
-> 1. `TypeOrmTransactionalModule.forFeature` was renamed to
->    `forRoot` and the options shape changed: `{ dataSource: DataSource | factory }`
->    became `{ dataSource?: string }`. The actual `DataSource` is
->    resolved from DI under `getDataSourceToken(dataSource)` —
->    the same convention `@nestjs/typeorm` uses for
->    `@InjectRepository(Entity, dataSource)`. Multi-DS deployments
->    call `forRoot` once per dataSource, mirroring Phase 14.10's
->    `TransactionalModule` and Phase 14.3.2's `OutboxModule`.
->
-> 2. Three patches install at module-load time (idempotent
->    install-once flags inside each patch module):
->    - `Repository.prototype.manager` — getter/setter pair. The
->      setter intercepts the `Repository` constructor's
->      `this.manager = manager` and stashes the value under a
->      hidden `Symbol.for(...)` key; the getter consults
->      `TransactionContext.getActiveTransactionByDataSource(name)`
->      and returns the active transactional `EntityManager` when
->      one exists for this Repository's dataSource. Because every
->      TypeORM `Repository` method is `this.manager.<method>(target, ...)`
->      under the hood, this single getter patch covers all 30+
->      Repository operations (save, find, query, count, sum,
->      createQueryBuilder, etc.).
->    - `EntityManager.prototype.getRepository` — wrapper that
->      stamps the freshly-resolved Repository with the same hidden
->      key, pointing at the calling EntityManager. Makes
->      `@InjectEntityManager() em.getRepository(E).save(...)`
->      transactional.
->    - `Repository.prototype.extend` — wrapper preserving the
->      stamp on extended (custom) repository classes.
->
->    Plus per-instance patches on each managed `DataSource`
->    (`manager` getter, `query`, `createQueryBuilder` — to inject
->    the active QueryRunner). The `manager` patch is per-instance
->    because TypeORM sets `this.manager` as an own-property in
->    the `DataSource` constructor; a prototype-level getter would
->    be shadowed.
->
-> 3. **Module-load activation, not factory-time**: the patches
->    are applied as a side effect of importing
->    `typeorm-transactional.module.ts`. Reason: NestJS resolves
->    providers in dependency order. A `useFactory` provider that
->    calls `dataSource.getRepository(Entity)` (e.g. `@InjectRepository`'s
->    internal factory) may run BEFORE
->    `TypeOrmTransactionalModule.forRoot`'s factory if it has no
->    DI dependency on the latter. A Repository constructed before
->    patches are installed gets its `this.manager = manager`
->    assignment as an own-property, which permanently shadows the
->    prototype getter. Module-load activation guarantees patches
->    are installed before any DI factory observes
->    `Repository.prototype`.
->
-> 4. **Install-once, no revert**: prototype patches stay installed
->    for the process lifetime. `TypeOrmTransactionalModule.resetForTesting`
->    drops the managed-DataSource WeakSet (so cached repositories
->    fall through to autocommit) but does not delete the prototype
->    getter — deletion would silently break Repository instances
->    constructed under the patched setter (those have no own-
->    property `manager`; deletion leaves `repo.manager` as
->    `undefined`). Tests that need full isolation destroy and
->    recreate the `DataSource` between cases (the typical pattern).
->
-> 5. **Cross-DS isolation preserved (DD-023)**: a Repository
->    bound to dataSource A inside a `@Transactional({ dataSource: 'B' })`
->    method autocommits — its `manager` getter looks up active
->    transaction for dataSource A, finds none, and falls back to
->    its captured original manager. Distributed transactions
->    across dataSources remain unsupported; cross-DS atomicity
->    routes through the outbox.
->
-> 6. **Documented limitations**:
->    - `@InjectEntityManager() em.save(Entity, ...)` direct call
->      is NOT transactional. The patched
->      `EntityManager.prototype.getRepository` covers
->      `em.getRepository(E).save(...)`, but
->      `EntityManager.prototype.save` itself is not patched (would
->      require ~14 method patches with recursion-avoidance logic
->      and a meaningful expansion of the patch surface). The
->      escape hatch is `getCurrentEntityManager()`, or simply
->      using a Repository.
->    - `BaseEntity` static methods (`User.save(...)` etc.) are
->      NOT supported. The `BaseEntity.useDataSource(...)` API
->      stores a captured DataSource reference that bypasses our
->      patches. Repository pattern is the recommended idiom.
->
-> Phase 14.20 verified end-to-end against real Postgres via
-> testcontainers (33 integration tests covering single-DS
-> happy/rollback/autocommit, `@InjectEntityManager`
-> `em.getRepository(E).save(...)` Q1 Option A coverage proof,
-> `@InjectDataSource` ds.manager.save(), REQUIRES_NEW propagation,
-> Repository.extend() patterns, and 8 cross-DS scenarios proving
-> DD-023 isolation semantics under transparent dispatch).
->
-> Cross-package consumers (cqrs, outbox-typeorm) and example apps
-> were migrated mechanically — same `forFeature → forRoot` rename
-> plus `getDataSourceToken()` provider registration to satisfy
-> the new DI-resolution contract.
-
-> **Note (Phase 14.21 OutboxTypeOrmModule reshape, 2026-04-29):**
-> Phase 14.20's `TypeOrmTransactionalModule.forRoot` pattern applied
-> to the `outbox-typeorm` package. `OutboxTypeOrmModule.forFeature`
-> renamed to `forRoot`; the options shape changed from
-> `{ dataSource: DataSource | factory, dataSourceName?, adapterInstance? }`
-> to `{ dataSource?: string }`. The actual `DataSource` is resolved
-> from DI via `@nestjs/typeorm`'s `getDataSourceToken(name)` —
-> consistent with Phase 14.20.
->
-> **Phase 14.12 cleanup bundled** — the deprecated `adapterInstance`
-> alias was removed in this same iteration (originally scheduled as
-> a separate phase). The two integration tests that verified the
-> deprecated alias and its precedence-vs-`dataSourceName` rule were
-> deleted; the surrounding multi-DS suite covers the canonical
-> `dataSource` field's happy path.
->
-> **Critical architectural finding from the audit** — `OutboxModule.forRoot`
-> ALWAYS registers something under the per-DS
-> `getEventPublicationRepositoryToken(dataSourceName)` token (defaults
-> to `InMemoryEventPublicationRepository` when no `repository` option
-> is passed). `OutboxTypeOrmModule.forRoot` cannot register under THE
-> SAME token directly — both modules are `@Global()` and a duplicate
-> `@Global()` provider for the same token causes NestJS DI conflicts.
->
-> Consequence: `typeOrmEventPublicationRepositoryProvider` (the
-> bridge function returning a `useExisting` Provider) is preserved
-> as the cross-module aliasing mechanism. Three options were
-> considered during audit:
->
-> 1. **Keep the bridge function** (chosen) — small, well-documented,
->    preserves architectural separation (outbox-core does not import
->    outbox-typeorm). User code carries one extra Provider call per
->    dataSource.
-> 2. **Remove the bridge** — would require dropping `OutboxModule.forRoot`'s
->    in-memory default; 14+ outbox unit tests rely on
->    `OutboxModule.forRoot({})` defaulting to in-memory. Rejected on
->    test-migration burden grounds.
-> 3. **Static-state coupling** — `OutboxTypeOrmModule.forRoot`
->    registers in a static map; `OutboxModule.forRoot`'s repository
->    factory reads it. Rejected on architectural-debt grounds (cross-
->    package static-state coupling violates the layered architecture).
->
-> Phase 14.21's other simplifications:
->
-> - `forRootAsync` added (parallel to `forRoot`). The `dataSource`
->   name is statically declared in the async options object; only
->   `schemaInitialization` and `isGlobal` are async-resolved through
->   the factory. Documented limitation: per-DS provider tokens
->   require synchronous name resolution.
-> - `TypeOrmEventPublicationRepository` constructor unchanged
->   (`(dataSource: DataSource, dataSourceName = 'default')`). The
->   module factory passes both arguments after resolving the
->   DataSource via DI.
-> - `SchemaInitializer` per-DS lifecycle preserved (zero behavioural
->   change) — module factory just resolves DataSource via DI instead
->   of from the option.
->
-> **Atomicity invariant verified** — the outbox pattern's
-> fundamental contract (business INSERT and `event_publication`
-> INSERT inside a `@Transactional()` method commit atomically, and
-> rollback discards both) holds via two parallel mechanisms:
->
-> 1. Phase 14.20 patched `Repository.prototype.manager` getter on
->    the `@InjectRepository` business Repository → routes through
->    the active transactional `EntityManager`.
-> 2. `TypeOrmEventPublicationRepository`'s explicit
->    `getCurrentEntityManager(dataSourceName, fallback)` call →
->    routes through the same active EM via `TransactionContext`.
->
-> Both reach the SAME active EM through the SAME context — parallel
-> doors to the same room. Phase 14.21 ships a dedicated
-> `atomicity.integration.spec.ts` regression net (3 tests) pinning
-> the contract against real Postgres.
->
-> Cross-package migrations: 4 outbox-typeorm integration spec files
-> + 1 example (mechanical, ~40 LoC delta).
+  - Phase 14 roadmap entry: [`docs/roadmap/README.md`](../roadmap/README.md)
 
 ## Context
 
-The current architecture supports a single transactional adapter
-*instance* per process. Multiple `DataSource`s under the same TypeORM
-adapter are supported via the `instanceName` field
-(see DD-005 and `getCurrentEntityManager(instanceName, fallback)`),
-but there is no story for:
+The original single-adapter architecture supported one transactional
+adapter *instance* per process. Multiple `DataSource`s under the same
+TypeORM adapter were possible via an internal `instanceName` field
+(see DD-005), but there was no story for:
 
 1. **Multiple `DataSource`s of the same ORM that need fully independent
-   outbox stacks** — e.g. `billing` events committed against the billing
-   DB and `inventory` events against the inventory DB, with separate
-   `event_publication` tables and separate workers.
+   outbox stacks** — e.g. `billing` events committed against the
+   billing DB and `inventory` events against the inventory DB, with
+   separate `event_publication` tables and separate workers.
 2. **Different ORMs running in the same process** — e.g. TypeORM for
    the main relational data, Prisma for an audit store, Mongoose for
    user-profile documents. Each needs its own transactional contract
@@ -289,7 +34,7 @@ but there is no story for:
    publications. Cross-module integration is via durable events, not
    shared transactions.
 
-Real-world cases that motivate this:
+Real-world cases that motivated this:
 
 - Modular monoliths where each module ships with its own schema (and
   potentially its own ORM choice).
@@ -298,29 +43,31 @@ Real-world cases that motivate this:
 - Reporting / analytics / audit stores that intentionally live in a
   different storage technology than the OLTP main store.
 
-The existing single-adapter design conflates "the adapter" with "the
-DI scope" — there is one `TransactionManager`, one `AdapterRegistry`,
-one `OutboxModule`, one `EventPublicationRepository`. To extend to
-the cases above without breaking single-adapter users, we need a
-naming contract that distinguishes adapter *instances* and a DI
-contract that lets users inject the right one.
+The single-adapter design conflated "the adapter" with "the DI scope"
+— one `TransactionManager`, one `AdapterRegistry`, one `OutboxModule`,
+one `EventPublicationRepository`. Multi-adapter required a naming
+contract that distinguishes adapter *instances* and a DI contract
+that lets users inject the right one.
 
 ## Decision
 
-Implement multi-adapter through the seven points below. They form a
+The shipped architecture rests on the ten points below. They form a
 cohesive design — accepting any one in isolation does not make sense.
+Points 9 and 10 capture the Phase 14.20 / 14.21 architectural
+extensions to the original eight; the [Revision history](#revision-history)
+section at the end records the phase boundaries that updated this ADR.
 
 ### 1. dataSource name as primary identifier
 
 A string `dataSource` name keys every adapter instance, every
 transactional context, every outbox stack. Default `'default'`
-preserves the current single-adapter ergonomics — users who never
-register a non-default name see no change.
+preserves the single-adapter ergonomics — users who never register a
+non-default name see no change.
 
-The dataSource name is what users *think* in (it's the name of their
-DB, not "the TypeORM adapter for the billing DB"). It also generalises
-cleanly across ORMs: a `'billing'` dataSource might be TypeORM today
-and Prisma tomorrow without renaming.
+The dataSource name is what users *think* in (the name of their DB,
+not "the TypeORM adapter for the billing DB"). It generalises
+cleanly across ORMs: a `'billing'` dataSource might be TypeORM
+today and Prisma tomorrow without renaming.
 
 ### 2. Token-based DI resolution
 
@@ -340,45 +87,65 @@ Same pattern for `OutboxEventPublisher`, `EventPublicationRepository`,
 Token utility functions live in `@nestjs-transactional/core` so all
 packages produce identical token strings for the same dataSource name.
 
-### 3. Per-dataSource provider registration
+### 3. Per-dataSource module registration via multi-`forRoot`
 
-Each `TransactionalModule.forRoot({ adapter, dataSource })` registers
-a *complete* set of providers under dataSource-derived tokens. Two
-calls produce two disjoint sets — no cross-talk.
+Every module in the family — `TransactionalModule`,
+`TypeOrmTransactionalModule`, `OutboxModule`, `OutboxTypeOrmModule` —
+is called once per dataSource. Each call registers a complete set of
+providers under dataSource-derived tokens. Two calls produce two
+disjoint sets — no cross-talk.
 
 ```ts
 @Module({
   imports: [
-    TransactionalModule.forRoot({
-      adapter: new TransactionalTypeOrmAdapter('billing'),
+    TypeOrmModule.forRoot({ name: 'billing',   /* ... */ }),
+    TypeOrmModule.forRoot({ name: 'inventory', /* ... */ }),
+
+    TransactionalModule.forRoot({ isGlobal: true }),
+
+    TypeOrmTransactionalModule.forRoot({ dataSource: 'billing',   isDefault: true }),
+    TypeOrmTransactionalModule.forRoot({ dataSource: 'inventory' }),
+
+    OutboxTypeOrmModule.forRoot({ dataSource: 'billing' }),
+    OutboxTypeOrmModule.forRoot({ dataSource: 'inventory' }),
+
+    OutboxModule.forRoot({
       dataSource: 'billing',
+      repository: typeOrmEventPublicationRepositoryProvider({ dataSource: 'billing' }),
     }),
-    TransactionalModule.forRoot({
-      adapter: new TransactionalTypeOrmAdapter('inventory'),
+    OutboxModule.forRoot({
       dataSource: 'inventory',
+      repository: typeOrmEventPublicationRepositoryProvider({ dataSource: 'inventory' }),
     }),
   ],
 })
 export class AppModule {}
 ```
 
-The "default" registration (no `dataSource`) keeps the current ergonomic
-shape and serves the single-adapter case unchanged.
+The default registration (`dataSource` omitted, or explicitly
+`'default'`) keeps the single-adapter ergonomic shape and serves the
+single-adapter case unchanged. Cross-call coordination of singletons
+(smart facade, processing bundle, listener scanner) lives in
+static-class storage — see [ADR-019](019-outbox-multi-forroot-pattern.md)
+for the mechanism. Phase 14.10 applied the same multi-`forRoot`
+pattern to `TransactionalModule.forRoot` so the entire family follows
+one convention.
 
-### 4. Adapter constructor accepts dataSource name
+### 4. Adapter construction is module-internal
 
-```ts
-const adapter = new TransactionalTypeOrmAdapter('billing');
-```
+Adapter instances are constructed by the per-ORM module's `forRoot`
+factory, not by user code. Users supply the *dataSource name*; the
+module resolves the underlying connection (e.g. TypeORM `DataSource`
+via `@nestjs/typeorm`'s `getDataSourceToken(name)`), constructs the
+adapter, and registers it under `getTransactionalAdapterToken(name)`
+in the core `AdapterRegistry`.
 
-The adapter encapsulates ORM-specific transaction control *and* its
-binding to a specific dataSource. Multiple instances of the same
-adapter class are first-class — there is no "global TypeORM state"
-anywhere in the design.
-
-This also clarifies the package boundary: `packages/typeorm` knows
-which TypeORM `DataSource` it is bound to; it does NOT inspect a
-registry to figure that out.
+The original draft of this ADR exposed `new TransactionalTypeOrmAdapter('billing')`
+as user-facing API. Phase 14.20 collapsed that to module-internal:
+users never see the adapter class. The module-internal construction
+path keeps the adapter and its connection co-located, simplifies
+multi-DS registration, and matches the `@nestjs/typeorm` mental model
+where DataSource registration is `forRoot`-only.
 
 ### 5. Inject decorators with dataSource parameter
 
@@ -393,8 +160,8 @@ class BillingService {
 }
 ```
 
-`@InjectTransactionManager()` (no argument) defaults to
-`'default'` — single-adapter consumers are unaffected. Mirrors
+`@InjectTransactionManager()` (no argument) defaults to `'default'` —
+single-adapter consumers are unaffected. Mirrors
 `@InjectRepository(Entity, dataSource?)` from `@nestjs/typeorm`.
 
 These decorators are thin wrappers over `@Inject(token)` where
@@ -420,21 +187,17 @@ A single shared `AsyncLocalStorage` carries a per-scope store whose
 active-transaction `Map` is keyed by dataSource name. Cross-dataSource
 enrolment is structurally impossible because the keys are disjoint
 namespaces — code looking up `'billing'` cannot retrieve a transaction
-registered under `'inventory'`. Crossing a dataSource boundary inside a
-single async call stack creates a *separate* `Map` entry; there is no
-automatic enrolment of the second manager into the first manager's
+registered under `'inventory'`. Crossing a dataSource boundary inside
+a single async call stack creates a *separate* `Map` entry; there is
+no automatic enrolment of the second manager into the first manager's
 transaction.
 
 The keying-not-multiple-ALS shape is deliberate. Spinning up a
 dedicated `AsyncLocalStorage` instance per dataSource would deliver
 the same guarantee (disjoint state) at the cost of cascading the
 static→instance migration of `TransactionContext` through every
-consumer (adapter helpers, CQRS dispatcher, outbox publisher) — for no
-behavioural improvement.
-
-This is deliberate. Distributed transactions across heterogeneous
-stores would force XA or 2PC into the design — see "Alternatives
-considered" below for why we reject that.
+consumer (adapter helpers, CQRS dispatcher, outbox publisher) — for
+no behavioural improvement. DD-023 carries the same rationale.
 
 The user-facing implication: cross-dataSource consistency is an
 *application-level* concern. The recommended pattern is "write to
@@ -446,8 +209,8 @@ applies to each dataSource independently.
 ### 8. Smart `OutboxEventPublisher` facade detects the active dataSource
 
 A facade wrapper around the per-dataSource publishers detects which
-dataSource has an active transaction in the current async context and
-routes the event accordingly:
+dataSource has an active transaction in the current async context
+and routes the event accordingly:
 
 ```ts
 @Transactional({ dataSource: 'billing' })
@@ -463,13 +226,120 @@ Explicit override is supported when the implicit behavior is wrong:
 this.publisher.publish(event, { dataSource: 'inventory' });
 ```
 
-This keeps single-adapter call sites unchanged (the facade resolves to
-the only registered publisher) while making multi-adapter publishing
-ergonomic — no per-call `@Inject` plumbing.
+This keeps single-adapter call sites unchanged (the facade resolves
+to the only registered publisher) while making multi-adapter
+publishing ergonomic — no per-call `@Inject` plumbing.
 
 If no transaction is active and no explicit dataSource is given, the
 facade falls back to `'default'` and (per the single-adapter rules)
 fails fast if `'default'` is not registered.
+
+The facade late-binds per-DS publishers via `OnModuleInit` +
+`ModuleRef.get` so it works under multi-`forRoot` where the full set
+of dataSources isn't known at module-build time. See ADR-019 § 4 for
+the late-binding mechanism.
+
+### 9. Transparent transactional repositories (Phase 14.20)
+
+`@InjectRepository(Entity)` Repositories automatically dispatch
+through the active `@Transactional()` scope's `EntityManager`. No
+`getCurrentEntityManager()` calls in user service code — the
+transparent dispatch covers `repo.save(...)`, `repo.find(...)`, all
+30+ Repository operations, custom `Repository.extend(...)` classes,
+`TreeRepository`, plus the `@InjectEntityManager() em.getRepository(E).save(...)`
+and `@InjectDataSource() ds.getRepository(E).save(...)` patterns.
+
+The mechanism is prototype-level patching modelled on the
+`typeorm-transactional` library (~166K weekly npm downloads):
+
+- `Repository.prototype.manager` — getter / setter pair. The setter
+  intercepts the `Repository` constructor's `this.manager = manager`
+  and stashes the value under a hidden `Symbol.for(...)` key; the
+  getter consults `TransactionContext.getActiveTransactionByDataSource(name)`
+  and returns the active transactional `EntityManager` when one exists
+  for this Repository's dataSource. Because every TypeORM `Repository`
+  method dispatches as `this.manager.<method>(target, ...)` under the
+  hood, this single getter patch covers every Repository operation.
+- `EntityManager.prototype.getRepository` — wrapper that stamps the
+  freshly-resolved Repository with the same hidden key, pointing at
+  the calling EntityManager. Makes
+  `@InjectEntityManager() em.getRepository(E).save(...)` transactional.
+- `Repository.prototype.extend` — wrapper preserving the stamp on
+  extended (custom) Repository classes.
+
+Plus per-instance patches on each managed `DataSource` (`manager`
+getter, `query`, `createQueryBuilder` — to inject the active
+QueryRunner). The `manager` patch is per-instance because TypeORM
+sets `this.manager` as an own-property in the `DataSource`
+constructor; a prototype-level getter would be shadowed.
+
+Patches install as a side effect of importing
+`typeorm-transactional.module.ts` (idempotent install-once flags
+inside each patch module). NestJS resolves providers in dependency
+order, and a `useFactory` provider that calls
+`dataSource.getRepository(Entity)` may run BEFORE
+`TypeOrmTransactionalModule.forRoot`'s factory if it has no DI
+dependency on the latter. A Repository constructed before patches
+are installed gets its `this.manager = manager` assignment as an
+own-property, which permanently shadows the prototype getter.
+Module-load activation guarantees patches are installed before any
+DI factory observes `Repository.prototype`.
+
+Cross-DS isolation (DD-023) is preserved — a Repository bound to
+dataSource A inside a `@Transactional({ dataSource: 'B' })` method
+autocommits, because its patched `manager` getter looks up the
+active transaction for dataSource A, finds none, and falls back to
+its captured original manager. Distributed transactions across
+dataSources remain unsupported; cross-DS atomicity routes through
+the outbox.
+
+Documented limitations live in
+[`docs/known-limitations.md`](../known-limitations.md):
+`@InjectEntityManager() em.save(Entity, ...)` direct calls and
+`BaseEntity` static methods are not patched and require the
+`getCurrentEntityManager()` escape hatch or the Repository pattern.
+
+### 10. Outbox persistence module reshape (Phase 14.21)
+
+`OutboxTypeOrmModule.forRoot({ dataSource?, isDefault? })` mirrors
+the Phase 14.20 `TypeOrmTransactionalModule.forRoot` shape. The
+underlying `DataSource` is resolved from DI via `@nestjs/typeorm`'s
+`getDataSourceToken(name)`. Each `forRoot` call registers
+`TypeOrmEventPublicationRepository` under a per-DS private token
+(`getEventPublicationRepositoryProviderToken(name)`).
+
+The cross-module aliasing bridge
+`typeOrmEventPublicationRepositoryProvider({ dataSource })` is
+preserved because `OutboxModule.forRoot` ALWAYS registers something
+under the per-DS `getEventPublicationRepositoryToken(name)` token
+(defaults to `InMemoryEventPublicationRepository` when no
+`repository` option is passed). `OutboxTypeOrmModule.forRoot` cannot
+register under the same token directly — both modules are `@Global()`
+and a duplicate `@Global()` provider for the same token causes
+NestJS DI conflicts. The bridge function returns a `useExisting`
+Provider that aliases the official outbox token to the private
+TypeORM-backed token.
+
+This preserves the architectural separation: outbox-core has no
+import dependency on outbox-typeorm; the user's `AppModule`
+explicitly opts in to TypeORM persistence by passing the bridge
+provider through `OutboxModule.forRoot({ repository, ... })`.
+
+The outbox atomicity invariant — business INSERT and
+`event_publication` INSERT inside a `@Transactional()` method commit
+atomically, and rollback discards both — holds via two parallel
+mechanisms reaching the same active `EntityManager`:
+
+1. The Phase 14.20 patched `Repository.prototype.manager` getter on
+   the `@InjectRepository` business Repository routes through the
+   active transactional `EntityManager`.
+2. `TypeOrmEventPublicationRepository`'s explicit
+   `getCurrentEntityManager(dataSourceName, fallback)` call routes
+   through the same active EM via `TransactionContext`.
+
+A dedicated
+[`atomicity.integration.spec.ts`](../../packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts)
+regression net pins the contract against real Postgres.
 
 ## Alternatives considered
 
@@ -498,9 +368,10 @@ blocks; we do not pretend to solve distributed transactions.
 
 ### Hidden auto-detection without explicit dataSource
 
-Rejected. "Whichever dataSource has an active transaction" is fine for
-*outbox publishing inside a `@Transactional` body* (point 8 above —
-that's the smart-facade path), but it breaks down for boundary cases:
+Rejected. "Whichever dataSource has an active transaction" is fine
+for *outbox publishing inside a `@Transactional` body* (point 8 above
+— that's the smart-facade path), but it breaks down for boundary
+cases:
 
 - Outside any transaction (which dataSource does the event belong to?)
 - Two dataSources active at once via nested `@Transactional` calls
@@ -514,7 +385,7 @@ unambiguously. Auto-detection there would create confusing failures
 
 ### Configuration via DI only (no decorator support)
 
-Rejected. The current decorator-based API
+Rejected. The decorator-based API
 (`@Transactional`, `@InjectRepository`-style decorators) is idiomatic
 NestJS, ships well, and matches what users already know from the
 NestJS ecosystem. Forcing the multi-adapter API to be DI-only would
@@ -524,55 +395,80 @@ single-adapter case (the vast majority of users).
 The decorators in points 5 and 6 *are* DI under the hood. They just
 add a thin discoverable surface on top.
 
+### User-constructed adapter instances
+
+Rejected during Phase 14.20. The original draft exposed
+`new TransactionalTypeOrmAdapter(dataSource)` as user-facing API.
+Real use exposed two issues: users had to thread the same dataSource
+name through both the adapter constructor AND the module options
+(easy to mismatch); and the adapter had to be hand-wired in the
+provider list, doubling the multi-DS registration boilerplate.
+Module-internal construction (point 4 above) eliminates both.
+
 ## Consequences
 
 ### Positive
 
-- Production-grade multi-database support — the patterns motivating
-  this ADR (modular monolith, audit-store split, ORM migration) all
-  have first-class support.
-- Multi-ORM combinations work without internal special-casing — adapter
-  packages share a contract; new adapters slot in.
-- Idiomatic NestJS — the `getXxxToken(dataSource)` /
+- **Production-grade multi-database support**. The patterns
+  motivating this ADR (modular monolith, audit-store split, ORM
+  migration) all have first-class support — verified end-to-end by
+  the [`e-commerce-orders`](../../examples/e-commerce-orders/)
+  flagship and the multi-DS tier-2 examples.
+- **Multi-ORM combinations work without internal special-casing**.
+  Adapter packages share a contract; new adapters slot in following
+  the [Adapter pattern conventions](#adapter-pattern-conventions)
+  below.
+- **Idiomatic NestJS**. The `getXxxToken(dataSource)` /
   `@InjectXxx(dataSource)` pattern matches `@nestjs/typeorm` and
-  `@nestjs/mongoose`, so users coming from that ecosystem don't learn
-  a new vocabulary.
-- Single-adapter users are unaffected — the default `'default'`
+  `@nestjs/mongoose`, so users coming from that ecosystem don't
+  learn a new vocabulary. Multi-`forRoot` is the same shape every
+  multi-instance NestJS module ships.
+- **Single-adapter users are unaffected**. The default `'default'`
   threading is transparent.
-- Outbox stacks naturally partition along dataSource lines — no
-  contention on a single `event_publication` table when multiple
+- **Outbox stacks naturally partition along dataSource lines**.
+  No contention on a single `event_publication` table when multiple
   bounded-context modules emit events.
+- **Transparent transactional repositories collapse the surface
+  area**. Phase 14.20 removed the most common reason for users to
+  reach for `getCurrentEntityManager()` — Repository methods now
+  participate transparently. The escape hatch remains for the
+  documented limitations.
 
 ### Negative
 
-- Significant API refactoring across every package
-  (`core`, `typeorm`, `cqrs`, `outbox`, `outbox-typeorm`,
-  `outbox-microservices`) — see
-  [`docs/migration/multi-adapter.md`](../migration/multi-adapter.md)
-  for the file-level impact list.
-- Verbose configuration for multi-database setups —
-  `TransactionalModule.forRoot()` repeated per dataSource,
-  `OutboxModule.forRoot({ dataSource })` repeated per dataSource,
-  etc. Mitigation: a `TransactionalModule.forFeatures([...])` shorthand
-  could be added later if the verbosity proves painful in real apps.
-  Not in scope for Phase 14.
-- Cross-dataSource transactions explicitly unsupported — users
+- **API surface refactoring touched every package**. The Phase 14
+  iterations migrated `core`, `typeorm`, `cqrs`, `outbox`,
+  `outbox-typeorm`, `outbox-microservices`, plus all examples and
+  cross-package consumers. The breaking-changes itemisation lives
+  in [`docs/migration/multi-adapter.md`](../migration/multi-adapter.md).
+- **Verbose configuration for multi-database setups**. Multi-DS apps
+  call `TypeOrmTransactionalModule.forRoot`, `OutboxTypeOrmModule.forRoot`,
+  and `OutboxModule.forRoot` once per dataSource — three calls × N
+  dataSources. Mitigated by the single-call shorthand for the
+  default-DS case and by configuration locality (each bounded-context
+  module imports its own `forRoot` for its own dataSource).
+- **Cross-dataSource transactions explicitly unsupported**. Users
   expecting Spring's `@Transactional` behavior across multiple
   datasources will need to rethink in terms of events. Documented
   prominently in the migration guide.
-- Token-naming convention is now a stable public API — once shipped,
-  changing `getTransactionManagerToken` is a breaking change for
-  anyone who hand-built tokens around the same string.
+- **Token-naming convention is now a stable public API**. Once
+  shipped, changing `getTransactionManagerToken` is a breaking
+  change for anyone who hand-built tokens around the same string.
+- **Patch-based transparent repositories carry a runtime footprint**.
+  The Phase 14.20 prototype patches install at module load and
+  remain installed for the process lifetime; `resetForTesting`
+  drops the managed-DataSource WeakSet but does not delete the
+  prototype getter. The trade-off pays back via the API
+  simplification.
 
 ### Neutral
 
 - The convention `'{Component}{DataSource}'` (PascalCase, dataSource
-  capitalised) becomes the standard pattern for any future ORM
-  adapter package. Consistency is the win; the cost is documenting it
-  once.
+  capitalised) is the standard pattern for any future ORM adapter
+  package. Consistency is the win; the cost is documenting it once.
 - Adapter packages must follow a consistent constructor contract
-  (`new TransactionalXxxAdapter(dataSource: string)`), making it
-  easier to author new adapters.
+  (`new TransactionalXxxAdapter(connection, dataSource: string)`,
+  module-internal), making it easier to author new adapters.
 
 ## Adapter pattern conventions
 
@@ -580,27 +476,27 @@ Confirmed during Phase 14.4 audit and codified here as guidance for
 future ORM adapters (`@nestjs-transactional/prisma`,
 `@nestjs-transactional/mongoose`, etc.):
 
-- **Adapters receive the concrete native connection directly.**
-  TypeORM's adapter takes a `DataSource` instance (or a thunk
-  resolving to one); a Prisma adapter would take a `PrismaClient`;
-  a Mongoose adapter would take a `Connection`. The user already
-  has these — usually instantiated from their own `forRoot` config
-  via `@nestjs/typeorm`, `nestjs-prisma`, etc. — and passes the
-  instance through. The adapter does NOT lazily resolve the
-  connection via DI tokens (`getDataSourceToken`, etc.); the
-  resolution path is the user's, kept transparent.
-- **The adapter is created at module-config time**, bound to the
-  connection at construction. `TypeOrmTransactionalModule.forFeature`
+- **Adapters receive the concrete native connection directly**.
+  TypeORM's adapter takes a `DataSource` instance (resolved from DI
+  via `@nestjs/typeorm`'s `getDataSourceToken(name)`); a Prisma
+  adapter would take a `PrismaClient`; a Mongoose adapter would take
+  a `Connection`. The user already has these — usually instantiated
+  from their own `forRoot` config via `@nestjs/typeorm`,
+  `nestjs-prisma`, etc. — and the *module*'s `forRoot` factory
+  resolves them via DI before constructing the adapter.
+- **The adapter is created at `forRoot` factory time**, bound to the
+  connection at construction. `TypeOrmTransactionalModule.forRoot`
   builds a `TypeOrmTransactionAdapter(dataSource, dataSourceName)` in
   its provider factory; future ORM modules follow the same shape
-  (`PrismaTransactionalModule.forFeature({ prisma, dataSourceName })`,
-  `MongooseTransactionalModule.forFeature({ connection, dataSourceName })`).
+  (`PrismaTransactionalModule.forRoot({ dataSource })`,
+  `MongooseTransactionalModule.forRoot({ dataSource })`). User code
+  never constructs an adapter directly.
 - **The dataSource identifier is a string flowing through every
-  consumer.** The adapter exposes it as `dataSourceName`; the user
+  consumer**. The adapter exposes it as `dataSourceName`; the user
   passes it via `@Transactional({ dataSource })`,
   `getCurrentEntityManager(dataSource)`, and the per-DS inject
-  decorators. The same string must round-trip cleanly across
-  decorator → manager → registry → adapter → helper.
+  decorators. The same string round-trips cleanly across decorator →
+  manager → registry → adapter → helper.
 
 This pattern keeps adapter packages thin: they wrap the native
 connection's transaction primitive (`DataSource.transaction`,
@@ -621,33 +517,88 @@ The codebase uses two distinct terms depending on context:
   the connection instance and the two would collide on the same
   field name. Examples: `TransactionalAdapter.dataSourceName`
   (instance property; the adapter also owns the connection),
-  `TypeOrmTransactionalOptions.dataSourceName` (the options object
-  also has `dataSource: DataSource | factory` for the connection).
+  `TypeOrmEventPublicationRepository(dataSource: DataSource, dataSourceName = 'default')`
+  (constructor takes both the connection and its name).
 
 The asymmetry is deliberate and stable. Renaming one to match the
 other would either:
-- collapse `dataSourceName` → `dataSource` and clobber the
-  connection field (breaks every existing typeorm consumer), or
+
+- collapse `dataSourceName` → `dataSource` and clobber the connection
+  field (breaks every existing typeorm consumer), or
 - promote `dataSource` → `dataSourceName` everywhere (verbose and
   inconsistent with NestJS conventions like `@nestjs/typeorm`'s
   `getDataSourceToken(dataSource: string)` parameter naming).
 
-A future major-version cleanup may revisit; for now the two names
-read naturally in their respective contexts and a single sentence
-of doc (this section) prevents new-contributor confusion.
+Phase 14.11 removed the deprecated `instanceName` alias that was
+retained for one phase boundary so consumers had time to migrate;
+`dataSource` / `dataSourceName` is the canonical pair. A future
+major-version cleanup may revisit the asymmetry; for now the two
+names read naturally in their respective contexts and a single
+sentence of doc (this section) prevents new-contributor confusion.
 
 ## Migration
 
 The Phase 14 implementation roadmap
-([docs/roadmap/README.md](../roadmap/README.md)) sequences the
-migration as 14.0–14.9: token utilities → core multi-adapter →
-outbox multi-adapter → adapter package migrations → CQRS migration →
-examples + docs → final verification. The breaking-changes list and
-file-level migration impact live in
-[docs/migration/multi-adapter.md](../migration/multi-adapter.md).
+([docs/roadmap/README.md](../roadmap/README.md)) sequenced the work
+across iterations 14.0–14.21:
 
-Breaking changes are itemised in
+- **14.0–14.2** — token utilities + `core` multi-adapter migration.
+- **14.3 / 14.3.1 / 14.3.2** — outbox multi-adapter, decorator-driven
+  per-DS handler registration (Categories A and B), multi-`forRoot`
+  pivot ([ADR-019](019-outbox-multi-forroot-pattern.md)).
+- **14.4–14.7** — TypeORM adapter, CQRS, examples migrations.
+- **14.10** — `TransactionalModule.forRoot` aligned with
+  multi-`forRoot`. Default `isGlobal` flipped to `true` to enable
+  cross-call DI visibility.
+- **14.11** — deprecated `instanceName` alias removed; `dataSource`
+  / `dataSourceName` is canonical.
+- **14.20** — transparent transactional repositories shipped (§ 9).
+  `TypeOrmTransactionalModule.forFeature` renamed to `forRoot`;
+  DataSource resolved from DI via `getDataSourceToken(name)`.
+- **14.21** — `OutboxTypeOrmModule` reshape (§ 10) mirroring
+  Phase 14.20.
+
+The breaking-changes itemisation lives in
 [`docs/migration/multi-adapter.md`](../migration/multi-adapter.md).
-Packages are not yet published, so accepting the breakage now is
-materially cheaper than introducing a parallel single-adapter API
-and supporting both forever.
+The end-to-end runnable demonstration of the final architecture is
+[`examples/e-commerce-orders`](../../examples/e-commerce-orders/) —
+three Postgres DataSources, per-DS outbox stacks, CQRS aggregates,
+Kafka externalization. Smaller multi-DS examples
+([`multi-datasource-basic`](../../examples/multi-datasource-basic/),
+[`multi-datasource-outbox`](../../examples/multi-datasource-outbox/),
+[`multi-datasource-cqrs`](../../examples/multi-datasource-cqrs/),
+[`shared-database-modular-monolith`](../../examples/shared-database-modular-monolith/))
+cover specific axes individually.
+
+## Revision history
+
+Phase-anchored. Each entry corresponds to a roadmap iteration in
+[`docs/roadmap/README.md`](../roadmap/README.md).
+
+- **Phase 14.0–14.3** — original ADR drafted with eight decision
+  points.
+- **Phase 14.2 scope refinement** — § 7 rewritten: single shared
+  `AsyncLocalStorage` with disjoint Map keys provides the same
+  disjoint-state guarantee as per-DS ALS instances would, without
+  the cross-package migration cost. DD-023 carries the same
+  revision.
+- **Phase 14.3.2** — `OutboxModule.forRoot` array API replaced with
+  multi-`forRoot`; full design rationale in ADR-019.
+- **Phase 14.10** — same multi-`forRoot` pattern applied to
+  `TransactionalModule.forRoot`. Default `isGlobal` flipped to
+  `true` to enable cross-call DI visibility. The Phase 14.2 Q1.B
+  `adapters: [...]` array form was removed.
+- **Phase 14.11** — deprecated
+  `TypeOrmTransactionalOptions.instanceName` alias removed;
+  `dataSource` / `dataSourceName` is canonical.
+- **Phase 14.20** — § 9 added: transparent transactional
+  repositories. `TypeOrmTransactionalModule.forFeature` renamed to
+  `forRoot`; DataSource resolved from DI. § 4 reshaped to reflect
+  module-internal adapter construction.
+- **Phase 14.21** — § 10 added: `OutboxTypeOrmModule` reshape
+  mirroring Phase 14.20. Atomicity invariant verified by dedicated
+  regression spec.
+- **Phase 14.8f doc sweep** — addendum-driven running history
+  collapsed into the Decision sections; § 3 / § 4 rewritten to
+  reflect the final shipped form; this Revision history section
+  added.
