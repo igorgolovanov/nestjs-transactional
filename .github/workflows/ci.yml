@@ -34,6 +34,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Cross-package type resolution goes through `dist/*.d.ts`
+      # (each package.json's `types` field). ESLint's
+      # `projectService: true` parser needs those resolved or it
+      # surfaces every cross-package import as "Unsafe call of a
+      # type that could not be resolved". Build first.
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
       - name: Lint
         run: pnpm -r --filter './packages/*' lint
 
@@ -86,6 +94,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ts-jest resolves `@nestjs-transactional/*` cross-package
+      # imports through the package.json `types` / `main` paths,
+      # which point at `dist/`. Without a build step a fresh
+      # checkout fails with `TS2307: Cannot find module
+      # '@nestjs-transactional/core'`.
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
       - name: Test
         run: pnpm -r --filter './packages/*' test
 
@@ -107,6 +123,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Per-package `tsc --noEmit` resolves cross-package imports
+      # via `node_modules/@nestjs-transactional/*/dist/*.d.ts`.
+      # Without a build, type-check sees only stale `.ts` source
+      # without declaration outputs and bails on the first
+      # cross-package import.
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
 
       - name: Type check
         run: pnpm -r --filter './packages/*' exec tsc --noEmit
