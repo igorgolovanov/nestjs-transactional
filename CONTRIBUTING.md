@@ -8,7 +8,7 @@ or a PR — stale instructions are worse than none.
 
 Requirements:
 
-- **Node.js 20.11+** (latest LTS is fine). Node 22 is covered by CI.
+- **Node.js 22.11+**. CI verifies the matrix [22, 24, 26].
 - **pnpm 9+**. Any pnpm 9 release works; the repo pins
   `packageManager` in `package.json`.
 - **Docker** — only for running TypeORM integration tests against a

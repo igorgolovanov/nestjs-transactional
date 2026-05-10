@@ -49,7 +49,7 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
 
 ## Technology Stack
 
-- **Runtime**: Node.js 20 LTS (minimum), 22 LTS supported
+- **Runtime**: Node.js 22 LTS (minimum); 22 / 24 / 26 verified in CI
 - **Language**: TypeScript 5.5+ in strict mode
 - **Core peer deps**: `@nestjs/common ^10.0.0 || ^11.0.0`,
   `@nestjs/core ^10.0.0 || ^11.0.0`, `reflect-metadata`, `rxjs ^7.0.0`

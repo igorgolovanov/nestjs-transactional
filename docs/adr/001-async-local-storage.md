@@ -162,10 +162,11 @@ default.
   (ALS lookup is a hash-map access on a per-async-resource basis),
   but non-zero. Hot paths can pay it; the framework cannot escape
   it.
-- **Lower bound on Node version.** Requires Node 20+ in the
+- **Lower bound on Node version.** Requires Node 22+ in the
   current package.json; the `AsyncLocalStorage.run` API has been
-  stable since Node 14, but other Node 20-era performance
-  improvements depend on it.
+  stable since Node 14, but the project's broader runtime baseline
+  (V8 ES2022+ semantics, `node:test` parity, native `fetch`) sets
+  the floor at Node 22 LTS.
 - **Subtle bugs when context is "lost".** Some uncommon async
   patterns (manual `EventEmitter` subscriptions outside the
   current scope, `setImmediate` chains in legacy code, ESM
