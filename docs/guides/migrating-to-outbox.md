@@ -3,20 +3,20 @@
 This guide walks through upgrading an application that today
 relies on `@nestjs-transactional/cqrs`'s in-memory
 `@TransactionalEventsHandler` to the durable outbox-backed
-delivery path (`@nestjs-transactional/outbox` plus a
-backend package such as `@nestjs-transactional/outbox-typeorm`).
+delivery path (`@nestjs-transactional/outbox` plus a backend
+package such as `@nestjs-transactional/outbox-typeorm`).
 
 No behavioural breaking changes — every existing
 `@TransactionalEventsHandler` keeps working as before. The
-migration is opt-in per handler class, and in most cases
-requires one decorator change plus a one-time module wiring
-update.
+migration is opt-in per handler class, and in most cases requires
+one decorator change plus a one-time module wiring update.
 
-> **Coming from the pre-0.1.0 method-level decorators?** See the
-> "Migrating from method-level listeners" section at the end —
-> you need to move the method into `handle(event)` and lift the
-> decorator up to the class before the rest of this guide
-> applies.
+The end-to-end runnable references for this guide are
+[`examples/basic-typeorm-outbox`](../../examples/basic-typeorm-outbox/)
+(single-DataSource baseline) and
+[`examples/e-commerce-orders`](../../examples/e-commerce-orders/)
+(multi-DataSource flagship with CQRS aggregates and Kafka
+externalization).
 
 ## What you get after the migration
 
@@ -34,14 +34,25 @@ update.
   atomically with the business write. A committed publication is
   guaranteed to be delivered; a publication whose transaction
   rolled back never exists.
+- **Optional externalization** — once the outbox is in place,
+  layering Kafka / RabbitMQ / NATS delivery via
+  `@nestjs-transactional/outbox-microservices` is one decorator
+  (`@Externalized`) plus one module import. See
+  [Adding externalization](#adding-externalization-to-a-message-broker)
+  below.
 
 ## What stays the same
 
 - Your `@Transactional()` methods.
-- Your `@nestjs/cqrs` command / query handlers.
-- Your aggregates (`AggregateRoot.apply(...)`, `commit()`).
+- Your `@nestjs/cqrs` command / query handlers and aggregates
+  (`AggregateRoot.apply(...)`, `commit()`).
 - Any `@TransactionalEventsHandler` you leave untouched. It keeps
   running in-memory, at its current phase, exactly as before.
+- Your `@nestjs/typeorm` `@InjectRepository` injection points —
+  Phase 14.20 transparent transactional repositories make them
+  dispatch through the active `@Transactional()` scope
+  automatically. No `getCurrentEntityManager()` calls in service
+  code.
 
 ## Step 1 — install the packages
 
@@ -64,7 +75,7 @@ import {
   EventPublicationArchiveEntity,
 } from '@nestjs-transactional/outbox-typeorm';
 
-export const dataSource = new DataSource({
+TypeOrmModule.forRoot({
   type: 'postgres',
   // ...existing options...
   entities: [
@@ -72,7 +83,7 @@ export const dataSource = new DataSource({
     EventPublicationArchiveEntity,
     // ...your own entities...
   ],
-});
+}),
 ```
 
 ## Step 3 — apply the schema
@@ -108,10 +119,9 @@ migration and let `SchemaInitializer` create the tables on first
 boot:
 
 ```ts
-OutboxTypeOrmModule.forFeature({
-  dataSource,
+OutboxTypeOrmModule.forRoot({
   schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
-})
+}),
 ```
 
 Do NOT enable this in production — schema changes should go
@@ -119,7 +129,8 @@ through a reviewed migration.
 
 ## Step 4 — wire the modules
 
-Add three imports and two provider bindings to your root module:
+Add the outbox modules to your root module. The single-DataSource
+shape:
 
 ```ts
 import { TransactionalModule } from '@nestjs-transactional/core';
@@ -142,60 +153,74 @@ import {
 
 @Module({
   imports: [
-    TransactionalModule.forRoot({ isGlobal: true }),               // already there
-    TypeOrmTransactionalModule.forFeature({ dataSource }),         // already there
+    // ----- TypeORM (your existing config) -----
+    TypeOrmModule.forRoot({ /* ... */ }),
+    TypeOrmModule.forFeature([/* your entities */]),
 
-    OutboxTypeOrmModule.forFeature({ dataSource }),                // NEW
+    // ----- Process-wide transactional infrastructure -----
+    TransactionalModule.forRoot({ isGlobal: true }),                  // already there
+    TypeOrmTransactionalModule.forRoot(),                             // already there
+
+    // ----- Outbox stack (NEW) -----
+    OutboxTypeOrmModule.forRoot({
+      schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
+    }),
+
     OutboxModule.forRoot({
-      repository: typeOrmEventPublicationRepositoryProvider,       // NEW — IMPORTANT
-      republishOnStartup: true,                                    // optional
-      processor: { pollingInterval: 1000, batchSize: 100 },         // optional
-      staleness: { processing: 60_000, monitorInterval: 30_000 },   // optional
+      repository: typeOrmEventPublicationRepositoryProvider(),        // IMPORTANT
+      republishOnStartup: true,
+      processor: { pollingInterval: 1000, batchSize: 100 },
+      staleness: { processing: 60_000, monitorInterval: 30_000 },
     }),
 
     // Register the event classes the outbox should know about.
     // In modular apps each feature module imports forFeature() for
-    // its own events; this snippet collapses them for clarity.
-    OutboxModule.forFeature([OrderPlacedEvent /* , ... */ ]),       // NEW
+    // the events it owns; this snippet collapses them for clarity.
+    OutboxModule.forFeature([OrderPlacedEvent /* , ... */]),
 
     // Only in worker processes — not in API-only apps that merely publish.
-    OutboxProcessingModule,                                         // NEW
+    OutboxProcessingModule,
 
-    CqrsTransactionalModule.forRoot(),                              // already there
+    // ----- CQRS bridge (only if you use @nestjs/cqrs) -----
+    CqrsTransactionalModule.forRoot(),                                // already there
   ],
   providers: [
-    // NEW — routes AggregateRoot.commit() events to the outbox
-    // for durable publication.
+    // Routes AggregateRoot.commit() events to the outbox for durable
+    // publication.
     { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-    // NEW — routes @IntegrationEventsHandler classes to the outbox
-    // registry for durable delivery.
+    // Routes @IntegrationEventsHandler classes to the outbox registry
+    // for durable delivery.
     { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
   ],
 })
 export class AppModule {}
 ```
 
-The `repository: typeOrmEventPublicationRepositoryProvider` line
-is the one most commonly forgotten. Without it, `OutboxModule`
-installs its `InMemoryEventPublicationRepository` default — the
-outbox runs but never actually writes to Postgres, so nothing
-survives a restart. The aliasing Provider forwards the
-`EVENT_PUBLICATION_REPOSITORY` token to the TypeORM
-implementation provided by `OutboxTypeOrmModule`.
+Three details that bite first-timers:
 
-The two `provide:` lines wire the cqrs-side structural ports to
-outbox's concrete services:
+1. **`repository: typeOrmEventPublicationRepositoryProvider()`** is
+   the function call that returns a `useExisting` Provider. Without
+   it, `OutboxModule` falls back to `InMemoryEventPublicationRepository`
+   — the outbox runs but never actually writes to Postgres, so
+   nothing survives a restart. Note the parentheses — passing the
+   function reference without invoking it is a frequent typo
+   (Convention #21 in [`docs/status/conventions.md`](../status/conventions.md)).
 
-- `OUTBOX_PUBLICATION_SCHEDULER` makes `HybridEventPublisher`
-  route `AggregateRoot.commit()` events into the outbox for
-  durable publication.
-- `OUTBOX_LISTENER_REGISTRAR` makes
-  `IntegrationEventsHandlerScanner` route
-  `@IntegrationEventsHandler` classes to the outbox instead of
-  to the in-memory dispatcher.
+2. **The two `provide:` lines** wire the cqrs-side structural ports
+   to outbox's concrete services. `OUTBOX_PUBLICATION_SCHEDULER`
+   makes `HybridEventPublisher` route `AggregateRoot.commit()`
+   events into the outbox; `OUTBOX_LISTENER_REGISTRAR` makes
+   `IntegrationEventsHandlerScanner` route `@IntegrationEventsHandler`
+   classes to the outbox instead of to the in-memory dispatcher.
+   Omit either binding and that half of the integration falls back
+   to in-memory.
 
-Omit either binding and that half of the integration falls back
-to in-memory.
+3. **`OutboxProcessingModule`** auto-starts the per-DS processor
+   and the staleness monitor on `OnApplicationBootstrap`. Import
+   it in worker processes only; an API-only service that just
+   publishes events should not own the processor.
+
+Live reference: [`examples/basic-typeorm-outbox/src/app.module.ts`](../../examples/basic-typeorm-outbox/src/app.module.ts).
 
 ## Step 5 — pick a handler per use case
 
@@ -213,6 +238,7 @@ what kind of delivery it needs.
 
 ```ts
 // Unchanged:
+@Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
 export class OrderPlacedMetrics
   implements ITransactionalEventHandler<OrderPlacedEvent>
@@ -232,6 +258,7 @@ export class OrderPlacedMetrics
 
 ```ts
 // Before:
+@Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)
 export class SendConfirmationHandler
   implements ITransactionalEventHandler<OrderPlacedEvent>
@@ -242,6 +269,7 @@ export class SendConfirmationHandler
 }
 
 // After:
+@Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent)
 export class SendConfirmationHandler
   implements IIntegrationEventHandler<OrderPlacedEvent>
@@ -270,6 +298,7 @@ outbox.
   the persistent registry to resolve across renames.
 
 ```ts
+@Injectable()
 @OutboxEventsHandler({
   events: [OrderPlacedEvent],
   id: 'Inventory.stable-id',
@@ -301,11 +330,15 @@ The `OutboxProcessingModule` auto-starts the processor and the
 staleness monitor on `OnApplicationBootstrap` and auto-stops
 them on `OnApplicationShutdown` — no manual hooks required.
 
+For graceful shutdown of in-flight publications during deploys,
+see the user-side `OutboxDrainService` pattern in
+[`examples/graceful-shutdown`](../../examples/graceful-shutdown/)
+(Convention #24).
+
 ## Step 7 — test the migration
 
-The outbox `/testing` subpath exposes
-`PublishedEvents` and `AssertablePublishedEvents` for
-Spring-Modulith-style assertions:
+The outbox `/testing` subpath exposes `PublishedEvents` and
+`AssertablePublishedEvents` for Spring-Modulith-style assertions:
 
 ```ts
 import {
@@ -324,30 +357,159 @@ it('publishes OrderPlacedEvent for the placed order', async () => {
 });
 ```
 
-## Migrating from method-level listeners (pre-0.1.0 snapshots)
+Both helpers read through the wired `EventPublicationRepository`
+implementation, so they work with the in-memory adapter for fast
+unit tests AND with the TypeORM adapter for testcontainers
+integration tests. See
+[`examples/testing-patterns`](../../examples/testing-patterns/)
+for the three-tier scaffold (unit / outbox unit / integration).
 
-If you are coming from an earlier snapshot that had
-`@TransactionalEventsListener`, `@OutboxEventListener`, or
-`@ApplicationModuleListener` as **method-level** decorators,
-every occurrence must be rewritten to the new class-level shape
-before the rest of this guide applies. See ADR-014 for the
-rationale.
+## Multi-DataSource migration
 
-**Mechanical conversion**:
+If your application runs multiple `DataSource`s (modular monolith,
+audit-store split, ORM migration), each DS gets its own outbox
+stack. Phase 14.3.1 + 14.21 made this transparent: handler
+registration auto-routes to the owning DS, and per-DS event
+publication tables don't contend.
+
+Module wiring (mirrors the
+[`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/)
+example):
+
+```ts
+@Module({
+  imports: [
+    // Two DataSources via @nestjs/typeorm.
+    TypeOrmModule.forRoot({ name: 'default',   /* ... */ }),
+    TypeOrmModule.forRoot({ name: 'inventory', /* ... */ }),
+
+    // Process-wide infrastructure.
+    TransactionalModule.forRoot({ isGlobal: true }),
+
+    // Per-DS transactional adapters.
+    TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+    TypeOrmTransactionalModule.forRoot({ dataSource: 'inventory' }),
+
+    // Per-DS outbox-typeorm registrations (each call resolves the
+    // DataSource via getDataSourceToken(name) and registers a
+    // TypeOrmEventPublicationRepository under a per-DS private token).
+    OutboxTypeOrmModule.forRoot({
+      schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
+    }),
+    OutboxTypeOrmModule.forRoot({
+      dataSource: 'inventory',
+      schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
+    }),
+
+    // Per-DS outbox-core registrations.
+    OutboxModule.forRoot({
+      repository: typeOrmEventPublicationRepositoryProvider(),
+      // ...processor / staleness options for the default DS...
+    }),
+    OutboxModule.forRoot({
+      dataSource: 'inventory',
+      repository: typeOrmEventPublicationRepositoryProvider('inventory'),
+      // ...processor / staleness options for the inventory DS...
+    }),
+
+    // Per-DS event-class registrations.
+    OutboxModule.forFeature([InvoiceCreatedEvent]),                       // default DS
+    OutboxModule.forFeature([StockAdjustedEvent], { dataSource: 'inventory' }),
+
+    // One worker module covers every per-DS processor.
+    OutboxProcessingModule,
+  ],
+})
+export class AppModule {}
+```
+
+Cross-DS coordination is **always** through the outbox — DD-023
+forbids cross-DS atomic transactions. A handler that needs to
+write to two DataSources should publish an integration event from
+one and consume it on the other.
+
+For the choreographed-saga shape (place order in DS A, react in
+DS B with compensation), see
+[`examples/saga-pattern`](../../examples/saga-pattern/) (single-DS
+multi-step) and
+[`examples/e-commerce-orders`](../../examples/e-commerce-orders/)
+(three-DS flagship with the same pattern).
+
+## Adding externalization to a message broker
+
+Once the outbox is in place, delivering events to Kafka /
+RabbitMQ / NATS / any `@nestjs/microservices` transport is a
+small step. Two pieces:
+
+### 1. Annotate the event class
+
+```ts
+import { Externalized } from '@nestjs-transactional/outbox';
+
+@Externalized<OrderPlacedEvent>({
+  target: 'orders.placed',
+  routingKey: (e) => e.tenantId,
+  client: 'KAFKA_CLIENT',
+})
+export class OrderPlacedEvent {
+  constructor(
+    readonly orderId: string,
+    readonly tenantId: string,
+  ) {}
+}
+```
+
+### 2. Wire `outbox-microservices`
+
+```ts
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { OutboxMicroservicesModule } from '@nestjs-transactional/outbox-microservices';
+
+@Module({
+  imports: [
+    // ...your existing outbox stack...
+
+    ClientsModule.register([
+      {
+        name: 'KAFKA_CLIENT',
+        transport: Transport.KAFKA,
+        options: { client: { brokers: ['localhost:9092'] } },
+      },
+    ]),
+
+    OutboxMicroservicesModule.forRoot({ defaultClient: 'KAFKA_CLIENT' }),
+  ],
+})
+export class AppModule {}
+```
+
+The processor invokes the bound `EventExternalizer` AFTER the
+local listener has succeeded — single-unit atomicity (DD-019):
+if either step fails, the publication is recorded as `FAILED`
+and surfaces in `FailedEventPublications.resubmit(...)`.
+
+**Read [ADR-016](../adr/016-externalization-reliability-semantics.md)
+before going to production**: the `@nestjs/microservices` `ClientProxy.emit()`
+API does NOT propagate broker-side delivery failures. Mitigation
+strategies (idempotent producers, consumer-side inbox / dedup) are
+covered in
+[`examples/externalization-with-fallback`](../../examples/externalization-with-fallback/).
+
+## Migrating from older snapshots
+
+If you are coming from a pre-0.1.0 snapshot that had method-level
+`@TransactionalEventsListener` / `@OutboxEventListener` /
+`@ApplicationModuleListener` decorators, every occurrence must be
+rewritten to the current class-level shape: lift the decorator to
+the class, rename the method to `handle`, and implement the
+matching `I*Handler` interface.
 
 ```ts
 // Before (method-level, pre-0.1.0):
 @Injectable()
 class NotificationHandlers {
   @TransactionalEventsListener(OrderPlacedEvent)
-  onOrderPlaced(event: OrderPlacedEvent): void {
-    this.metrics.increment('orders.placed');
-  }
-
-  @ApplicationModuleListener(OrderPlacedEvent)
-  async shipOrder(event: OrderPlacedEvent): Promise<void> {
-    await this.shipping.createShipment(event.orderId);
-  }
+  onOrderPlaced(event: OrderPlacedEvent): void { /* ... */ }
 }
 
 // After (class-level):
@@ -356,73 +518,32 @@ class NotificationHandlers {
 class OrderPlacedMetrics
   implements ITransactionalEventHandler<OrderPlacedEvent>
 {
-  handle(event: OrderPlacedEvent): void {
-    this.metrics.increment('orders.placed');
-  }
-}
-
-@Injectable()
-@IntegrationEventsHandler(OrderPlacedEvent)
-class ShipOrderHandler
-  implements IIntegrationEventHandler<OrderPlacedEvent>
-{
-  async handle(event: OrderPlacedEvent): Promise<void> {
-    await this.shipping.createShipment(event.orderId);
-  }
+  handle(event: OrderPlacedEvent): void { /* ... */ }
 }
 ```
 
-Each method that previously carried a decorator becomes its own
-class with that decorator at the class level, the method renamed
-to `handle`, and the matching `I*Handler` interface
-implemented. Register both new classes as providers (the module's
-`providers` array or `@Module({ providers: [...] })`).
-
-**Listener id change**: the new scanner composes listener ids as
-`${baseId}#${EventName}` where baseId defaults to the class name
-(or an explicit `options.id`). Stored publications written under
+[ADR-014](../adr/014-handler-api-redesign.md) covers the rationale
+in full. **Listener id format**: stored publications written under
 the old `${ClassName}.${methodName}` format will NOT be resolved
-by the new scanners — they become orphans. Before re-running a
-migrated application against a database with stored publications:
-
-- **Maintenance-window option** — run the application's old
-  version until the `event_publication` table is empty (or drop
-  the outstanding rows if you can afford to), then deploy the
-  new version.
-- **Manual replay option** — for every orphaned `listenerId` you
-  see in the database, call
-  `OutboxListenerRegistry.register(...)` at bootstrap with a
-  matching id and an `invoke` closure that re-dispatches to the
-  renamed class.
-
-For a fresh database (no stored publications) no cleanup is
-needed.
-
-## Breaking changes vs. previous snapshots
-
-- **Pre-0.1.0 listener decorators removed**. See "Migrating from
-  method-level listeners" above. No deprecation period — this is
-  a pre-release shift.
-- **Listener id format changed** from
-  `${ClassName}.${methodName}` to `${baseId}#${EventName}`.
-  Stored publications from the old format need manual cleanup or
-  replay registration.
-
-All other user-facing APIs — `@Transactional()`, propagation
-modes, isolation levels, `AggregateRoot.commit()`,
-`TransactionalEventPublisher` — are unchanged.
+by the current `${baseId}#${EventName}` format. For a fresh
+database (no stored publications) no cleanup is needed; for a
+populated `event_publication` table, drain the queue under the
+old version OR call `OutboxListenerRegistry.register(...)` at
+bootstrap with the legacy id and a closure that re-dispatches to
+the renamed class.
 
 ## Troubleshooting
 
 **"My `@OutboxEventsHandler` never fires."**
 Likely causes: (1) the `repository` option on
-`OutboxModule.forRoot` is missing or pointing at the InMemory
-default — no rows make it to Postgres; (2) no worker is running
-— import `OutboxProcessingModule` in a process; (3) the event
-type was not registered via `OutboxModule.forFeature([...])` in
-any imported module — deserialisation fails and the row stays in
-`FAILED`; (4) the class lacks a `handle` method — the scanner logs
-a warning and skips.
+`OutboxModule.forRoot` is missing or passed without parentheses
+— pointing at the InMemory default — no rows make it to Postgres;
+(2) no worker is running — import `OutboxProcessingModule` in a
+process; (3) the event type was not registered via
+`OutboxModule.forFeature([...])` in any imported module —
+deserialisation fails and the row stays in `FAILED`; (4) the
+class lacks a `handle` method — the scanner logs a warning and
+skips.
 
 **"Event type 'X' already registered."**
 The same event class appears in two `OutboxModule.forFeature([...])`
@@ -431,10 +552,10 @@ that actually owns the event class.
 
 **"Rollback leaks a publication row."**
 Should not happen — flush is a `beforeCommit` hook, and
-`beforeCommit` hooks participate in the transaction. Verify
-your adapter reports commit failures correctly. The integration
-test in `packages/outbox-typeorm/test/integration/cqrs-outbox.integration.spec.ts`
-exercises this path.
+`beforeCommit` hooks participate in the transaction. Verify your
+adapter reports commit failures correctly. The
+[atomicity regression spec](../../packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts)
+pins this contract end-to-end against real Postgres.
 
 **"Two workers each grab the same row."**
 Should not happen — `findReadyForProcessing` uses
@@ -444,20 +565,52 @@ are running the worker on a database without `SKIP LOCKED`
 support, you need a different backend adapter.
 
 **"`@IntegrationEventsHandler` fires twice."**
-Shouldn't happen with the new scanner — each class is routed to
-exactly one path. If you see a double invocation, verify you
-haven't registered the same class twice under different module
-hierarchies, and that you don't have both an
-`@IntegrationEventsHandler` and an `@OutboxEventsHandler` on
+Each class is routed to exactly one path by
+`IntegrationEventsHandlerScanner`. If you see a double
+invocation, verify you haven't registered the same class twice
+under different module hierarchies, and that you don't have both
+an `@IntegrationEventsHandler` and an `@OutboxEventsHandler` on
 overlapping event types from separate classes (which would be
 two deliveries, one per class — the intended behaviour).
+
+**"Multi-DS handler fires on the wrong DataSource."**
+Phase 14.3.1 Category B requires `@TransactionalEventsHandler`
+classes to declare their owning DS via the decorator option:
+
+```ts
+@TransactionalEventsHandler({
+  events: [OrderPlacedEvent],
+  dataSource: 'inventory',
+})
+```
+
+Outbox-routed handlers (`@OutboxEventsHandler`,
+`@IntegrationEventsHandler`) auto-route via the per-DS event-type
+registry and need no explicit `dataSource` option (Category A).
+
+**"Kafka externalizer reports success but no message arrives."**
+ADR-016 silent-success limitation. The `@nestjs/microservices`
+`ClientProxy.emit()` API completes when the dispatch is handed
+off to the transport, not when the broker durably acknowledges.
+Mitigation: configure the proxy for stronger acknowledgment
+(Kafka `producer.acks: 'all'` + `idempotent: true`, RabbitMQ
+confirm channels, NATS JetStream), or add a consumer-side
+inbox / dedup check. See
+[`examples/externalization-with-fallback`](../../examples/externalization-with-fallback/).
 
 ## See also
 
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
 - [Outbox integration with CQRS](../architecture/outbox-integration-with-cqrs.md)
+- [Event externalization architecture](../architecture/event-externalization.md)
 - [ADR-006 — outbox rationale](../adr/006-outbox-pattern.md)
 - [ADR-007 — outbox architecture](../adr/007-outbox-architecture.md)
-- [ADR-014 — class-level handler API redesign](../adr/014-handler-api-redesign.md)
-- [`examples/basic-typeorm-outbox/`](../../examples/basic-typeorm-outbox/) (single-DS production-shape baseline)
-- [`examples/e-commerce-orders/`](../../examples/e-commerce-orders/) (Phase 14.8e flagship; multi-DS outbox + CQRS + Kafka externalization)
+- [ADR-014 — class-level handler API](../adr/014-handler-api-redesign.md)
+- [ADR-015 — event externalization architecture](../adr/015-event-externalization-architecture.md)
+- [ADR-016 — externalization reliability semantics](../adr/016-externalization-reliability-semantics.md)
+- [ADR-018 — multi-adapter architecture](../adr/018-multi-adapter-architecture.md)
+- [ADR-019 — `OutboxModule` multi-`forRoot` pattern](../adr/019-outbox-multi-forroot-pattern.md)
+- [`examples/basic-typeorm-outbox`](../../examples/basic-typeorm-outbox/) — single-DS production-shape baseline.
+- [`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/) — two-DS independent outbox stacks.
+- [`examples/saga-pattern`](../../examples/saga-pattern/) — choreographed multi-step business saga over outbox events.
+- [`examples/e-commerce-orders`](../../examples/e-commerce-orders/) — three-DS flagship combining outbox + CQRS + REST + Kafka externalization.
