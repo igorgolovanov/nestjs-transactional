@@ -244,7 +244,9 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 ## Current Status
 
 **Last updated**: 2026-05-10 — Phase 14.8e Tier 5 (production-
-realism example library) shipped. See
+realism example library) shipped, and the framework fix for
+Convention #22 (`TypeOrmTransactionalModule.forRootAsync` bootstrap
+bug) landed as a same-day follow-up. See
 [`docs/status/2026-05-10-phase-14-8e.md`](docs/status/2026-05-10-phase-14-8e.md)
 for the retrospective. Earlier phase retrospectives in
 [`docs/status/`](docs/status/); the full completed-phases archival
@@ -265,13 +267,6 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   Optional: retire / refactor / absorb the two pre-tier
   `cqrs-full-stack` and `outbox-full-stack` examples (the latter
   was already flagged as superseded by `e-commerce-orders`).
-- **Framework gap from Phase 14.8e**: investigate and fix
-  `TypeOrmTransactionalModule.forRootAsync` bootstrap bug
-  (`this.postgres.Pool is not a constructor` when paired with
-  `TypeOrmModule.forRootAsync`). User-side workaround documented
-  in Convention #22 + tracked as a separate task. Sequential
-  with or before Phase 14.8f to allow the async-config example to
-  drop the workaround.
 - **Phase 9 iteration 9.3**: release automation for the outbox
   packages — changeset entries, CI matrix tweaks, first
   0.1.0-alpha release.
@@ -281,6 +276,17 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
 
 ### Five most recent decisions
 
+- Framework fix landed for Convention #22 (2026-05-10, follow-up
+  to Phase 14.8e closure) — `TypeOrmTransactionalModule.forRootAsync`
+  registration moved from a `useFactory` provider to an
+  `OnModuleInit`-driven `@Injectable()` class generated per
+  `forRootAsync` call. Root cause was `markAsManaged(undefined)`
+  cascading from `moduleRef.get`/`resolve` returning `undefined`
+  while `@nestjs/typeorm`'s async DataSource provider was still
+  pending. Pinned by
+  `packages/typeorm/test/integration/forrootasync.integration.spec.ts`.
+  The async-config example reverted its workaround and now uses
+  `forRootAsync` for all four framework modules.
 - Phase 14.8e shipped — Tier 5 production-realism examples
   (`e-commerce-orders` flagship 3-DS saga + Kafka + CQRS + REST;
   `async-config-from-environment` `forRootAsync` end-to-end with
@@ -292,15 +298,13 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   #20 `CqrsTransactionalModule` does not export `CommandBus` /
   `QueryBus` (controllers inject handlers directly);
   #21 `OutboxModule.forRootAsync({ repository })` lives on options,
-  not on the async factory result; #22 framework-bug workaround
-  for `TypeOrmTransactionalModule.forRootAsync` (use sync
-  `forRoot()`); #23 dotenv refuses to overwrite `process.env`
-  (snapshot/restore between tests); #24 user-side
+  not on the async factory result; #22 historical record of the
+  `TypeOrmTransactionalModule.forRootAsync` bug (now fixed —
+  see decision above); #23 dotenv refuses to overwrite
+  `process.env` (snapshot/restore between tests); #24 user-side
   `OutboxDrainService` complement to the framework's sync
-  `OutboxProcessingModule.onApplicationShutdown`. Two framework
-  gaps surfaced (one tracked for fix, one accepted as user-side
-  pattern). LoC envelope updated for flagship multi-multi-axis
-  examples (1800–2100 floor).
+  `OutboxProcessingModule.onApplicationShutdown`. LoC envelope
+  updated for flagship multi-multi-axis examples (1800–2100 floor).
 - Phase 14.8d shipped — Tier 4 advanced-pattern examples (saga
   with compensation; cross-DS audit through outbox; master/replica
   read-write-separation; meta-example with three test tiers).
@@ -318,8 +322,6 @@ list is at [`docs/status/completed.md`](docs/status/completed.md).
   catches (smart-facade DI requires class-token, not
   `@InjectOutboxPublisher`; `OutboxModule.forRoot` belongs at
   AppModule level when sub-modules are involved).
-- Phase 14.8a shipped — Tier 1 foundational examples; Convention
-  #14 inscribed (Tier 2+ examples ship 1-per-commit).
 
 For the full list of completed phases see
 [`docs/status/completed.md`](docs/status/completed.md). For

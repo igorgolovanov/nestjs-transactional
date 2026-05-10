@@ -105,18 +105,15 @@ export class AppModule {
         TypeOrmModule.forFeature([AuditLogEntry]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        // Sync `forRoot` here on purpose. `TypeOrmTransactionalModule`
-        // takes no async-resolvable tunables (`dataSource` and
-        // `isDefault` are statically declared per the JSDoc on
-        // `TypeOrmTransactionalAsyncOptions`), and the `forRootAsync`
-        // variant currently fails to bootstrap when combined with
-        // `TypeOrmModule.forRootAsync` — TypeORM's PostgresDriver
-        // ends up with an `undefined`-Pool driver namespace before
-        // its `loadDependencies` finishes. See the README's "Common
-        // pitfalls" section for the full diagnosis. The sync call
-        // produces an identical AdapterRegistry registration with
-        // none of the async edge cases.
-        TypeOrmTransactionalModule.forRoot(),
+        TypeOrmTransactionalModule.forRootAsync({
+          imports: [ConfigModule],
+          inject: [ConfigService],
+          useFactory: () => ({
+            // No tunables to read here in this example — the async
+            // shape is shown for symmetry with the rest of the
+            // stack. Real apps may branch `isDefault` on env, etc.
+          }),
+        }),
 
         OutboxTypeOrmModule.forRootAsync({
           imports: [ConfigModule],
