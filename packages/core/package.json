@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/core",
-  "version": "0.0.0",
+  "version": "1.0.0-alpha.0",
   "description": "Declarative transaction management for NestJS — core primitives (AsyncLocalStorage context, TransactionManager, @Transactional decorator, adapter port)",
   "license": "MIT",
   "author": "Igor Golovanov",
