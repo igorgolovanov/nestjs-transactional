@@ -1,5 +1,8 @@
 # @nestjs-transactional/typeorm
 
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
+
 TypeORM adapter for [@nestjs-transactional/core](../core).
 
 ## Overview

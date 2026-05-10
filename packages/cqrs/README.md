@@ -1,5 +1,8 @@
 # @nestjs-transactional/cqrs
 
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
+
 Integration between [@nestjs-transactional/core](../core) and
 [`@nestjs/cqrs`](https://docs.nestjs.com/recipes/cqrs). Gives
 `@CommandHandler` / `@QueryHandler` / `@EventsHandler` classes
