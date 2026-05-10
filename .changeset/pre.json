@@ -1,0 +1,32 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "@nestjs-transactional-examples/async-config-from-environment": "0.0.0",
+    "@nestjs-transactional-examples/audit-logging": "0.0.0",
+    "@nestjs-transactional-examples/basic-cqrs": "0.0.0",
+    "@nestjs-transactional-examples/basic-outbox": "0.0.0",
+    "@nestjs-transactional-examples/basic-transactional": "0.0.0",
+    "@nestjs-transactional-examples/basic-typeorm-outbox": "0.0.0",
+    "@nestjs-transactional-examples/e-commerce-orders": "0.0.0",
+    "@nestjs-transactional-examples/externalization-kafka": "0.0.0",
+    "@nestjs-transactional-examples/externalization-multi-broker": "0.0.0",
+    "@nestjs-transactional-examples/externalization-multi-datasource": "0.0.0",
+    "@nestjs-transactional-examples/externalization-with-fallback": "0.0.0",
+    "@nestjs-transactional-examples/graceful-shutdown": "0.0.0",
+    "@nestjs-transactional-examples/multi-datasource-basic": "0.0.0",
+    "@nestjs-transactional-examples/multi-datasource-cqrs": "0.0.0",
+    "@nestjs-transactional-examples/multi-datasource-outbox": "0.0.0",
+    "@nestjs-transactional-examples/read-write-separation": "0.0.0",
+    "@nestjs-transactional-examples/saga-pattern": "0.0.0",
+    "@nestjs-transactional-examples/shared-database-modular-monolith": "0.0.0",
+    "@nestjs-transactional-examples/testing-patterns": "0.0.0",
+    "@nestjs-transactional/core": "0.0.0",
+    "@nestjs-transactional/cqrs": "0.0.0",
+    "@nestjs-transactional/outbox": "0.0.0",
+    "@nestjs-transactional/outbox-microservices": "0.0.0",
+    "@nestjs-transactional/outbox-typeorm": "0.0.0",
+    "@nestjs-transactional/typeorm": "0.0.0"
+  },
+  "changesets": []
+}
