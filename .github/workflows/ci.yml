@@ -110,3 +110,31 @@ jobs:
 
       - name: Type check
         run: pnpm -r --filter './packages/*' exec tsc --noEmit
+
+  test-integration:
+    name: Integration tests (Node 22)
+    runs-on: ubuntu-latest
+    # ubuntu-latest ships with Docker — testcontainers spins up Postgres
+    # per-suite. Currently `typeorm` and `outbox-typeorm` define
+    # `test:integration`; pnpm filter-run skips packages without it.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Integration tests
+        run: pnpm -r --filter './packages/*' test:integration
