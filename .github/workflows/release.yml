@@ -58,4 +58,10 @@ jobs:
           title: 'chore(release): version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # `actions/setup-node@v4` with `registry-url:` generates an
+          # `.npmrc` that references `${NODE_AUTH_TOKEN}`. Both names
+          # must point at the npm publish token — without
+          # NODE_AUTH_TOKEN the .npmrc literal-expands to a placeholder
+          # and `npm publish` 404s with "not in this registry".
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
