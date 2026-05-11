@@ -227,7 +227,7 @@ broker, or graceful shutdown — see the
 | 6 — `@nestjs-transactional/outbox-typeorm` | ✅ done (alpha) | Entity, repository, migration, `SchemaInitializer`, `OutboxTypeOrmModule` |
 | 7 — CQRS ↔ outbox integration | ✅ done (alpha) | `HybridEventPublisher`, `@IntegrationEventsHandler`, `IntegrationEventsHandlerScanner` with outbox/in-memory routing |
 | 8 — Testing utilities | ✅ done (alpha) | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
-| 9 — Documentation & release | 🟡 in progress | Architecture docs, ADRs, migration guide, full-stack examples, first `1.0.0-alpha.0` release |
+| 9 — Documentation & release | ✅ done (alpha) | Architecture docs, ADRs, migration guide, full-stack examples, first `1.0.0-alpha.0` release shipped to npm |
 | 10 — Class-level handler API + naming refinement | ✅ done | Method-level → class-level migration (ADR-014); second pass renamed `@ApplicationModuleHandler` → `@IntegrationEventsHandler` |
 | 11 — Event externalization | ✅ done (alpha) | `EventExternalizer` SPI, `@Externalized` decorator, `outbox-microservices` package, ADR-015, ADR-016 (silent-success reliability finding), externalization example library coverage |
 | 14 — Multi-adapter architecture | ✅ done (alpha) | dataSource-name-keyed registration, multi-`forRoot` pattern (ADR-019), transparent transactional repositories, `OutboxTypeOrmModule` reshape, Tier 1–5 example library, ADR-018 |

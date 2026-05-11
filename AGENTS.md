@@ -242,49 +242,67 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last update**: Phase 14.8f comprehensive documentation sweep
-shipped (5 commits) — closes Phase 14.8 Tier 1–5 example library
-and the multi-adapter era documentation. Per-package READMEs
-synced with the example catalogue and Phase 14.20/14.21 alignment;
-pre-tier `cqrs-full-stack` and `outbox-full-stack` examples retired;
-ADR-018 / ADR-019 collapsed running addendum history into final-form
-Decision prose; `docs/guides/migrating-to-outbox.md` fully rewritten
-with multi-DataSource and externalization sections;
-[`docs/roadmap/README.md`](docs/roadmap/README.md) restructured
-into an era-based narrative with Phase 14 sub-phases in numerical
-order. The phase-by-phase narrative is the canonical source for
-historical context.
+**Last update**: First public alpha shipped — six packages
+published to npm at `1.0.0-alpha.0` with `alpha` dist-tag:
+`@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`.
+Released via `release.yml`'s `changesets/action@v1` after merging the
+"Version Packages" PR. The repository is now a publicly installable
+NestJS infrastructure library; further iterations are public
+releases rather than pre-release prep work.
 
 ### Blocked / Awaiting
 
-- *(none — release pipeline ready; first `1.0.0-alpha.0` publish
-  imminent.)*
+- *(none — alpha shipped; future releases follow the standard
+  changeset → version PR → publish flow.)*
 
 ### Next
 
-- **First `1.0.0-alpha.0` publish**: `release.yml`'s
-  `changesets/action@v1` step opens the "Version Packages" PR with
-  `0.0.0 → 1.0.0-alpha.0` bumps for the six framework packages
-  (linked cohort, alpha pre-release mode). Merging the PR triggers
-  the actual `npm publish` with `alpha` dist-tag. NPM_TOKEN secret
-  is configured. The `1.0.0-alpha.0` start (rather than
-  `0.1.0-alpha.0`) is changesets's standard behaviour for `0.0.0`
-  initial versions in pre-release mode + linked config; the alpha
-  series leads naturally into a future stable `1.0.0`.
+- **Trusted Publishing migration** *(optional, deferred)* — npm
+  now supports OIDC-based publisher trust per-package. Migrating
+  the six published packages to Trusted Publishing would let the
+  long-lived Granular `NPM_TOKEN` secret be revoked. Setup is
+  per-package in npm's UI; configure each with GitHub repo +
+  workflow filename. Low priority; current token works fine until
+  rotation due.
+- **Real-broker integration tests for `outbox-microservices`** —
+  the unit specs use a mock `ClientProxy`; a future iteration
+  could spin up Kafka / RabbitMQ via testcontainers and exercise
+  the externalizer against a live broker. Anchor for that work
+  is `examples/externalization-with-fallback` which already runs
+  a docker-compose RabbitMQ.
 - Future phases (not scheduled): broker-aware externalizers
-  (native `kafkajs` / `amqplib` / `nats`), outbox-prisma,
-  outbox-mongodb, OpenTelemetry integration, ESM dual packaging.
+  (native `kafkajs` / `amqplib` / `nats` under the same SPI from
+  DD-018 — closes the ADR-016 silent-success gap), `outbox-prisma`,
+  `outbox-mongodb`, OpenTelemetry integration, ESM dual packaging.
+- **`1.0.0` stable progression**: when the API stabilises through
+  user feedback on the alpha series, `pnpm changeset pre exit`
+  followed by a regular `version` cycle promotes the cohort to
+  `1.0.0` with `latest` dist-tag.
 
 ### Five most recent decisions
 
+- First public alpha shipped — six packages at `1.0.0-alpha.0` on
+  npm with `alpha` dist-tag. Linked-cohort versioning via
+  changesets keeps the six packages in lockstep. Final blocker
+  was a CI plumbing issue: `actions/setup-node@v4` with
+  `registry-url:` generates an `.npmrc` referencing
+  `${NODE_AUTH_TOKEN}`, but the publish step only set `NPM_TOKEN`
+  — `.npmrc` literal-expanded to the placeholder `XXXXX-XXXXX-XXXXX-XXXXX`
+  and every PUT 404'd. Fix: explicitly pass `NODE_AUTH_TOKEN`
+  alongside `NPM_TOKEN` in the `changesets/action` env, both
+  pointing at `secrets.NPM_TOKEN`. Sigstore provenance signing
+  worked throughout via OIDC (`id-token: write`) — only the npm
+  registry PUT failed. The `1.0.0-alpha.0` start (rather than
+  `0.1.0-alpha.0`) is changesets's standard behaviour for `0.0.0`
+  initial versions in pre-release mode + linked config; the alpha
+  series leads naturally into a future stable `1.0.0`.
 - Phase 14.8f shipped — comprehensive documentation sweep closing
   the multi-adapter era. Five commits: per-package READMEs synced
   with the example catalogue + Phase 14.20/14.21 alignment;
   pre-tier `cqrs-full-stack` and `outbox-full-stack` examples
-  retired (coverage absorbed by `basic-cqrs`, `basic-typeorm-outbox`,
-  Tier 5 `e-commerce-orders`); ADR-018 / ADR-019 deep rewrite
-  collapsed running addendum history into final-form Decision
-  prose; `docs/guides/migrating-to-outbox.md` fully rewritten with
+  retired; ADR-018 / ADR-019 deep rewrite collapsed running
+  addendum history into final-form Decision prose;
+  `docs/guides/migrating-to-outbox.md` fully rewritten with
   multi-DataSource and externalization sections;
   `docs/roadmap/README.md` restructured into era-based narrative
   with Phase 14 sub-phases in numerical order. Net delta:
@@ -329,12 +347,6 @@ historical context.
   #16 `@TransactionalEventsHandler` does not receive
   `OutboxEventPublisher.publish` events; #17 `Node16` module
   resolution required for subpath imports).
-- Phase 14.8c shipped — ADR-016 silent-success limitation pinned
-  by the externalization example library; consumer-side
-  inbox/dedup pattern inscribed as code template; three Tier 3
-  examples use class-token `OutboxEventPublisher` DI for smart-
-  facade routing; one global externalizer per process (per-broker
-  routing via `@Externalized({ client })`).
 
 For the full phase-by-phase narrative see
 [`docs/roadmap/README.md`](docs/roadmap/README.md). For

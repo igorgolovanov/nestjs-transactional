@@ -138,23 +138,25 @@ the `outbox/testing` subpath. Mirrors Spring Modulith's
 any wired `EventPublicationRepository` — in-memory for unit tests,
 TypeORM for integration tests.
 
-### Phase 9: Documentation and release (in progress)
+### Phase 9: Documentation and release (shipped)
 
 Documentation tracks:
 
 - Architecture documents (`docs/architecture/`) — core design,
   outbox pattern, outbox-cqrs integration, event externalization.
 - ADR-006 through ADR-019 — full Decision-Record set.
-- This roadmap and per-phase status retrospectives.
+- This roadmap and the empirical conventions index.
 - Migration guide ([`docs/guides/migrating-to-outbox.md`](../guides/migrating-to-outbox.md)).
 - Tier 1–5 example library (Phase 14.8 — see Era 4).
-- Comprehensive doc sweep (Phase 14.8f — current iteration).
+- Comprehensive doc sweep (Phase 14.8f).
 
-Release tracks remaining:
+Release tracks:
 
 - Changeset entries for the outbox packages.
-- First `1.0.0-alpha.0` release.
-- CI matrix tweaks for Docker integration tests, NPM_TOKEN setup.
+- First `1.0.0-alpha.0` release published to npm (six packages,
+  `alpha` dist-tag, Sigstore provenance via OIDC).
+- CI: lint / build / test / type-check / integration-tests jobs
+  green across Node 22 / 24 / 26. NPM_TOKEN secret configured.
 
 ## Era 2 — Handler API maturation (Phase 10, shipped)
 
