@@ -84,6 +84,23 @@ pnpm add @nestjs-transactional/core \
 Peer dependencies: `@nestjs/common`, `@nestjs/core`, `@nestjs/typeorm`,
 `reflect-metadata`, `rxjs`, `typeorm`.
 
+## Compatibility
+
+| Peer                                | Supported range            |
+| ----------------------------------- | -------------------------- |
+| Node.js                             | `>=22.13.0`                |
+| `typeorm`                           | `^0.3.0 \|\| ^1.0.0`       |
+| `@nestjs/typeorm`                   | `^10.0.0 \|\| ^11.0.0`     |
+| `@nestjs/common` / `@nestjs/core`   | `^10.0.0 \|\| ^11.0.0`     |
+| `reflect-metadata`                  | `^0.1.13 \|\| ^0.2.0`      |
+| `rxjs`                              | `^7.0.0`                   |
+
+The TypeORM range covers both stable `0.3.x` and stable `1.x`
+releases. CI runs the full unit and integration matrix
+(testcontainers Postgres) against both TypeORM majors. TypeORM
+nightly / beta builds are not in the declared range; install them
+explicitly via `pnpm.overrides` if you need to pin to one.
+
 ## Usage
 
 Full wiring for an application that publishes, processes, and
