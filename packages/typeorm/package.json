@@ -23,7 +23,7 @@
     "savepoint"
   ],
   "engines": {
-    "node": ">=22.11.0"
+    "node": ">=22.13.0"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -60,7 +60,7 @@
     "@nestjs/typeorm": "^10.0.0 || ^11.0.0",
     "reflect-metadata": "^0.1.13 || ^0.2.0",
     "rxjs": "^7.0.0",
-    "typeorm": "^0.3.25"
+    "typeorm": "^0.3.0 || ^1.0.0"
   },
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
@@ -74,6 +74,6 @@
     "rxjs": "^7.8.1",
     "sql.js": "^1.11.0",
     "testcontainers": "^10.13.0",
-    "typeorm": "^0.3.25"
+    "typeorm": "^0.3.0 || ^1.0.0"
   }
 }

@@ -32,7 +32,7 @@ let originalGetRepository: typeof EntityManager.prototype.getRepository | undefi
  * stamp pointing at this `EntityManager`. The patched
  * `Repository.prototype.manager` getter then has a stable fallback
  * (the original, non-active manager) and a way to discover the
- * dataSource name (via `original.connection`).
+ * dataSource name (via `getEmDataSource(original)`).
  *
  * This wrap matters specifically for the
  * `@InjectEntityManager() em.getRepository(Entity).save(...)` user
@@ -43,7 +43,7 @@ let originalGetRepository: typeof EntityManager.prototype.getRepository | undefi
  * itself — and the patched `Repository.prototype.manager` getter
  * would have nothing to read. With the wrap, the returned repo
  * carries `em` under the stash symbol, the getter resolves the
- * dataSource name from `em.connection`, and the lookup proceeds
+ * dataSource name from `em` (via the version-compat helper), and the lookup proceeds
  * normally. Net effect: even when reaching a Repository through
  * `@InjectEntityManager`, the active transactional EntityManager is
  * still used.

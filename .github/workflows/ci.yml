@@ -12,12 +12,13 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint (Node ${{ matrix.node-version }})
+    name: Lint (Node ${{ matrix.node-version }}, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         node-version: [22, 24, 26]
+        typeorm-version: ['0.3', '1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +33,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
+            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
+            pnpm install --no-frozen-lockfile
+          else
+            pnpm install --frozen-lockfile
+          fi
 
       # Cross-package type resolution goes through `dist/*.d.ts`
       # (each package.json's `types` field). ESLint's
@@ -46,12 +53,13 @@ jobs:
         run: pnpm -r --filter './packages/*' lint
 
   build:
-    name: Build (Node ${{ matrix.node-version }})
+    name: Build (Node ${{ matrix.node-version }}, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         node-version: [22, 24, 26]
+        typeorm-version: ['0.3', '1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,18 +74,25 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
+            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
+            pnpm install --no-frozen-lockfile
+          else
+            pnpm install --frozen-lockfile
+          fi
 
       - name: Build
         run: pnpm -r --filter './packages/*' build
 
   test:
-    name: Test (Node ${{ matrix.node-version }})
+    name: Test (Node ${{ matrix.node-version }}, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         node-version: [22, 24, 26]
+        typeorm-version: ['0.3', '1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,7 +107,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
+            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
+            pnpm install --no-frozen-lockfile
+          else
+            pnpm install --frozen-lockfile
+          fi
 
       # ts-jest resolves `@nestjs-transactional/*` cross-package
       # imports through the package.json `types` / `main` paths,
@@ -106,8 +127,12 @@ jobs:
         run: pnpm -r --filter './packages/*' test
 
   type-check:
-    name: Type check
+    name: Type check (TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        typeorm-version: ['0.3', '1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,7 +147,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
+            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
+            pnpm install --no-frozen-lockfile
+          else
+            pnpm install --frozen-lockfile
+          fi
 
       # Per-package `tsc --noEmit` resolves cross-package imports
       # via `node_modules/@nestjs-transactional/*/dist/*.d.ts`.
@@ -136,8 +167,12 @@ jobs:
         run: pnpm -r --filter './packages/*' exec tsc --noEmit
 
   test-integration:
-    name: Integration tests (Node 22)
+    name: Integration tests (Node 22, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        typeorm-version: ['0.3', '1.0']
     # ubuntu-latest ships with Docker — testcontainers spins up Postgres
     # per-suite. Currently `typeorm` and `outbox-typeorm` define
     # `test:integration`; pnpm filter-run skips packages without it.
@@ -155,7 +190,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
+            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
+            pnpm install --no-frozen-lockfile
+          else
+            pnpm install --frozen-lockfile
+          fi
 
       - name: Build
         run: pnpm -r --filter './packages/*' build

@@ -9,6 +9,7 @@
 import { Repository } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
+import { getEmDataSource } from './get-em-data-source';
 import { getActiveEntityManager, getManagedDataSourceName, isManaged } from './managed-registry';
 import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols';
 
@@ -103,7 +104,7 @@ export function applyRepositoryPatches(): void {
         return undefined as unknown as EntityManager;
       }
 
-      const ds = original.connection;
+      const ds = getEmDataSource(original);
       if (!isManaged(ds)) {
         return original;
       }
