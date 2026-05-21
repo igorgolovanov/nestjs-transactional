@@ -34,6 +34,7 @@
     "release-0-1-0-alpha-outbox-microservices",
     "release-0-1-0-alpha-outbox-typeorm",
     "release-0-1-0-alpha-outbox",
-    "release-0-1-0-alpha-typeorm"
+    "release-0-1-0-alpha-typeorm",
+    "typeorm-1-support"
   ]
 }
