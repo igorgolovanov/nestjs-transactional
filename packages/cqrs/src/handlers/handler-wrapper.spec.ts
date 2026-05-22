@@ -221,6 +221,7 @@ describe('CqrsHandlerWrapper (integration with @nestjs/cqrs)', () => {
 
   beforeEach(() => {
     TransactionalModule.resetForTesting();
+    CqrsHandlerWrapper.resetForTesting();
   });
 
   afterEach(async () => {
@@ -308,6 +309,69 @@ describe('CqrsHandlerWrapper (integration with @nestjs/cqrs)', () => {
     await commandBus.execute(new DeleteOrderCommand('o-7'));
 
     expect(adapter.committedTransactions).toHaveLength(1);
+  });
+
+  // Prototype-level wrapping — pinned by ADR-020. These tests assert the
+  // mechanism (where the wrap lives, marker placement, idempotency,
+  // reset hook) rather than the observable transactional behaviour, which
+  // the other cases in this file already cover.
+  describe('prototype-level wrapping (ADR-020)', () => {
+    const WRAPPED_MARKER = Symbol.for('@nestjs-transactional/wrapped');
+
+    it('mutates the handler class prototype, not the instance', async () => {
+      const originalExecute = PlaceOrderHandler.prototype.execute;
+      adapter = new FakeAdapter();
+      module = await buildModule(
+        { wrapCommandHandlers: true, wrapQueryHandlers: true, wrapEventHandlers: true },
+        adapter,
+      );
+
+      expect(PlaceOrderHandler.prototype.execute).not.toBe(originalExecute);
+
+      const handler = module.get(PlaceOrderHandler);
+      expect(Object.prototype.hasOwnProperty.call(handler, 'execute')).toBe(false);
+    });
+
+    it('sets WRAPPED_MARKER on the prototype method', async () => {
+      adapter = new FakeAdapter();
+      module = await buildModule(
+        { wrapCommandHandlers: true, wrapQueryHandlers: true, wrapEventHandlers: true },
+        adapter,
+      );
+
+      const protoMethod = PlaceOrderHandler.prototype.execute as object;
+      expect(Reflect.getMetadata(WRAPPED_MARKER, protoMethod)).toBe(true);
+    });
+
+    it('is idempotent — a second wrapAll call does not re-wrap', async () => {
+      adapter = new FakeAdapter();
+      module = await buildModule(
+        { wrapCommandHandlers: true, wrapQueryHandlers: true, wrapEventHandlers: true },
+        adapter,
+      );
+      const firstWrapped = PlaceOrderHandler.prototype.execute;
+
+      const wrapper = module.get(CqrsHandlerWrapper);
+      wrapper.wrapAll();
+
+      expect(PlaceOrderHandler.prototype.execute).toBe(firstWrapped);
+    });
+
+    it('resetForTesting restores the original prototype method', async () => {
+      const originalExecute = PlaceOrderHandler.prototype.execute;
+      adapter = new FakeAdapter();
+      module = await buildModule(
+        { wrapCommandHandlers: true, wrapQueryHandlers: true, wrapEventHandlers: true },
+        adapter,
+      );
+      expect(PlaceOrderHandler.prototype.execute).not.toBe(originalExecute);
+
+      await module.close();
+      module = undefined as unknown as TestingModule;
+      CqrsHandlerWrapper.resetForTesting();
+
+      expect(PlaceOrderHandler.prototype.execute).toBe(originalExecute);
+    });
   });
 
   it('rolls back when a wrapped handler throws', async () => {

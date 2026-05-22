@@ -105,6 +105,7 @@ the Design Decisions list below.
 - **ADR-016**: Externalization reliability semantics — [`docs/adr/016-externalization-reliability-semantics.md`](docs/adr/016-externalization-reliability-semantics.md)
 - **ADR-018**: Multi-adapter architecture — [`docs/adr/018-multi-adapter-architecture.md`](docs/adr/018-multi-adapter-architecture.md)
 - **ADR-019**: OutboxModule multi-`forRoot` registration pattern — [`docs/adr/019-outbox-multi-forroot-pattern.md`](docs/adr/019-outbox-multi-forroot-pattern.md)
+- **ADR-020**: Prototype-level wrapping for CQRS handlers — [`docs/adr/020-prototype-level-cqrs-wrapping.md`](docs/adr/020-prototype-level-cqrs-wrapping.md)
 
 Superseded / Skipped (number reserved, not reused):
 
