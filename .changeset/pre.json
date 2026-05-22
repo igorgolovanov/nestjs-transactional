@@ -30,6 +30,7 @@
   },
   "changesets": [
     "cqrs-prototype-level-wrapping",
+    "publish-config-alpha-tag",
     "release-0-1-0-alpha-core",
     "release-0-1-0-alpha-cqrs",
     "release-0-1-0-alpha-outbox-microservices",
