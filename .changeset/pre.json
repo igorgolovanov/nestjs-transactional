@@ -37,6 +37,7 @@
     "release-0-1-0-alpha-outbox-typeorm",
     "release-0-1-0-alpha-outbox",
     "release-0-1-0-alpha-typeorm",
+    "release-tag-alpha-cli-flag",
     "typeorm-1-support"
   ]
 }
