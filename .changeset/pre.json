@@ -29,6 +29,7 @@
     "@nestjs-transactional/typeorm": "0.0.0"
   },
   "changesets": [
+    "cqrs-prototype-level-wrapping",
     "release-0-1-0-alpha-core",
     "release-0-1-0-alpha-cqrs",
     "release-0-1-0-alpha-outbox-microservices",
