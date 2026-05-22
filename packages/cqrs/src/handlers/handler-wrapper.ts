@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
 import {
   PropagationMode,
@@ -81,27 +81,72 @@ type HandlerMethod = (...args: unknown[]) => unknown;
 
 /**
  * Wraps the `execute` (or `handle`) method of every `@CommandHandler` /
- * `@QueryHandler` / `@EventsHandler` instance with a transaction, using
- * the handler's own `@Transactional` metadata where present or the
+ * `@QueryHandler` / `@EventsHandler` class prototype with a transaction,
+ * using the handler's own `@Transactional` metadata where present or the
  * kind-specific defaults from {@link HandlerWrapperOptions} otherwise.
  *
- * The replacement is an own-property assignment on each handler instance,
- * shadowing the prototype method. `@nestjs/cqrs`'s buses resolve
- * `instance.execute` / `instance.handle` at call time (late binding), so
- * the wrap takes effect for every subsequent bus dispatch.
+ * The replacement is an own-property assignment on each handler class
+ * prototype, intercepting `@nestjs/cqrs`'s late-bound
+ * `instance.execute(query)` / `instance.handle(event)` lookup. This works
+ * for handlers of any scope — `Scope.DEFAULT` (singleton),
+ * `Scope.REQUEST`, and `Scope.TRANSIENT` — because the wrap point is the
+ * prototype, not any particular instance. See ADR-020.
  *
  * Double-wrap prevention: each wrapped method is tagged with the shared
  * `WRAPPED_MARKER` symbol. Other mechanisms in the coordinated wrapping
  * triad (see ADR-005) honour the same marker.
  *
- * Limitation: only works with static-dependency-tree (singleton) handlers.
- * Request-scoped handlers are resolved per-request by `@nestjs/cqrs`'s
- * `ModuleRef.resolve`, which produces a fresh instance our wrap has not
- * mutated.
+ * Test isolation: prototype mutation persists across `TestingModule`
+ * rebuilds. Call {@link CqrsHandlerWrapper.resetForTesting} in
+ * `beforeEach` to restore prototypes between cases. See ADR-020.
+ *
+ * Limitation: arrow-function `execute = async (q) => {...}` /
+ * `handle = async (e) => {...}` defined as instance fields are not
+ * wrapped — they live on the instance and shadow the prototype. Use
+ * regular method syntax (`async execute(q) { ... }`) so the method
+ * lives on the prototype.
  */
 @Injectable()
-export class CqrsHandlerWrapper {
+export class CqrsHandlerWrapper implements OnModuleDestroy {
   private readonly logger = new Logger(CqrsHandlerWrapper.name);
+
+  /**
+   * Tracks every prototype the wrapper has mutated so
+   * {@link CqrsHandlerWrapper.resetForTesting} can restore the
+   * originals. Static — shared across wrapper instances (typically one
+   * per app; multiple `TestingModule` rebuilds across tests share this
+   * tracker and the marker on each prototype method, hence the need
+   * for an explicit reset).
+   */
+  private static readonly wrappedPrototypes = new Map<
+    object,
+    { methodName: string; originalMethod: HandlerMethod }
+  >();
+
+  /**
+   * @internal Test-isolation hook (ADR-020). Restores prototype
+   * methods mutated by previous `wrapAll` runs and clears the
+   * tracker. Call in `beforeEach` when a test suite rebuilds the
+   * `TestingModule` between cases — without this, the prototype
+   * stays wrapped from the previous test and `WRAPPED_MARKER` makes
+   * the next `wrapAll` a no-op, leaving the wrong wrapper (or any
+   * wrapper at all, in "leaves unwrapped" assertions) in place.
+   *
+   * Production code calling this after the wrap loop has finished
+   * does not affect already-resolved handler instances — late-bound
+   * `instance.execute(query)` resolves to whatever lives on the
+   * prototype at call time, which after this call is the original
+   * method.
+   *
+   * Mirrors `OutboxModule.resetForTesting` (ADR-019 § 5).
+   */
+  static resetForTesting(): void {
+    for (const [metatype, { methodName, originalMethod }] of this.wrappedPrototypes) {
+      const proto = (metatype as { prototype: Record<string, unknown> }).prototype;
+      proto[methodName] = originalMethod;
+    }
+    this.wrappedPrototypes.clear();
+  }
 
   constructor(
     private readonly discovery: DiscoveryService,
@@ -109,6 +154,25 @@ export class CqrsHandlerWrapper {
     @Inject(CQRS_HANDLER_WRAPPER_OPTIONS)
     private readonly options: HandlerWrapperOptions,
   ) {}
+
+  /**
+   * NestJS lifecycle hook. When the module closes (`module.close()`,
+   * `app.close()`, test teardown via `afterEach: module.close`), restore
+   * every wrapped prototype method. This makes subsequent
+   * `TestingModule` rebuilds in the same process start from a clean
+   * prototype — without it, the `WRAPPED_MARKER` on the previous
+   * wrapper short-circuits the next `wrapAll`, leaving a stale closure
+   * (over the previous `TransactionManager`) on the prototype.
+   *
+   * Production effect: none — by the time `onModuleDestroy` fires the
+   * app is shutting down and no further bus dispatches occur. The
+   * explicit {@link CqrsHandlerWrapper.resetForTesting} static remains
+   * available for tests that do not rely on `module.close()` for
+   * cleanup.
+   */
+  onModuleDestroy(): void {
+    CqrsHandlerWrapper.resetForTesting();
+  }
 
   /**
    * Scan every provider and wrap handler methods. Safe to call multiple
@@ -119,16 +183,12 @@ export class CqrsHandlerWrapper {
     let wrappedCount = 0;
 
     for (const wrapper of providers) {
-      if (wrapper.instance === null || wrapper.instance === undefined) {
-        continue;
-      }
       if (typeof wrapper.metatype !== 'function') {
         // Value / factory providers have no class constructor — nothing to
         // classify as a CQRS handler.
         continue;
       }
 
-      const instance = wrapper.instance as object;
       const metatype = wrapper.metatype as object;
       const kind = this.classifyHandler(metatype);
       if (kind === null) {
@@ -136,7 +196,7 @@ export class CqrsHandlerWrapper {
       }
 
       const methodName = kind === 'event' ? 'handle' : 'execute';
-      if (this.wrapHandler(instance, metatype, methodName, kind)) {
+      if (this.wrapHandler(metatype, methodName, kind)) {
         wrappedCount++;
       }
     }
@@ -168,39 +228,42 @@ export class CqrsHandlerWrapper {
     return null;
   }
 
-  private wrapHandler(
-    instance: object,
-    metatype: object,
-    methodName: string,
-    kind: HandlerKind,
-  ): boolean {
-    const host = instance as Record<string, unknown>;
-    const currentMethod = host[methodName];
-    if (typeof currentMethod !== 'function') {
+  private wrapHandler(metatype: object, methodName: string, kind: HandlerKind): boolean {
+    const proto = (metatype as { prototype: Record<string, unknown> }).prototype;
+    const protoMethod = proto[methodName];
+    if (typeof protoMethod !== 'function') {
+      // Method is not on the prototype (e.g. arrow-function instance field).
+      // See ADR-020 "Limitations".
       return false;
     }
 
-    if (Reflect.getMetadata(WRAPPED_MARKER, currentMethod) === true) {
+    if (Reflect.getMetadata(WRAPPED_MARKER, protoMethod) === true) {
       return false;
     }
 
-    const resolved = this.resolveMetadata(currentMethod, metatype, kind);
+    const resolved = this.resolveMetadata(protoMethod, metatype, kind);
     if (resolved === undefined) {
       return false;
     }
 
-    const boundOriginal = (currentMethod as HandlerMethod).bind(instance);
+    const original = protoMethod as HandlerMethod;
     const manager = this.manager;
 
-    const wrapped = (...args: unknown[]): Promise<unknown> =>
-      manager.run(resolved, () => Promise.resolve(boundOriginal(...args)));
+    // Regular function (not arrow) — `this` is bound by the call site
+    // (`instance.execute(query)`) so the wrap composes with any scope of
+    // handler instance.
+    const wrapped = function (this: object, ...args: unknown[]): Promise<unknown> {
+      return manager.run(resolved, () => Promise.resolve(original.apply(this, args)));
+    };
 
     Reflect.defineMetadata(WRAPPED_MARKER, true, wrapped);
     Reflect.defineMetadata(TRANSACTIONAL_METADATA, resolved, wrapped);
 
-    host[methodName] = wrapped;
+    proto[methodName] = wrapped;
+    CqrsHandlerWrapper.wrappedPrototypes.set(metatype, { methodName, originalMethod: original });
+
     this.logger.debug(
-      `Wrapped ${kind} handler ${instance.constructor.name}.${methodName} ` +
+      `Wrapped ${kind} handler ${(metatype as { name: string }).name}.prototype.${methodName} ` +
         `(propagation=${resolved.propagation ?? PropagationMode.REQUIRED})`,
     );
     return true;

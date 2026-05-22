@@ -410,16 +410,54 @@ publications unless `options.id` is set.
 
 Full catalogue: [examples/README.md](../../examples/README.md).
 
+## Handler scopes
+
+Works with handlers of any `@nestjs/cqrs` scope —
+`Scope.DEFAULT` (singleton), `Scope.REQUEST`, and `Scope.TRANSIENT` —
+since [ADR-020](../../docs/adr/020-prototype-level-cqrs-wrapping.md):
+the wrap is applied to the handler class **prototype**, which
+intercepts `@nestjs/cqrs`'s late-bound `instance.execute(query)` lookup
+regardless of how the instance is resolved.
+
+A common request-scoped pattern uses `@nestjs/cqrs`'s own `AsyncContext`
+mechanism to carry per-request data (user, geo, A/B flags, ...) into
+the handler via the standard `REQUEST` token:
+
+```ts
+import { Inject, Scope } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { AsyncContext, QueryHandler, IQueryHandler } from '@nestjs/cqrs';
+
+@QueryHandler(ListUserContributionsQuery, { scope: Scope.REQUEST })
+export class ListUserContributionsQueryHandler
+  implements IQueryHandler<ListUserContributionsQuery> {
+  constructor(@Inject(REQUEST) private readonly ctx: AsyncContext) {}
+
+  async execute(query: ListUserContributionsQuery) {
+    // this.ctx carries the per-request data, the wrap opens a transaction
+  }
+}
+```
+
+Multiple dispatches that should share one handler instance per HTTP
+request need to share one `AsyncContext` — either pass it as the second
+argument (`queryBus.execute(query, ctx)`) or attach it to each query
+via `AsyncContext.merge(source, query)`. Without sharing, each dispatch
+gets a new `AsyncContext` (and a new instance) — that is `@nestjs/cqrs`
+behaviour and unrelated to the transaction wrap.
+
 ## Limitations
 
-- Only works with **singleton** handlers. Request-scoped CQRS handlers
-  are resolved per-request by `@nestjs/cqrs` via `ModuleRef.resolve(...)`,
-  producing a fresh instance our bootstrap wrap has not mutated.
 - Direct `eventBus.publish(...)` calls (outside of an aggregate) do NOT
   go through the transactional dispatcher — only `AggregateRoot.commit()`
   -emitted events via `mergeObjectContext` / `mergeClassContext`. If you
   need phase-aware handlers on bus-published events, publish them from
   an aggregate instead.
+- Arrow-function `execute = async (q) => {...}` /
+  `handle = async (e) => {...}` defined as instance fields are not
+  wrapped. The wrap point is the class prototype, and instance arrow
+  fields shadow the prototype. Use regular method syntax
+  (`async execute(q) { ... }`) so the method lives on the prototype.
 - `@nestjs/cqrs`'s handler-metadata constants are read via hardcoded
   string literals (`__commandHandler__`, etc.) because `@nestjs/cqrs`
   does not re-export them. See `handler-wrapper.ts` —
