@@ -65,3 +65,25 @@ jobs:
           # and `npm publish` 404s with "not in this registry".
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Post-publish dist-tag fix-up. `@changesets/cli publish` always
+      # publishes under `latest` and refuses `--tag` in pre-release mode
+      # (changesets/changesets#942), so we re-tag every just-published
+      # pre-release as `alpha` here. `latest` stays on the freshest
+      # version (changesets default) — fine while the cohort is alpha-only;
+      # after `pnpm changeset pre exit`, the stable publish will set
+      # `latest` to `1.0.0` and this step becomes a no-op (publishedPackages
+      # is empty when nothing publishes).
+      - name: Tag pre-releases as alpha
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          echo "$PUBLISHED" | jq -c '.[]' | while read -r pkg; do
+            name=$(echo "$pkg" | jq -r '.name')
+            version=$(echo "$pkg" | jq -r '.version')
+            echo "Tagging $name@$version as alpha"
+            npm dist-tag add "$name@$version" alpha
+          done
