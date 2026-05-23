@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/cqrs",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "@nestjs/cqrs integration for @nestjs-transactional/core — transactional event listeners with phases, handler wrapping, AggregateRoot integration",
   "license": "MIT",
   "author": "Igor Golovanov",
