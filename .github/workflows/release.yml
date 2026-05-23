@@ -70,12 +70,17 @@ jobs:
       # publishes under `latest` and refuses `--tag` in pre-release mode
       # (changesets/changesets#942), so we re-tag every just-published
       # pre-release as `alpha` here. `latest` stays on the freshest
-      # version (changesets default) — fine while the cohort is alpha-only;
-      # after `pnpm changeset pre exit`, the stable publish will set
-      # `latest` to `1.0.0` and this step becomes a no-op (publishedPackages
-      # is empty when nothing publishes).
+      # version (changesets default) — fine while the cohort is alpha-only.
+      #
+      # Two guards keep this step from tagging stable versions as `alpha`
+      # after `pnpm changeset pre exit`:
+      #   1. `hashFiles('.changeset/pre.json') != ''` — primary gate: the
+      #      file exists only while the cohort is in pre-release mode.
+      #   2. Per-version skip on missing prerelease segment (no `-` in the
+      #      semver) — safety net for mixed publishes or a misconfigured
+      #      pre-exit.
       - name: Tag pre-releases as alpha
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' && hashFiles('.changeset/pre.json') != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -84,6 +89,10 @@ jobs:
           echo "$PUBLISHED" | jq -c '.[]' | while read -r pkg; do
             name=$(echo "$pkg" | jq -r '.name')
             version=$(echo "$pkg" | jq -r '.version')
+            if [[ "$version" != *-* ]]; then
+              echo "Skipping $name@$version — no prerelease segment, not tagging as alpha"
+              continue
+            fi
             echo "Tagging $name@$version as alpha"
             npm dist-tag add "$name@$version" alpha
           done

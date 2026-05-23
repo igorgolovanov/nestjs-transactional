@@ -24,6 +24,16 @@ published pre-releases land in both `latest` and `alpha`; subsequent
 `npm install @nestjs-transactional/<pkg>@alpha` resolves to the
 newest pre-release rather than to a stale `1.0.0-alpha.0`.
 
+Two guards prevent the step from tagging stable versions as
+`alpha` after `pnpm changeset pre exit`:
+
+1. `if: hashFiles('.changeset/pre.json') != ''` — primary gate.
+   `pre.json` exists only while the cohort is in pre-release mode;
+   the file is removed by `changeset pre exit`.
+2. Per-version skip on a missing prerelease segment (no `-` in the
+   semver) — safety net for a mixed publish run or a misconfigured
+   pre-exit.
+
 `publishConfig.tag = "alpha"` from a prior change stays in the
 package manifests as declarative metadata for direct `npm publish`
 callers. Both — the workflow step and the manifest field — become
