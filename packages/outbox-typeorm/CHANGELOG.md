@@ -1,5 +1,39 @@
 # @nestjs-transactional/outbox-typeorm
 
+## 1.0.0-alpha.4
+
+### Patch Changes
+
+- [#10](https://github.com/igorgolovanov/nestjs-transactional/pull/10) [`8e5b9fa`](https://github.com/igorgolovanov/nestjs-transactional/commit/8e5b9fadcafa9ffec377d02e86c493a5eb7797a9) Thanks [@igorgolovanov](https://github.com/igorgolovanov)! - Pass `--tag alpha` to `changeset publish` in the release script.
+
+  Previous attempt declared `publishConfig.tag = "alpha"` in each
+  package's `package.json`. The metadata reached the npm registry,
+  but `@changesets/cli publish` overrides it with its own `--tag`
+  argument (defaulting to `latest`), so every pre-release after
+  `1.0.0-alpha.0` continued to land in the `latest` dist-tag while
+  `alpha` stayed pinned to the initial version.
+
+  The fix is a single CLI flag in the root `release` script:
+
+  ```diff
+  - "release": "changeset publish"
+  + "release": "changeset publish --tag alpha"
+  ```
+
+  `changesets/action` invokes this script from the Release workflow,
+  so the flag propagates to every package in the same publish run.
+  The previously-added `publishConfig.tag` stays in place as
+  declarative metadata for direct `npm publish` callers (where it
+  still applies); it will be removed alongside the `--tag alpha`
+  flag during `pnpm changeset pre exit` for stable `1.0.0`.
+
+  No functional / API change — release infrastructure only.
+
+- Updated dependencies [[`8e5b9fa`](https://github.com/igorgolovanov/nestjs-transactional/commit/8e5b9fadcafa9ffec377d02e86c493a5eb7797a9)]:
+  - @nestjs-transactional/core@1.0.0-alpha.4
+  - @nestjs-transactional/typeorm@1.0.0-alpha.4
+  - @nestjs-transactional/outbox@1.0.0-alpha.4
+
 ## 1.0.0-alpha.3
 
 ### Patch Changes
