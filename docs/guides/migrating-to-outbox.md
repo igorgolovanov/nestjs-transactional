@@ -29,7 +29,8 @@ externalization).
   (worker died mid-flight) flip back to `FAILED` for another
   attempt.
 - **Horizontal scale-out** — multiple worker processes poll the
-  same table without fighting each other (`FOR UPDATE SKIP LOCKED`).
+  same table; an atomic conditional-`UPDATE` claim guarantees only
+  one of them dispatches each publication.
 - **At-least-once delivery semantics** — publications commit
   atomically with the business write. A committed publication is
   guaranteed to be delivered; a publication whose transaction
@@ -558,11 +559,14 @@ adapter reports commit failures correctly. The
 pins this contract end-to-end against real Postgres.
 
 **"Two workers each grab the same row."**
-Should not happen — `findReadyForProcessing` uses
-`SELECT ... FOR UPDATE SKIP LOCKED` (Postgres) and `tryClaim`
-uses a conditional `UPDATE ... WHERE status IN (...)`. If you
-are running the worker on a database without `SKIP LOCKED`
-support, you need a different backend adapter.
+They may both *fetch* it — `findReadyForProcessing` does not take
+row locks — but only one can *claim* it: `tryClaim` issues a
+conditional `UPDATE ... WHERE id = :id AND status IN (...)` and
+reports whether the row was actually transitioned. The loser sees
+zero affected rows and moves on without invoking the listener. So
+duplicate fetches are possible by design; duplicate dispatches are
+not. If you scale far past a handful of workers, the wasted
+`SELECT`s add up — that is the point to revisit the claim strategy.
 
 **"`@IntegrationEventsHandler` fires twice."**
 Each class is routed to exactly one path by

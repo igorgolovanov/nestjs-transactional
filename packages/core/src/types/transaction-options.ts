@@ -23,6 +23,11 @@ export interface TransactionOptions {
    * to route to a read replica or to issue `SET TRANSACTION READ ONLY`.
    * It is a hint, not an enforcement — writes may still be attempted and
    * may be rejected by the database.
+   *
+   * NOT IMPLEMENTED by the shipped `TypeOrmTransactionAdapter` — the flag
+   * is carried through the core and handed to the adapter, which
+   * currently ignores it. Do not rely on it to prevent writes. See
+   * `docs/known-limitations.md`.
    */
   readonly readOnly?: boolean;
 
@@ -30,6 +35,11 @@ export interface TransactionOptions {
    * Transaction timeout in milliseconds. If the adapter supports
    * transaction-level timeouts (e.g. `statement_timeout` on Postgres),
    * exceeding this triggers a rollback. Omit for no timeout.
+   *
+   * NOT IMPLEMENTED by the shipped `TypeOrmTransactionAdapter` — the
+   * value is carried through the core and handed to the adapter, which
+   * currently ignores it. No timeout is enforced. See
+   * `docs/known-limitations.md`.
    */
   readonly timeout?: number;
 }

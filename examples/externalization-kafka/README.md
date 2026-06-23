@@ -61,7 +61,7 @@ docker-compose -f examples/externalization-kafka/docker-compose.yml down -v
                                   |
                                   v
                   +---------------------------+
-                  | EventPublicationProcessor |  poll FOR UPDATE SKIP LOCKED
+                  | EventPublicationProcessor |  poll, claim by UPDATE
                   +-------------+-------------+
                                 |
                   +-------------+-------------+

@@ -4,6 +4,40 @@ Limitations of the current implementation. Each entry names the
 phase in which it is slated for resolution (or "no fix planned"
 with rationale).
 
+## Transaction options — `readOnly` and `timeout` are not enforced
+
+`TransactionOptions.readOnly` and `TransactionOptions.timeout`
+(`packages/core/src/types/transaction-options.ts`) are accepted by
+the core, carried through `TransactionManager`, and handed to the
+adapter — but the shipped `TypeOrmTransactionAdapter`
+(`packages/typeorm/src/adapter/typeorm.adapter.ts`) forwards only
+`isolation` to `DataSource.transaction`. Both options are therefore
+**no-ops today**.
+
+What this means in practice:
+
+- `@ReadOnly()` and `@Transactional({ readOnly: true })` express
+  intent and document the method, but a write inside such a method
+  still commits. There is no `SET TRANSACTION READ ONLY`, and no
+  read-replica routing.
+- `@Transactional({ timeout: 5000 })` does not abort anything. A
+  long-running transaction runs until the database or the client
+  library times it out on its own terms.
+- The same applies to `CqrsTransactionalModule`'s
+  `defaultQueryOptions: { readOnly: true }` default — query handlers
+  are not write-protected by it.
+
+The options are deliberately kept in the type surface rather than
+removed: they are the natural extension point for the intended
+behaviour, and adapters are free to honour them (the
+`TransactionAdapter` contract permits it).
+
+**Fix:** scheduled as item A1 of the
+[improvement plan](roadmap/improvement-plan.md) — the direction
+(implement `readOnly` via `SET TRANSACTION READ ONLY` on
+Postgres-family dialects; implement or formally deprecate `timeout`)
+needs a DD before implementation.
+
 ## Phase 14 multi-adapter
 
 Single-adapter (default-DS) deployments are unaffected by these

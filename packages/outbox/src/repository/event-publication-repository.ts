@@ -75,16 +75,36 @@ export interface EventPublicationRepository {
    * Atomically claim a publication: transition `PUBLISHED` or
    * `RESUBMITTED` → `PROCESSING` (and increment `completionAttempts`)
    * iff the current status is one of those. Returns `true` when the
-   * claim succeeded, `false` otherwise — used by the dispatcher to
-   * prevent double-processing across workers.
+   * claim succeeded, `false` otherwise.
+   *
+   * **This method carries the SPI's whole concurrency guarantee.** It is
+   * what prevents double-processing across workers, so the status check
+   * and the transition MUST be one indivisible operation — a conditional
+   * `UPDATE ... WHERE status IN (...)` reporting affected-row count, a
+   * `findOneAndUpdate` with the status in the filter, or an equivalent
+   * compare-and-set. A read-then-write implementation is incorrect: two
+   * workers would both observe `PUBLISHED` and both dispatch.
+   *
+   * See DD-025.
    */
   tryClaim(id: string): Promise<boolean>;
 
   /**
    * Find publications ready for processing (status `PUBLISHED` or
-   * `RESUBMITTED`). Production implementations should use
-   * `SELECT ... FOR UPDATE SKIP LOCKED` (or equivalent) to be safe
-   * against concurrent workers.
+   * `RESUBMITTED`), oldest first.
+   *
+   * Deliberately NOT exclusive: implementations need not lock rows or
+   * hand out disjoint sets, and concurrent workers may receive
+   * overlapping results. Correctness comes from {@link tryClaim} — a
+   * worker that loses the claim skips the publication without invoking
+   * its listener, so overlap costs a wasted read, never a duplicate
+   * dispatch.
+   *
+   * Row-locking implementations (`SELECT ... FOR UPDATE SKIP LOCKED`)
+   * are permitted but not expected, and neither shipped implementation
+   * uses one: a pessimistic lock has to be held by a transaction that
+   * spans the listener invocation, which is unsafe for long-running
+   * listeners. See DD-025.
    */
   findReadyForProcessing(limit: number): Promise<EventPublication[]>;
 

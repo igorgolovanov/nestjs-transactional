@@ -229,26 +229,47 @@ cqrs → (optional) typeorm → core → NestJS platform + Node builtins
 
 ## Testing strategy
 
-### Per-package targets
+### Per-package shape
 
 - **core** — unit tests with `InMemoryTransactionAdapter` for
   TransactionContext, TransactionManager, AdapterRegistry,
-  decorators, interceptor. Coverage target: 90% lines, 85%
-  branches on public API.
-- **typeorm** — unit tests against SQLite in-memory; integration
-  tests with testcontainers (real Postgres) for savepoint
-  behavior, isolation levels, multi-DataSource scenarios,
-  connection pool behavior. Coverage target: 85% lines on units.
+  decorators, interceptor.
+- **typeorm** — unit tests against SQLite in-memory (`sql.js`);
+  integration tests with testcontainers (real Postgres) for
+  savepoint behavior, isolation levels, multi-DataSource
+  scenarios, connection pool behavior.
 - **cqrs** — unit tests for decorators, scanner, wrapper with a
-  mocked TransactionManager. Integration tests with a full NestJS
-  testing module: real `CqrsModule` + `InMemoryTransactionAdapter`
-  (or TypeORM SQLite). E2E tests for cross-package interaction
-  (cqrs + typeorm + core). Coverage target: 85% on handler logic.
-- **outbox** — coverage target 90% lines, 85% branches.
-- **outbox-typeorm** — coverage target 85% lines (the remainder
-  is TypeORM integration that is hard to cover in unit tests).
-- **outbox-microservices** — coverage target 90% lines on units
-  (ClientProxy mocked).
+  mocked TransactionManager, plus full NestJS testing modules
+  (real `CqrsModule` + `InMemoryTransactionAdapter`).
+- **outbox** — unit tests throughout, against
+  `InMemoryEventPublicationRepository`.
+- **outbox-typeorm** — integration tests (testcontainers) carry
+  the SQL and module wiring; `test/unit/` covers the Docker-free
+  surface, above all the `affected`-count claim contract from
+  DD-025 and the schema initializer's production-safety default.
+- **outbox-microservices** — unit tests with a mocked
+  `ClientProxy`, including the ADR-016 silent-success canary. No
+  real-broker suite exists (see ADR-016).
+
+### Coverage gate
+
+Coverage is enforced, not aspirational. Each package declares a
+`coverageThreshold` in its `jest.config.js`, and the `coverage`
+job in CI runs `pnpm -r --filter './packages/*' test:cov` — a
+package that drops below its floor fails the build. Run it
+locally the same way before opening a PR.
+
+The floors are **baselines, not targets**: they were set from
+measured coverage when the gate was introduced and are meant to
+ratchet upward. Two rules follow from that:
+
+- Raising a floor after improving coverage is welcome.
+- Lowering one is a deliberate, reviewable change. Say why in the
+  PR description; do not let it ride along with unrelated work.
+
+`passWithNoTests` is deliberately **not** set, so a package that
+ships without unit tests fails its own `test` script instead of
+reporting success.
 
 ### Test utilities
 

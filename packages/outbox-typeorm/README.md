@@ -64,9 +64,16 @@ Design notes: [`docs/roadmap/README.md`](../../docs/roadmap/README.md),
   (`WHERE id = :id AND status IN (PUBLISHED, RESUBMITTED)`) and
   returns whether the row was actually transitioned — atomic under
   concurrent workers.
-- `findReadyForProcessing` uses
-  `SELECT ... FOR UPDATE SKIP LOCKED` so multiple workers can poll
-  without fighting for the same rows.
+- `findReadyForProcessing` polls ready rows in publication-date order
+  WITHOUT per-row locking. An earlier design used
+  `SELECT ... FOR UPDATE SKIP LOCKED`; it was dropped because
+  pessimistic locks need an enclosing transaction wide enough to hold
+  the lock across the listener invocation, which is unsafe for
+  long-running listeners. Concurrent workers may therefore see the
+  same rows — correctness comes from `tryClaim` above, and a losing
+  worker simply moves on. The duplicate-fetch cost is negligible at
+  typical worker counts (1–3); very high worker counts would want a
+  different claim strategy.
 - `archiveCompleted` copies the row into
   `event_publication_archive` and then deletes it from the hot queue
   — atomicity comes from the ambient transaction the processor wraps

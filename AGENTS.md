@@ -24,8 +24,8 @@ growing set of npm packages organised by concern.
   testing utilities. ORM-agnostic.
 - **@nestjs-transactional/outbox-typeorm** *(alpha)* — TypeORM persistence
   backend for the outbox: `event_publication` + archive entities,
-  `TypeOrmEventPublicationRepository` with `FOR UPDATE SKIP LOCKED`,
-  shipped migration, `OutboxTypeOrmModule` wiring.
+  `TypeOrmEventPublicationRepository` with an atomic conditional-`UPDATE`
+  claim (`tryClaim`), shipped migration, `OutboxTypeOrmModule` wiring.
 - **@nestjs-transactional/outbox-microservices** *(alpha)* — event
   externalization to brokers (Kafka, RabbitMQ, NATS, JMS, gRPC, ...) via
   `@nestjs/microservices` `ClientProxy`. One package covers every transport
@@ -78,6 +78,7 @@ the linked docs for depth.
 | Architecture Decision Records | [docs/adr/](docs/adr/) — see ADR index below |
 | Design Decisions | [docs/dd/](docs/dd/) — see DD index below |
 | Implementation roadmap (per phase) | [docs/roadmap/README.md](docs/roadmap/README.md) |
+| Improvement plan (path to stable 1.0.0) | [docs/roadmap/improvement-plan.md](docs/roadmap/improvement-plan.md) |
 | Empirically-discovered conventions | [docs/status/conventions.md](docs/status/conventions.md) |
 | Coding conventions, testing strategy, dev workflow | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Multi-adapter migration guide | [docs/migration/multi-adapter.md](docs/migration/multi-adapter.md) |
@@ -151,6 +152,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-022](docs/dd/022-inject-decorators-datasource.md) — Inject decorators accept a dataSource parameter
 - [DD-023](docs/dd/023-independent-tx-contexts-per-ds.md) — Independent transaction contexts per dataSource
 - [DD-024](docs/dd/024-outbox-publisher-facade.md) — Smart `OutboxEventPublisher` facade
+- [DD-025](docs/dd/025-claim-atomicity-obligation.md) — The claim carries the concurrency guarantee, not the poll
 
 ## DO NOT cheat-sheet
 
@@ -205,6 +207,8 @@ Before merging into main:
 - [ ] Build with no warnings (`pnpm -r build`)
 - [ ] Lint clean (`pnpm -r lint`)
 - [ ] Coverage has not dropped below baseline
+      (`pnpm -r --filter './packages/*' test:cov` — enforced by
+      per-package `coverageThreshold`, gated by the `coverage` CI job)
 - [ ] Changeset added (for user-facing changes)
 - [ ] README / docs updated when the public API changed
 - [ ] ADR added for significant architectural decisions
@@ -258,6 +262,13 @@ releases rather than pre-release prep work.
 
 ### Next
 
+- **Improvement plan (post-alpha assessment)** — the prioritised
+  workstreams for the stable-`1.0.0` push (API consistency, coverage
+  governance, outbox production readiness) live in
+  [`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md).
+  Architectural items there (A1 `readOnly`/`timeout`, C2 retry
+  policy, C3 observability SPI, C5 broker-aware externalizers) start
+  as DD/ADR discussions.
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
   the six published packages to Trusted Publishing would let the

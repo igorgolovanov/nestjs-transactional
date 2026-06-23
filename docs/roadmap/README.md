@@ -17,6 +17,10 @@ CQRS integration, externalization SPI, and the Tier 1–5 example
 library have all shipped. Phase 9 release automation and the
 broker-aware externalizers (Phase 12+) remain ahead.
 
+The post-alpha full-project assessment and the prioritised plan for
+the stable-`1.0.0` push live in
+[`improvement-plan.md`](improvement-plan.md).
+
 ## Era 1 — Foundation (Phases 0–9)
 
 ### Phase 0: Monorepo setup (shipped)
@@ -112,7 +116,11 @@ TypeORM persistence backend:
   worker / operator / cleanup indexes.
 - `TypeOrmEventPublicationRepository` implementing the SPI from
   outbox; `tryClaim` conditional `UPDATE`,
-  `findReadyForProcessing` using `SELECT ... FOR UPDATE SKIP LOCKED`.
+  `findReadyForProcessing` using `SELECT ... FOR UPDATE SKIP LOCKED`
+  (the row locking was dropped before release — pessimistic locks
+  need an enclosing transaction wide enough to span the listener
+  invocation; the shipped poll takes no locks and relies on
+  `tryClaim` alone).
 - Schema migration `CreateEventPublication1700000000000` plus
   `SchemaInitializer` for development-time auto-init.
 - `OutboxTypeOrmModule` (later reshaped in Phase 14.21 — see

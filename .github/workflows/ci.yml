@@ -126,6 +126,48 @@ jobs:
       - name: Test
         run: pnpm -r --filter './packages/*' test
 
+  coverage:
+    name: Coverage (Node 22, TypeORM 0.3)
+    runs-on: ubuntu-latest
+    # Single cell on purpose: coverage does not vary by Node or TypeORM
+    # version, and the `test` job already proves the suite passes across
+    # the full matrix. What this job adds is the per-package
+    # `coverageThreshold` gate — the enforcement behind the "coverage has
+    # not dropped below baseline" quality gate, which was previously
+    # unverifiable in CI.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
+      # Fails when any package drops below its baseline floor, and — with
+      # `passWithNoTests` gone — when a package ships no unit tests at all.
+      - name: Test with coverage
+        run: pnpm -r --filter './packages/*' test:cov
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: packages/*/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
+
   type-check:
     name: Type check (TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest

@@ -11,6 +11,16 @@ Accepted — 2026-04-24.
 > the abstract package's npm name moved. Body references updated inline;
 > the title was rewritten to use the current name.
 
+> **Note (SPI contract amendment):** the `SPI contract` appendix below
+> originally required production `findReadyForProcessing`
+> implementations to use `FOR UPDATE SKIP LOCKED` or equivalent. No
+> shipped implementation does — row locking was dropped before release
+> because a pessimistic lock needs a transaction spanning the listener
+> invocation. The obligation belongs on `tryClaim`, and the appendix is
+> corrected inline to say so. The Decision below (the
+> `outbox` / `outbox-typeorm` split) is unaffected. Rationale:
+> [DD-025](../dd/025-claim-atomicity-obligation.md).
+
 ## Context
 
 [ADR-006](006-outbox-pattern.md) decides to implement a full
@@ -152,9 +162,15 @@ each method must do:
   one SQL statement.
 - `tryClaim(id)` — atomic conditional update
   (`PUBLISHED|RESUBMITTED → PROCESSING`), returns whether the
-  claim won.
-- `findReadyForProcessing(limit)` — worker poll. Production
-  impls must use `FOR UPDATE SKIP LOCKED` or equivalent.
+  claim won. This method carries the SPI's entire concurrency
+  guarantee: the status check and the transition must be one
+  indivisible operation, so a read-then-write implementation does
+  not satisfy the contract (DD-025).
+- `findReadyForProcessing(limit)` — worker poll. Deliberately
+  non-exclusive: implementations need not lock rows or return
+  disjoint sets, and concurrent workers may see overlapping
+  results. A losing `tryClaim` skips the publication, so overlap
+  costs a wasted read and never a duplicate dispatch (DD-025).
 - `findStale(beforeDate, statuses)` — staleness monitor
   input.
 - `findCompleted / findIncomplete / findFailed` — operator
@@ -163,13 +179,14 @@ each method must do:
 - `archiveCompleted(id)` — ARCHIVE-mode completion.
 - `delete(id)` — DELETE-mode completion.
 
-A backend author implements these ten methods, wires up a
+A backend author implements these twelve methods, wires up a
 module that binds the implementation to `EVENT_PUBLICATION_REPOSITORY`,
 and the rest of the library runs unchanged.
 
 ## See also
 
 - [ADR-006 — Outbox pattern rationale](006-outbox-pattern.md)
+- [DD-025 — Claim atomicity obligation](../dd/025-claim-atomicity-obligation.md)
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
 - [`@nestjs-transactional/outbox` README](../../packages/outbox/README.md)
 - [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)

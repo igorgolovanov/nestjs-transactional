@@ -8,8 +8,8 @@ single-unit atomicity invariant pinned by integration tests
 A successful `@Transactional` method commits the business INSERT and the
 `event_publication` row in the **same database transaction**; a thrown
 error rolls back both. The worker (`EventPublicationProcessor`) polls
-the table with `FOR UPDATE SKIP LOCKED` and dispatches to the
-`@OutboxEventsHandler`.
+the table, claims each row with an atomic conditional `UPDATE`, and
+dispatches to the `@OutboxEventsHandler`.
 
 ## When to use this example
 

@@ -29,7 +29,9 @@ export const CQRS_TRANSACTIONAL_OPTIONS = 'CQRS_TRANSACTIONAL_OPTIONS';
  * - `wrapCommandHandlers`: `true`
  * - `wrapQueryHandlers`: `true`
  * - `wrapEventHandlers`: `true`
- * - `defaultQueryOptions`: `{ readOnly: true }`
+ * - `defaultQueryOptions`: `{ readOnly: true }` — declarative intent
+ *   only; no shipped adapter enforces `readOnly` yet (see
+ *   `docs/known-limitations.md`)
  * - `useTransactionalEventPublisher`: `true`
  */
 export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
@@ -63,16 +65,23 @@ export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
  *   dispatcher.
  *
  * Pair with `TransactionalModule.forRoot({ isGlobal: true })` at the
- * application root. For TypeORM-backed applications, also register
- * adapters with `TypeOrmTransactionalModule.forFeature(...)`.
+ * application root. For TypeORM-backed applications, register one
+ * adapter per DataSource with `TypeOrmTransactionalModule.forRoot(...)`
+ * (ADR-019 — one call per dataSource, not one per feature module).
+ *
+ * Do NOT import `@nestjs/cqrs`'s `CqrsModule` alongside this module
+ * (convention #6): this module imports `CqrsModule` internally and
+ * overrides the `EventPublisher` DI token, so a second import in the
+ * consumer shadows the override and aggregate events silently bypass
+ * the dispatcher.
  *
  * @example
  * ```ts
  * @Module({
  *   imports: [
  *     TransactionalModule.forRoot({ isGlobal: true }),
- *     TypeOrmTransactionalModule.forFeature({ dataSource: myDs }),
- *     CqrsModule,
+ *     TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+ *     // No `CqrsModule` here — see the note above.
  *     CqrsTransactionalModule.forRoot(),
  *   ],
  * })

@@ -65,6 +65,11 @@ export function Transactional(
  * must not mutate state. Options are applied first and the `readOnly: true`
  * flag is overlaid on top, so callers cannot turn it off from here — use
  * `@Transactional` directly if that is the intent.
+ *
+ * The flag is declarative intent, not enforcement: the shipped
+ * `TypeOrmTransactionAdapter` does not yet map `readOnly` to a database
+ * statement, so a write inside a `@ReadOnly` method still succeeds. See
+ * `docs/known-limitations.md`.
  */
 export const ReadOnly = (
   options: Partial<TransactionalMetadata> = {},
