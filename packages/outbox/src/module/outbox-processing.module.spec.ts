@@ -72,13 +72,13 @@ describe('OutboxProcessingModule', () => {
       .mockImplementation(() => undefined);
     processorStop = jest
       .spyOn(module.get(EventPublicationProcessor), 'stop')
-      .mockImplementation(() => undefined);
+      .mockResolvedValue(undefined);
     monitorStart = jest
       .spyOn(module.get(StalenessMonitor), 'start')
       .mockImplementation(() => undefined);
     monitorStop = jest
       .spyOn(module.get(StalenessMonitor), 'stop')
-      .mockImplementation(() => undefined);
+      .mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -98,5 +98,28 @@ describe('OutboxProcessingModule', () => {
 
     expect(processorStop).toHaveBeenCalledTimes(1);
     expect(monitorStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('awaits every drain before shutdown completes', async () => {
+    // The hook used to be synchronous, so NestJS moved on to tearing
+    // down providers (the DataSource among them) while a batch was
+    // still running. `module.close()` must not resolve until each
+    // drain has.
+    let processorDrained = false;
+    let monitorDrained = false;
+    processorStop.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      processorDrained = true;
+    });
+    monitorStop.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      monitorDrained = true;
+    });
+
+    await module.init();
+    await module.close();
+
+    expect(processorDrained).toBe(true);
+    expect(monitorDrained).toBe(true);
   });
 });

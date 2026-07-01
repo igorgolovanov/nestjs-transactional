@@ -21,6 +21,7 @@ const disabledConfig: StalenessConfig = {
   processing: 0,
   resubmitted: 0,
   monitorInterval: 60_000,
+  shutdownTimeout: 5_000,
 };
 
 describe('StalenessMonitor', () => {
@@ -35,8 +36,8 @@ describe('StalenessMonitor', () => {
     repo = new InMemoryEventPublicationRepository();
   });
 
-  afterEach(() => {
-    monitor?.stop();
+  afterEach(async () => {
+    await monitor?.stop();
     monitor = undefined;
     jest.useRealTimers();
   });
@@ -115,10 +116,10 @@ describe('StalenessMonitor', () => {
     await repo.updateStatus(pub!.id, PublicationStatus.COMPLETED);
 
     monitor = new StalenessMonitor(repo, {
+      ...disabledConfig,
       published: 1_000,
       processing: 1_000,
       resubmitted: 1_000,
-      monitorInterval: 60_000,
     });
     await monitor.checkStaleness();
 
@@ -139,7 +140,7 @@ describe('StalenessMonitor', () => {
     expect((await repo.findById(pub!.id))!.status).toBe(PublicationStatus.PROCESSING);
   });
 
-  it('stop cancels the scheduled polling tick', () => {
+  it('stop cancels the scheduled polling tick', async () => {
     jest.useFakeTimers();
     monitor = new StalenessMonitor(repo, {
       ...disabledConfig,
@@ -149,7 +150,78 @@ describe('StalenessMonitor', () => {
     monitor.start();
     expect(jest.getTimerCount()).toBe(1);
 
-    monitor.stop();
+    await monitor.stop();
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  describe('shutdown drain', () => {
+    function sleep(ms: number): Promise<void> {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    it('waits for an in-flight sweep so shutdown cannot cut it in half', async () => {
+      let releaseSweep!: () => void;
+      const sweeping = new Promise<void>((resolve) => {
+        releaseSweep = resolve;
+      });
+      let sweepEntered!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        sweepEntered = resolve;
+      });
+      jest.spyOn(repo, 'findStale').mockImplementation(async () => {
+        sweepEntered();
+        await sweeping;
+        return [];
+      });
+
+      monitor = new StalenessMonitor(repo, {
+        ...disabledConfig,
+        processing: 60_000,
+        monitorInterval: 1,
+        shutdownTimeout: 5_000,
+      });
+      monitor.start();
+      await entered;
+
+      let settled = false;
+      const stopped = monitor.stop().then(() => {
+        settled = true;
+      });
+
+      await sleep(30);
+      expect(settled).toBe(false);
+
+      releaseSweep();
+      await stopped;
+      expect(settled).toBe(true);
+    });
+
+    it('gives up after the drain timeout so a hung query cannot block shutdown', async () => {
+      let sweepEntered!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        sweepEntered = resolve;
+      });
+      jest.spyOn(repo, 'findStale').mockImplementation(async () => {
+        sweepEntered();
+        await new Promise<void>(() => {
+          /* never settles */
+        });
+        return [];
+      });
+
+      monitor = new StalenessMonitor(repo, {
+        ...disabledConfig,
+        processing: 60_000,
+        monitorInterval: 1,
+        shutdownTimeout: 25,
+      });
+      monitor.start();
+      await entered;
+
+      const warn = jest.spyOn(Logger.prototype, 'warn');
+      await monitor.stop();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('drain timed out'));
+    });
   });
 });

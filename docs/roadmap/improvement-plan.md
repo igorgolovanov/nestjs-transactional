@@ -264,7 +264,33 @@ mocked `EntityManager`, but the outbox entities use Postgres-specific
 
 ## Workstream C — Outbox production readiness
 
-### C1. Graceful shutdown does not drain in-flight work
+### C1. Graceful shutdown does not drain in-flight work — *shipped*
+
+`EventPublicationProcessor.stop()` and `StalenessMonitor.stop()` are
+`async` and await the work already in flight; the module hook awaits
+all of them concurrently, so multi-dataSource deployments do not add
+up their budgets. An idle worker resolves immediately — the drain
+costs nothing when there is nothing to drain.
+
+`processor.shutdownTimeout` and `staleness.shutdownTimeout` bound the
+wait (default `DEFAULT_DRAIN_TIMEOUT_MS`, 10 s; `0` restores the old
+no-wait behaviour). Work abandoned at the deadline is abandoned, not
+cancelled — there is no safe way to interrupt a half-finished listener
+invocation — so the trade-off is shutdown latency against recovery
+lag, never durability.
+
+Convention #24 is rewritten as a historical record and the example's
+`OutboxDrainService` is deleted. Pinned at two levels: unit specs for
+the drain, the timeout, the `0` case and idempotency, and the
+`graceful-shutdown` integration suite against real Postgres. Both were
+mutation-checked — removing the drain fails the unit specs, and
+setting `shutdownTimeout: 0` fails the integration test that asserts
+an in-flight handler completes before teardown.
+
+Not addressed here: `StartupRecoveryService` has no in-flight work to
+drain (it runs once at bootstrap), so it needed no change.
+
+Original finding:
 
 `OutboxProcessingModule.onApplicationShutdown()`
 (`packages/outbox/src/module/outbox-processing.module.ts`) is
@@ -373,6 +399,11 @@ Recorded, not scheduled. Ordered roughly by value.
   given [ADR-004](../adr/004-public-api-stability.md) commits to API
   stability, an `.api.md`-style surface snapshot would turn breaking
   changes into reviewable diffs.
+- **Broken relative doc links** — 20 across 10 files, mostly example
+  READMEs citing ADR/DD files by a guessed slug (`dd/019-single-unit-atomicity.md`
+  for `019-hybrid-delivery-atomicity.md`, and so on). Surfaced while
+  verifying links during C1. Worth a link-check step in CI so it
+  cannot regress.
 - **Docs site / benchmarks** — markdown-only docs, no published
   site; no perf harness behind the AsyncLocalStorage overhead
   claims.
@@ -391,7 +422,8 @@ Recorded, not scheduled. Ordered roughly by value.
    (`typeorm` 62, `outbox-microservices` 65).
 3. **API consistency**: A2, A3, A5, A7, then A6.
 4. **A1 decision + implementation** (DD first).
-5. **Outbox production readiness**: C1 → C2 (DD) → C3 (DD) → C4.
+5. **Outbox production readiness**: ~~C1~~ **shipped** → C2 (DD) →
+   C3 (DD) → C4.
 6. **C5 broker-aware externalizers** as its own scheduled phase.
 
 Every user-facing change ships with a changeset; architectural items

@@ -67,12 +67,21 @@ import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outb
     }),
     OutboxModule.forRoot({
       republishOnStartup: true,
-      processor: { pollingInterval: 1000, batchSize: 100 },
+      processor: {
+        pollingInterval: 1000,
+        batchSize: 100,
+        // How long shutdown waits for a batch already in flight.
+        // Defaults to DEFAULT_DRAIN_TIMEOUT_MS (10s); keep it under
+        // your platform's grace period. 0 = don't wait.
+        shutdownTimeout: 10_000,
+      },
       staleness: { processing: 60_000, monitorInterval: 30_000 },
       // repository: { provide: EVENT_PUBLICATION_REPOSITORY, useClass: TypeOrmEventPublicationRepository },
     }),
     // Import OutboxProcessingModule ONLY in worker processes — not in
-    // API-only apps that merely publish events.
+    // API-only apps that merely publish events. On shutdown it awaits
+    // the in-flight batch before NestJS tears down the DataSource, so
+    // publications are not stranded in PROCESSING.
     OutboxProcessingModule,
     // Register the event classes this module emits / consumes.
     OutboxModule.forFeature([OrderPlacedEvent, OrderShippedEvent]),

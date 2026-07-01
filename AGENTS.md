@@ -293,6 +293,29 @@ releases rather than pre-release prep work.
 
 ### Five most recent decisions
 
+- Improvement-plan items shipped — post-alpha assessment
+  ([`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md))
+  and its first three iterations. **Docs accuracy**: `readOnly` /
+  `timeout` documented as unimplemented (item A1 stopgap; the
+  implement-or-deprecate DD is still open), the
+  `CqrsTransactionalModule` `@example` no longer violates
+  convention #6 or calls a non-existent `forFeature`, and the
+  `FOR UPDATE SKIP LOCKED` claim was corrected everywhere —
+  [DD-025](docs/dd/025-claim-atomicity-obligation.md) relocates the
+  atomicity obligation from the poll to `tryClaim`, with ADR-007's
+  SPI appendix amended inline. **Coverage governance**:
+  `passWithNoTests` removed, per-package `coverageThreshold` floors
+  set from measured baselines, a `coverage` CI job enforcing them,
+  and `outbox-typeorm`'s first unit suite (it previously reported
+  success with zero tests). **C1 graceful drain**:
+  `EventPublicationProcessor.stop()` and `StalenessMonitor.stop()`
+  are now `async` and await the work already in flight, bounded by
+  `processor.shutdownTimeout` / `staleness.shutdownTimeout`
+  (`DEFAULT_DRAIN_TIMEOUT_MS`, 10 s; `0` restores the old no-wait
+  behaviour); `OutboxProcessingModule.onApplicationShutdown` awaits
+  all of them concurrently. Convention #24's user-side
+  `OutboxDrainService` workaround is retired and deleted from the
+  `graceful-shutdown` example.
 - First public alpha shipped — six packages at `1.0.0-alpha.0` on
   npm with `alpha` dist-tag. Linked-cohort versioning via
   changesets keeps the six packages in lockstep. Final blocker
@@ -349,8 +372,9 @@ releases rather than pre-release prep work.
   `TypeOrmTransactionalModule.forRootAsync` bug (now fixed — see
   decision above); #23 dotenv refuses to overwrite `process.env`
   (snapshot/restore between tests); #24 user-side
-  `OutboxDrainService` complement to the framework's sync
-  `OutboxProcessingModule.onApplicationShutdown`. LoC envelope
+  `OutboxDrainService` complement to the then-synchronous
+  `OutboxProcessingModule.onApplicationShutdown` (superseded — the
+  framework now drains; see the C1 decision above). LoC envelope
   updated for flagship multi-multi-axis examples (1800–2100 floor).
 - Phase 14.8d shipped — Tier 4 advanced-pattern examples (saga
   with compensation; cross-DS audit through outbox; master/replica

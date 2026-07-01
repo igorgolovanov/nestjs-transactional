@@ -123,8 +123,8 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
     );
   });
 
-  afterEach(() => {
-    processor.stop();
+  afterEach(async () => {
+    await processor.stop();
   });
 
   it('listener still runs and publication is COMPLETED when an externalizer is bound', async () => {
@@ -235,8 +235,8 @@ describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wire
     );
   });
 
-  afterEach(() => {
-    processor.stop();
+  afterEach(async () => {
+    await processor.stop();
   });
 
   it('invokes the externalizer with resolved metadata for events carrying @Externalized', async () => {
@@ -390,7 +390,7 @@ describe('EventPublicationProcessor (without externalizer — backward compatibl
       const [pub] = repo.getAll();
       expect(pub!.status).toBe(PublicationStatus.COMPLETED);
     } finally {
-      processor.stop();
+      await processor.stop();
     }
   });
 });

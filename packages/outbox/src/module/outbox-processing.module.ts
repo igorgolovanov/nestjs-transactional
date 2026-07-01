@@ -46,12 +46,26 @@ export class OutboxProcessingModule implements OnApplicationBootstrap, OnApplica
     }
   }
 
-  onApplicationShutdown(): void {
-    for (const processor of this.bundle.processors) {
-      processor.stop();
-    }
-    for (const monitor of this.bundle.monitors) {
-      monitor.stop();
-    }
+  /**
+   * Drain every worker before NestJS proceeds with the rest of the
+   * teardown.
+   *
+   * Awaited on purpose: the hook used to be synchronous, so NestJS moved
+   * straight on to destroying providers — the DataSource among them —
+   * while a batch dispatched by the previous tick was still running.
+   * That could interrupt a publication's `PROCESSING → COMPLETED`
+   * transition and strand the row until the staleness monitor found it.
+   *
+   * Each worker's drain is individually bounded (`shutdownTimeout`), so
+   * a stuck listener delays shutdown by at most that budget. Drains run
+   * concurrently rather than in sequence: they are independent, and
+   * serialising them would add up the budgets in multi-dataSource
+   * deployments.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    await Promise.all([
+      ...this.bundle.processors.map((processor) => processor.stop()),
+      ...this.bundle.monitors.map((monitor) => monitor.stop()),
+    ]);
   }
 }

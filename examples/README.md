@@ -113,10 +113,10 @@ matching your need; the four cover the canonical entry points.
   `OUTBOX_PROCESSOR_OPTIONS`. 5 integration tests including
   per-profile assertion + Joi-rejection cases.
 - [`graceful-shutdown`](graceful-shutdown) **— shipped.**
-  `app.enableShutdownHooks()` plus a user-side `OutboxDrainService`
-  that polls `findIncomplete()` until no row is in `PROCESSING`
-  state, with a configurable timeout. Plugs the gap in the
-  framework's sync `OutboxProcessingModule.onApplicationShutdown`.
+  `app.enableShutdownHooks()` plus the framework's bounded outbox
+  drain: `OutboxProcessingModule.onApplicationShutdown` awaits the
+  batch already in flight, with the budget set via
+  `processor.shutdownTimeout`.
   Plus an `ExampleCleanupService` stand-in for arbitrary user
   cleanup hooks. 4 integration tests including mid-handler
   shutdown and mid-tx atomicity.

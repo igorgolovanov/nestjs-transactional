@@ -5,6 +5,8 @@ export * from './types/resubmission-options';
 export * from './types/staleness-config';
 export * from './types/errors';
 
+export { DEFAULT_DRAIN_TIMEOUT_MS } from './shutdown/drain';
+
 export * from './serialization/event-serializer';
 export * from './serialization/event-type-registry';
 export * from './serialization/event-type-resolver';

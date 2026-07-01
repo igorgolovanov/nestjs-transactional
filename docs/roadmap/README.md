@@ -584,7 +584,10 @@ Three production-realism examples:
 - `graceful-shutdown` — `app.enableShutdownHooks()` plus a
   user-side `OutboxDrainService` that polls
   `findIncomplete()` until no row is in `PROCESSING`
-  state (Convention #24).
+  state (Convention #24). The workaround was retired once the
+  framework grew its own bounded drain (improvement-plan item
+  C1); the example now configures `processor.shutdownTimeout`
+  instead.
 
 #### Phase 14.8f — Comprehensive documentation pass
 

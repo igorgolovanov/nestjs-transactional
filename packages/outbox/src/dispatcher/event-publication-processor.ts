@@ -8,6 +8,7 @@ import {
 import { ExternalizationRegistry } from '../externalization/externalization-registry';
 import { EventPublicationRegistry } from '../registry/event-publication-registry';
 import { OutboxListenerRegistry } from '../registry/listener-registry';
+import { drainWithTimeout } from '../shutdown/drain';
 import type { EventPublication } from '../types/event-publication';
 
 import type { EventPublicationProcessorOptions } from './processor-options';
@@ -35,6 +36,12 @@ export class EventPublicationProcessor {
   private readonly logger = new Logger(EventPublicationProcessor.name);
   private running = false;
   private processingLoop: NodeJS.Timeout | null = null;
+  /**
+   * The batch currently being processed, or `null` when the worker is
+   * idle. Tracked so {@link stop} can drain it instead of leaving it
+   * running against providers NestJS is already tearing down.
+   */
+  private inFlightBatch: Promise<void> | null = null;
 
   constructor(
     private readonly registry: EventPublicationRegistry,
@@ -57,13 +64,37 @@ export class EventPublicationProcessor {
     this.logger.log('EventPublicationProcessor started');
   }
 
-  /** Stop the polling loop and cancel any pending scheduled tick. */
-  stop(): void {
+  /**
+   * Stop the polling loop and drain the batch already in flight.
+   *
+   * Resolves once no batch is running, or once
+   * `options.shutdownTimeout` elapses — whichever comes first. A
+   * publication abandoned at the deadline stays in `PROCESSING` and is
+   * recovered by the staleness monitor on a later boot; blocking
+   * shutdown indefinitely on a stuck listener would be worse.
+   *
+   * Idempotent, and safe to call while a drain from an earlier call is
+   * still in progress. Never rejects.
+   */
+  async stop(): Promise<void> {
     this.running = false;
     if (this.processingLoop !== null) {
       clearTimeout(this.processingLoop);
       this.processingLoop = null;
     }
+
+    const inFlight = this.inFlightBatch;
+    if (inFlight !== null) {
+      const drained = await drainWithTimeout(inFlight, this.options.shutdownTimeout);
+      if (!drained) {
+        this.logger.warn(
+          `EventPublicationProcessor drain timed out after ${this.options.shutdownTimeout}ms — ` +
+            'the in-flight batch was abandoned. Publications left in PROCESSING ' +
+            'will be recovered by the staleness monitor.',
+        );
+      }
+    }
+
     this.logger.log('EventPublicationProcessor stopped');
   }
 
@@ -101,7 +132,17 @@ export class EventPublicationProcessor {
       return;
     }
     this.processingLoop = setTimeout(() => {
-      void this.processBatch().finally(() => this.scheduleNext());
+      this.processingLoop = null;
+      const batch = this.processBatch();
+      this.inFlightBatch = batch;
+      void batch.finally(() => {
+        // Guard against clearing a newer batch's handle: `stop()` may
+        // have already replaced or read it.
+        if (this.inFlightBatch === batch) {
+          this.inFlightBatch = null;
+        }
+        this.scheduleNext();
+      });
     }, this.options.pollingInterval);
   }
 

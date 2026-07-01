@@ -331,10 +331,12 @@ The `OutboxProcessingModule` auto-starts the processor and the
 staleness monitor on `OnApplicationBootstrap` and auto-stops
 them on `OnApplicationShutdown` — no manual hooks required.
 
-For graceful shutdown of in-flight publications during deploys,
-see the user-side `OutboxDrainService` pattern in
-[`examples/graceful-shutdown`](../../examples/graceful-shutdown/)
-(Convention #24).
+Shutdown drains in-flight work rather than abandoning it: the hook
+awaits the batch already running, bounded by
+`processor.shutdownTimeout` (10 s default — keep it under your
+platform's grace period). Anything abandoned at the deadline is
+recovered by the staleness monitor on a later boot. See
+[`examples/graceful-shutdown`](../../examples/graceful-shutdown/).
 
 ## Step 7 — test the migration
 

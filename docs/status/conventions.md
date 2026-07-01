@@ -324,26 +324,32 @@ is preserved as a stub; subsequent numbers do not shift.
     operators sometimes forget. Don't rely on `.env` to "reset" a
     variable that has already been set in the deployment environment.
 
-24. **Outbox graceful drain requires a user-side `OnApplicationShutdown`
-    complement** (surfaced in Phase 14.8e, `graceful-shutdown`). The
-    framework's `OutboxProcessingModule.onApplicationShutdown` calls
-    `processor.stop()` synchronously — sets `running = false` and
-    cancels the next-poll `setTimeout`. It does NOT await the
-    `processBatch()` Promise that the previous tick already
-    dispatched. NestJS proceeds to dispose the DataSource provider; an
-    in-flight `processOne()` writing `PROCESSING → COMPLETED` can race
-    the pool teardown, leaving the row stuck in `PROCESSING` until the
-    staleness monitor recovers it on the next boot. **Pattern**: a
-    user-side `OutboxDrainService` that implements
-    `OnApplicationShutdown` async, idempotently re-calls
-    `processor.stop()` (safe regardless of NestJS shutdown ordering
-    between sibling providers), then polls
-    `EventPublicationRepository.findIncomplete()` until no row is in
-    `PROCESSING` state or `DRAIN_TIMEOUT_MS` elapses (10 s default —
-    tune to your platform's grace period; Kubernetes default
-    `terminationGracePeriodSeconds` is 30 s, leave 5–10 s margin for
-    the rest of the shutdown chain). Canonical pattern in
-    `examples/graceful-shutdown/src/shutdown/outbox-drain.service.ts`.
+24. **Outbox graceful drain is the framework's job — no user-side
+    complement needed** (surfaced in Phase 14.8e, fixed as improvement-plan
+    item C1). **Do not write a drain service**; if you find one in an
+    older codebase, delete it.
+
+    *Historical record.* `OutboxProcessingModule.onApplicationShutdown`
+    used to be synchronous: it set `running = false` and cancelled the
+    next-poll `setTimeout`, but did NOT await the `processBatch()`
+    Promise the previous tick had already dispatched. NestJS proceeded
+    to dispose the DataSource provider, so an in-flight `processOne()`
+    writing `PROCESSING → COMPLETED` could race the pool teardown and
+    leave the row stuck in `PROCESSING` until the staleness monitor
+    recovered it on a later boot. The documented workaround was a
+    user-side `OutboxDrainService` that re-called `processor.stop()`
+    and then polled `findIncomplete()` until nothing was `PROCESSING`.
+
+    Now `EventPublicationProcessor.stop()` and
+    `StalenessMonitor.stop()` are `async` and await the work already in
+    flight, and the module hook awaits all of them concurrently. Tune
+    the budget with `processor.shutdownTimeout` /
+    `staleness.shutdownTimeout` (default
+    `DEFAULT_DRAIN_TIMEOUT_MS`, 10 s — Kubernetes'
+    `terminationGracePeriodSeconds` defaults to 30 s, so leave margin
+    for the rest of the shutdown chain); `0` restores the old
+    no-wait behaviour. Abandoning work at the deadline is still
+    recoverable, not lossy — that is the trade-off the timeout buys.
 
 25. **Inbox / dedup as the consumer-side complement to a producer
     outbox** (surfaced in Phase 14.8c, `externalization-with-fallback`,
