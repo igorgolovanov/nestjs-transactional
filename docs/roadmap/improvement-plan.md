@@ -106,7 +106,15 @@ around the dispatcher (convention #6). It was the only place in the
 repository still showing the forbidden pattern, and it shipped in the
 `.d.ts`. Both are corrected.
 
-### A5. `ResubmissionOptions.maxInFlight` is a dead option
+### A5. `ResubmissionOptions.maxInFlight` is a dead option — *shipped*
+
+Removed rather than implemented (DD-026): `resubmit` only issues cheap
+status updates, the option has no counterpart in Spring Modulith, and
+the quantities that actually bound load are `batchSize` here and
+`maxConcurrent` on the processor. Breaking change to a published alpha
+API, shipped with a changeset.
+
+Original finding:
 
 `ResubmissionOptions` (`packages/outbox/src/types/resubmission-options.ts`)
 exposes `withMaxInFlight()` and a `maxInFlight` getter, but
@@ -307,7 +315,53 @@ batch completes; `onApplicationShutdown` awaits it (with a bounded
 drain timeout); the `graceful-shutdown` example drops its workaround;
 pinned by an integration test.
 
-### C2. No automatic retry policy or terminal state — *needs DD/ADR*
+### C2. No automatic retry policy or terminal state — *shipped*
+
+**The framing in the original finding below was wrong and is corrected
+by [DD-026](../dd/026-automatic-retry-policy.md).** Checking the Spring
+Modulith reference showed it has no automatic retry with backoff and no
+dead-letter state either — its model is exactly the one we had, with
+"stop after N attempts" expressed as a filter over
+`completionAttempts`, and the same five lifecycle states. So this was
+never a parity gap; it was a question of whether to go past parity.
+
+Shipped as an opt-in `OutboxRetryScheduler`: a per-dataSource
+self-rescheduling worker, started and drained by
+`OutboxProcessingModule` alongside the processor and staleness monitor,
+configured through the new `retry` option. `maxAttempts: 0` (the
+default) means no automatic retry and no timer, so nothing changes for
+existing deployments.
+
+Two decisions worth carrying forward:
+
+- **No sixth lifecycle state.** A publication that exhausts its
+  attempts stays `FAILED` and stays queryable; the cap bounds the
+  automatic path only. Deferred rather than refused — `status` is a
+  plain `varchar(32)`, so an `ABANDONED` state could be added later
+  without a migration if alerting on the compound predicate proves
+  painful.
+- **Layered on the operator API.** The scheduler calls
+  `FailedEventPublications.resubmit()` with a backoff predicate as its
+  filter, so there is one resubmission code path and the parity story
+  stays intact.
+
+Backoff needed no schema change: eligibility is measured from
+`lastResubmissionDate ?? publicationDate`, which is exact from the
+second retry onward. The known imprecision — a long-lived publication
+that just failed is immediately due for its first retry — is documented
+in DD-026 and bounded by the scheduler's own interval.
+
+Pinned by 18 scheduler specs plus three module-level wiring specs (the
+default-disabled config, option pass-through, and an end-to-end
+fail → auto-resubmit → complete cycle proving the scheduler is bound to
+the right per-dataSource repository). Mutation-checked: flattening the
+backoff curve to zero and an off-by-one in the attempt cap each fail
+three specs.
+
+Not done here: nothing consumes the retry outcome for alerting, which
+is C3's territory.
+
+Original finding (framing since corrected):
 
 "Retry" today is the operator-driven
 `FailedEventPublications.resubmit()`. `completionAttempts` is
@@ -422,8 +476,8 @@ Recorded, not scheduled. Ordered roughly by value.
    (`typeorm` 62, `outbox-microservices` 65).
 3. **API consistency**: A2, A3, A5, A7, then A6.
 4. **A1 decision + implementation** (DD first).
-5. **Outbox production readiness**: ~~C1~~ **shipped** → C2 (DD) →
-   C3 (DD) → C4.
+5. **Outbox production readiness**: ~~C1~~ ~~C2~~ **shipped** → C3 (DD)
+   → C4.
 6. **C5 broker-aware externalizers** as its own scheduled phase.
 
 Every user-facing change ships with a changeset; architectural items

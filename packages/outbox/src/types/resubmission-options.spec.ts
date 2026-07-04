@@ -6,7 +6,6 @@ describe('ResubmissionOptions', () => {
       const opts = ResubmissionOptions.defaults();
 
       expect(opts.batchSize).toBe(100);
-      expect(opts.maxInFlight).toBe(10);
       expect(opts.minAge).toBe(0);
       expect(opts.maxCompletionAttempts).toBeNull();
       expect(opts.filter).toBeNull();
@@ -28,14 +27,6 @@ describe('ResubmissionOptions', () => {
 
       expect(returned).toBe(opts);
       expect(opts.batchSize).toBe(50);
-    });
-
-    it('withMaxInFlight returns the same instance and updates the value', () => {
-      const opts = ResubmissionOptions.defaults();
-      const returned = opts.withMaxInFlight(3);
-
-      expect(returned).toBe(opts);
-      expect(opts.maxInFlight).toBe(3);
     });
 
     it('withMinAge returns the same instance and updates the value', () => {
@@ -67,13 +58,11 @@ describe('ResubmissionOptions', () => {
       const filter = jest.fn().mockReturnValue(true);
       const opts = ResubmissionOptions.defaults()
         .withBatchSize(25)
-        .withMaxInFlight(2)
         .withMinAge(1_000)
         .withMaxAttempts(4)
         .withFilter(filter);
 
       expect(opts.batchSize).toBe(25);
-      expect(opts.maxInFlight).toBe(2);
       expect(opts.minAge).toBe(1_000);
       expect(opts.maxCompletionAttempts).toBe(4);
       expect(opts.filter).toBe(filter);

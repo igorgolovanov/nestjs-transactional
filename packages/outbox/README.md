@@ -76,6 +76,11 @@ import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outb
         shutdownTimeout: 10_000,
       },
       staleness: { processing: 60_000, monitorInterval: 30_000 },
+      // Automatic retry for FAILED publications. Off by default
+      // (maxAttempts: 0) — recovery is then operator-driven via
+      // FailedEventPublications.resubmit(). maxAttempts counts the
+      // first delivery, so 3 means "original plus two retries".
+      retry: { maxAttempts: 3, baseDelay: 1_000, factor: 2, maxDelay: 300_000 },
       // repository: { provide: EVENT_PUBLICATION_REPOSITORY, useClass: TypeOrmEventPublicationRepository },
     }),
     // Import OutboxProcessingModule ONLY in worker processes — not in
@@ -198,6 +203,38 @@ await this.failedEventPublications.resubmit(
 );
 await this.completedEventPublications.purge(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 ```
+
+### 5. Automatic retry (optional)
+
+Recovery is operator-driven by default, like Spring Modulith's. Set
+`retry.maxAttempts` to have `OutboxRetryScheduler` do it for you: it
+resubmits `FAILED` publications whose backoff window has elapsed, on
+its own interval, and stops once a publication has used up its
+attempts.
+
+```typescript
+OutboxModule.forRoot({
+  retry: {
+    maxAttempts: 3,     // counts the first delivery: original + 2 retries
+    interval: 60_000,   // how often to look for eligible publications
+    baseDelay: 1_000,   // delay before the first retry
+    factor: 2,          // baseDelay * factor^(attempts - 1)
+    maxDelay: 300_000,  // ceiling for the computed delay
+    jitter: 0.2,        // spread retries so a mass failure doesn't burst
+    batchSize: 100,
+  },
+});
+```
+
+There is no dead-letter state (DD-026). A publication that exhausts its
+attempts stays `FAILED` and keeps showing up in
+`FailedEventPublications.findAll()`, so you can alert on it and still
+resubmit it by hand — the cap bounds the automatic path only.
+
+The scheduler is a thin layer over `resubmit()`, so anything it does
+you can also do yourself: skip `retry` entirely and drive
+`FailedEventPublications.resubmit(...)` from your own cron if you want
+different selection logic.
 
 ## Listener ids
 

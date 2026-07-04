@@ -44,6 +44,11 @@ export class OutboxProcessingModule implements OnApplicationBootstrap, OnApplica
     for (const monitor of this.bundle.monitors) {
       monitor.start();
     }
+    // No-op unless the dataSource configured `retry.maxAttempts > 0`
+    // (DD-026) — automatic retry is opt-in.
+    for (const scheduler of this.bundle.retrySchedulers) {
+      scheduler.start();
+    }
   }
 
   /**
@@ -66,6 +71,7 @@ export class OutboxProcessingModule implements OnApplicationBootstrap, OnApplica
     await Promise.all([
       ...this.bundle.processors.map((processor) => processor.stop()),
       ...this.bundle.monitors.map((monitor) => monitor.stop()),
+      ...this.bundle.retrySchedulers.map((scheduler) => scheduler.stop()),
     ]);
   }
 }

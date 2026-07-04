@@ -28,6 +28,7 @@ import {
   type EventExternalizer,
 } from '../externalization/event-externalizer';
 import { ExternalizationRegistry } from '../externalization/externalization-registry';
+import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
 import {
   OUTBOX_RECOVERY_OPTIONS,
@@ -60,6 +61,7 @@ import {
   getOutboxPublisherToken,
 } from '../tokens/token-utils';
 import { CompletionMode } from '../types/completion-mode';
+import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config';
 import { DEFAULT_STALENESS_CONFIG, type StalenessConfig } from '../types/staleness-config';
 
 const DEFAULT_DATA_SOURCE = 'default';
@@ -99,6 +101,8 @@ export interface OutboxModuleOptions {
 
   readonly processor?: Partial<EventPublicationProcessorOptions>;
   readonly staleness?: Partial<StalenessConfig>;
+  /** Automatic retry policy for FAILED publications (DD-026). Off unless `maxAttempts > 0`. */
+  readonly retry?: Partial<OutboxRetryConfig>;
   readonly republishOnStartup?: boolean;
   readonly startupBatchSize?: number;
   readonly completionMode?: CompletionMode;
@@ -126,6 +130,8 @@ export interface OutboxModuleOptions {
 export interface OutboxModuleAsyncFactoryResult {
   readonly processor?: Partial<EventPublicationProcessorOptions>;
   readonly staleness?: Partial<StalenessConfig>;
+  /** Automatic retry policy for FAILED publications (DD-026). Off unless `maxAttempts > 0`. */
+  readonly retry?: Partial<OutboxRetryConfig>;
   readonly republishOnStartup?: boolean;
   readonly startupBatchSize?: number;
   readonly completionMode?: CompletionMode;
@@ -152,6 +158,7 @@ export interface OutboxModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'
 export const OUTBOX_PROCESSOR_OPTIONS = Symbol('OUTBOX_PROCESSOR_OPTIONS');
 /** DI token carrying the resolved {@link StalenessConfig}. */
 export const OUTBOX_STALENESS_CONFIG = Symbol('OUTBOX_STALENESS_CONFIG');
+export const OUTBOX_RETRY_CONFIG = Symbol('OUTBOX_RETRY_CONFIG');
 
 /**
  * Bundle of per-dataSource processors and monitors that
@@ -169,6 +176,7 @@ export const OUTBOX_PROCESSING_BUNDLE = Symbol('OUTBOX_PROCESSING_BUNDLE');
 export interface OutboxProcessingBundle {
   readonly processors: readonly EventPublicationProcessor[];
   readonly monitors: readonly StalenessMonitor[];
+  readonly retrySchedulers: readonly OutboxRetryScheduler[];
   readonly recoveryServices: readonly StartupRecoveryService[];
 }
 
@@ -181,6 +189,7 @@ interface OutboxRegistrationRecord {
   readonly dataSource: string;
   readonly processorOptions: EventPublicationProcessorOptions;
   readonly stalenessConfig: StalenessConfig;
+  readonly retryConfig: OutboxRetryConfig;
   readonly recoveryOptions: OutboxRecoveryOptions;
 }
 
@@ -201,6 +210,10 @@ function resolveProcessorOptions(
 
 function resolveStalenessConfig(staleness: Partial<StalenessConfig> | undefined): StalenessConfig {
   return { ...DEFAULT_STALENESS_CONFIG, ...staleness };
+}
+
+function resolveRetryConfig(retry: Partial<OutboxRetryConfig> | undefined): OutboxRetryConfig {
+  return { ...DEFAULT_RETRY_CONFIG, ...retry };
 }
 
 function resolveRecoveryOptions(
@@ -298,12 +311,14 @@ export class OutboxModule {
       options.republishOnStartup,
       options.startupBatchSize,
     );
+    const retryCfg = resolveRetryConfig(options.retry);
 
     this.registrations.set(ds, {
       dataSource: ds,
       processorOptions: processorOpts,
       stalenessConfig: stalenessCfg,
       recoveryOptions: recoveryOpts,
+      retryConfig: retryCfg,
     });
 
     const providers: Provider[] = [
@@ -314,6 +329,7 @@ export class OutboxModule {
         processorOpts,
         stalenessCfg,
         recoveryOpts,
+        retryCfg,
       ),
     ];
     const exportTokens: InjectionToken[] = [...perDataSourceExports(ds)];
@@ -386,6 +402,7 @@ export class OutboxModule {
       processorOptions: resolveProcessorOptions(undefined, undefined),
       stalenessConfig: resolveStalenessConfig(undefined),
       recoveryOptions: resolveRecoveryOptions(undefined, undefined),
+      retryConfig: resolveRetryConfig(undefined),
     });
 
     const asyncToken = ASYNC_OPTIONS_TOKEN(ds);
@@ -408,6 +425,8 @@ export class OutboxModule {
     const processorOptionsToken = perDsProcessorOptionsToken(ds);
     const stalenessConfigToken = perDsStalenessConfigToken(ds);
     const recoveryOptionsToken = perDsRecoveryOptionsToken(ds);
+    const retryToken = perDsRetrySchedulerToken(ds);
+    const retryConfigToken = perDsRetryConfigToken(ds);
 
     const providers: Provider[] = [
       asyncOptionsProvider,
@@ -490,6 +509,24 @@ export class OutboxModule {
         useFactory: (repo: EventPublicationRepository, cfg: StalenessConfig): StalenessMonitor =>
           new StalenessMonitor(repo, cfg),
         inject: [repositoryToken, stalenessConfigToken],
+      },
+
+      {
+        provide: retryConfigToken,
+        useFactory: (opts: OutboxModuleAsyncFactoryResult): OutboxRetryConfig =>
+          resolveRetryConfig(opts.retry),
+        inject: [asyncToken],
+      },
+      {
+        provide: retryToken,
+        useFactory: (
+          repo: EventPublicationRepository,
+          cfg: OutboxRetryConfig,
+        ): OutboxRetryScheduler =>
+          // Built on a per-DS `FailedEventPublications` rather than the
+          // class-token one, which is bound to the default dataSource.
+          new OutboxRetryScheduler(new FailedEventPublications(repo), cfg),
+        inject: [repositoryToken, retryConfigToken],
       },
 
       {
@@ -626,6 +663,12 @@ function perDsStalenessConfigToken(ds: string): string {
 function perDsRecoveryOptionsToken(ds: string): string {
   return `${ds}RecoveryOptions`;
 }
+function perDsRetrySchedulerToken(ds: string): string {
+  return `${ds}OutboxRetryScheduler`;
+}
+function perDsRetryConfigToken(ds: string): string {
+  return `${ds}OutboxRetryConfig`;
+}
 
 function buildPerDataSourceProviders(
   ds: string,
@@ -634,6 +677,7 @@ function buildPerDataSourceProviders(
   processorOpts: EventPublicationProcessorOptions,
   stalenessCfg: StalenessConfig,
   recoveryOpts: OutboxRecoveryOptions,
+  retryCfg: OutboxRetryConfig,
 ): Provider[] {
   const eventTypeRegistryToken = getEventTypeRegistryToken(ds);
   const repositoryToken = getEventPublicationRepositoryToken(ds);
@@ -648,6 +692,8 @@ function buildPerDataSourceProviders(
   const processorOptionsToken = perDsProcessorOptionsToken(ds);
   const stalenessConfigToken = perDsStalenessConfigToken(ds);
   const recoveryOptionsToken = perDsRecoveryOptionsToken(ds);
+  const retryToken = perDsRetrySchedulerToken(ds);
+  const retryConfigToken = perDsRetryConfigToken(ds);
 
   return [
     { provide: eventTypeRegistryToken, useFactory: (): EventTypeRegistry => new EventTypeRegistry() },
@@ -720,6 +766,19 @@ function buildPerDataSourceProviders(
       inject: [repositoryToken, stalenessConfigToken],
     },
 
+    { provide: retryConfigToken, useValue: retryCfg },
+    {
+      provide: retryToken,
+      useFactory: (
+        repo: EventPublicationRepository,
+        cfg: OutboxRetryConfig,
+      ): OutboxRetryScheduler =>
+        // Built on a per-DS `FailedEventPublications` rather than the
+        // class-token one, which is bound to the default dataSource.
+        new OutboxRetryScheduler(new FailedEventPublications(repo), cfg),
+      inject: [repositoryToken, retryConfigToken],
+    },
+
     { provide: recoveryOptionsToken, useValue: recoveryOpts },
     // StartupRecoveryService for non-default dataSources alias to the
     // class-token instance registered by the default-DS forRoot. The
@@ -776,8 +835,10 @@ function buildDefaultDataSourceAliases(): Provider[] {
     { provide: ExternalizationRegistry, useExisting: getExternalizationRegistryToken(ds) },
     { provide: EventPublicationProcessor, useExisting: getEventPublicationProcessorToken(ds) },
     { provide: StalenessMonitor, useExisting: perDsStalenessMonitorToken(ds) },
+    { provide: OutboxRetryScheduler, useExisting: perDsRetrySchedulerToken(ds) },
     { provide: OUTBOX_PROCESSOR_OPTIONS, useExisting: perDsProcessorOptionsToken(ds) },
     { provide: OUTBOX_STALENESS_CONFIG, useExisting: perDsStalenessConfigToken(ds) },
+    { provide: OUTBOX_RETRY_CONFIG, useExisting: perDsRetryConfigToken(ds) },
     { provide: OUTBOX_RECOVERY_OPTIONS, useExisting: perDsRecoveryOptionsToken(ds) },
   ];
 }
@@ -793,8 +854,10 @@ function defaultDataSourceAliasTokens(): InjectionToken[] {
     ExternalizationRegistry,
     EventPublicationProcessor,
     StalenessMonitor,
+    OutboxRetryScheduler,
     OUTBOX_PROCESSOR_OPTIONS,
     OUTBOX_STALENESS_CONFIG,
+    OUTBOX_RETRY_CONFIG,
     OUTBOX_RECOVERY_OPTIONS,
   ];
 }
@@ -868,6 +931,9 @@ function buildProcessingBundleProvider(moduleClass: typeof OutboxModule): Provid
         },
         get monitors(): readonly StalenessMonitor[] {
           return dsNames.map((ds) => get<StalenessMonitor>(perDsStalenessMonitorToken(ds)));
+        },
+        get retrySchedulers(): readonly OutboxRetryScheduler[] {
+          return dsNames.map((ds) => get<OutboxRetryScheduler>(perDsRetrySchedulerToken(ds)));
         },
         get recoveryServices(): readonly StartupRecoveryService[] {
           return dsNames.map((ds) =>

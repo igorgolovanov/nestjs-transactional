@@ -153,6 +153,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-023](docs/dd/023-independent-tx-contexts-per-ds.md) — Independent transaction contexts per dataSource
 - [DD-024](docs/dd/024-outbox-publisher-facade.md) — Smart `OutboxEventPublisher` facade
 - [DD-025](docs/dd/025-claim-atomicity-obligation.md) — The claim carries the concurrency guarantee, not the poll
+- [DD-026](docs/dd/026-automatic-retry-policy.md) — Automatic retry is an opt-in scheduler, not a new lifecycle state
 
 ## DO NOT cheat-sheet
 
@@ -315,7 +316,16 @@ releases rather than pre-release prep work.
   behaviour); `OutboxProcessingModule.onApplicationShutdown` awaits
   all of them concurrently. Convention #24's user-side
   `OutboxDrainService` workaround is retired and deleted from the
-  `graceful-shutdown` example.
+  `graceful-shutdown` example. **C2 automatic retry**: opt-in
+  `OutboxRetryScheduler` ([DD-026](docs/dd/026-automatic-retry-policy.md))
+  resubmits `FAILED` publications on an exponential backoff, capped by
+  `retry.maxAttempts` (`0` = off, the default). Checking the reference
+  corrected the assessment's framing — Spring Modulith has no automatic
+  retry or dead-letter state either, so this is a deliberate step past
+  parity, layered over `FailedEventPublications.resubmit()` rather than
+  beside it. No sixth lifecycle state: an exhausted publication stays
+  `FAILED` and queryable. `ResubmissionOptions.maxInFlight` (dead
+  option, item A5) removed.
 - First public alpha shipped — six packages at `1.0.0-alpha.0` on
   npm with `alpha` dist-tag. Linked-cohort versioning via
   changesets keeps the six packages in lockstep. Final blocker
