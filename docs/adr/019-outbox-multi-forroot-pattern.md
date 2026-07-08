@@ -312,7 +312,7 @@ Phase 14.3.1 (Categories A / B), so the manual workaround the
 original spec showed is no longer needed — both
 [`OutboxModule.forFeature`](../../packages/outbox/src/module/outbox.module.ts)
 auto-registration and the
-[`@TransactionalEventsHandler({ dataSource })`](../../packages/cqrs/src/handlers/decorators/transactional-events-handler.ts)
+[`@TransactionalEventsHandler({ dataSource })`](../../packages/cqrs/src/decorators/transactional-events-handler.decorator.ts)
 per-DS option route handlers to the right dataSource transparently.
 
 The end-to-end multi-DS architecture is exercised in production

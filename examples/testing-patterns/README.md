@@ -151,8 +151,8 @@ pnpm -C examples/testing-patterns test:integration
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
-- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-smart-facade-outbox-publisher.md)
+- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
+- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
 - [`packages/core/src/testing/in-memory.adapter.ts`](../../packages/core/src/testing/in-memory.adapter.ts)
 - [`packages/outbox/src/testing/published-events.ts`](../../packages/outbox/src/testing/published-events.ts)
 - [`packages/outbox/src/testing/assertable-published-events.ts`](../../packages/outbox/src/testing/assertable-published-events.ts)

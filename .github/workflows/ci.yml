@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  doc-links:
+    name: Doc links
+    runs-on: ubuntu-latest
+    # No pnpm install, no build: the check is plain shell over
+    # `git ls-files`, so it runs in seconds and fails fast on a rotted
+    # ADR/DD reference. Twenty had accumulated unnoticed before this
+    # gate existed.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check relative markdown links
+        run: ./scripts/check-doc-links.sh
+
   lint:
     name: Lint (Node ${{ matrix.node-version }}, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest

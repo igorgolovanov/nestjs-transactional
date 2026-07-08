@@ -24,6 +24,7 @@
     "test:watch": "pnpm -r --filter './packages/*' --parallel test:watch",
     "test:integration": "pnpm -r --filter './packages/*' test:integration",
     "lint": "eslint \"packages/*/src/**/*.ts\"",
+    "lint:doc-links": "./scripts/check-doc-links.sh",
     "lint:fix": "eslint \"packages/*/src/**/*.ts\" --fix",
     "format": "prettier --write \"packages/*/src/**/*.{ts,json}\" \"*.{md,json,yml,yaml}\"",
     "format:check": "prettier --check \"packages/*/src/**/*.{ts,json}\" \"*.{md,json,yml,yaml}\"",

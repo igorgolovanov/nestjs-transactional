@@ -43,6 +43,9 @@ pnpm typecheck
 pnpm format:check    # verify — CI fails if dirty
 pnpm format          # rewrite
 
+# Relative markdown links resolve (ADR / DD / source references)
+pnpm lint:doc-links
+
 # TypeORM integration tests (requires Docker)
 pnpm --filter @nestjs-transactional/typeorm test:integration
 ```
@@ -306,8 +309,8 @@ Smaller trade-offs that do not warrant a full ADR go in
 
 1. Branch from `main`. PRs target `main`.
 2. Changeset committed (if user-visible change).
-3. All of `lint`, `build`, `test`, `typecheck`, `format:check` clean
-   locally. CI runs the same gates.
+3. All of `lint`, `build`, `test`, `typecheck`, `format:check`,
+   `lint:doc-links` clean locally. CI runs the same gates.
 4. Description explains the **why** — reviewers can read the diff for
    the what.
 5. Link related issues.

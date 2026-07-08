@@ -207,6 +207,8 @@ Before merging into main:
 - [ ] Integration tests green (`pnpm -r test:integration`)
 - [ ] Build with no warnings (`pnpm -r build`)
 - [ ] Lint clean (`pnpm -r lint`)
+- [ ] Relative doc links resolve (`pnpm lint:doc-links` — gated by the
+      `doc-links` CI job; ADR / DD slugs are easy to mistype)
 - [ ] Coverage has not dropped below baseline
       (`pnpm -r --filter './packages/*' test:cov` — enforced by
       per-package `coverageThreshold`, gated by the `coverage` CI job)

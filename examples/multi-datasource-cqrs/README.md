@@ -184,6 +184,6 @@ semantics) — same pattern as
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
   (Phase 14.3.1 addendum documents Category A/B framing)
 - [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
-- [`docs/architecture/cqrs-integration.md`](../../docs/architecture/cqrs-integration.md)
+- [`@nestjs-transactional/cqrs` README — public API and usage](../../packages/cqrs/README.md)
 - Multi-DS cqrs regression test at the package level:
   [`packages/cqrs/src/module/cqrs-transactional.module.multi-datasource.spec.ts`](../../packages/cqrs/src/module/cqrs-transactional.module.multi-datasource.spec.ts).

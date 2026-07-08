@@ -453,11 +453,19 @@ Recorded, not scheduled. Ordered roughly by value.
   given [ADR-004](../adr/004-public-api-stability.md) commits to API
   stability, an `.api.md`-style surface snapshot would turn breaking
   changes into reviewable diffs.
-- **Broken relative doc links** — 20 across 10 files, mostly example
-  READMEs citing ADR/DD files by a guessed slug (`dd/019-single-unit-atomicity.md`
-  for `019-hybrid-delivery-atomicity.md`, and so on). Surfaced while
-  verifying links during C1. Worth a link-check step in CI so it
-  cannot regress.
+- ~~**Broken relative doc links**~~ — *fixed.* 20 across 10 files,
+  mostly example READMEs citing ADR/DD files by a guessed slug
+  (`dd/019-single-unit-atomicity.md` for
+  `019-hybrid-delivery-atomicity.md`, and so on). Surfaced while
+  verifying links during C1. All repointed at real files, and
+  `scripts/check-doc-links.sh` now gates it in CI (`doc-links` job) so
+  it cannot regress.
+
+  Two needed judgement rather than a slug swap: the text
+  "dataSource name as primary identifier" describes DD-020, not the
+  DD-021 the number claimed, and `docs/architecture/cqrs-integration.md`
+  never existed at all — the two examples citing it now point at
+  `packages/cqrs/README.md`, which actually documents the integration.
 - **Docs site / benchmarks** — markdown-only docs, no published
   site; no perf harness behind the AsyncLocalStorage overhead
   claims.
