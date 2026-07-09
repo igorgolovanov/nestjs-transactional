@@ -66,7 +66,7 @@ export async function stopPostgresContainer(ctx: PostgresTestContext): Promise<v
  * Create a second database inside the running Postgres container and
  * return an initialised {@link DataSource} pointing at it. Mirror of
  * the helper in `packages/typeorm/test/setup-testcontainers.ts` — used
- * by Phase 14.5 multi-dataSource integration tests so two logically
+ * by the multi-dataSource integration tests so two logically
  * independent DataSources can share one container.
  *
  * Caller is responsible for destroying the returned DataSource before

@@ -27,8 +27,8 @@ export interface RegisteredOutboxListener {
  * keyed by both the listener id (for targeted dispatch / resume) and
  * the event class name (for fan-out when a new event is published).
  *
- * Populated at application bootstrap by the scanner (upcoming Phase 5
- * iteration). Stateless beyond the two index maps.
+ * Populated at application bootstrap by the scanner. Stateless
+ * beyond the two index maps.
  */
 @Injectable()
 export class OutboxListenerRegistry {

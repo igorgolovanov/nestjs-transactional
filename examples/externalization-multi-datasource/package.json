@@ -2,7 +2,7 @@
   "name": "@nestjs-transactional-examples/externalization-multi-datasource",
   "version": "0.0.0",
   "private": true,
-  "description": "Multi-DataSource outbox with per-event @Externalized routing to RabbitMQ — two physical Postgres DBs, two ClientProxy registrations, single global externalizer (Phase 14.6 per-event routing)",
+  "description": "Multi-DataSource outbox with per-event @Externalized routing to RabbitMQ — two physical Postgres DBs, two ClientProxy registrations, single global externalizer with per-event routing",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",

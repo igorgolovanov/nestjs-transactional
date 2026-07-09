@@ -26,7 +26,7 @@ type OutboxListenerMethod = (event: unknown) => Promise<void>;
  * the per-dataSource {@link OutboxListenerRegistry} that owns each
  * decorated event class.
  *
- * **Per-dataSource routing (Phase 14.3.1).** Multi-`OutboxModule.forRoot`
+ * **Per-dataSource routing.** Multi-`OutboxModule.forRoot`
  * deployments register events to per-DS `EventTypeRegistry`
  * instances via `OutboxModule.forFeature(events, { dataSource })`.
  * The scanner walks every per-DS `EventTypeRegistry`, resolves which

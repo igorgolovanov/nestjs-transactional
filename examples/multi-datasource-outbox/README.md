@@ -3,8 +3,8 @@
 Two TypeORM DataSources, **each with its own complete outbox stack**,
 backed by two distinct Postgres databases. Demonstrates the production
 multi-DS shape: per-DS `event_publication` table, per-DS worker, per-DS
-`forFeature(...)`, decorator-driven handler routing (Phase 14.3.1
-Category A — auto-resolves owning DS from the per-DS
+`forFeature(...)`, decorator-driven handler routing (the outbox
+handler scanner auto-resolves the owning DS from the per-DS
 `EventTypeRegistry`).
 
 Single-unit atomicity (DD-019) holds **per dataSource**: a billing
@@ -69,7 +69,7 @@ pnpm -C examples/multi-datasource-outbox start
    to their owning DS — `InvoiceCreatedEvent` to default,
    `StockAdjustedEvent` to inventory.
 6. **`@OutboxEventsHandler` classes carry no `dataSource` option** —
-   Phase 14.3.1 Category A scanner walks every per-DS
+   the outbox handler scanner walks every per-DS
    `EventTypeRegistry`, finds which DS owns each handler's events, and
    registers the listener with that DS's registry. Single source of
    truth: the `forFeature` registration.
@@ -93,7 +93,7 @@ pnpm -C examples/multi-datasource-outbox start
 - [`src/billing.handler.ts`](src/billing.handler.ts) +
   [`src/inventory.handler.ts`](src/inventory.handler.ts) — class-level
   `@OutboxEventsHandler({ events, id })` listeners. No `dataSource`
-  option — auto-routed by Phase 14.3.1 scanner.
+  option — auto-routed by the outbox handler scanner.
 - [`src/events.ts`](src/events.ts) — `InvoiceCreatedEvent` +
   `StockAdjustedEvent` domain events.
 - [`src/app.module.ts`](src/app.module.ts) — multi-`forRoot` wiring
@@ -117,9 +117,9 @@ pnpm -C examples/multi-datasource-outbox start
 - **`OutboxModule.forFeature(events, { dataSource })` is authoritative.**
   Registering `StockAdjustedEvent` to the default DS by mistake routes
   every `@OutboxEventsHandler` for it through the billing registry —
-  the publication row would land in the wrong DB. Phase 14.3.1's
-  scanner throws at bootstrap if a handler subscribes to events spanning
-  multiple DSes (cross-DS handlers must be split per-DS).
+  the publication row would land in the wrong DB. The outbox handler
+  scanner throws at bootstrap if a handler subscribes to events
+  spanning multiple DSes (cross-DS handlers must be split per-DS).
 - **`OutboxProcessingModule` belongs in the worker process.** API
   processes that only publish should NOT import it — both per-DS
   workers would compete with the dedicated worker for rows. This
@@ -140,14 +140,14 @@ pnpm -C examples/multi-datasource-outbox start
   production-shape outbox. Same atomicity contract, simpler shape.
 - [`multi-datasource-cqrs`](../multi-datasource-cqrs) *(planned)* —
   same two DataSources with `@nestjs/cqrs` handlers per dataSource
-  (Phase 14.3.1 Category B in-memory dispatcher).
+  (per-dataSource routing in the cqrs in-memory dispatcher).
 - [`shared-database-modular-monolith`](../shared-database-modular-monolith)
   *(planned)* — same physical Postgres, separate schemas per module.
 
 ## Further reading
 
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-  (Phase 14.3.1 addendum documents Category A scanner)
+  (the addendum documents the outbox handler scanner)
 - [ADR-019 — outbox multi-`forRoot` pattern](../../docs/adr/019-outbox-multi-forroot-pattern.md)
 - [DD-019 single-unit atomicity](../../docs/dd/019-hybrid-delivery-atomicity.md),
   [DD-023 per-DS contexts](../../docs/dd/023-independent-tx-contexts-per-ds.md),

@@ -15,7 +15,7 @@ import {
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
 /**
- * Phase 14.20: stand-in for `TypeOrmModule.forRoot(...)` —
+ * Stand-in for `TypeOrmModule.forRoot(...)` —
  * registers the `getDataSourceToken()` provider in a `@Global()`
  * module so the new `TypeOrmTransactionalModule.forRoot` factory
  * can resolve the DataSource from DI.
@@ -230,7 +230,7 @@ describe('OutboxTypeOrmModule (full-stack integration, Postgres via testcontaine
     // restart we drop the static `OutboxModule.registrations` Map
     // — within a single process the second `buildApp` would
     // otherwise hit the duplicate-dataSource guard.
-    // Phase 14.20: also reset TransactionalModule + TypeOrmTransactionalModule
+    // Also reset TransactionalModule + TypeOrmTransactionalModule
     // for the same reason — the multi-forRoot dedup pattern applies
     // to the core module too (one infrastructure registration per
     // process), and the typeorm forRoot must be able to remark the

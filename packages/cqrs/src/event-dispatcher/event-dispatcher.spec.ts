@@ -375,14 +375,14 @@ describe('TransactionalEventDispatcher', () => {
   });
 
   // -----------------------------------------------------------------
-  // Phase 14.3.1 — per-dataSource hook attachment.
+  // per-dataSource hook attachment.
   //
   // Listeners declare `metadata.dataSource`; the dispatcher resolves
   // the matching active transaction and pushes hooks directly onto
   // its hook lists, bypassing TransactionManager.registerBeforeCommit's
   // first-active-tx semantics.
   // -----------------------------------------------------------------
-  describe('multi-dataSource hook attachment (Phase 14.3.1)', () => {
+  describe('multi-dataSource hook attachment', () => {
     let billingAdapter: FakeAdapter;
     let multiDsManager: TransactionManager;
     let multiDsDispatcher: TransactionalEventDispatcher;

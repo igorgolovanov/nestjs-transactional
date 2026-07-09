@@ -96,7 +96,7 @@ class OutboxCqrsBridgeModule {}
  * 1. **Three Postgres DataSources** — orders (default) + inventory
  *    + billing. Each gets its own `event_publication` table, its
  *    own outbox worker, its own transactional adapter
- *    (Phase 14.3.1 + ADR-019 multi-`forRoot`).
+ *    (ADR-019 multi-`forRoot`).
  * 2. **CQRS** — `CqrsTransactionalModule.forRoot` overrides the
  *    `EventPublisher` token to `HybridEventPublisher` so
  *    `aggregate.commit()` fans out to BOTH the in-memory

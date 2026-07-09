@@ -44,7 +44,7 @@ export interface OutboxPublishOptions {
  *
  * **Cross-dataSource publishing** is allowed: the routing decision is
  * about the event's *registered* dataSource, NOT about which
- * transactions are currently active. With Phase 14.2's cross-DS
+ * transactions are currently active. With cross-DS
  * simultaneous transactions, a billing event published from inside an
  * outer-billing / inner-inventory async stack still routes to billing
  * (because that's where the event class is registered) and validates
@@ -186,7 +186,7 @@ export class OutboxEventPublisher implements OnModuleInit {
       return options.dataSource;
     }
 
-    // Phase 14.3.1 — same helper used by `OutboxListenerScanner` and
+    // same helper used by `OutboxListenerScanner` and
     // `MultiDsOutboxListenerRegistrar` so the routing policy (one
     // owning DS per event class, throw on 0 or many matches) stays
     // consistent across publish and listener-registration paths.

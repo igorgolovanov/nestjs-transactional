@@ -17,8 +17,8 @@ export class PlaceReservationCommand {
 
 /**
  * Inventory dataSource. `@Transactional({ dataSource: 'inventory' })`
- * opens the transaction on the inventory adapter — Phase 14.3.1
- * Category B's `TransactionalEventDispatcher.scheduleDispatch`
+ * opens the transaction on the inventory adapter — Category B's
+ * `TransactionalEventDispatcher.scheduleDispatch`
  * resolves the listener's bound DS via
  * `TransactionContext.getActiveTransactionByDataSource('inventory')`
  * and pushes the AFTER_COMMIT hook directly onto THIS transaction's

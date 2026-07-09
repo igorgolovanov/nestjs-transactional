@@ -6,7 +6,7 @@ import { InvoicePaidEvent } from './invoice-paid.event';
 /**
  * Module-internal listener — observes the `InvoicePaidEvent` after
  * it lands in `billing.event_publication` and the worker dispatches
- * it. Phase 14.3.1 Category A scanner finds the event in the
+ * it. Category A scanner finds the event in the
  * billing-DS registry and routes this handler to billing's
  * `OutboxListenerRegistry` automatically.
  *

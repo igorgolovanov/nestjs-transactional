@@ -5,8 +5,8 @@ Two TypeORM DataSources (`billing` + `inventory`) wired with
 aggregate (`Invoice` / `Reservation`); each
 `@TransactionalEventsHandler` listener carries a `dataSource` option
 that pins it to the right DS's transaction context — the headline
-demonstration of **Phase 14.3.1 Category B** (cqrs in-memory
-dispatcher per-DS hook attachment).
+demonstration of **per-dataSource routing for the cqrs in-memory
+dispatcher** (Category B — per-DS hook attachment).
 
 Backed by SQLite in-memory (via `sql.js`) — `basic-cqrs` shape
 extended with a second DataSource. No Docker required.
@@ -16,8 +16,8 @@ extended with a second DataSource. No Docker required.
 - You have multiple DataSources AND you use `@nestjs/cqrs` aggregates
   / phase listeners. Single source of truth: one decorator option
   binds a listener to the right DS's transaction.
-- You want to see the difference between Phase 14.3.1 Category A
-  (auto-routing for outbox-backed handlers — see
+- You want to see the difference between Category A (auto-routing for
+  outbox-backed handlers — see
   [`multi-datasource-outbox`](../multi-datasource-outbox)) and
   Category B (explicit `dataSource` decorator for cqrs in-memory
   handlers).
@@ -62,7 +62,7 @@ Or from this directory: `pnpm start` / `pnpm test`.
    (no `dataSource` option needed — `'default'` is implicit).
 7. **`InventoryNotificationListener`** —
    `@TransactionalEventsHandler({ events: [...], dataSource: 'inventory' })`.
-   Phase 14.3.1 Category B: dispatcher uses
+   Category B: dispatcher uses
    `TransactionContext.getActiveTransactionByDataSource('inventory')`
    to attach the hook to the inventory transaction's hook list.
 8. **Cross-DS rollback isolation** (DD-023) — a billing rollback
@@ -80,7 +80,7 @@ Expected `pnpm start` output:
 [...] LOG [BillingNotificationListener] AFTER_COMMIT (billing) — notifying for invoice inv-1
    billing notified: [ 'inv-1' ]
    inventory notified (untouched): []
-2) PlaceReservationCommand("res-1") — inventory tx commits (Phase 14.3.1 Cat B)
+2) PlaceReservationCommand("res-1") — inventory tx commits (Cat B)
 [...] LOG [InventoryNotificationListener] AFTER_COMMIT (inventory) — notifying for reservation res-1
    inventory notified: [ 'res-1' ]
    billing notified (still): [ 'inv-1' ]
@@ -96,8 +96,8 @@ Expected `pnpm start` output:
 
 ## Why the `dataSource` option matters
 
-Without Phase 14.3.1 Category B, the cqrs in-memory dispatcher
-attached AFTER_COMMIT hooks via
+Without per-dataSource routing (Category B), the cqrs in-memory
+dispatcher attached AFTER_COMMIT hooks via
 `TransactionManager.registerBeforeCommit` — which targets "the
 first active transaction in the context". In a single-DS app that's
 fine. In a multi-DS app where two transactions are concurrently
@@ -156,7 +156,7 @@ semantics) — same pattern as
   each test rebuilds the module from scratch.** Multi-`forRoot` dedup
   uses static class storage.
 
-## Phase 14.3.1 Category A vs Category B
+## Category A vs Category B
 
 | Aspect | Category A (outbox) | Category B (cqrs in-memory) |
 |---|---|---|
@@ -182,7 +182,7 @@ semantics) — same pattern as
 ## Further reading
 
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-  (Phase 14.3.1 addendum documents Category A/B framing)
+  (the addendum documents the Category A/B framing)
 - [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [`@nestjs-transactional/cqrs` README — public API and usage](../../packages/cqrs/README.md)
 - Multi-DS cqrs regression test at the package level:

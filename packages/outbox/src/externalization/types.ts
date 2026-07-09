@@ -2,11 +2,11 @@
  * Metadata describing how a single event should be routed to an
  * external message broker.
  *
- * Produced by the `ExternalizationRegistry` (Phase 11.2) by resolving
+ * Produced by the `ExternalizationRegistry` by resolving
  * the event's class against the metadata stored by the `@Externalized`
  * decorator. Consumed by an {@link EventExternalizer} implementation
  * (e.g. `MicroservicesEventExternalizer` from
- * `@nestjs-transactional/outbox-microservices`, Phase 11.3) which
+ * `@nestjs-transactional/outbox-microservices`) which
  * translates the abstract `target` / `routingKey` / `headers` shape
  * into transport-specific calls.
  *

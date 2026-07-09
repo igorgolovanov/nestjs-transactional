@@ -21,7 +21,7 @@ import { InvoiceRow } from './invoice.entity';
  * `billing.invoices` INSERT (DD-019 single-unit atomicity).
  *
  * NOTE: framework-level "default" + Postgres-level "billing" schema
- * is intentional naming asymmetry. Phase 14.3+ today binds class-token
+ * is intentional naming asymmetry. The outbox today binds class-token
  * outbox aliases (e.g. `StartupRecoveryService`) to the default DS
  * only; multi-DS deployments make one of their domain modules the
  * default. The README documents this pattern.

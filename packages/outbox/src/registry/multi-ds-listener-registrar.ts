@@ -45,7 +45,7 @@ interface RegistrarListenerEntry {
 
 /**
  * Multi-dataSource implementation of the cqrs package's
- * `OutboxListenerRegistrar` structural port (Phase 14.3.1).
+ * `OutboxListenerRegistrar` structural port.
  *
  * Walks every per-dataSource {@link EventTypeRegistry} to resolve
  * which dataSource owns each incoming listener's event class, then

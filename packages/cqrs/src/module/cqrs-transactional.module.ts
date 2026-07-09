@@ -88,7 +88,7 @@ export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
  * export class AppModule {}
  * ```
  *
- * **Multi-dataSource setups** (Phase 14.7): the cqrs runtime is
+ * **Multi-dataSource setups**: the cqrs runtime is
  * dataSource-agnostic by design. There is exactly one
  * `CqrsTransactionalModule.forRoot()` per application regardless of
  * how many dataSources are configured — multi-DS routing emerges

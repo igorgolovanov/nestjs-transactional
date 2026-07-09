@@ -173,7 +173,7 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     // OrderConfirmedEvent reached the Kafka mock — externalization
     // happens AFTER the worker delivers, so we wait for it.
     // Note: `@Externalized` `headers` / `routingKey` callbacks are
-    // currently a Phase 11.3 documented limitation — they're not
+    // currently a documented limitation — they're not
     // routed to `ClientProxy.emit` yet. Tests assert on the event
     // payload itself.
     await waitFor(() =>

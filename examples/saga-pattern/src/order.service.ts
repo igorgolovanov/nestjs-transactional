@@ -14,7 +14,7 @@ import { OrderPlacedEvent } from './events';
  * up via the outbox.
  *
  * `OutboxEventPublisher.publish` is the canonical class-token
- * injection (Phase 14.8c carry-over) and routes by the event class's
+ * injection and routes by the event class's
  * `OutboxModule.forFeature` registration. This example registers
  * everything in one `'default'` dataSource so all events route the
  * same way.

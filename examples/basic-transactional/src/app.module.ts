@@ -20,7 +20,7 @@ import { UserService } from './user.service';
 
     TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
 
-    // Phase 14.20: registers the TypeORM adapter for the default
+    // Registers the TypeORM adapter for the default
     // dataSource. Importing this module is also what activates the
     // transparent-repository prototype patches at module-load time
     // (see `@nestjs-transactional/typeorm` JSDoc).

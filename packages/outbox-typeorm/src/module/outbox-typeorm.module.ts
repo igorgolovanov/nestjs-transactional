@@ -18,12 +18,12 @@ import {
 import { SchemaInitializer } from '../schema/schema-initializer';
 
 /**
- * Options accepted by {@link OutboxTypeOrmModule.forRoot} (Phase 14.21).
+ * Options accepted by {@link OutboxTypeOrmModule.forRoot}.
  *
  * The dataSource identifier is now a *string name only*. The actual
  * `DataSource` instance is resolved from DI under
  * `getDataSourceToken(name)` — the same convention `@nestjs/typeorm`
- * uses for `@InjectRepository(E, dataSource)`. Mirrors the Phase 14.20
+ * uses for `@InjectRepository(E, dataSource)`. Mirrors the
  * shape of `TypeOrmTransactionalModule.forRoot`.
  */
 export interface OutboxTypeOrmOptions {
@@ -36,7 +36,7 @@ export interface OutboxTypeOrmOptions {
    * Multi-dataSource deployments call `forRoot` once per dataSource;
    * each call registers its own `TypeOrmEventPublicationRepository`
    * instance under {@link getTypeOrmRepositoryProviderToken} so the
-   * outbox-side per-DS tokens (Phase 14.3) can resolve them via the
+   * outbox-side per-DS tokens can resolve them via the
    * provider returned by {@link typeOrmEventPublicationRepositoryProvider}.
    */
   readonly dataSource?: string;
@@ -62,7 +62,7 @@ export interface OutboxTypeOrmOptions {
 
 /**
  * Asynchronous flavour of {@link OutboxTypeOrmOptions}. Mirrors the
- * shape of `TypeOrmTransactionalModule.forRootAsync` (Phase 14.20).
+ * shape of `TypeOrmTransactionalModule.forRootAsync`.
  *
  * **dataSource name limitation**: the `dataSource` field on this
  * interface is *statically declared* (not async-resolved). NestJS
@@ -136,8 +136,8 @@ const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
 
 /**
  * NestJS module that wires the TypeORM persistence backend for the
- * Event Publication Registry (Phase 14.21 reshape, mirrors Phase
- * 14.20's `TypeOrmTransactionalModule.forRoot`). Multi-dataSource
+ * Event Publication Registry, mirroring
+ * `TypeOrmTransactionalModule.forRoot`. Multi-dataSource
  * setups call {@link forRoot} once per dataSource — each call
  * registers an independent {@link TypeOrmEventPublicationRepository}
  * instance under a private per-dataSource token. The
@@ -205,7 +205,7 @@ export class OutboxTypeOrmModule {
    * @internal
    * Counter for `forRootAsync`-only token uniqueness. Mirrors the
    * pattern used in `TypeOrmTransactionalModule.forRootAsync`
-   * (Phase 14.20) — every async call gets a unique provider symbol
+   * — every async call gets a unique provider symbol
    * so consecutive calls don't collide.
    */
   private static asyncCounter = 0;
@@ -390,7 +390,7 @@ function buildPerDataSourceExports(dataSourceName: string): InjectionToken[] {
  *   → TypeOrmEventPublicationRepository instance
  * ```
  *
- * Phase 14.21 considered removing this bridge function (delete it,
+ * We considered removing this bridge function (delete it,
  * have `OutboxTypeOrmModule.forRoot` register directly under the
  * official outbox-side token), but the change would require
  * `OutboxModule.forRoot` to drop its in-memory default — which would

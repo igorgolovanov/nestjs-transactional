@@ -1,8 +1,7 @@
 # Known Limitations
 
-Limitations of the current implementation. Each entry names the
-phase in which it is slated for resolution (or "no fix planned"
-with rationale).
+Limitations of the current implementation. Each entry names where
+its fix is tracked (or "no fix planned" with rationale).
 
 ## Transaction options — `readOnly` and `timeout` are not enforced
 
@@ -38,22 +37,21 @@ behaviour, and adapters are free to honour them (the
 Postgres-family dialects; implement or formally deprecate `timeout`)
 needs a DD before implementation.
 
-## Phase 14 multi-adapter
+## Multi-adapter
 
 Single-adapter (default-DS) deployments are unaffected by these
 limitations.
 
-The Phase 14.3.1 entry (decorator-driven handler registration in
-multi-DS deployments) was removed when Phase 14.3.1 shipped — both
+Decorator-driven handler registration in multi-DS deployments used
+to be listed here; per-dataSource handler routing resolved it. Both
 Category A (outbox-routed scanners auto-resolve owning DS via
 per-DS event-type registries) and Category B (cqrs in-memory
 dispatcher's per-DS hook attachment via explicit decorator
 `dataSource` option) now work transparently for multi-DS apps.
-See the
-[ADR-018](adr/018-multi-adapter-architecture.md) Phase 14.3.1
-addendum.
+See the revision history in
+[ADR-018](adr/018-multi-adapter-architecture.md) for the record.
 
-### Phase 14.20 transparent transactional repositories — escape-hatch patterns
+### Transparent transactional repositories — escape-hatch patterns
 
 Two patterns are NOT covered by the prototype patches and require
 the user to fall back to `getCurrentEntityManager()` or use a

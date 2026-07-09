@@ -41,7 +41,7 @@ import type { TransactionAdapter } from '../types/transaction-adapter';
  *
  * Matches NestJS conventions (`TypeOrmModule`, `MongooseModule`,
  * `ClientsModule`) and aligns with `OutboxModule.forRoot` from
- * Phase 14.3.2 (ADR-019). Cross-call coordination of singletons
+ * ADR-019. Cross-call coordination of singletons
  * (`AdapterRegistry`, `TransactionManager`, `APP_INTERCEPTOR`,
  * `TransactionalMethodsBootstrap`, `TRANSACTION_OBSERVERS`) lives in
  * static class storage on {@link TransactionalModule}, mirroring
@@ -79,7 +79,7 @@ export interface TransactionalModuleOptions {
   readonly adapter?: TransactionAdapter;
 
   /**
-   * When `true` (default — Phase 14.10), the module is registered as
+   * When `true` (default), the module is registered as
    * `@Global()` — its exports are available app-wide without being
    * re-imported. Honored per call (each `forRoot` builds its own
    * `DynamicModule` with its own `global` flag). Multi-call setups
@@ -164,7 +164,7 @@ const ASYNC_REGISTRATION_TOKEN = (id: number): symbol =>
  * default) the global {@link TransactionalInterceptor}. ADR-018
  * shape — multi-dataSource deployments call {@link forRoot} once per
  * dataSource. Static class storage coordinates singletons across
- * calls (mirrors Phase 14.3.2 `OutboxModule` per ADR-019).
+ * calls (mirrors `OutboxModule` per ADR-019).
  *
  * The first call registers the process-wide infrastructure; subsequent
  * calls only contribute per-dataSource providers. Adapter-specific
@@ -303,7 +303,7 @@ export class TransactionalModule {
       // ADAPTER_REGISTRY factory closes over the static `registrations`
       // Map. By the time NestJS resolves this factory, every synchronous
       // `forRoot` body has run and the Map is fully populated. Pattern
-      // mirrors Phase 14.3.2 `OutboxModule` per ADR-019.
+      // mirrors `OutboxModule` per ADR-019.
       providers.push({
         provide: ADAPTER_REGISTRY,
         useFactory: (): AdapterRegistry =>
@@ -525,7 +525,7 @@ function buildPerDataSourceProviders(adapter: TransactionAdapter): Provider[] {
  * `registrations` Map on {@link TransactionalModule}. Called by the
  * first-`forRoot`'s `ADAPTER_REGISTRY` factory at provider-resolution
  * time — by then every synchronous `forRoot` body has populated the
- * Map. Pattern mirrors Phase 14.3.2 `OutboxModule` per ADR-019.
+ * Map. Pattern mirrors `OutboxModule` per ADR-019.
  *
  * @internal
  */

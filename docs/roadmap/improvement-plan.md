@@ -470,7 +470,7 @@ Recorded, not scheduled. Ordered roughly by value.
   site; no perf harness behind the AsyncLocalStorage overhead
   claims.
 - **`outbox-prisma` / `outbox-mongodb`** — roadmap-only, no
-  scaffolding; unblocked by the Phase 14 multi-adapter contract.
+  scaffolding; unblocked by the multi-adapter contract.
 
 ## Suggested sequencing
 

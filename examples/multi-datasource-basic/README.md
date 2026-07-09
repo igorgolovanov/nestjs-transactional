@@ -40,7 +40,7 @@ Or from this directory: `pnpm start` / `pnpm test`.
    per-DS DI tokens.
 3. `BillingService.createInvoice` — `@Transactional()` (defaults to the
    `'default'` dataSource → billing). Uses
-   `@InjectRepository(InvoiceEntity)` — Phase 14.20 transparent repo.
+   `@InjectRepository(InvoiceEntity)` — a transparent transactional repo.
 4. `InventoryService.upsertStock` — `@Transactional({ dataSource: 'inventory' })`
    (DD-020 canonical form). Uses
    `@InjectRepository(StockItemEntity, 'inventory')` — `@nestjs/typeorm`
@@ -79,7 +79,7 @@ between them by design.
 
 `@Transactional({ dataSource: 'inventory' })` tells the manager to open
 a transaction against the `inventory` adapter; the active EntityManager
-is registered under that name. Phase 14.20's
+is registered under that name. The patched
 `Repository.prototype.manager` getter consults
 `TransactionContext.getActiveTransactionByDataSource('inventory')` for
 Repositories injected via `@InjectRepository(StockItemEntity, 'inventory')`
@@ -118,7 +118,7 @@ EntityManager for that dataSource.
   static class storage; without reset, the second test sees "dataSource
   already registered" and throws.
 - **`@InjectEntityManager() em.save()` direct call is NOT transactional**
-  (Phase 14.20 known limitation). Use `@InjectRepository` (this
+  (known transparent-repository limitation). Use `@InjectRepository` (this
   example's pattern) or `getCurrentEntityManager(dataSource)`.
 
 ## Related examples
@@ -128,7 +128,8 @@ EntityManager for that dataSource.
 - [`multi-datasource-outbox`](../multi-datasource-outbox) — adds
   durable cross-DS event integration via the outbox.
 - [`multi-datasource-cqrs`](../multi-datasource-cqrs) — adds
-  `@nestjs/cqrs` handlers per dataSource (Phase 14.3.1 Category B).
+  `@nestjs/cqrs` handlers per dataSource (per-dataSource routing in
+  the cqrs in-memory dispatcher).
 - [`shared-database-modular-monolith`](../shared-database-modular-monolith)
   — same physical Postgres, separate schemas per module.
 

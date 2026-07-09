@@ -1,5 +1,5 @@
 /**
- * Phase 14.20 transparent transactional repositories — patching
+ * Transparent transactional repositories — patching
  * machinery. Exported so the module layer can drive `applyAllPatches`
  * in `forRoot`, and so unit tests can probe state directly. None of
  * these symbols are intended for application code — public API stays

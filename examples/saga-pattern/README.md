@@ -172,7 +172,7 @@ pnpm -C examples/saga-pattern start
   with the same saga pattern at multi-DataSource scale plus REST
   surface and Kafka externalization.
 - [`multi-datasource-outbox`](../multi-datasource-outbox) — outbox
-  per dataSource with decorator-driven routing (Phase 14.3.1).
+  per dataSource with decorator-driven handler routing.
 - [`externalization-with-fallback`](../externalization-with-fallback) —
   consumer-side inbox/dedup pattern complementing the producer
   outbox.

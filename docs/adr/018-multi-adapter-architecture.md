@@ -239,7 +239,7 @@ The facade late-binds per-DS publishers via `OnModuleInit` +
 of dataSources isn't known at module-build time. See ADR-019 § 4 for
 the late-binding mechanism.
 
-### 9. Transparent transactional repositories (Phase 14.20)
+### 9. Transparent transactional repositories
 
 `@InjectRepository(Entity)` Repositories automatically dispatch
 through the active `@Transactional()` scope's `EntityManager`. No
@@ -299,10 +299,10 @@ Documented limitations live in
 `BaseEntity` static methods are not patched and require the
 `getCurrentEntityManager()` escape hatch or the Repository pattern.
 
-### 10. Outbox persistence module reshape (Phase 14.21)
+### 10. Outbox persistence module reshape
 
 `OutboxTypeOrmModule.forRoot({ dataSource?, isDefault? })` mirrors
-the Phase 14.20 `TypeOrmTransactionalModule.forRoot` shape. The
+the `TypeOrmTransactionalModule.forRoot` shape from § 9. The
 underlying `DataSource` is resolved from DI via `@nestjs/typeorm`'s
 `getDataSourceToken(name)`. Each `forRoot` call registers
 `TypeOrmEventPublicationRepository` under a per-DS private token
@@ -330,7 +330,7 @@ The outbox atomicity invariant — business INSERT and
 atomically, and rollback discards both — holds via two parallel
 mechanisms reaching the same active `EntityManager`:
 
-1. The Phase 14.20 patched `Repository.prototype.manager` getter on
+1. The patched `Repository.prototype.manager` getter on
    the `@InjectRepository` business Repository routes through the
    active transactional `EntityManager`.
 2. `TypeOrmEventPublicationRepository`'s explicit
@@ -429,7 +429,7 @@ Module-internal construction (point 4 above) eliminates both.
   No contention on a single `event_publication` table when multiple
   bounded-context modules emit events.
 - **Transparent transactional repositories collapse the surface
-  area**. Phase 14.20 removed the most common reason for users to
+  area**. They removed the most common reason for users to
   reach for `getCurrentEntityManager()` — Repository methods now
   participate transparently. The escape hatch remains for the
   documented limitations.
@@ -455,7 +455,7 @@ Module-internal construction (point 4 above) eliminates both.
   shipped, changing `getTransactionManagerToken` is a breaking
   change for anyone who hand-built tokens around the same string.
 - **Patch-based transparent repositories carry a runtime footprint**.
-  The Phase 14.20 prototype patches install at module load and
+  The prototype patches install at module load and
   remain installed for the process lifetime; `resetForTesting`
   drops the managed-DataSource WeakSet but does not delete the
   prototype getter. The trade-off pays back via the API

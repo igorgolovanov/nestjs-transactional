@@ -53,7 +53,7 @@ applyAllPatches();
 /**
  * Options accepted by {@link TypeOrmTransactionalModule.forRoot}.
  *
- * Phase 14.20 reshape: this module now resolves the actual TypeORM
+ * Reshaped so this module now resolves the actual TypeORM
  * `DataSource` via DI (using `getDataSourceToken` from
  * `@nestjs/typeorm`) instead of taking it as a constructor argument.
  * The new contract is "TypeORM is configured by `@nestjs/typeorm`'s
@@ -94,7 +94,7 @@ export interface TypeOrmTransactionalOptions {
  * populates as a side effect.
  *
  * Mirrors the documented limitation on
- * `TransactionalModule.forRootAsync` (Phase 14.10).
+ * `TransactionalModule.forRootAsync`.
  */
 export interface TypeOrmTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
   readonly useFactory: (
@@ -109,7 +109,7 @@ const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
 /**
  * NestJS module that binds a TypeORM {@link DataSource} to the core
  * {@link AdapterRegistry} as a transactional adapter AND activates
- * the transparent transactional patching machinery (Phase 14.20).
+ * the transparent transactional patching machinery.
  * Once registered:
  *
  * - Every `Repository` reachable via `@InjectRepository`,
@@ -261,7 +261,7 @@ export class TypeOrmTransactionalModule {
     // (or even `moduleRef.get`) cascaded into a hard-to-diagnose
     // `Invalid value used in weak set` followed by
     // `this.postgres.Pool is not a constructor` when paired with
-    // `TypeOrmModule.forRootAsync` (Phase 14.8e Convention #22).
+    // `TypeOrmModule.forRootAsync` (Convention #22).
     //
     // The robust pattern is `OnModuleInit`: by the time the hook
     // runs, every provider in the module tree has been instantiated

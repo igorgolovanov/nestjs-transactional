@@ -36,7 +36,7 @@ let originalGetRepository: typeof EntityManager.prototype.getRepository | undefi
  *
  * This wrap matters specifically for the
  * `@InjectEntityManager() em.getRepository(Entity).save(...)` user
- * pattern (Phase 14.20 Q1 Option A coverage proof): the injected
+ * pattern (coverage proof in the integration tests): the injected
  * `EntityManager` is the DataSource's default (non-transactional)
  * manager. Calling `em.getRepository(Entity)` would, without this
  * wrap, return a Repository whose only `manager` reference is `em`
@@ -50,7 +50,7 @@ let originalGetRepository: typeof EntityManager.prototype.getRepository | undefi
  *
  * `@InjectEntityManager` + direct method call (`em.save(Entity, ...)`)
  * is NOT covered by this patch — that is the documented limitation
- * (Phase 14.20 Q5). Use `getCurrentEntityManager()` as the escape
+ *. Use `getCurrentEntityManager()` as the escape
  * hatch.
  */
 export function applyEntityManagerPatches(): void {

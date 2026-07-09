@@ -179,9 +179,9 @@ with `schema: 'billing'` in TypeORM's `forRoot`. Two reasons:
   billing-side `@Transactional` calling into an inventory-side
   `@Transactional` opens TWO independent transactions. For
   cross-schema consistency use the outbox.
-- **One module must be bound to the default DS today.** Phase 14.3
-  binds class-token outbox aliases to the default DS only;
-  multi-DS-only deployments fail with "StartupRecoveryService
+- **One module must be bound to the default DS today.** The outbox's
+  multi-adapter support binds class-token aliases to the default DS
+  only; multi-DS-only deployments fail with "StartupRecoveryService
   cannot be resolved". Pick whichever module makes the most sense
   to be the default — billing in this example.
 - **Production should NOT use `synchronize: true` for outbox tables.**

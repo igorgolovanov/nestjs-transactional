@@ -345,7 +345,8 @@ releases rather than pre-release prep work.
   series leads naturally into a future stable `1.0.0`.
 - Phase 14.8f shipped — comprehensive documentation sweep closing
   the multi-adapter era. Five commits: per-package READMEs synced
-  with the example catalogue + Phase 14.20/14.21 alignment;
+  with the example catalogue, plus alignment with transparent
+  transactional repositories and the `OutboxTypeOrmModule` reshape;
   pre-tier `cqrs-full-stack` and `outbox-full-stack` examples
   retired; ADR-018 / ADR-019 deep rewrite collapsed running
   addendum history into final-form Decision prose;

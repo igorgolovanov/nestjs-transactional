@@ -141,15 +141,15 @@ export class AppModule {
           processor: { pollingInterval: 100, batchSize: 50 },
         }),
 
-        // Per-DS event-class registrations — Phase 14.3.1 Category A
+        // Per-DS event-class registrations — Category A
         // `OutboxListenerScanner` walks these to route handlers to
         // the matching per-DS registry.
         OutboxModule.forFeature([InvoicePaidEvent]),
         OutboxModule.forFeature([ReservationPlacedEvent], { dataSource: 'inventory' }),
 
-        // ONE externalizer covers BOTH dataSources (Phase 14.6 Q1.A
-        // verification: per-event @Externalized({ client }) is the
-        // routing axis, NOT a per-DS externalizer Map). The default
+        // ONE externalizer covers BOTH dataSources (per-event
+        // @Externalized({ client }) is the routing axis, NOT a
+        // per-DS externalizer Map). The default
         // is BILLING_BROKER as a safety net — every event in this
         // example has its own `client` override.
         OutboxMicroservicesModule.forRoot({ defaultClient: BILLING_BROKER }),

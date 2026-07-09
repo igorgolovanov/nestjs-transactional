@@ -257,5 +257,5 @@ docker compose exec kafka kafka-console-consumer \
 - [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-- [Phase 14.8e Tier 5 status doc](../../docs/status/) (added on
+- [Tier 5 status doc](../../docs/status/) (added on
   closure of this tier)

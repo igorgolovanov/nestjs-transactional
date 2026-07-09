@@ -1,9 +1,8 @@
 # basic-typeorm-outbox
 
 End-to-end outbox example with **real Postgres**, the TypeORM persistence
-backend (`@nestjs-transactional/outbox-typeorm`), and the Phase 14.21
-single-unit atomicity invariant pinned by integration tests
-(testcontainers).
+backend (`@nestjs-transactional/outbox-typeorm`), and the single-unit
+atomicity invariant pinned by integration tests (testcontainers).
 
 A successful `@Transactional` method commits the business INSERT and the
 `event_publication` row in the **same database transaction**; a thrown
@@ -53,8 +52,8 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
 1. **Atomic commit.** `OrderService.placeOrder` runs `orders.save(...)`
    AND `outbox.publish(...)` inside a single `@Transactional()` method.
    Both rows land in the `orders` table and the `event_publication`
-   table at commit time. The Phase 14.21 atomicity invariant: one
-   transaction, two rows, single LSN.
+   table at commit time. The atomicity invariant: one transaction,
+   two rows, single LSN.
 2. **Atomic rollback.** `placeOrderAndFail` does the same writes and
    then throws. Neither row is persisted — the publication row is gone,
    so the event is never delivered.
@@ -69,8 +68,8 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
 
 - [`src/order.service.ts`](src/order.service.ts) — `@Transactional()`
   method with both an `@InjectRepository` write and an
-  `outbox.publish`. Phase 14.20 transparent repos + Phase 14.21
-  atomicity in five lines.
+  `outbox.publish`. Transparent transactional repos + atomic
+  publication in five lines.
 - [`src/shipping.handler.ts`](src/shipping.handler.ts) —
   `@OutboxEventsHandler({ events: [OrderPlacedEvent], id: '...' })`.
 - [`src/order-placed.event.ts`](src/order-placed.event.ts) — domain
@@ -99,7 +98,7 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
   via `@OutboxEventsHandler({ events: [...], id: 'stable-id' })` —
   this example does so.
 - **`@InjectEntityManager() em.save(Entity, ...)` is NOT transactional**
-  (Phase 14.20 known limitation). Use `@InjectRepository` (this
+  (known transparent-repository limitation). Use `@InjectRepository` (this
   example's pattern) or `getCurrentEntityManager()`.
 - **Don't import `CqrsModule` directly alongside
   `CqrsTransactionalModule.forRoot()`.** Not relevant here (no CQRS),
@@ -122,7 +121,8 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
 - [ADR-006 — outbox pattern rationale](../../docs/adr/006-outbox-pattern.md)
 - [ADR-007 — outbox architecture](../../docs/adr/007-outbox-architecture.md)
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-  (Phase 14.20 + Phase 14.21 addenda)
+  (addenda document the transparent-repository and `OutboxTypeOrmModule`
+  designs)
 - [`docs/architecture/outbox-pattern.md`](../../docs/architecture/outbox-pattern.md)
 - Atomicity regression test that pins the same contract at the package
   level: [`packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts`](../../packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts).

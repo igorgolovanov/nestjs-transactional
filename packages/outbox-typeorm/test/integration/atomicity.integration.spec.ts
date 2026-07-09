@@ -25,7 +25,7 @@ import {
 } from '../setup-testcontainers';
 
 /**
- * Phase 14.21 atomicity verification — the critical regression net
+ * Atomicity verification — the critical regression net
  * for the outbox pattern's fundamental contract: business writes and
  * `event_publication` writes inside a `@Transactional()` method must
  * land in the SAME database transaction (atomic commit), and a thrown
@@ -33,7 +33,7 @@ import {
  *
  * Two transactional dispatch mechanisms cooperate here:
  *
- * 1. **Phase 14.20 patches** — `Repository.prototype.manager` getter
+ * 1. **Prototype patches** — `Repository.prototype.manager` getter
  *    on the `@InjectRepository`'d business Repository routes through
  *    the active transactional `EntityManager`.
  * 2. **`getCurrentEntityManager` in `TypeOrmEventPublicationRepository`**
@@ -78,7 +78,7 @@ class UserService {
   ) {}
 
   /**
-   * Happy path: business INSERT through the Phase 14.20-patched
+   * Happy path: business INSERT through the patched
    * Repository, plus outbox INSERT through `OutboxEventPublisher`
    * (which fires the actual `event_publication` write at
    * before-commit time via the registry's flush hook). Both must
@@ -118,7 +118,7 @@ function buildFakeTypeOrmModule(providers: Provider[]): unknown {
   return FakeTypeOrmModule;
 }
 
-describe('Outbox + business INSERT atomicity (Phase 14.21, Postgres via testcontainers)', () => {
+describe('Outbox + business INSERT atomicity (Postgres via testcontainers)', () => {
   let ctx: PostgresTestContext;
   let app: TestingModule;
 

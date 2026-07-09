@@ -1,8 +1,8 @@
 # basic-transactional
 
-Foundational `@Transactional()` example showcasing **Phase 14.20 transparent
-repositories** — `@InjectRepository(UserEntity)` works out of the box,
-no `getCurrentEntityManager()` boilerplate.
+Foundational `@Transactional()` example showcasing **transparent
+transactional repositories** — `@InjectRepository(UserEntity)` works out
+of the box, no `getCurrentEntityManager()` boilerplate.
 
 Backed by TypeORM + SQLite in-memory (via `sql.js`); no Docker required.
 
@@ -11,11 +11,11 @@ Backed by TypeORM + SQLite in-memory (via `sql.js`); no Docker required.
 - You are starting from scratch and want the smallest possible illustration
   of declarative transactions in NestJS.
 - You want to see how `@InjectRepository` cooperates with `@Transactional()`
-  with zero glue code (Phase 14.20 selling point).
+  with zero glue code (the transparent-repository selling point).
 - You want a regression-friendly template for your own service unit tests
   that exercise commit + rollback paths.
 
-For multi-DataSource setups see `multi-datasource` (Phase 14.8b);
+For multi-DataSource setups see `multi-datasource-basic`;
 for outbox-backed event delivery see `basic-outbox` and `basic-typeorm-outbox`.
 
 ## Run
@@ -82,8 +82,9 @@ at runtime by one of three coordinated mechanisms (see ADR-005):
 ## Common pitfalls
 
 - **`@InjectEntityManager() em.save(Entity, ...)` direct call is NOT
-  transactional.** Phase 14.20 patches `EntityManager.prototype.getRepository`,
-  not `EntityManager.prototype.save`. Use the Repository pattern shown here,
+  transactional.** The transparent-repository patches cover
+  `EntityManager.prototype.getRepository`, not
+  `EntityManager.prototype.save`. Use the Repository pattern shown here,
   or fall back to `getCurrentEntityManager()` for a manual escape hatch.
 - **`BaseEntity` static methods (`User.save(...)`) are NOT supported.**
   `BaseEntity.useDataSource(...)` stores a captured DataSource that bypasses
@@ -107,4 +108,4 @@ at runtime by one of three coordinated mechanisms (see ADR-005):
 
 - [ADR-005 — method wrapping strategy](../../docs/adr/005-method-wrapping-strategy.md)
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-  (Phase 14.20 addendum documents the transparent-repository design)
+  (the addendum documents the transparent-repository design)

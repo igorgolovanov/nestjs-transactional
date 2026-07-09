@@ -12,7 +12,7 @@ import { PlaceReservationHandler } from './place-reservation.handler';
 
 /**
  * Multi-DS CQRS demo. Two SQLite in-memory DataSources via `sql.js`,
- * each backing one bounded context (billing / inventory). Phase 14.3.1
+ * each backing one bounded context (billing / inventory).
  * Category B is the headline feature: the cqrs in-memory dispatcher
  * attaches AFTER_COMMIT hooks to the *correct* dataSource's active
  * transaction by reading the listener's `dataSource` decorator option.

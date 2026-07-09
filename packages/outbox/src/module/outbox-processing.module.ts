@@ -15,7 +15,7 @@ import {
  * {@link EventPublicationProcessor} and {@link StalenessMonitor} on
  * application bootstrap and stops them on shutdown.
  *
- * Phase 14.3 generalised this to multi-dataSource: the module reads
+ * This is generalised to multi-dataSource: the module reads
  * {@link OUTBOX_PROCESSING_BUNDLE} provided by `OutboxModule.forRoot`
  * — the bundle contains arrays of per-dataSource processors and
  * monitors. Single-dataSource deployments see the bundle with

@@ -1,4 +1,4 @@
-# DD-016: Implement event externalization (Phase 11)
+# DD-016: Implement event externalization
 
 **Context**: Spring Modulith provides `@Externalized` for routing events
 to external message brokers (Kafka, RabbitMQ, JMS, AMQP, ...). Our

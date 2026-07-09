@@ -47,7 +47,7 @@ export interface TransactionalEventsHandlerOptions {
    */
   readonly fallbackExecution?: boolean;
   /**
-   * dataSource the handler's phase hooks attach to (Phase 14.3.1).
+   * dataSource the handler's phase hooks attach to.
    * Defaults to {@link DEFAULT_DATA_SOURCE_NAME} (`'default'`) —
    * single-dataSource apps can omit it.
    *
@@ -64,7 +64,7 @@ export interface TransactionalEventsHandlerOptions {
    * outbox path — both of which auto-resolve the dataSource by
    * walking per-DS event-type registries — the in-memory dispatcher
    * has no event-type registry to consult. The cqrs package is
-   * decoupled from outbox by design (Phase 14.7), so the dataSource
+   * decoupled from outbox by design, so the dataSource
    * is declared explicitly on the decorator.
    */
   readonly dataSource?: string;
@@ -110,7 +110,7 @@ export interface TransactionalEventsHandlerMetadata {
  * dispatcher registration happens at application bootstrap via
  * `TransactionalListenerScanner`.
  *
- * **Multi-dataSource semantics (Phase 14.3.1).** The dispatcher pushes
+ * **Multi-dataSource semantics.** The dispatcher pushes
  * phase hooks directly onto the per-dataSource active transaction
  * resolved via
  * `TransactionContext.getActiveTransactionByDataSource(dataSource)`,

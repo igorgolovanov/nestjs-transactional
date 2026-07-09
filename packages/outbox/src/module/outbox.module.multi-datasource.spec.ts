@@ -144,8 +144,9 @@ describe('OutboxModule multi-forRoot (integration, in-memory)', () => {
     billingService = module.get(BillingService);
     inventoryService = module.get(InventoryService);
 
-    // Manual per-DS listener registration (Phase 14.3.1 will fix the
-    // scanner to do this automatically based on event ownership).
+    // Manual per-DS listener registration. The scanner does this
+    // automatically from event ownership; wiring it by hand here
+    // keeps the test focused on the registry itself.
     const defaultRegistry = module.get<OutboxListenerRegistry>(
       getOutboxListenerRegistryToken('default'),
     );

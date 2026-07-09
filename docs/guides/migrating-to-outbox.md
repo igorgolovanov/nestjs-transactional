@@ -50,7 +50,7 @@ externalization).
 - Any `@TransactionalEventsHandler` you leave untouched. It keeps
   running in-memory, at its current phase, exactly as before.
 - Your `@nestjs/typeorm` `@InjectRepository` injection points —
-  Phase 14.20 transparent transactional repositories make them
+  transparent transactional repositories make them
   dispatch through the active `@Transactional()` scope
   automatically. No `getCurrentEntityManager()` calls in service
   code.
@@ -371,9 +371,9 @@ for the three-tier scaffold (unit / outbox unit / integration).
 
 If your application runs multiple `DataSource`s (modular monolith,
 audit-store split, ORM migration), each DS gets its own outbox
-stack. Phase 14.3.1 + 14.21 made this transparent: handler
-registration auto-routes to the owning DS, and per-DS event
-publication tables don't contend.
+stack. This works transparently: handler registration auto-routes
+to the owning DS, and per-DS event publication tables don't
+contend.
 
 Module wiring (mirrors the
 [`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/)
@@ -580,8 +580,9 @@ overlapping event types from separate classes (which would be
 two deliveries, one per class — the intended behaviour).
 
 **"Multi-DS handler fires on the wrong DataSource."**
-Phase 14.3.1 Category B requires `@TransactionalEventsHandler`
-classes to declare their owning DS via the decorator option:
+The cqrs in-memory dispatcher (Category B) requires
+`@TransactionalEventsHandler` classes to declare their owning DS
+via the decorator option:
 
 ```ts
 @TransactionalEventsHandler({

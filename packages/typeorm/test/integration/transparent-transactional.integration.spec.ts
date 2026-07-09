@@ -42,7 +42,7 @@ function buildFakeTypeOrmModule(providers: Provider[]): unknown {
 }
 
 /**
- * Phase 14.20 — transparent transactional repositories. End-to-end
+ * Transparent transactional repositories. End-to-end
  * verification against real Postgres that injected `Repository`,
  * `EntityManager`, and `DataSource` instances all dispatch through
  * the active transactional `EntityManager` while inside a
@@ -149,7 +149,7 @@ class RequiresNewService {
   }
 }
 
-describe('Transparent transactional repositories (Phase 14.20, Postgres via testcontainers)', () => {
+describe('Transparent transactional repositories (Postgres via testcontainers)', () => {
   let ctx: PostgresTestContext;
   let moduleRef: TestingModule;
 

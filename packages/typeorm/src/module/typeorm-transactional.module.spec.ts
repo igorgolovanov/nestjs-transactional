@@ -42,7 +42,7 @@ function buildFakeDataSourceModule(providers: Provider[]): unknown {
 }
 
 /**
- * Phase 14.20 module reshape — `forFeature` was renamed to
+ * Module reshape — `forFeature` was renamed to
  * `forRoot` and the options shape changed (dataSource is now a
  * string name, not the DataSource instance). The DataSource
  * itself is resolved via `@nestjs/typeorm`'s `getDataSourceToken`.

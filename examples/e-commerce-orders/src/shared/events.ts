@@ -8,7 +8,7 @@ import { KAFKA_CLIENT } from '../clients';
  * via `OutboxModule.forFeature`). Subscribers in other contexts
  * import the class only to type their handlers.
  *
- * The Phase 14.3.1 Category A scanner walks every per-DS
+ * The Category A scanner walks every per-DS
  * `EventTypeRegistry`, finds which DS owns each handler's events,
  * and registers the listener with that DS's listener registry. The
  * `id: 'Module.action'` convention on `@IntegrationEventsHandler`

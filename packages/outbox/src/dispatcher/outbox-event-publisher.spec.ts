@@ -203,7 +203,7 @@ describe('DataSourceOutboxPublisher', () => {
     });
 
     it('buffers events inside a transaction and flushes them via a single beforeCommit hook', async () => {
-      // Phase 14.3: the per-DS publisher pushes the hook directly
+      // The per-DS publisher pushes the hook directly
       // onto `tx.beforeCommitHooks` (not via
       // `manager.registerBeforeCommit`, which targets only the
       // first-active transaction — wrong in multi-DS scenarios).
@@ -285,7 +285,7 @@ describe('DataSourceOutboxPublisher', () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
 
       expect(errorSpy).toHaveBeenCalledTimes(1);
-      // Phase 14.3: error message names the dataSource explicitly.
+      // Error message names the dataSource explicitly.
       expect(errorSpy.mock.calls[0]![0]).toContain(
         "scheduleForPublication outside an active 'default' transaction",
       );

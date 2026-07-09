@@ -9,7 +9,7 @@ import type { EventTypeRegistry } from './event-type-registry';
  * the event-type — otherwise throws {@link OutboxError} with an
  * actionable message.
  *
- * Single source of truth shared by three consumers (Phase 14.3.1):
+ * Single source of truth shared by three consumers:
  *
  *  - {@link OutboxEventPublisher.resolveDataSource} — smart-facade
  *    publisher routes events to the dataSource that registered them.

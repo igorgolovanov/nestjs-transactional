@@ -83,7 +83,7 @@ class AuditListener implements IOutboxEventHandler<InternalAuditEvent> {
 }
 
 /**
- * Mocks how `OutboxMicroservicesModule` (Phase 11.3) will register
+ * Mocks how `OutboxMicroservicesModule` will register
  * the externalizer: as a global module that exports the
  * `EVENT_EXTERNALIZER` binding so the `OutboxModule` factory can
  * resolve it through DI.

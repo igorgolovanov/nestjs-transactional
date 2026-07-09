@@ -12,22 +12,22 @@ for NestJS applications, not just Spring Framework core.
 - AsyncLocalStorage for transaction context (core)
 
 **Spring Modulith features (partially covered, expansion planned):**
-- Event Publication Registry with persistent log — outbox (Phase 5)
-- `@IntegrationEventsHandler` shortcut — cqrs integration (Phase 7)
-- Failed / Incomplete / Completed publications API — outbox (Phase 5)
-- Staleness monitor — outbox (Phase 5)
-- Republish on restart — outbox (Phase 5)
-- Completion modes (UPDATE / DELETE / ARCHIVE) — outbox (Phase 5)
-- `PublishedEvents` test utility — outbox `/testing` (Phase 8)
-- Event externalization to brokers — Phase 11 in progress: SPI,
+- Event Publication Registry with persistent log — outbox
+- `@IntegrationEventsHandler` shortcut — cqrs integration
+- Failed / Incomplete / Completed publications API — outbox
+- Staleness monitor — outbox
+- Republish on restart — outbox
+- Completion modes (UPDATE / DELETE / ARCHIVE) — outbox
+- `PublishedEvents` test utility — outbox `/testing`
+- Event externalization to brokers — SPI,
   `@Externalized`, `outbox-microservices` package,
   [ADR-015](../adr/015-event-externalization-architecture.md),
   reliability caveat in [ADR-016](../adr/016-externalization-reliability-semantics.md).
   One package covers all `@nestjs/microservices` transports
-  ([DD-016](../dd/016-event-externalization.md)). End-to-end working
-  example pending in Phase 11.5b. Reliability semantics weaker than
-  Spring Modulith's broker-acked story — see ADR-016 for the
-  trade-off and three production mitigation strategies.
+  ([DD-016](../dd/016-event-externalization.md)). Reliability
+  semantics are weaker than Spring Modulith's broker-acked story —
+  see ADR-016 for the trade-off and three production mitigation
+  strategies.
 
 **Explicitly out of scope:**
 - Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)

@@ -2,7 +2,7 @@
   "name": "@nestjs-transactional-examples/basic-transactional",
   "version": "0.0.0",
   "private": true,
-  "description": "Foundational @Transactional() example showcasing Phase 14.20 transparent repositories",
+  "description": "Foundational @Transactional() example showcasing transparent transactional repositories",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",

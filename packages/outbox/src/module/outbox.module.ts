@@ -883,7 +883,7 @@ function buildFacadePublisherProvider(moduleClass: typeof OutboxModule): Provide
 
 /**
  * Build the providers wiring the {@link MultiDsOutboxListenerRegistrar}
- * (Phase 14.3.1). Registered in the first-registration block so the
+ *. Registered in the first-registration block so the
  * cqrs package's `IntegrationEventsHandlerScanner` picks the smart
  * registrar up via its `@Optional() @Inject(OUTBOX_LISTENER_REGISTRAR)`
  * — without any consumer-side wiring. The structural-port token
@@ -963,7 +963,7 @@ function privateRegistrations(
 }
 
 // `TransactionManager` referenced for documentation completeness;
-// no longer used directly in this file after Phase 14.3 (the per-DS
+// no longer used directly in this file (the per-DS
 // publisher pushes hooks directly onto the active-transaction object,
 // bypassing manager.registerBeforeCommit's single-tx assumption).
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

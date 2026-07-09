@@ -21,7 +21,7 @@ import { PublicationStatus } from '../types/publication-status';
  *   `COMPLETED` / `FAILED` → `RESUBMITTED`);
  * - hand out deserialized event payloads ready for listener invocation.
  *
- * Does NOT invoke listeners — that is the dispatcher's job (Phase 5.6).
+ * Does NOT invoke listeners — that is the dispatcher's job.
  * Inspired by the internals of Spring Modulith's Event Publication
  * Registry.
  */

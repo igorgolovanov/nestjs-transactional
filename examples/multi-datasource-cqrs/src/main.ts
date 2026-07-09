@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   console.log('   billing notified:', billing.notified);
   console.log('   inventory notified (untouched):', inventory.notified);
 
-  console.log('2) PlaceReservationCommand("res-1") — inventory tx commits (Phase 14.3.1 Cat B)');
+  console.log('2) PlaceReservationCommand("res-1") — inventory tx commits (Cat B)');
   await commandBus.execute(new PlaceReservationCommand('res-1', 'sku-x', 3));
   console.log('   inventory notified:', inventory.notified);
   console.log('   billing notified (still):', billing.notified);

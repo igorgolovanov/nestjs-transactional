@@ -8,7 +8,7 @@ import { REFUNDS_BROKER } from './clients';
  * state and the `ClientProxy.emit` outcome:
  *
  *   1. **Happy path**: emit resolves, broker received → publication
- *      COMPLETED. Standard Phase 11 flow.
+ *      COMPLETED. Standard externalization flow.
  *   2. **ADR-016 silent failure**: emit resolves successfully but
  *      broker never received the message (broker stopped, network
  *      partition that the proxy doesn't surface) → publication

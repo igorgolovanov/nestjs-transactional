@@ -322,7 +322,7 @@ describe('OutboxListenerScanner', () => {
     });
   });
 
-  describe('multi-dataSource — Phase 14.3.1 routing', () => {
+  describe('multi-dataSource routing', () => {
     it('routes handlers to per-DS registries by event ownership', async () => {
       await build({
         multiDs: true,
@@ -416,7 +416,7 @@ describe('OutboxListenerScanner', () => {
     });
 
     it('throws when an event is registered to multiple dataSources (ambiguous)', async () => {
-      // Phase 14.3.2 — duplicate registration across DSes is allowed at
+      // Duplicate registration across DSes is allowed at
       // the EventTypeRegistry level (each registry is independent), but
       // resolveDataSourceByEventTypeName flags the ambiguity at scanner
       // time so the handler's destination is not silently picked.

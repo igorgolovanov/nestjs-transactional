@@ -18,7 +18,7 @@ export class IssueInvoiceCommand {
 /**
  * Default dataSource (billing). `@Transactional()` opens a billing-DS
  * transaction; `aggregate.commit()` enqueues the event as an
- * AFTER_COMMIT hook on THAT transaction (Phase 14.3.1 Category B).
+ * AFTER_COMMIT hook on THAT transaction (Category B).
  *
  * `EventPublisher.mergeObjectContext` retargets `aggregate.commit()`
  * through `TransactionalEventPublisher` — events become hooks instead

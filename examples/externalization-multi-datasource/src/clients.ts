@@ -7,8 +7,8 @@
  * Two axes, orthogonal:
  *
  *   - **Per-DataSource outbox stack** — `OutboxModule.forFeature(...,
- *     { dataSource })` (Phase 14.3.2 / ADR-019)
- *   - **Per-event broker** — `@Externalized({ client })` (Phase 11.3)
+ *     { dataSource })` (ADR-019)
+ *   - **Per-event broker** — `@Externalized({ client })`
  *
  * In this example the axes happen to align (each DS publishes events
  * routed to its own broker queue), but they don't have to. A single

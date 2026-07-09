@@ -33,7 +33,7 @@ export interface IntegrationEventsHandlerOptions {
   readonly id?: string;
   /**
    * dataSource the in-memory dispatcher fallback path attaches phase
-   * hooks to (Phase 14.3.1). Only consulted when the outbox is NOT
+   * hooks to. Only consulted when the outbox is NOT
    * wired (no `OUTBOX_LISTENER_REGISTRAR` binding) — the outbox path
    * auto-resolves the dataSource by walking per-DS event-type
    * registries.
@@ -110,7 +110,7 @@ export interface IntegrationEventsHandlerMetadata {
  * (a DI concept), and (b) "Integration events" is the established
  * DDD/microservices term for cross-module/cross-service event flow.
  *
- * **Multi-dataSource setups (Phase 14.3.1).** When the outbox path
+ * **Multi-dataSource setups.** When the outbox path
  * is wired, `OutboxModule.forRoot` auto-binds
  * `OUTBOX_LISTENER_REGISTRAR` to a smart
  * `MultiDsOutboxListenerRegistrar` that walks per-dataSource

@@ -44,7 +44,7 @@ externalization story for their application.
 │    │                                                               │
 │    ├── tryClaim → PROCESSING                                       │
 │    ├── listenerRegistry.invoke(event)         (local listener)     │
-│    ├── tryExternalize(event, publication)     (NEW — Phase 11)     │
+│    ├── tryExternalize(event, publication)     (externalization)    │
 │    │     └── ExternalizationRegistry.buildMetadata(...)            │
 │    │     └── externalizer.externalize(event, metadata)             │
 │    └── markCompleted / markFailed                                  │

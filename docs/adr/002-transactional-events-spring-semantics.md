@@ -165,7 +165,7 @@ fork or replace it.
   do `mergeObjectContext(order); order.commit()` get
   transactional delivery automatically once they import
   `CqrsTransactionalModule.forRoot()`.
-- **Foundation for the outbox.** Phase 5 ([ADR-006](006-outbox-pattern.md))
+- **Foundation for the outbox.** [ADR-006](006-outbox-pattern.md)
   builds on the same phase machinery — `@OutboxEventsHandler`
   registers the publication row at `BEFORE_COMMIT` so the row
   commits with the business data; `@IntegrationEventsHandler`

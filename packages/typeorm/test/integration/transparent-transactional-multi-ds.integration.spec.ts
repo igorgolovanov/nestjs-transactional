@@ -162,7 +162,7 @@ class CrossDsService {
   }
 }
 
-describe('Transparent transactional repositories — multi-DS (Phase 14.20)', () => {
+describe('Transparent transactional repositories — multi-DS', () => {
   let ctx: PostgresTestContext;
   let billingDs: DataSource;
   let moduleRef: TestingModule;

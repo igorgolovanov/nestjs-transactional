@@ -26,14 +26,14 @@ is preserved as a stub; subsequent numbers do not shift.
    consumers can bind it manually on specific controllers instead
    of globally.
 
-3. **`TransactionalModule.forRoot({ isGlobal: true })` is the default
-   from Phase 14.10 onwards.** Single-call setups pairing with
+3. **`TransactionalModule.forRoot({ isGlobal: true })` is the
+   default.** Single-call setups pairing with
    `TypeOrmTransactionalModule` rely on `isGlobal: true` so that
    `AdapterRegistry` is visible in the typeorm module's provider
    scope; multi-`forRoot` setups additionally rely on it for the
    second-and-later calls' per-DS providers to find the singletons
-   the first call registered. Phase 14.10 flipped the option's
-   default from `false` to `true` to match `OutboxModule` and
+   the first call registered. The default was flipped from `false`
+   to `true` to match `OutboxModule` and
    remove a common-case footgun. Users who genuinely want a
    non-global module pass `isGlobal: false` explicitly and accept
    the per-import constraint.
@@ -46,10 +46,10 @@ is preserved as a stub; subsequent numbers do not shift.
    consistent within the package.
 
 5. **(Retired)** ~~Session handoff notes live under `docs/sessions/`.~~
-   The `docs/sessions/` folder was removed from history during the
-   Phase 14.8f follow-up cleanup. The `**Last update**` block in
+   The `docs/sessions/` folder was removed from history during a
+   later documentation cleanup. The `**Last update**` block in
    [`AGENTS.md`](../../AGENTS.md) is the canonical resume-context
-   surface; per-phase narrative lives in
+   surface; the phase-by-phase narrative lives in
    [`docs/roadmap/README.md`](../roadmap/README.md). Convention number
    kept stable; `#6+` retain their numbers so cross-references
    elsewhere stay valid.
@@ -89,8 +89,8 @@ is preserved as a stub; subsequent numbers do not shift.
    `ExternalizationRegistry.onModuleInit`), every `forFeature`
    factory has already executed — natural NestJS lifecycle ordering
    makes the registry fully populated before any consumer reads it.
-   Do NOT pass `eventTypes` to `forRoot` — that field was removed in
-   Phase 13. Move event registrations to the feature modules that
+   Do NOT pass `eventTypes` to `forRoot` — that field has been
+   removed. Move event registrations to the feature modules that
    own the event classes.
 
 10. **Multi-adapter naming: dataSource name is the primary identifier
@@ -109,25 +109,21 @@ is preserved as a stub; subsequent numbers do not shift.
     silently enrol into a sibling transaction (DD-023). Distributed
     transactions across dataSources are explicitly NOT supported —
     cross-dataSource consistency goes through the outbox, see
-    ADR-018. Phase 14 lands the implementation; Phase 14.0 was the
-    documentation-only preparation iteration.
+    ADR-018.
 
-11. **Two-commit phases must verify both commits before closure.**
-    Phases that ship in two commits (code + docs) require explicit
-    verification that BOTH commits landed before the phase is marked
-    complete. "Done" reported on the code commit alone is incomplete
-    — the docs commit drifts into the next phase's session and gets
-    forgotten. Pattern observed across multiple cleanup-phase pairs
-    (Phase 14.3.2 code + ADR-019 docs; Phase 14.10 code + Phase
-    14.10/14.11 bundled docs). Mitigation: end-of-phase checklist
-    explicitly asks "did the docs commit land?" before moving on.
-    Bundling consecutive cleanup phases' docs into one commit is
-    acceptable once both code commits have shipped — but the bundle
-    must still happen before another non-cleanup phase starts,
-    otherwise it slips again.
+11. **Work that ships as code + docs must verify both commits before
+    closure.** "Done" reported on the code commit alone is incomplete
+    — the docs commit drifts into the next session and gets forgotten.
+    Observed repeatedly across cleanup work, where the implementation
+    landed and its ADR update did not. Mitigation: the closing
+    checklist explicitly asks "did the docs commit land?" before
+    moving on. Bundling several cleanups' docs into one commit is
+    acceptable once every code commit has shipped — but the bundle
+    must still happen before unrelated work starts, otherwise it
+    slips again.
 
 12. **Patches in `@nestjs-transactional/typeorm` install at module-load
-    time, NOT at `forRoot` factory time** (Phase 14.20). Importing
+    time, NOT at `forRoot` factory time.** Importing
     `@nestjs-transactional/typeorm` triggers `applyAllPatches()` as a
     side effect of evaluating `typeorm-transactional.module.ts`.
     Reason: NestJS resolves providers in dependency order; a
@@ -146,7 +142,7 @@ is preserved as a stub; subsequent numbers do not shift.
 
 13. **`TypeOrmTransactionalModule.resetForTesting` resets the
     managed-DataSource WeakSet only — prototype patches stay installed
-    for the process lifetime** (Phase 14.20). Reverting a prototype
+    for the process lifetime.** Reverting a prototype
     patch by deleting the descriptor would silently break Repository
     instances constructed under the patched setter (those have no
     own-property `manager`; deletion leaves `repo.manager === undefined`).
@@ -158,13 +154,13 @@ is preserved as a stub; subsequent numbers do not shift.
     #34/#51; we make the trade-off survivable instead of silent via
     the install-once contract.
 
-14. **Tier 2+ examples ship one-per-commit** (Phase 14.8a closure).
-    Tier 1 (Phase 14.8a) bundled 2 examples per commit because three of
-    the four were small (~+400 LoC each) and naturally paired. Tier 2+
-    examples are larger (multi-DS / Kafka / docker-compose stacks) and
-    benefit from independent review granularity. Pattern: audit at the
-    start of each tier, then one example per commit, then a closing
-    docs commit recording the tier completion.
+14. **Tier 2+ examples ship one-per-commit.** Tier 1 bundled two
+    examples per commit because three of the four were small
+    (~+400 LoC each) and naturally paired. Tier 2+ examples are larger
+    (multi-DS / Kafka / docker-compose stacks) and benefit from
+    independent review granularity. Pattern: audit at the start of
+    each tier, then one example per commit, then a closing docs commit
+    recording the tier completion.
 
     **LoC envelope**: Tier 2 examples landed 700-1000 LoC per commit;
     Tier 3 examples landed 891-1184 (broker stack + externalization
@@ -197,7 +193,7 @@ is preserved as a stub; subsequent numbers do not shift.
 
 16. **`@TransactionalEventsHandler` (cqrs in-memory dispatcher) does
     NOT receive events published through `OutboxEventPublisher.publish`
-    directly** (surfaced in Phase 14.8d, `testing-patterns` integration
+    directly** (surfaced in the `testing-patterns` example integration
     tier). The in-memory dispatcher consumes from cqrs's
     `EventBus.publish` / `AggregateRoot.commit()` paths; the outbox
     consumes from `OutboxEventPublisher.publish`. To bridge: either
@@ -207,7 +203,7 @@ is preserved as a stub; subsequent numbers do not shift.
 
 17. **Subpath imports require `module: Node16` + `moduleResolution:
     Node16` + `isolatedModules: true` in the consuming `tsconfig`**
-    (surfaced in Phase 14.8d, `testing-patterns` first build). The
+    (surfaced in the `testing-patterns` example first build). The
     monorepo `tsconfig.base.json` uses `module: CommonJS` /
     `moduleResolution: node` which cannot read package.json `exports`
     subpaths — TS errors with `TS2307: Cannot find module
@@ -215,11 +211,11 @@ is preserved as a stub; subsequent numbers do not shift.
     declarations`. Consuming examples must override. `basic-cqrs`
     already does (the canonical pattern); `testing-patterns` followed.
     A future cleanup may flip the base config to `Node16` and
-    propagate; out of scope for the examples-only Phase 14.8.
+    propagate; out of scope for the examples work.
 
 18. **Inner-method indirection for `@Transactional({ dataSource })`
-    inside an `@IntegrationEventsHandler`** (surfaced in Phase 14.8e,
-    `e-commerce-orders`). The cqrs scanner captures
+    inside an `@IntegrationEventsHandler`** (surfaced in the
+    `e-commerce-orders` example). The cqrs scanner captures
     `instance.handle.bind(instance)` in `OnModuleInit`;
     `TransactionalMethodsBootstrap` wraps methods at
     `OnApplicationBootstrap` — strictly later. A naive
@@ -252,7 +248,7 @@ is preserved as a stub; subsequent numbers do not shift.
     `examples/e-commerce-orders/src/orders/externalized-event-stub.ts`.
 
 20. **`CqrsTransactionalModule` does NOT export `CommandBus` / `QueryBus`
-    to consumers** (surfaced in Phase 14.8e, `e-commerce-orders`). The
+    to consumers** (surfaced in the `e-commerce-orders` example). The
     module imports `CqrsModule` internally and overrides
     `EventPublisher` (Convention #6); a duplicate `CqrsModule.forRoot()`
     in the consumer would shadow the override. Consequently the module
@@ -264,7 +260,7 @@ is preserved as a stub; subsequent numbers do not shift.
 
 21. **`OutboxModule.forRootAsync({ repository })` takes `repository`
     at the OPTIONS level, NOT in the async factory result** (surfaced
-    in Phase 14.8e, `async-config-from-environment`). Provider tokens
+    in the `async-config-from-environment` example). Provider tokens
     must be declared at module-build time, so the module reads
     `repository` (and `serializer`) from the options argument
     synchronously. The async factory's return shape
@@ -281,7 +277,7 @@ is preserved as a stub; subsequent numbers do not shift.
 
 22. **`TypeOrmTransactionalModule.forRootAsync` registers via
     `OnModuleInit`, not via a `useFactory` provider** (fixed in the
-    same Phase 14.8e session that surfaced it). Originally surfaced as
+    same session that surfaced it). Originally surfaced as
     a bootstrap failure (`TypeError: this.postgres.Pool is not a
     constructor` cascading from `markAsManaged(undefined)`) when
     `forRootAsync` was used alongside `TypeOrmModule.forRootAsync`.
@@ -312,7 +308,7 @@ is preserved as a stub; subsequent numbers do not shift.
     exists.
 
 23. **dotenv refuses to overwrite an existing `process.env` key**
-    (surfaced in Phase 14.8e, `async-config-from-environment`
+    (surfaced in the `async-config-from-environment` example
     integration tests). Two consequences: (a) tests that load multiple
     `.env` files sequentially in the same Jest worker get
     cross-contamination — the FIRST file's values mask later files'
@@ -325,8 +321,8 @@ is preserved as a stub; subsequent numbers do not shift.
     variable that has already been set in the deployment environment.
 
 24. **Outbox graceful drain is the framework's job — no user-side
-    complement needed** (surfaced in Phase 14.8e, fixed as improvement-plan
-    item C1). **Do not write a drain service**; if you find one in an
+    complement needed** (surfaced in the `graceful-shutdown` example, fixed as
+    improvement-plan item C1). **Do not write a drain service**; if you find one in an
     older codebase, delete it.
 
     *Historical record.* `OutboxProcessingModule.onApplicationShutdown`
@@ -352,8 +348,8 @@ is preserved as a stub; subsequent numbers do not shift.
     recoverable, not lossy — that is the trade-off the timeout buys.
 
 25. **Inbox / dedup as the consumer-side complement to a producer
-    outbox** (surfaced in Phase 14.8c, `externalization-with-fallback`,
-    reinforced by saga / audit-logging in Phase 14.8d). Producer-side
+    outbox** (surfaced in the `externalization-with-fallback` example,
+    reinforced by `saga-pattern` and `audit-logging`). Producer-side
     at-least-once delivery (the outbox guarantee) plus consumer-side
     at-most-once execution (the inbox guarantee) compose into
     exactly-once *effects*. The consumer-side template:
@@ -370,8 +366,8 @@ is preserved as a stub; subsequent numbers do not shift.
     (audit-row PK on `operationId`).
 
 26. **Idempotency gate at every outbox-driven step using PK + unique-
-    violation catch** (surfaced in Phase 14.8d across `saga-pattern`
-    and `audit-logging`). For any handler that writes a domain row in
+    violation catch** (surfaced across the `saga-pattern`
+    and `audit-logging` examples). For any handler that writes a domain row in
     response to an outbox event, the row's primary key must be
     deterministic from the event identity (e.g.
     `${orderId}:${sku}` for reservations, `orderId` for payments).
@@ -387,8 +383,8 @@ is preserved as a stub; subsequent numbers do not shift.
     where the business row IS its own gate.
 
 27. **Asymmetric multi-`forRoot` is the natural shape when one
-    dataSource is purely a sink** (surfaced in Phase 14.8d,
-    `audit-logging`). Multi-DS apps where one dataSource only consumes
+    dataSource is purely a sink** (surfaced in the
+    `audit-logging` example). Multi-DS apps where one dataSource only consumes
     integration events do NOT need the full outbox stack on the sink
     side — only `TypeOrmTransactionalModule.forRoot({ dataSource: '<sink>' })`
     so the sink-side handler can run inside a `@Transactional({ dataSource: '<sink>' })`

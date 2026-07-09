@@ -33,5 +33,5 @@ Phase 14.10 reworked `TransactionalModule.forRoot` to the multi-
 `forRoot` shape (one call per dataSource, mirroring Phase 14.3.2
 `OutboxModule` per ADR-019). See [ADR-018](../adr/018-multi-adapter-architecture.md)
 for the multi-adapter architecture and its breaking-changes list,
-plus the Phase 14.10 + 14.11 addendum at the top of that ADR for
-the cleanup record.
+plus the Phase 14.10 + 14.11 entries in that ADR's revision history
+for the cleanup record.

@@ -131,7 +131,7 @@ class OrderProjection implements ITransactionalEventHandler<OrderPlacedEvent> {
 // --- Harness ---
 
 /**
- * Phase 14.20: `TypeOrmTransactionalModule.forRoot` resolves the
+ * `TypeOrmTransactionalModule.forRoot` resolves the
  * actual TypeORM `DataSource` via `@nestjs/typeorm`'s
  * `getDataSourceToken`. For unit tests we provide that token via a
  * `@Global()` fixture (in production `TypeOrmModule.forRoot(...)`

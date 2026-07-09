@@ -1,13 +1,11 @@
-# Migration to multi-adapter (Phase 14)
+# Migration to multi-adapter
 
 This guide enumerates the file-level impact and the breaking
-changes Phase 14 introduces. Captured during 14.0 so the
-implementation phases (14.1–14.9) can be sequenced without
-re-discovering the surface.
+changes the multi-adapter architecture introduces.
 
 For the architectural rationale see
 [ADR-018 — multi-adapter architecture](../adr/018-multi-adapter-architecture.md)
-and the Phase 14 design decisions
+and the multi-adapter design decisions
 [DD-020](../dd/020-multi-adapter-datasource-name.md) ..
 [DD-024](../dd/024-outbox-publisher-facade.md).
 
@@ -26,16 +24,15 @@ and the Phase 14 design decisions
 - `AdapterRegistry` — likely subsumed by per-dataSource provider
   registration; if still needed, gains a dataSource axis.
 - New: token utilities (`getTransactionManagerToken`, ...) and inject
-  decorators (`@InjectTransactionManager`, ...) — Phase 14.1.
+  decorators (`@InjectTransactionManager`, ...).
 
 ### `packages/typeorm`
 - `TransactionalTypeOrmAdapter` — constructor takes a dataSource
   name ([DD-021](../dd/021-adapter-constructor-datasource.md));
   resolves the actual TypeORM `DataSource` via DI.
 - `TypeOrmTransactionalModule.forFeature` — `instanceName` field
-  renamed to `dataSourceName` for cross-package consistency
-  (Phase 14.4 introduced `dataSourceName`; Phase 14.11 removed
-  the deprecated `instanceName` alias).
+  renamed to `dataSourceName` for cross-package consistency. The
+  deprecated `instanceName` alias has since been removed.
 - `getCurrentEntityManager(dataSource?: string, fallback?)` —
   default `'default'`.
 
@@ -92,7 +89,7 @@ and the Phase 14 design decisions
 - Every example module updated to the new `forRoot({ adapter,
   dataSource })` shape. Single-adapter examples lean on default
   `'default'` and stay short.
-- New `examples/multi-adapter-typeorm/` (Phase 14.8) — two TypeORM
+- New `examples/multi-adapter-typeorm/` — two TypeORM
   dataSources, separate outboxes, durable cross-DB integration.
 
 ### Tests
@@ -103,17 +100,17 @@ and the Phase 14 design decisions
   isolation, the smart facade routing, and the `'default'` fallback
   behavior.
 
-## Breaking changes (cumulative across Phase 14)
+## Breaking changes (cumulative)
 
 Acceptable because no package has shipped a stable release yet.
 
-1. `TransactionalModule.forRoot` signature changed (Phase 14.10):
-   accepts a single `{ adapter, ... }` per call. Multi-adapter
-   setups call `forRoot` once per dataSource. The `adapters: [...]`
-   array form (Phase 14.2 Q1.B compromise) was removed; cross-call
-   coordination of singletons happens through static class storage
-   on `TransactionalModule` itself, mirroring the Phase 14.3.2
-   `OutboxModule` mechanism per ADR-019. Default `isGlobal` flipped
+1. `TransactionalModule.forRoot` signature changed: it accepts a
+   single `{ adapter, ... }` per call. Multi-adapter setups call
+   `forRoot` once per dataSource. The `adapters: [...]` array form
+   was removed; cross-call coordination of singletons happens
+   through static class storage on `TransactionalModule` itself,
+   mirroring the `OutboxModule` multi-`forRoot` mechanism per
+   ADR-019. Default `isGlobal` flipped
    from `false` to `true` to match `OutboxModule` and unblock
    multi-call cross-DI visibility. Infrastructure-only
    `forRoot({})` (no adapter) preserved — the call wires the
@@ -133,10 +130,9 @@ Acceptable because no package has shipped a stable release yet.
    parameter renamed from `instanceName` to `dataSource`. Same
    semantics; the rename is for cross-package consistency.
 8. `TypeOrmTransactionalModule.forFeature` — `dataSourceName` is
-   the canonical identifier (introduced Phase 14.4). The
-   deprecated `instanceName` alias was removed in Phase 14.11 —
-   one-phase carry-over for migration. The existing `dataSource`
-   field continues to hold the actual TypeORM `DataSource`
+   the canonical identifier. The deprecated `instanceName` alias
+   has been removed. The existing `dataSource` field continues to
+   hold the actual TypeORM `DataSource`
    instance — see [ADR-018](../adr/018-multi-adapter-architecture.md)
    "Vocabulary asymmetry" for why both names coexist. Same
    semantics throughout.

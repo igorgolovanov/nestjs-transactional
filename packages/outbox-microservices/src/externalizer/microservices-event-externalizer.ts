@@ -32,7 +32,7 @@ import {
  * overrides via `@Externalized({ client })` resolve through the same
  * `ModuleRef.get(token, { strict: false })` lookup.
  *
- * **Headers / routingKey limitation (Phase 11.3):** the
+ * **Headers / routingKey limitation:** the
  * `@nestjs/microservices` `ClientProxy.emit` API has no unified
  * headers / routing-key parameter — handling is transport-specific
  * (Kafka headers, AMQP properties, NATS subject suffixes, ...). For
@@ -113,12 +113,12 @@ export class MicroservicesEventExternalizer
     }
 
     if (metadata.headers !== undefined || metadata.routingKey !== undefined) {
-      // Phase 11.3 limitation — ClientProxy.emit has no unified
+      // Current limitation — ClientProxy.emit has no unified
       // headers / routing-key parameter. Logged for visibility; the
       // broker-aware message construction iteration will route them
       // through transport-specific envelopes.
       this.logger.debug(
-        `${metadata.eventType}: headers/routingKey are not applied to the wire payload in this version (Phase 11.3 limitation): ${JSON.stringify(
+        `${metadata.eventType}: headers/routingKey are not applied to the wire payload in this version (current limitation): ${JSON.stringify(
           { headers: metadata.headers, routingKey: metadata.routingKey },
         )}`,
       );
