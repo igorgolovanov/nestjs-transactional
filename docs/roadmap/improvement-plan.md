@@ -67,7 +67,40 @@ adapter or documented as a per-adapter limitation in
 `known-limitations.md` and in the option's JSDoc; behaviour pinned by
 integration tests.
 
-### A2. `CqrsTransactionalModule` lacks `forRootAsync`
+### A2. `CqrsTransactionalModule` lacks `forRootAsync` — *shipped*
+
+`forRootAsync` mirrors the shape core and typeorm already use:
+structural flags on the options object, value-shaped config from the
+factory. `useTransactionalEventPublisher` is the one structural flag
+here — it decides whether the `EventPublisher` override provider is
+registered at all, and NestJS needs provider tokens at
+module-definition time, so it stays on the options object rather than
+the factory result (the same split `OutboxModule.forRootAsync` uses for
+`repository`, convention #21).
+
+Both paths now share one `resolveWrapperOptions` defaults resolver and
+one `buildModule` provider matrix, so they cannot drift; a spec asserts
+the two produce identical `exports` and provider counts. The
+`exports: exportTokens as never[]` cast is gone, replaced by a typed
+`InjectionToken[]`.
+
+Two things surfaced while doing it:
+
+- Naming the local array `exports` broke the module at runtime — in the
+  CommonJS output that shadows the module-level `exports` object, and
+  the local `const`'s TDZ made every earlier `exports.X = ...`
+  assignment in the file throw. Caught by the new specs, renamed to
+  `exportTokens`, and the reason is now a comment so nobody
+  reintroduces it.
+- `module.get(EventPublisher)` from a root non-strict scope returns
+  `CqrsModule`'s own publisher, not the override — in both `forRoot` and
+  `forRootAsync`. The override reaches consumers through this module's
+  `exports`, which is the same mechanism that makes a duplicate
+  `CqrsModule` import shadow it (convention #6). Structural assertions
+  on the returned `DynamicModule` are the reliable way to test it;
+  behavioural coverage stays in the E2E spec.
+
+Original finding:
 
 Core and typeorm modules expose `forRootAsync`; the cqrs module only
 has `forRoot` (`packages/cqrs/src/module/cqrs-transactional.module.ts`).
@@ -81,7 +114,25 @@ module.
 surface; `never[]` cast replaced with a properly typed exports array;
 covered by module specs; README example added.
 
-### A3. `@nestjs/cqrs` peer range narrower than the rest of the repo
+### A3. `@nestjs/cqrs` peer range narrower than the rest of the repo — *shipped (kept, documented)*
+
+Investigated and deliberately **not** widened. The wrapper's own
+mechanism would work on `@nestjs/cqrs@10` — the handler-metadata
+constants it reads (`__commandHandler__`, `__queryHandler__`,
+`__eventsHandler__`) are identical across both majors, and
+`CqrsModule.forRoot()` exists in both. But `AsyncContext` is a v11
+addition, and it is the mechanism behind the request-scoped handler
+support ADR-020 ships and the README advertises. Widening to `^10`
+would promise a documented feature that cannot work there.
+
+`@nestjs/cqrs@10` also peers on `@nestjs/common ^9 || ^10`, so a
+consumer pinned to it is on NestJS 10 regardless — the narrower range
+costs those users nothing they could otherwise have had.
+
+The rationale is now in `packages/cqrs/README.md` under *Limitations*,
+where someone comparing peer ranges will actually look.
+
+Original finding:
 
 `packages/cqrs/package.json` pins `@nestjs/cqrs: "^11.0.0"` while
 every other NestJS peer is `"^10.0.0 || ^11.0.0"`. Either widen the
@@ -482,7 +533,7 @@ Recorded, not scheduled. Ordered roughly by value.
    together, since the gate and the missing tests it exposes could not
    be separated. Follow-on: raise the branch floors, weakest first
    (`typeorm` 62, `outbox-microservices` 65).
-3. **API consistency**: A2, A3, A5, A7, then A6.
+3. **API consistency**: ~~A2, A3, A5~~ **shipped** — A7, then A6 remain.
 4. **A1 decision + implementation** (DD first).
 5. **Outbox production readiness**: ~~C1~~ ~~C2~~ **shipped** → C3 (DD)
    → C4.

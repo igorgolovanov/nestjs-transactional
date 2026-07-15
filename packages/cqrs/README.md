@@ -86,6 +86,37 @@ export class AppModule {}
 importing `CqrsModule` a second time in the consumer shadows the
 override with the original.
 
+### Async configuration
+
+`forRootAsync` resolves the wrapper options through a NestJS-style
+factory, for config that only exists at runtime:
+
+```ts
+CqrsTransactionalModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (cfg: ConfigService) => ({
+    wrapQueryHandlers: cfg.get('WRAP_QUERIES') !== 'false',
+    defaultCommandOptions: { isolation: cfg.get('TX_ISOLATION') },
+  }),
+});
+```
+
+`useTransactionalEventPublisher` stays on the options object rather than
+the factory result, because it decides whether the `EventPublisher`
+override provider is registered at all and NestJS needs provider tokens
+at module-definition time:
+
+```ts
+CqrsTransactionalModule.forRootAsync({
+  useTransactionalEventPublisher: false, // structural — not from the factory
+  useFactory: () => ({ wrapEventHandlers: false }),
+});
+```
+
+Both paths produce an identical provider matrix and share one defaults
+resolver, so they cannot drift apart.
+
 ## Full example
 
 An order placement flow, end-to-end:
@@ -463,6 +494,16 @@ behaviour and unrelated to the transaction wrap.
   does not re-export them. See `handler-wrapper.ts` —
   [DD-002](../../docs/dd/002-no-fork-nestjs-cqrs.md) documents this
   coupling.
+- **`@nestjs/cqrs@11` only**, while every other peer here accepts
+  `^10 || ^11`. The narrower range is deliberate, not an oversight.
+  The wrapper's own mechanism would work on `@nestjs/cqrs@10` — the
+  metadata constants above are byte-identical between the two majors —
+  but `AsyncContext` does not exist before v11, and it is the mechanism
+  behind the request-scoped handler support described under *Handler
+  scopes*. Advertising `^10` would promise a documented feature that
+  cannot work there. `@nestjs/cqrs@10` also peers on
+  `@nestjs/common ^9 || ^10`, so a consumer pinned to it is on NestJS 10
+  regardless.
 
 ## Status
 
