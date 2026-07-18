@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import type {
-  IsolationLevel,
-  TransactionAdapter,
-  TransactionOptions,
+import {
+  IllegalTransactionStateError,
+  type IsolationLevel,
+  type TransactionAdapter,
+  type TransactionOptions,
 } from '@nestjs-transactional/core';
 import type { DataSource, EntityManager } from 'typeorm';
 
@@ -29,6 +30,12 @@ type TypeOrmIsolationLevel =
  * Only `isolation` from {@link TransactionOptions} is forwarded today.
  * `readOnly` and `timeout` are accepted for forward compatibility but do
  * not yet map to per-dialect statements.
+ *
+ * `PropagationMode.NESTED` needs savepoints, so `runInSavepoint` first
+ * checks the driver's own capability flag and rejects with
+ * `IllegalTransactionStateError` on drivers that cannot do them (SQL
+ * Server, SAP HANA, MongoDB, Spanner, Cordova) instead of emitting SQL
+ * they will refuse.
  */
 export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTransactionHandle> {
   readonly name = 'typeorm';
@@ -77,6 +84,8 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
     parent: TypeOrmTransactionHandle,
     fn: (handle: TypeOrmTransactionHandle) => Promise<T>,
   ): Promise<T> {
+    this.assertSavepointsSupported();
+
     const savepointName = `sp_${randomUUID().replace(/-/g, '_').substring(0, 30)}`;
 
     await parent.entityManager.query(`SAVEPOINT ${savepointName}`);
@@ -88,6 +97,37 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
     } catch (err) {
       await parent.entityManager.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
       throw err;
+    }
+  }
+
+  /**
+   * Fail fast when the configured driver cannot do savepoints, rather
+   * than emitting `SAVEPOINT` SQL it will reject with an opaque
+   * driver-level error that says nothing about `NESTED` propagation.
+   *
+   * TypeORM reports the capability itself — `driver.transactionSupport`
+   * is `'nested'` for the savepoint-capable drivers (Postgres, MySQL,
+   * Oracle, SQLite, CockroachDB, ...), `'simple'` for SQL Server and
+   * SAP HANA, and `'none'` for MongoDB, Spanner and Cordova. Reading the
+   * flag beats maintaining our own dialect allowlist, which would rot
+   * with every driver TypeORM adds.
+   *
+   * Deliberately permissive when the flag is missing: a TypeORM version
+   * that renames or drops it must not turn every `NESTED` call into a
+   * hard failure, since absence of the signal is not evidence of absent
+   * support.
+   */
+  private assertSavepointsSupported(): void {
+    const support = (this.dataSource.driver as { transactionSupport?: string } | undefined)
+      ?.transactionSupport;
+
+    if (support !== undefined && support !== 'nested') {
+      throw new IllegalTransactionStateError(
+        `PropagationMode.NESTED needs savepoints, which the '${this.dataSource.options.type}' ` +
+          `driver does not support (TypeORM reports transactionSupport: '${support}'). ` +
+          'Use PropagationMode.REQUIRED to join the caller\'s transaction, or ' +
+          'REQUIRES_NEW for an independent one.',
+      );
     }
   }
 }

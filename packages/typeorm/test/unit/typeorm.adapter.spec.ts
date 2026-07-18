@@ -1,6 +1,8 @@
+import { IllegalTransactionStateError } from '@nestjs-transactional/core';
 import { DataSource, type EntityManager } from 'typeorm';
 
 import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter';
+import type { TypeOrmTransactionHandle } from '../../src/types/typeorm-transaction-handle';
 import { TestUser } from '../shared/test-user.entity';
 
 async function createSqlJsDataSource(): Promise<DataSource> {
@@ -168,6 +170,84 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
 
       const names = (await ds.getRepository(TestUser).find()).map((u) => u.name).sort();
       expect(names).toEqual(['middle', 'outer']);
+    });
+
+    describe('drivers without nested-transaction support', () => {
+      // The `TransactionAdapter` contract requires
+      // `IllegalTransactionStateError` when savepoints are unavailable.
+      // Emitting raw `SAVEPOINT` SQL at a driver that cannot honour it
+      // surfaces an opaque driver error instead, which tells the user
+      // nothing about NESTED propagation being the cause.
+      //
+      // TypeORM reports the capability itself via
+      // `driver.transactionSupport`, so no dialect allowlist is needed:
+      // `'nested'` supports savepoints, `'simple'` (sqlserver, sap) and
+      // `'none'` (mongodb, spanner, cordova) do not.
+
+      function withTransactionSupport(support: string | undefined): TypeOrmTransactionAdapter {
+        // Mutating the live driver keeps the rest of the DataSource real,
+        // so only the capability under test is faked.
+        (ds.driver as unknown as { transactionSupport: string | undefined }).transactionSupport =
+          support;
+        return new TypeOrmTransactionAdapter(ds, 'default');
+      }
+
+      async function parentHandle(): Promise<TypeOrmTransactionHandle> {
+        return ds.transaction(async (entityManager: EntityManager) => ({
+          id: 'parent',
+          adapterName: 'typeorm',
+          entityManager,
+        }));
+      }
+
+      it.each(['simple', 'none'])(
+        'rejects with IllegalTransactionStateError when transactionSupport is %s',
+        async (support) => {
+          const parent = await parentHandle();
+          const restricted = withTransactionSupport(support);
+          const inner = jest.fn();
+
+          await expect(restricted.runInSavepoint(parent, inner)).rejects.toBeInstanceOf(
+            IllegalTransactionStateError,
+          );
+          // The callback must not run — a half-executed nested block
+          // would be worse than a clean rejection.
+          expect(inner).not.toHaveBeenCalled();
+        },
+      );
+
+      it('names the driver and the propagation mode in the message', async () => {
+        const parent = await parentHandle();
+        const restricted = withTransactionSupport('none');
+
+        await expect(restricted.runInSavepoint(parent, async () => undefined)).rejects.toThrow(
+          /NESTED/,
+        );
+        await expect(restricted.runInSavepoint(parent, async () => undefined)).rejects.toThrow(
+          /transactionSupport/,
+        );
+      });
+
+      it('carries the stable error code', async () => {
+        const parent = await parentHandle();
+        const restricted = withTransactionSupport('none');
+
+        await expect(restricted.runInSavepoint(parent, async () => undefined)).rejects.toMatchObject(
+          { code: 'ILLEGAL_TRANSACTION_STATE' },
+        );
+      });
+
+      it('stays permissive when the driver does not report the capability', async () => {
+        // A TypeORM version that drops or renames the flag must not turn
+        // every NESTED call into a hard failure — absence of the signal
+        // is not evidence of absent support.
+        const parent = await parentHandle();
+        const unknown = withTransactionSupport(undefined);
+
+        await expect(
+          unknown.runInSavepoint(parent, async () => 'ran'),
+        ).resolves.toBe('ran');
+      });
     });
   });
 });

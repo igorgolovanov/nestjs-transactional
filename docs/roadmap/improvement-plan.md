@@ -178,7 +178,53 @@ it — only `batchSize`, `minAge`, `maxCompletionAttempts`, and
 from the options type (breaking change → changeset), with tests
 either way.
 
-### A6. TypeORM patching layer has no contract tests
+### A6. TypeORM patching layer has no contract tests — *shipped*
+
+`packages/typeorm/test/unit/typeorm-internals.contract.spec.ts` asserts
+the stock-TypeORM shapes the patches depend on. It imports only
+`typeorm` — never our own modules, which install the patches as an
+import side effect (convention #12) — so every assertion describes the
+substrate rather than our code, and each failure message names the file
+that has to be revisited.
+
+The failure mode this guards against is the dangerous kind: if one of
+these shapes changes, the patch stops taking effect and every repository
+call quietly runs on its own autocommit connection instead of the
+transaction. Nothing throws, and behavioural tests that only check
+business outcomes would still pass against a single connection.
+
+Shapes now pinned:
+
+- `Repository`'s constructor assigns `manager` by **plain assignment**,
+  so it routes through a prototype setter and creates no own property.
+  This is the load-bearing one — a native class field or an
+  `Object.defineProperty(this, ...)` would create an own property that
+  shadows the patched getter.
+- `Repository.prototype.manager` is not already an accessor in stock
+  TypeORM.
+- Repository data methods delegate through `this.manager` with
+  `this.metadata.target`, which is what makes swapping `manager` enough
+  to redirect them.
+- `getRepository` lives on `EntityManager.prototype` (an own-instance
+  method would escape the wrap), and `extend` lives on
+  `Repository.prototype` and builds its child through the same
+  constructor path.
+- `DataSource` keeps `manager` as an own instance property, which is why
+  `data-source-patches.ts` patches the instance rather than the
+  prototype.
+- `driver.transactionSupport` still exists — read by A7's savepoint
+  check, which falls back to permissive if the flag disappears, so this
+  test is the only thing that would notice.
+
+Verified against both CI matrix cells: every assumption holds
+identically in TypeORM 0.3 and 1.0 (checked by inspecting the published
+1.0.0 tarball, since the suite only installs one version at a time
+locally). The assertions were also probed against a simulated break —
+emulating TypeORM switching to `defineProperty` for `manager` does
+produce the own-property descriptor the contract test forbids.
+
+Original finding:
+
 
 `packages/typeorm/src/patching/*` concentrates ~54 `any` usages and
 reaches into un-exported TypeORM internals
@@ -191,7 +237,28 @@ suite asserting the internal shapes the patches rely on.
 a pointed message) when a TypeORM internal the patch depends on
 changes shape; runs in the existing version matrix.
 
-### A7. `runInSavepoint` never signals unsupported savepoints
+### A7. `runInSavepoint` never signals unsupported savepoints — *shipped*
+
+`TypeOrmTransactionAdapter.runInSavepoint` now checks the driver's
+capability before emitting SQL and throws
+`IllegalTransactionStateError` — the error the `TransactionAdapter`
+contract prescribes — naming the driver, the reported capability, and
+the propagation modes to use instead.
+
+No dialect allowlist was needed: TypeORM reports the capability itself
+through `driver.transactionSupport`, which is `'nested'` for the
+savepoint-capable drivers and `'simple'` (SQL Server, SAP HANA) or
+`'none'` (MongoDB, Spanner, Cordova) otherwise. Same values in 0.3 and
+1.0.
+
+Deliberately permissive when the flag is absent: a TypeORM version that
+renames or drops it must not turn every `NESTED` call into a hard
+failure, since absence of the signal is not evidence of absent support.
+A6's contract test covers that blind spot by failing if the flag
+disappears.
+
+Original finding:
+
 
 The `TransactionAdapter` contract
 (`packages/core/src/types/transaction-adapter.ts`) prescribes
@@ -533,7 +600,8 @@ Recorded, not scheduled. Ordered roughly by value.
    together, since the gate and the missing tests it exposes could not
    be separated. Follow-on: raise the branch floors, weakest first
    (`typeorm` 62, `outbox-microservices` 65).
-3. **API consistency**: ~~A2, A3, A5~~ **shipped** — A7, then A6 remain.
+3. ~~**API consistency**: A2, A3, A5, A7, A6.~~ **Shipped** — workstream A is
+   complete except A1, whose DD is still open.
 4. **A1 decision + implementation** (DD first).
 5. **Outbox production readiness**: ~~C1~~ ~~C2~~ **shipped** → C3 (DD)
    → C4.
