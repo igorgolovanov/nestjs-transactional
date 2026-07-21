@@ -19,27 +19,40 @@ export interface TransactionOptions {
   readonly isolation?: IsolationLevel;
 
   /**
-   * Hint that the transaction will only issue reads. Adapters may use this
-   * to route to a read replica or to issue `SET TRANSACTION READ ONLY`.
-   * It is a hint, not an enforcement — writes may still be attempted and
-   * may be rejected by the database.
+   * Hint that the transaction will only issue reads. A hint by design,
+   * matching Spring's semantics: adapters honour it where the underlying
+   * database allows, and ignore it where it cannot be expressed
+   * (DD-027).
    *
-   * NOT IMPLEMENTED by the shipped `TypeOrmTransactionAdapter` — the flag
-   * is carried through the core and handed to the adapter, which
-   * currently ignores it. Do not rely on it to prevent writes. See
-   * `docs/known-limitations.md`.
+   * `TypeOrmTransactionAdapter` issues `SET TRANSACTION READ ONLY` on
+   * Postgres-family dialects (`postgres`, `cockroachdb`,
+   * `aurora-postgres`), so a write inside the transaction is refused by
+   * the database. On every other dialect it is a silent no-op — notably
+   * MySQL, where the access mode can only be set as
+   * `START TRANSACTION READ ONLY` and TypeORM does not expose that
+   * moment.
+   *
+   * Only applies when the adapter actually starts the transaction: a
+   * `REQUIRED` call joining an existing read-write transaction cannot
+   * make it read-only after the fact.
    */
   readonly readOnly?: boolean;
 
   /**
-   * Transaction timeout in milliseconds. If the adapter supports
-   * transaction-level timeouts (e.g. `statement_timeout` on Postgres),
-   * exceeding this triggers a rollback. Omit for no timeout.
+   * Budget for the whole transaction, in milliseconds. Omit for no
+   * timeout.
    *
-   * NOT IMPLEMENTED by the shipped `TypeOrmTransactionAdapter` — the
-   * value is carried through the core and handed to the adapter, which
-   * currently ignores it. No timeout is enforced. See
-   * `docs/known-limitations.md`.
+   * NOT IMPLEMENTED by `TypeOrmTransactionAdapter`, and deliberately not
+   * approximated (DD-027). TypeORM exposes no transaction-level timeout,
+   * and the nearest dialect feature — Postgres' `statement_timeout` —
+   * bounds each statement rather than the transaction, so
+   * `timeout: 5000` on a method issuing four queries would allow twenty
+   * seconds, not five. A wrong meaning under a familiar name is worse
+   * than a documented gap.
+   *
+   * The option stays in the surface as the extension point for adapters
+   * whose driver has a real transaction budget: Prisma's `$transaction`
+   * accepts exactly this.
    */
   readonly timeout?: number;
 }

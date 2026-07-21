@@ -36,9 +36,9 @@ export const CQRS_TRANSACTIONAL_OPTIONS = 'CQRS_TRANSACTIONAL_OPTIONS';
  * - `wrapCommandHandlers`: `true`
  * - `wrapQueryHandlers`: `true`
  * - `wrapEventHandlers`: `true`
- * - `defaultQueryOptions`: `{ readOnly: true }` — declarative intent
- *   only; no shipped adapter enforces `readOnly` yet (see
- *   `docs/known-limitations.md`)
+ * - `defaultQueryOptions`: `{ readOnly: true }` — enforced by the
+ *   database on Postgres-family dialects, a documenting hint elsewhere
+ *   (DD-027)
  * - `useTransactionalEventPublisher`: `true`
  */
 export interface CqrsTransactionalOptions extends HandlerWrapperOptions {

@@ -38,7 +38,51 @@ docs corpus (20 ADRs, 24 DDs, tiered example library).
 
 ## Workstream A — API consistency for 1.0.0
 
-### A1. `readOnly` and `timeout` are declared but silently ignored — *needs DD/ADR*
+### A1. `readOnly` and `timeout` are declared but silently ignored — *shipped*
+
+Decided and implemented per
+[DD-027](../dd/027-readonly-and-timeout-semantics.md), which corrected a
+premise in the recommendation below.
+
+**`readOnly` is now enforced where the dialect allows it.** The TypeORM
+adapter issues `SET TRANSACTION READ ONLY` as the transaction's first
+statement on `postgres`, `cockroachdb` and `aurora-postgres`; a stray
+write is refused by the database. Pinned by unit specs per dialect and
+by integration tests against real Postgres, including that read-only
+does not leak into the next transaction on the same pooled connection
+and that a nested savepoint inherits it.
+
+The recommendation below assumed MySQL was simply unimplemented. It is
+not implementable: MySQL's `SET TRANSACTION` applies to the *next*
+transaction and raises `ERROR 1568` inside a started one, so the access
+mode has to be given as `START TRANSACTION READ ONLY` — a moment TypeORM
+never exposes. Other dialects get a deliberate silent no-op rather than
+an error, because `CqrsTransactionalModule` defaults every query handler
+to `readOnly: true` and erroring would break consumers on an option they
+never set.
+
+Also worth recording: `readOnly` is a hint in Spring too, where the real
+benefit comes from Hibernate's `FlushMode.MANUAL`. TypeORM has no unit of
+work and no dirty checking, so there is no equivalent optimisation to
+gain — which means "declared but not enforced" had been at parity all
+along, and only the JSDoc oversold it.
+
+**`timeout` stays declared and unimplemented, deliberately.** TypeORM
+exposes no transaction-level timeout, and the nearest dialect feature —
+Postgres' `statement_timeout` — bounds each statement rather than the
+transaction, so `timeout: 5000` on a method issuing four queries would
+allow twenty seconds. Attaching that meaning to this name would mislead
+more than the documented gap does. It stays in the surface because
+Prisma's `$transaction` accepts a real transaction budget, so a future
+Prisma adapter can implement it correctly instead of us removing and
+reintroducing the option.
+
+An explicit dialect allowlist was unavoidable here — unlike the
+savepoint check (A7), TypeORM publishes no capability flag for
+transaction access mode. The adapter carries a comment saying the list
+needs review when a driver is added.
+
+Original finding and its stopgap:
 
 *Stopgap shipped:* the JSDoc on both options, on `@ReadOnly`, and on
 the cqrs module's `defaultQueryOptions` default now states that
@@ -602,7 +646,8 @@ Recorded, not scheduled. Ordered roughly by value.
    (`typeorm` 62, `outbox-microservices` 65).
 3. ~~**API consistency**: A2, A3, A5, A7, A6.~~ **Shipped** — workstream A is
    complete except A1, whose DD is still open.
-4. **A1 decision + implementation** (DD first).
+4. ~~**A1 decision + implementation** (DD first).~~ **Shipped** (DD-027) —
+   workstream A is now complete.
 5. **Outbox production readiness**: ~~C1~~ ~~C2~~ **shipped** → C3 (DD)
    → C4.
 6. **C5 broker-aware externalizers** as its own scheduled phase.

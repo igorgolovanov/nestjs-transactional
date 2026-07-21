@@ -3,39 +3,45 @@
 Limitations of the current implementation. Each entry names where
 its fix is tracked (or "no fix planned" with rationale).
 
-## Transaction options — `readOnly` and `timeout` are not enforced
+## Transaction options — `readOnly` is per-dialect, `timeout` is not implemented
 
-`TransactionOptions.readOnly` and `TransactionOptions.timeout`
-(`packages/core/src/types/transaction-options.ts`) are accepted by
-the core, carried through `TransactionManager`, and handed to the
-adapter — but the shipped `TypeOrmTransactionAdapter`
-(`packages/typeorm/src/adapter/typeorm.adapter.ts`) forwards only
-`isolation` to `DataSource.transaction`. Both options are therefore
-**no-ops today**.
+Resolved as far as it can be, by
+[DD-027](dd/027-readonly-and-timeout-semantics.md). What remains is a
+genuine limitation rather than an unimplemented intent.
 
-What this means in practice:
+**`readOnly` is enforced on Postgres-family dialects only.**
+`TypeOrmTransactionAdapter` issues `SET TRANSACTION READ ONLY` as the
+transaction's first statement on `postgres`, `cockroachdb` and
+`aurora-postgres`, so a stray write is refused by the database. On every
+other dialect it is a silent no-op:
 
-- `@ReadOnly()` and `@Transactional({ readOnly: true })` express
-  intent and document the method, but a write inside such a method
-  still commits. There is no `SET TRANSACTION READ ONLY`, and no
-  read-replica routing.
-- `@Transactional({ timeout: 5000 })` does not abort anything. A
-  long-running transaction runs until the database or the client
-  library times it out on its own terms.
-- The same applies to `CqrsTransactionalModule`'s
-  `defaultQueryOptions: { readOnly: true }` default — query handlers
-  are not write-protected by it.
+- **MySQL / MariaDB** — not a gap we can close. `SET TRANSACTION`
+  applies to the *next* transaction there and raises `ERROR 1568` inside
+  a started one; the access mode must be given as
+  `START TRANSACTION READ ONLY`, and TypeORM never exposes that moment.
+- **SQLite and the rest** — no transaction access mode to set.
 
-The options are deliberately kept in the type surface rather than
-removed: they are the natural extension point for the intended
-behaviour, and adapters are free to honour them (the
-`TransactionAdapter` contract permits it).
+The practical consequence worth planning around: the same code enforces
+on Postgres and does not on MySQL or SQLite, so a team developing
+against SQLite and deploying to Postgres meets the constraint for the
+first time in production. Failing there still beats the write silently
+landing, but it is a real difference between environments.
 
-**Fix:** scheduled as item A1 of the
-[improvement plan](roadmap/improvement-plan.md) — the direction
-(implement `readOnly` via `SET TRANSACTION READ ONLY` on
-Postgres-family dialects; implement or formally deprecate `timeout`)
-needs a DD before implementation.
+`readOnly` also applies only when the adapter *starts* the transaction —
+a `REQUIRED` call joining an existing read-write transaction cannot make
+it read-only after the fact. Spring behaves the same way.
+
+**`timeout` is not implemented and deliberately not approximated.**
+TypeORM exposes no transaction-level timeout. The nearest dialect
+feature, Postgres' `statement_timeout`, bounds each statement rather
+than the transaction — `timeout: 5000` on a method issuing four queries
+would allow twenty seconds, not five — and a wall-clock deadline cannot
+interrupt a statement already in flight. The option stays in the type
+surface as the extension point for adapters whose driver has a real
+transaction budget; Prisma's `$transaction` accepts exactly this.
+
+**Fix:** none planned for `readOnly` beyond the dialects above. For
+`timeout`, a future Prisma adapter can implement it natively.
 
 ## Multi-adapter
 

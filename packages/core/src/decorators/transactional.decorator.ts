@@ -66,10 +66,10 @@ export function Transactional(
  * flag is overlaid on top, so callers cannot turn it off from here — use
  * `@Transactional` directly if that is the intent.
  *
- * The flag is declarative intent, not enforcement: the shipped
- * `TypeOrmTransactionAdapter` does not yet map `readOnly` to a database
- * statement, so a write inside a `@ReadOnly` method still succeeds. See
- * `docs/known-limitations.md`.
+ * Enforcement is per-dialect (DD-027). On Postgres-family databases
+ * `TypeOrmTransactionAdapter` issues `SET TRANSACTION READ ONLY`, so a
+ * stray write fails at the database. Elsewhere — MySQL, SQLite, ... —
+ * the flag documents intent but nothing stops the write.
  */
 export const ReadOnly = (
   options: Partial<TransactionalMetadata> = {},

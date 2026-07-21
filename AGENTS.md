@@ -154,6 +154,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-024](docs/dd/024-outbox-publisher-facade.md) — Smart `OutboxEventPublisher` facade
 - [DD-025](docs/dd/025-claim-atomicity-obligation.md) — The claim carries the concurrency guarantee, not the poll
 - [DD-026](docs/dd/026-automatic-retry-policy.md) — Automatic retry is an opt-in scheduler, not a new lifecycle state
+- [DD-027](docs/dd/027-readonly-and-timeout-semantics.md) — `readOnly` honoured per dialect; `timeout` stays an extension point
 
 ## DO NOT cheat-sheet
 

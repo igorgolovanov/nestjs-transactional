@@ -105,6 +105,115 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
     });
   });
 
+  describe('readOnly (DD-027)', () => {
+    /**
+     * Records every statement the adapter issues, so the tests can assert
+     * both *whether* `SET TRANSACTION READ ONLY` is emitted and that it
+     * comes before any user work — Postgres rejects the statement once
+     * the transaction has run its first query.
+     */
+    function recordingAdapter(type: string): {
+      adapter: TypeOrmTransactionAdapter;
+      statements: string[];
+    } {
+      const statements: string[] = [];
+      const mockDataSource = {
+        options: { type },
+        transaction: (runner: (em: EntityManager) => Promise<unknown>) =>
+          runner({
+            query: (sql: string): Promise<unknown> => {
+              statements.push(sql);
+              return Promise.resolve([]);
+            },
+          } as unknown as EntityManager),
+      } as unknown as DataSource;
+
+      return { adapter: new TypeOrmTransactionAdapter(mockDataSource, 'default'), statements };
+    }
+
+    it.each(['postgres', 'cockroachdb', 'aurora-postgres'])(
+      'issues SET TRANSACTION READ ONLY on %s',
+      async (type) => {
+        const { adapter: pg, statements } = recordingAdapter(type);
+
+        await pg.runInTransaction({ readOnly: true }, async () => 'ok');
+
+        expect(statements).toEqual(['SET TRANSACTION READ ONLY']);
+      },
+    );
+
+    it('emits it before the callback runs — Postgres rejects it after the first query', async () => {
+      const { adapter: pg, statements } = recordingAdapter('postgres');
+
+      await pg.runInTransaction({ readOnly: true }, async (handle) => {
+        await handle.entityManager.query('SELECT 1');
+        return 'ok';
+      });
+
+      expect(statements).toEqual(['SET TRANSACTION READ ONLY', 'SELECT 1']);
+    });
+
+    it.each(['mysql', 'mariadb', 'sqlite', 'sqljs', 'mssql', 'oracle', 'mongodb'])(
+      'stays a silent no-op on %s',
+      async (type) => {
+        // MySQL would raise ERROR 1568 for the statement mid-transaction,
+        // and the cqrs module defaults every query handler to
+        // readOnly: true — so erroring here would break consumers who
+        // never opted in (DD-027).
+        const { adapter: other, statements } = recordingAdapter(type);
+
+        await expect(other.runInTransaction({ readOnly: true }, async () => 'ok')).resolves.toBe(
+          'ok',
+        );
+        expect(statements).toEqual([]);
+      },
+    );
+
+    it.each([{ readOnly: false }, {}])(
+      'issues nothing when readOnly is not requested (%j)',
+      async (options) => {
+        const { adapter: pg, statements } = recordingAdapter('postgres');
+
+        await pg.runInTransaction(options, async () => 'ok');
+
+        expect(statements).toEqual([]);
+      },
+    );
+
+    it('combines with an isolation level', async () => {
+      // Isolation goes to `DataSource.transaction`, readOnly goes to a
+      // statement — they must not clobber each other.
+      const statements: string[] = [];
+      let isolationArg: unknown;
+      const mockDataSource = {
+        options: { type: 'postgres' },
+        transaction: (
+          isoOrRunner: unknown,
+          maybeRunner?: (em: EntityManager) => Promise<unknown>,
+        ) => {
+          isolationArg = isoOrRunner;
+          const runner = (
+            typeof isoOrRunner === 'function' ? isoOrRunner : maybeRunner
+          ) as (em: EntityManager) => Promise<unknown>;
+          return runner({
+            query: (sql: string): Promise<unknown> => {
+              statements.push(sql);
+              return Promise.resolve([]);
+            },
+          } as unknown as EntityManager);
+        },
+      } as unknown as DataSource;
+
+      await new TypeOrmTransactionAdapter(mockDataSource, 'default').runInTransaction(
+        { readOnly: true, isolation: 'SERIALIZABLE' },
+        async () => 'ok',
+      );
+
+      expect(isolationArg).toBe('SERIALIZABLE');
+      expect(statements).toEqual(['SET TRANSACTION READ ONLY']);
+    });
+  });
+
   describe('runInSavepoint', () => {
     it('releases the savepoint on success — inner writes persist', async () => {
       await adapter.runInTransaction({}, async (parent) => {
