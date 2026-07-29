@@ -104,9 +104,10 @@ Peer dependencies: `@nestjs/common`, `@nestjs/core`, `@nestjs/typeorm`,
 
 The TypeORM range covers both stable `0.3.x` and stable `1.x`
 releases. CI runs the full unit and integration matrix
-(testcontainers Postgres) against both TypeORM majors. TypeORM
-nightly / beta builds are not in the declared range; install them
-explicitly via `pnpm.overrides` if you need to pin to one.
+(testcontainers Postgres) against three points of it — `0.3.31`,
+`1.0.0` and `1.1.0`. TypeORM nightly / beta builds are not in the
+declared range; install them explicitly via `pnpm.overrides` if you
+need to pin to one.
 
 ## Usage
 

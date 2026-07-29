@@ -53,7 +53,10 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
 - **Language**: TypeScript 5.5+ in strict mode
 - **Core peer deps**: `@nestjs/common ^10.0.0 || ^11.0.0`,
   `@nestjs/core ^10.0.0 || ^11.0.0`, `reflect-metadata`, `rxjs ^7.0.0`
-- **TypeORM peer**: `typeorm ^0.3.25`, `@nestjs/typeorm ^10.0.0 || ^11.0.0`
+- **TypeORM peer**: `typeorm ^0.3.0 || ^1.0.0`,
+  `@nestjs/typeorm ^10.0.0 || ^11.0.0`. Development happens against
+  `1.1.0` (what the lockfile pins); CI additionally forces `0.3.31`
+  and `1.0.0` via `pnpm.overrides`
 - **CQRS peer**: `@nestjs/cqrs ^11.0.0`
 - **Package manager**: pnpm workspaces
 - **Build**: tsc with project references (no bundler — pure TypeScript)

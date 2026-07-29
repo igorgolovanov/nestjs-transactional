@@ -63,10 +63,11 @@ pnpm add @nestjs-transactional/typeorm @nestjs-transactional/core typeorm @nestj
 
 The TypeORM range covers both stable `0.3.x` and stable `1.x`
 releases. CI runs the full unit and integration matrix
-(testcontainers Postgres) against both TypeORM majors, so the
-adapter is exercised end-to-end on every supported peer. TypeORM
-nightly / beta builds are not in the declared range; install them
-explicitly via `pnpm.overrides` if you need to pin to one.
+(testcontainers Postgres) against three points of it — `0.3.31`,
+`1.0.0` and `1.1.0` — so the adapter is exercised end-to-end on the
+newest `0.3.x`, the floor of `^1.0.0`, and the current release.
+TypeORM nightly / beta builds are not in the declared range; install
+them explicitly via `pnpm.overrides` if you need to pin to one.
 
 ## Quick start
 
