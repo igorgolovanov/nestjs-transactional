@@ -216,6 +216,9 @@ Before merging into main:
 - [ ] Coverage has not dropped below baseline
       (`pnpm -r --filter './packages/*' test:cov` — enforced by
       per-package `coverageThreshold`, gated by the `coverage` CI job)
+- [ ] Examples still build and run (covered by the `-r` runs above,
+      gated by the `examples` CI job — they consume the packages the
+      way a user does, so they catch breakage the package suites miss)
 - [ ] Changeset added (for user-facing changes)
 - [ ] README / docs updated when the public API changed
 - [ ] ADR added for significant architectural decisions

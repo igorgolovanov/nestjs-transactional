@@ -592,10 +592,24 @@ ADR-016 amended by a superseding ADR once the gap closes.
 
 Recorded, not scheduled. Ordered roughly by value.
 
-- **Examples in CI** — 19 workspace example apps are excluded from
-  every CI job (`--filter './packages/*'`); they can silently break
-  against library changes. A build (and optionally test) job over
-  `examples/*` closes the biggest CI gap.
+- ~~**Examples in CI**~~ — *fixed.* All 19 workspace example apps were
+  excluded from every CI job (`--filter './packages/*'`) and could
+  silently break against library changes. The `examples` job now builds
+  the packages, then builds all 19 examples, runs their unit tests and
+  runs the 14 `test:integration` suites against testcontainers Postgres
+  — 19 builds, 26 unit tests, 65 integration tests, ~25s on top of the
+  install and package build.
+
+  Deliberately off the TypeORM matrix, and the job says why: the
+  examples declare `typeorm ^1.1.0`, and the override the matrix legs
+  use is repo-wide, so forcing an older TypeORM onto them puts two
+  copies in one workspace — which resolves `getDataSourceToken()`
+  against the wrong `DataSource` class. Peer-range coverage is the
+  matrix's job; this one asks whether a consumer app still works.
+
+  The gap was not hypothetical: the TypeORM 1.1.0 bump broke
+  `examples/basic-transactional` at runtime through exactly that
+  mechanism, and nothing in CI would have noticed.
 - **`.nvmrc` inconsistency** — pins `20` while `engines` demands
   `>=22.11.0` and CI tests 22/24/26. Trivial fix, real contributor
   friction.

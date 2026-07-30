@@ -344,3 +344,51 @@ jobs:
 
       - name: Integration tests
         run: pnpm -r --filter './packages/*' test:integration
+
+  examples:
+    name: Examples (Node 22, TypeORM 1.1)
+    runs-on: ubuntu-latest
+    # Deliberately NOT on the TypeORM matrix the jobs above use. The
+    # examples declare `typeorm ^1.1.0`, and the override those legs apply
+    # is repo-wide: forcing 0.3.31 onto an example that asks for ^1.1.0
+    # puts two TypeORM copies in one workspace, and since
+    # `getDataSourceToken()` returns the `DataSource` class itself for the
+    # default source, the example then registers one copy's class and the
+    # adapter looks up the other's. Peer-range coverage is the matrix
+    # above's job; this one answers a different question — does an ordinary
+    # consumer app still build and run against the library as it stands?
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Examples consume the packages through `workspace:*` links and
+      # type-check against their `dist/*.d.ts`, so the library has to be
+      # built before anything under `examples/` compiles.
+      - name: Build packages
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Build examples
+        run: pnpm -r --filter './examples/*' build
+
+      - name: Test examples
+        run: pnpm -r --filter './examples/*' test
+
+      # Same testcontainers Postgres the library's integration job uses. The
+      # externalization examples stub the broker rather than starting Kafka
+      # or RabbitMQ, so their `docker-compose.yml` is for `pnpm start` demos
+      # only and no broker is needed here. Five examples define no
+      # `test:integration`; pnpm filter-run skips them.
+      - name: Integration tests
+        run: pnpm -r --filter './examples/*' test:integration
