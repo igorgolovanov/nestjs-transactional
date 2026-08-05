@@ -32,10 +32,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn({ id: randomUUID(), adapterName: this.name });
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -188,9 +185,7 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
   it('resolves the wrapper it wired', async () => {
     // Regression guard for the `exports: exportTokens as never[]` smell
     // the typed exports array replaced.
-    const built = await build([
-      CqrsTransactionalModule.forRootAsync({ useFactory: () => ({}) }),
-    ]);
+    const built = await build([CqrsTransactionalModule.forRootAsync({ useFactory: () => ({}) })]);
 
     expect(built.get(CqrsHandlerWrapper)).toBeInstanceOf(CqrsHandlerWrapper);
     expect(built.get(TransactionalEventDispatcher)).toBeInstanceOf(TransactionalEventDispatcher);

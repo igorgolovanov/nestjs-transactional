@@ -1,0 +1,12 @@
+# Every change requests a review from the maintainer. GitHub only
+# enforces this when "Require review from Code Owners" is enabled in
+# branch protection; without that it is a routing hint, not a gate.
+*                       @igorgolovanov
+
+# Called out separately because a mistake here is expensive and not
+# caught by tests: the release pipeline, the publishing contract, and
+# the decision records the code is expected to honour.
+/.github/workflows/     @igorgolovanov
+/.changeset/            @igorgolovanov
+/docs/adr/              @igorgolovanov
+/docs/dd/               @igorgolovanov

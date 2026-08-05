@@ -1,0 +1,15 @@
+# Blank issues stay available on purpose: the two forms cover the
+# common cases, and a report that fits neither should not have to be
+# bent into one.
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/igorgolovanov/nestjs-transactional/tree/main/docs
+    about: >
+      ADRs and design decisions, the architecture guides, the migration
+      guides, and known limitations — most "is this supposed to work?"
+      questions are answered here.
+  - name: Security vulnerability
+    url: https://github.com/igorgolovanov/nestjs-transactional/security/advisories/new
+    about: >
+      Report privately instead of opening an issue. See SECURITY.md.

@@ -103,10 +103,7 @@ export class OutboxRetryScheduler {
       }
       return resubmitted;
     } catch (err) {
-      this.logger.error(
-        'Retry pass failed',
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error('Retry pass failed', err instanceof Error ? err.stack : String(err));
       return 0;
     }
   }

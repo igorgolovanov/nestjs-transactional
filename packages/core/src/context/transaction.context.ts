@@ -130,9 +130,7 @@ export class TransactionContext {
    * dataSource?" without needing to know the adapter type that owns
    * the dataSource.
    */
-  static getActiveTransactionByDataSource(
-    dataSource: string,
-  ): ActiveTransaction | undefined {
+  static getActiveTransactionByDataSource(dataSource: string): ActiveTransaction | undefined {
     const store = als.getStore();
     if (store === undefined) {
       return undefined;

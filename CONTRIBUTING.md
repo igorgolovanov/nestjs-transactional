@@ -8,7 +8,10 @@ or a PR — stale instructions are worse than none.
 
 Requirements:
 
-- **Node.js 22.11+**. CI verifies the matrix [22, 24, 26].
+- **Node.js 22.13+**, which is what `.nvmrc` selects (`nvm use`). CI
+  verifies the matrix [22, 24, 26]. The floor is 22.13 rather than
+  22.11 because TypeORM 1.x requires `^22.13.0` on the 22 line, and
+  developing here means installing it.
 - **pnpm 9+**. Any pnpm 9 release works; the repo pins
   `packageManager` in `package.json`.
 - **Docker** — only for running TypeORM integration tests against a
@@ -24,6 +27,27 @@ pnpm -r --filter './packages/*' test
 ```
 
 All three of these should succeed on a clean clone.
+
+### Git hooks
+
+`pnpm install` installs two hooks through husky:
+
+- **pre-commit** runs `lint-staged`, which formats the staged files
+  Prettier owns. Exactly the set the `format` CI job checks, so the
+  hook and the gate cannot disagree.
+- **commit-msg** runs commitlint against the Conventional Commits rules
+  below. Three defaults are relaxed in `commitlint.config.js`, each
+  because the default rejected commits this repo legitimately makes —
+  the reasons are in the config.
+
+ESLint is deliberately not in the pre-commit hook: the config uses
+type-aware rules that resolve cross-package imports through
+`dist/*.d.ts`, so running it would mean building six packages on every
+commit. `pnpm lint` and the `lint` CI job cover it instead.
+
+To bypass a hook once — a work-in-progress commit on a local branch,
+say — `git commit --no-verify`. CI still checks everything, so nothing
+gets in that way.
 
 ## Running tests and gates
 

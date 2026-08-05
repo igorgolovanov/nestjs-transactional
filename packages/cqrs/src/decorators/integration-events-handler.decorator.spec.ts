@@ -58,9 +58,7 @@ describe('@IntegrationEventsHandler', () => {
     });
 
     it('throws when called with an empty events array', () => {
-      expect(() => IntegrationEventsHandler({ events: [] })).toThrow(
-        /at least one event type/,
-      );
+      expect(() => IntegrationEventsHandler({ events: [] })).toThrow(/at least one event type/);
     });
   });
 

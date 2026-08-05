@@ -46,9 +46,7 @@ describe('Token utilities (core)', () => {
     });
 
     it('uses the provided dataSource name', () => {
-      expect(getTransactionalAdapterToken('reporting')).toBe(
-        'reportingTransactionalAdapter',
-      );
+      expect(getTransactionalAdapterToken('reporting')).toBe('reportingTransactionalAdapter');
     });
   });
 

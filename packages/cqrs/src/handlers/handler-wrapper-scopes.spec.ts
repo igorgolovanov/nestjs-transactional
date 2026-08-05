@@ -2,13 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { DiscoveryModule, REQUEST } from '@nestjs/core';
-import {
-  AsyncContext,
-  CqrsModule,
-  type IQueryHandler,
-  QueryBus,
-  QueryHandler,
-} from '@nestjs/cqrs';
+import { AsyncContext, CqrsModule, type IQueryHandler, QueryBus, QueryHandler } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
   type TransactionAdapter,

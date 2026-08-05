@@ -64,9 +64,9 @@ import { CqrsTransactionalModule } from './cqrs-transactional.module';
  *     `docs/known-limitations.md`).
  */
 
-class NamedFakeAdapter
-  implements TransactionAdapter<TransactionHandle & { id: string; adapterName: string }>
-{
+class NamedFakeAdapter implements TransactionAdapter<
+  TransactionHandle & { id: string; adapterName: string }
+> {
   readonly name = 'in-memory';
   constructor(readonly dataSourceName: string) {}
 
@@ -206,9 +206,7 @@ class BillingPersistentListener implements IOutboxEventHandler<BillingEvent> {
  */
 @Global()
 @Module({
-  providers: [
-    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-  ],
+  providers: [{ provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher }],
   exports: [OUTBOX_PUBLICATION_SCHEDULER],
 })
 class OutboxCqrsBridge {}
@@ -406,10 +404,13 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (decoupling)', () =>
       // behaviour: the registrar must possess a `register(...)`
       // method, and feeding it a billing event must land in the
       // billing-DS registry without further wiring.
-      const registrar = module.get<{ register: (l: { id: string; eventType: string; invoke: (e: unknown) => Promise<void> }) => void }>(
-        OUTBOX_LISTENER_REGISTRAR,
-        { strict: false },
-      );
+      const registrar = module.get<{
+        register: (l: {
+          id: string;
+          eventType: string;
+          invoke: (e: unknown) => Promise<void>;
+        }) => void;
+      }>(OUTBOX_LISTENER_REGISTRAR, { strict: false });
       expect(typeof registrar.register).toBe('function');
 
       // Sanity check on the auto-routing: scanner already registered
@@ -421,14 +422,10 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (decoupling)', () =>
         getOutboxListenerRegistryToken('default'),
       );
       expect(
-        billingRegistry.getById(
-          composeListenerId(BillingPersistentListener.name, BillingEvent),
-        ),
+        billingRegistry.getById(composeListenerId(BillingPersistentListener.name, BillingEvent)),
       ).toBeDefined();
       expect(
-        defaultRegistry.getById(
-          composeListenerId(BillingPersistentListener.name, BillingEvent),
-        ),
+        defaultRegistry.getById(composeListenerId(BillingPersistentListener.name, BillingEvent)),
       ).toBeUndefined();
     });
   });

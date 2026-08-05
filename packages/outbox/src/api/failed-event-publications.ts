@@ -8,7 +8,6 @@ import type { EventPublication } from '../types/event-publication';
 import { PublicationStatus } from '../types/publication-status';
 import { ResubmissionOptions } from '../types/resubmission-options';
 
-
 /**
  * Operator-facing query + resubmit API for publications currently in
  * the `FAILED` state. Equivalent to Spring Modulith's
@@ -50,9 +49,7 @@ export class FailedEventPublications {
    * 2. Apply the user-supplied `filter` predicate, if any.
    * 3. Keep at most `batchSize` publications.
    */
-  async resubmit(
-    options: ResubmissionOptions = ResubmissionOptions.defaults(),
-  ): Promise<number> {
+  async resubmit(options: ResubmissionOptions = ResubmissionOptions.defaults()): Promise<number> {
     const failed = await this.repository.findFailed({
       minAge: options.minAge,
       maxAttempts: options.maxCompletionAttempts ?? undefined,

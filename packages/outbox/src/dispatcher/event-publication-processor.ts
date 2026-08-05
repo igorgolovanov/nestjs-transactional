@@ -1,10 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { ExternalizationError } from '../externalization/errors';
-import {
-  EVENT_EXTERNALIZER,
-  type EventExternalizer,
-} from '../externalization/event-externalizer';
+import { EVENT_EXTERNALIZER, type EventExternalizer } from '../externalization/event-externalizer';
 import { ExternalizationRegistry } from '../externalization/externalization-registry';
 import { EventPublicationRegistry } from '../registry/event-publication-registry';
 import { OutboxListenerRegistry } from '../registry/listener-registry';
@@ -120,10 +117,7 @@ export class EventPublicationProcessor {
         await Promise.all(chunk.map((pub) => this.processOne(pub)));
       }
     } catch (err) {
-      this.logger.error(
-        'Batch processing failed',
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error('Batch processing failed', err instanceof Error ? err.stack : String(err));
     }
   }
 
@@ -208,27 +202,19 @@ export class EventPublicationProcessor {
    * try / catch in `processOne` records the publication as `FAILED`,
    * which preserves the single-unit atomicity contract from DD-019.
    */
-  private async tryExternalize(
-    event: unknown,
-    publication: EventPublication,
-  ): Promise<void> {
+  private async tryExternalize(event: unknown, publication: EventPublication): Promise<void> {
     if (this.externalizer === undefined || this.externalizationRegistry === undefined) {
       return;
     }
 
-    const metadata = this.externalizationRegistry.buildMetadata(
-      publication.eventType,
-      event,
-    );
+    const metadata = this.externalizationRegistry.buildMetadata(publication.eventType, event);
     if (metadata === undefined) {
       return;
     }
 
     try {
       await this.externalizer.externalize(event, metadata);
-      this.logger.debug(
-        `Externalized ${publication.eventType} → ${metadata.target}`,
-      );
+      this.logger.debug(`Externalized ${publication.eventType} → ${metadata.target}`);
     } catch (err) {
       const cause = err instanceof Error ? err : undefined;
       const message = err instanceof Error ? err.message : String(err);

@@ -203,9 +203,7 @@ export class CqrsTransactionalModule {
   static forRootAsync(options: CqrsTransactionalAsyncOptions): DynamicModule {
     const optionsProvider: FactoryProvider = {
       provide: CQRS_TRANSACTIONAL_OPTIONS,
-      useFactory: async (
-        ...args: never[]
-      ): Promise<ResolvedWrapperOptions> =>
+      useFactory: async (...args: never[]): Promise<ResolvedWrapperOptions> =>
         resolveWrapperOptions(await options.useFactory(...args)),
       inject: options.inject ? [...options.inject] : undefined,
     };

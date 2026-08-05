@@ -65,11 +65,7 @@ export interface EventPublicationRepository {
    * - `PROCESSING` → `FAILED` (exception)
    * - `FAILED` → `RESUBMITTED` (operator resubmit)
    */
-  updateStatus(
-    id: string,
-    status: PublicationStatus,
-    options?: UpdateStatusOptions,
-  ): Promise<void>;
+  updateStatus(id: string, status: PublicationStatus, options?: UpdateStatusOptions): Promise<void>;
 
   /**
    * Atomically claim a publication: transition `PUBLISHED` or

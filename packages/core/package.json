@@ -3,6 +3,7 @@
   "version": "1.0.0-alpha.5",
   "description": "Declarative transaction management for NestJS — core primitives (AsyncLocalStorage context, TransactionManager, @Transactional decorator, adapter port)",
   "license": "MIT",
+  "sideEffects": false,
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",

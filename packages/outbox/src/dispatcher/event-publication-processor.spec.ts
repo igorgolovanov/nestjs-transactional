@@ -41,10 +41,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -88,11 +85,7 @@ describe('EventPublicationProcessor', () => {
       new JsonEventSerializer(eventTypeRegistry),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new DataSourceOutboxPublisher(
-      'default',
-      publicationRegistry,
-      listenerRegistry,
-    );
+    publisher = new DataSourceOutboxPublisher('default', publicationRegistry, listenerRegistry);
     processor = new EventPublicationProcessor(publicationRegistry, listenerRegistry, options);
     invocations = [];
   });
@@ -204,9 +197,7 @@ describe('EventPublicationProcessor', () => {
   });
 
   it('swallows infrastructure errors from findReadyForProcessing without throwing', async () => {
-    jest
-      .spyOn(repo, 'findReadyForProcessing')
-      .mockRejectedValueOnce(new Error('DB down'));
+    jest.spyOn(repo, 'findReadyForProcessing').mockRejectedValueOnce(new Error('DB down'));
 
     await expect(processor.processBatch()).resolves.toBeUndefined();
   });

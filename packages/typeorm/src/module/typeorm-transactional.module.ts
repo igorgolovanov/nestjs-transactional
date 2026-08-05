@@ -300,10 +300,7 @@ export class TypeOrmTransactionalModule {
  * Module-level `Reflect` metadata required by NestJS DI is set up
  * via `@Inject(asyncToken)` on the constructor parameter.
  */
-function createAsyncRegistrationClass(
-  id: number,
-  asyncToken: symbol,
-): Type<OnModuleInit> {
+function createAsyncRegistrationClass(id: number, asyncToken: symbol): Type<OnModuleInit> {
   @Injectable()
   class TypeOrmTransactionalAsyncRegistration implements OnModuleInit {
     constructor(
@@ -357,9 +354,6 @@ function registerManagedDataSource(args: {
   patchDataSourceInstance(dataSource);
 
   const adapter = new TypeOrmTransactionAdapter(dataSource, dataSourceName);
-  registry.register(
-    { adapterName: 'typeorm', instanceName: dataSourceName, adapter },
-    isDefault,
-  );
+  registry.register({ adapterName: 'typeorm', instanceName: dataSourceName, adapter }, isDefault);
   return adapter;
 }

@@ -107,10 +107,17 @@ ADR). Pre-1.0 ADRs are encouraged but not required.
 - **Changesets** (`pnpm changeset`) is the source of truth for
   release intent. Every PR that touches public API ships a
   changeset.
-- **`@arethetypeswrong/cli`** runs in CI to verify that the
-  published types match the runtime exports.
-- **`publint`** runs in CI to verify package.json `exports`
-  field consistency.
+- **`@arethetypeswrong/cli`** — *not wired up.* Intended to verify
+  that the published types match the runtime exports.
+- **`publint`** — *not wired up.* Intended to verify package.json
+  `exports` field consistency.
+
+Both were described here as running in CI before either was added,
+and the packages have shipped six alpha releases without them. Until
+they exist, `exports` correctness rests on review and on the
+`type-check` job, which verifies the sources compile but says nothing
+about what a consumer resolves from the published tarball. Tracked in
+the [improvement plan](../roadmap/improvement-plan.md).
 
 ### Process commitments
 
@@ -236,8 +243,12 @@ both public.
   predates the actual 1.0 release (still pending) but the
   policy is in effect from the first published release.
 - The `@arethetypeswrong/cli` and `publint` checks were
-  added in Phase 4 (CI/CD setup) and are non-negotiable
-  parts of the release process.
+  recorded here as added and non-negotiable. They were
+  neither, and this ADR asserted otherwise for six alpha
+  releases — see the Tooling section for what actually
+  guards `exports` today. Corrected rather than quietly
+  dropped, because an unmet commitment in a decision record
+  is more misleading than an absent one.
 - Future ADRs that introduce or change public API surface
   (ADR-018 token utilities, ADR-014 handler API redesign,
   any future ADR-NNN) cite this one for the stability

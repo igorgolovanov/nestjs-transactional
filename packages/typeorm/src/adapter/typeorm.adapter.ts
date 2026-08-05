@@ -129,7 +129,7 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
       throw new IllegalTransactionStateError(
         `PropagationMode.NESTED needs savepoints, which the '${this.dataSource.options.type}' ` +
           `driver does not support (TypeORM reports transactionSupport: '${support}'). ` +
-          'Use PropagationMode.REQUIRED to join the caller\'s transaction, or ' +
+          "Use PropagationMode.REQUIRED to join the caller's transaction, or " +
           'REQUIRES_NEW for an independent one.',
       );
     }

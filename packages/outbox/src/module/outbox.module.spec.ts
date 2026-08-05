@@ -44,10 +44,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -269,7 +266,7 @@ describe('OutboxModule (integration)', () => {
       await processor.processBatch();
 
       const repository = module.get<EventPublicationRepository>(EVENT_PUBLICATION_REPOSITORY);
-      expect((await repository.findFailed())).toHaveLength(1);
+      expect(await repository.findFailed()).toHaveLength(1);
 
       expect(await scheduler.runOnce()).toBe(1);
       await processor.processBatch();

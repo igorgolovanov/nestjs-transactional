@@ -3,6 +3,9 @@
   "version": "1.0.0-alpha.5",
   "description": "TypeORM persistence backend for @nestjs-transactional/outbox — event_publication table, FOR UPDATE SKIP LOCKED worker safety",
   "license": "MIT",
+  "sideEffects": [
+    "./dist/entity/*.js"
+  ],
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",

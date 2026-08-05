@@ -178,9 +178,7 @@ function resolveMetadata(
   };
 }
 
-function isOptionsObject(
-  candidate: unknown,
-): candidate is TransactionalEventsHandlerOptions {
+function isOptionsObject(candidate: unknown): candidate is TransactionalEventsHandlerOptions {
   return (
     candidate !== null &&
     typeof candidate === 'object' &&

@@ -117,10 +117,7 @@ export class StalenessMonitor {
         );
       }
     } catch (err) {
-      this.logger.error(
-        'Staleness check failed',
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error('Staleness check failed', err instanceof Error ? err.stack : String(err));
     }
   }
 

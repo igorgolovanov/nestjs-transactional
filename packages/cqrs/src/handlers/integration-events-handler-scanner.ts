@@ -1,11 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  Optional,
-  type OnModuleInit,
-  type Type,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleInit, type Type } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
 import { PropagationMode, TransactionManager } from '@nestjs-transactional/core';
 

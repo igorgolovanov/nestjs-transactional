@@ -19,7 +19,6 @@ import { PublicationNotFoundError } from '../types/errors';
 import type { EventPublication, NewEventPublication } from '../types/event-publication';
 import { PublicationStatus } from '../types/publication-status';
 
-
 /**
  * In-memory reference implementation of {@link EventPublicationRepository}.
  *
@@ -126,16 +125,12 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
     return Array.from(this.publications.values())
       .filter(
         (p) =>
-          p.status === PublicationStatus.PUBLISHED ||
-          p.status === PublicationStatus.RESUBMITTED,
+          p.status === PublicationStatus.PUBLISHED || p.status === PublicationStatus.RESUBMITTED,
       )
       .slice(0, limit);
   }
 
-  async findStale(
-    beforeDate: Date,
-    statuses: PublicationStatus[],
-  ): Promise<EventPublication[]> {
+  async findStale(beforeDate: Date, statuses: PublicationStatus[]): Promise<EventPublication[]> {
     return Array.from(this.publications.values()).filter(
       (p) => statuses.includes(p.status) && p.publicationDate < beforeDate,
     );

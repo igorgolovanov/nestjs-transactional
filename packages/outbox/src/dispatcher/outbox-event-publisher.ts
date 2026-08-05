@@ -3,10 +3,7 @@ import { ModuleRef } from '@nestjs/core';
 
 import { EventTypeRegistry } from '../serialization/event-type-registry';
 import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import {
-  getEventTypeRegistryToken,
-  getOutboxPublisherToken,
-} from '../tokens/token-utils';
+import { getEventTypeRegistryToken, getOutboxPublisherToken } from '../tokens/token-utils';
 import { OutboxError } from '../types/errors';
 
 import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';

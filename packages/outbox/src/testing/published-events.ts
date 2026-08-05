@@ -36,9 +36,7 @@ export class PublishedEvents {
    */
   async all(): Promise<unknown[]> {
     const rows = await this.collectAll();
-    return rows.map((pub) =>
-      this.serializer.deserialize(pub.serializedEvent, pub.eventType),
-    );
+    return rows.map((pub) => this.serializer.deserialize(pub.serializedEvent, pub.eventType));
   }
 
   /**
@@ -47,12 +45,7 @@ export class PublishedEvents {
    * that class.
    */
   ofType<T extends object>(eventType: Type<T>): PublishedEventsView<T> {
-    return new PublishedEventsView<T>(
-      () => this.collectAll(),
-      this.serializer,
-      eventType,
-      [],
-    );
+    return new PublishedEventsView<T>(() => this.collectAll(), this.serializer, eventType, []);
   }
 
   private async collectAll(): Promise<EventPublication[]> {
@@ -98,12 +91,10 @@ export class PublishedEventsView<T extends object> {
         ? (event: T): boolean => (fnOrGetter as (event: T) => K)(event) === (expected as K)
         : (fnOrGetter as (event: T) => boolean);
 
-    return new PublishedEventsView<T>(
-      this.fetchAll,
-      this.serializer,
-      this.eventType,
-      [...this.predicates, predicate],
-    );
+    return new PublishedEventsView<T>(this.fetchAll, this.serializer, this.eventType, [
+      ...this.predicates,
+      predicate,
+    ]);
   }
 
   /** Number of matching events. Materialises the view. */

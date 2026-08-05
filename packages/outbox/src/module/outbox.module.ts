@@ -23,10 +23,7 @@ import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
 } from '../dispatcher/processor-options';
-import {
-  EVENT_EXTERNALIZER,
-  type EventExternalizer,
-} from '../externalization/event-externalizer';
+import { EVENT_EXTERNALIZER, type EventExternalizer } from '../externalization/event-externalizer';
 import { ExternalizationRegistry } from '../externalization/externalization-registry';
 import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
@@ -193,8 +190,7 @@ interface OutboxRegistrationRecord {
   readonly recoveryOptions: OutboxRecoveryOptions;
 }
 
-const ASYNC_OPTIONS_TOKEN = (ds: string): symbol =>
-  Symbol(`OUTBOX_ASYNC_OPTIONS[${ds}]`);
+const ASYNC_OPTIONS_TOKEN = (ds: string): symbol => Symbol(`OUTBOX_ASYNC_OPTIONS[${ds}]`);
 
 function resolveProcessorOptions(
   processor: Partial<EventPublicationProcessorOptions> | undefined,
@@ -431,7 +427,10 @@ export class OutboxModule {
     const providers: Provider[] = [
       asyncOptionsProvider,
 
-      { provide: eventTypeRegistryToken, useFactory: (): EventTypeRegistry => new EventTypeRegistry() },
+      {
+        provide: eventTypeRegistryToken,
+        useFactory: (): EventTypeRegistry => new EventTypeRegistry(),
+      },
 
       options.repository
         ? reBindProvider(options.repository, repositoryToken)
@@ -696,7 +695,10 @@ function buildPerDataSourceProviders(
   const retryConfigToken = perDsRetryConfigToken(ds);
 
   return [
-    { provide: eventTypeRegistryToken, useFactory: (): EventTypeRegistry => new EventTypeRegistry() },
+    {
+      provide: eventTypeRegistryToken,
+      useFactory: (): EventTypeRegistry => new EventTypeRegistry(),
+    },
 
     repository
       ? reBindProvider(repository, repositoryToken)
@@ -936,9 +938,7 @@ function buildProcessingBundleProvider(moduleClass: typeof OutboxModule): Provid
           return dsNames.map((ds) => get<OutboxRetryScheduler>(perDsRetrySchedulerToken(ds)));
         },
         get recoveryServices(): readonly StartupRecoveryService[] {
-          return dsNames.map((ds) =>
-            get<StartupRecoveryService>(perDsStartupRecoveryToken(ds)),
-          );
+          return dsNames.map((ds) => get<StartupRecoveryService>(perDsStartupRecoveryToken(ds)));
         },
       };
     },

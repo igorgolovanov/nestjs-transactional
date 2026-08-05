@@ -7,10 +7,7 @@ import {
 } from '../dispatcher/outbox-event-publisher';
 import { EventTypeRegistry } from '../serialization/event-type-registry';
 import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import {
-  getEventTypeRegistryToken,
-  getOutboxListenerRegistryToken,
-} from '../tokens/token-utils';
+import { getEventTypeRegistryToken, getOutboxListenerRegistryToken } from '../tokens/token-utils';
 
 import { OutboxListenerRegistry } from './listener-registry';
 
@@ -89,10 +86,7 @@ export class MultiDsOutboxListenerRegistrar {
    */
   register(listener: RegistrarListenerEntry): void {
     const eventTypeRegistries = this.collectEventTypeRegistries();
-    const dataSource = resolveDataSourceByEventTypeName(
-      listener.eventType,
-      eventTypeRegistries,
-    );
+    const dataSource = resolveDataSourceByEventTypeName(listener.eventType, eventTypeRegistries);
 
     const registry = this.moduleRef.get<OutboxListenerRegistry>(
       getOutboxListenerRegistryToken(dataSource),

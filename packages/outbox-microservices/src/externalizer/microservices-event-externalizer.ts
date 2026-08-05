@@ -14,10 +14,7 @@ import {
 } from '@nestjs-transactional/outbox';
 import { firstValueFrom } from 'rxjs';
 
-import {
-  OUTBOX_MICROSERVICES_OPTIONS,
-  type OutboxMicroservicesOptions,
-} from '../types/options';
+import { OUTBOX_MICROSERVICES_OPTIONS, type OutboxMicroservicesOptions } from '../types/options';
 
 /**
  * {@link EventExternalizer} implementation backed by `@nestjs/microservices`
@@ -43,9 +40,7 @@ import {
  * construction iteration.
  */
 @Injectable()
-export class MicroservicesEventExternalizer
-  implements EventExternalizer, OnApplicationBootstrap
-{
+export class MicroservicesEventExternalizer implements EventExternalizer, OnApplicationBootstrap {
   private readonly logger = new Logger(MicroservicesEventExternalizer.name);
 
   constructor(
@@ -56,7 +51,9 @@ export class MicroservicesEventExternalizer
 
   onApplicationBootstrap(): void {
     if (this.options.validateOnBootstrap === false) {
-      this.logger.log('Bootstrap validation disabled — defaultClient will be resolved on first externalize() call');
+      this.logger.log(
+        'Bootstrap validation disabled — defaultClient will be resolved on first externalize() call',
+      );
       return;
     }
 

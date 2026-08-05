@@ -153,8 +153,7 @@ export interface TransactionalModuleAsyncOptions extends Pick<ModuleMetadata, 'i
   readonly inject?: readonly InjectionToken[];
 }
 
-const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
-  Symbol(`TRANSACTIONAL_ASYNC_OPTIONS[${id}]`);
+const ASYNC_OPTIONS_TOKEN = (id: number): symbol => Symbol(`TRANSACTIONAL_ASYNC_OPTIONS[${id}]`);
 const ASYNC_REGISTRATION_TOKEN = (id: number): symbol =>
   Symbol(`TRANSACTIONAL_ASYNC_REGISTRATION[${id}]`);
 
@@ -306,8 +305,7 @@ export class TransactionalModule {
       // mirrors `OutboxModule` per ADR-019.
       providers.push({
         provide: ADAPTER_REGISTRY,
-        useFactory: (): AdapterRegistry =>
-          buildRegistryFromStaticStorage(TransactionalModule),
+        useFactory: (): AdapterRegistry => buildRegistryFromStaticStorage(TransactionalModule),
       });
       providers.push({
         provide: AdapterRegistry,
@@ -413,10 +411,7 @@ export class TransactionalModule {
       inject: [asyncToken, ADAPTER_REGISTRY],
     };
 
-    const providers: Provider[] = [
-      asyncOptionsProvider,
-      adapterEagerRegistrationProvider,
-    ];
+    const providers: Provider[] = [asyncOptionsProvider, adapterEagerRegistrationProvider];
     const exportTokens: InjectionToken[] = [];
 
     if (isFirst) {
@@ -445,8 +440,9 @@ export class TransactionalModule {
       // after the factory runs).
       providers.push({
         provide: TRANSACTION_OBSERVERS,
-        useFactory: (opts: TransactionalModuleAsyncFactoryResult): readonly TransactionObserver[] =>
-          opts.observers ? [...opts.observers] : [],
+        useFactory: (
+          opts: TransactionalModuleAsyncFactoryResult,
+        ): readonly TransactionObserver[] => (opts.observers ? [...opts.observers] : []),
         inject: [asyncToken],
       });
 
@@ -529,9 +525,7 @@ function buildPerDataSourceProviders(adapter: TransactionAdapter): Provider[] {
  *
  * @internal
  */
-function buildRegistryFromStaticStorage(
-  moduleClass: typeof TransactionalModule,
-): AdapterRegistry {
+function buildRegistryFromStaticStorage(moduleClass: typeof TransactionalModule): AdapterRegistry {
   const registry = new AdapterRegistry();
   // The Map is `private static` — read it through a structural cast.
   const registrations = (

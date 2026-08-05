@@ -32,7 +32,9 @@ import { OutboxModule } from './outbox.module';
  * (DD-023). Unlike the default-named-only adapter used in the
  * single-DS spec, this version takes the name in the constructor.
  */
-class NamedFakeAdapter implements TransactionAdapter<TransactionHandle & { id: string; adapterName: string }> {
+class NamedFakeAdapter implements TransactionAdapter<
+  TransactionHandle & { id: string; adapterName: string }
+> {
   readonly name = 'in-memory';
   constructor(readonly dataSourceName: string) {}
 
@@ -321,9 +323,7 @@ describe('OutboxModule.forRoot — duplicate-dataSource detection', () => {
 
   it('throws when the same dataSource is registered twice', () => {
     OutboxModule.forRoot({});
-    expect(() => OutboxModule.forRoot({})).toThrow(
-      "OutboxModule.forRoot('default') called twice",
-    );
+    expect(() => OutboxModule.forRoot({})).toThrow("OutboxModule.forRoot('default') called twice");
   });
 
   it('throws when a non-default dataSource is registered twice', () => {

@@ -1,0 +1,119 @@
+name: Bug report
+description: Something behaves differently from what the docs promise
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things worth a look first — they resolve a good share of
+        reports without anyone waiting on a reply:
+
+        - [`docs/known-limitations.md`](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/known-limitations.md)
+          — several behaviours that look like bugs are documented
+          trade-offs, with the reasoning and the workaround.
+        - [ADR-016](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/016-externalization-reliability-semantics.md)
+          — if events are marked `COMPLETED` while your broker was
+          unreachable, that is the known silent-success gap, not a new
+          bug.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: >
+        The observed behaviour, and the behaviour you expected instead.
+        If a doc or a JSDoc comment promised the other thing, quote it —
+        a documentation defect is a real defect here and is treated as
+        one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: >
+        A failing test is worth more than a description, and the
+        `examples/` directory is a ready starting point — the closest
+        example plus your change is an ideal report. Otherwise: the
+        decorated method, its options, and what the database ended up
+        containing.
+      render: typescript
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: >
+        All six packages ship as one version cohort, so one number is
+        usually enough (`pnpm why @nestjs-transactional/core`). Say so
+        if you have a mixed set.
+      placeholder: 1.0.0-alpha.5
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: packages
+    attributes:
+      label: Packages in use
+      options:
+        - label: '`core`'
+        - label: '`typeorm`'
+        - label: '`cqrs`'
+        - label: '`outbox`'
+        - label: '`outbox-typeorm`'
+        - label: '`outbox-microservices`'
+
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Database
+      description: >
+        Asked because it changes the answer. `readOnly` is enforced only
+        on the Postgres family, and `PropagationMode.NESTED` needs a
+        driver with savepoint support — see
+        [DD-027](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/027-readonly-and-timeout-semantics.md).
+      options:
+        - Postgres (or CockroachDB / Aurora Postgres)
+        - MySQL / MariaDB
+        - SQLite / sql.js / better-sqlite3
+        - SQL Server
+        - Oracle
+        - MongoDB
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: datasources
+    attributes:
+      label: DataSource setup
+      description: >
+        Multi-dataSource deployments have their own documented
+        limitations, so this narrows the search considerably.
+      options:
+        - Single dataSource (the default)
+        - Multiple dataSources
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: TypeORM and Node versions
+      description: >
+        The supported TypeORM range spans two majors (`^0.3.0 || ^1.0.0`)
+        and behaviour differs between them in places.
+      placeholder: typeorm 1.1.0, node 22.14.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        Stack trace, the relevant module wiring, whether it reproduces
+        with the outbox worker stopped — whatever you already know.

@@ -1,10 +1,7 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 
-import {
-  EVENT_PUBLICATION_TABLE,
-  applyEventPublicationSchema,
-} from './event-publication-schema';
+import { EVENT_PUBLICATION_TABLE, applyEventPublicationSchema } from './event-publication-schema';
 import type { SchemaInitializationOptions } from './schema-initialization-options';
 
 interface ExistsRow {
@@ -45,9 +42,7 @@ export class SchemaInitializer implements OnApplicationBootstrap {
       return;
     }
 
-    this.logger.log(
-      `Initialising '${EVENT_PUBLICATION_TABLE}' schema (development auto-init)`,
-    );
+    this.logger.log(`Initialising '${EVENT_PUBLICATION_TABLE}' schema (development auto-init)`);
 
     const queryRunner = this.dataSource.createQueryRunner();
     try {

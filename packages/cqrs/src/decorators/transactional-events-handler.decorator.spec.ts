@@ -125,9 +125,7 @@ describe('@TransactionalEventsHandler', () => {
     });
 
     it('throws when called with an empty events array (options)', () => {
-      expect(() => TransactionalEventsHandler({ events: [] })).toThrow(
-        /at least one event type/,
-      );
+      expect(() => TransactionalEventsHandler({ events: [] })).toThrow(/at least one event type/);
     });
   });
 

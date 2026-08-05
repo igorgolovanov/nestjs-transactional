@@ -45,10 +45,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return result;
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -78,9 +75,9 @@ class ShippingHandlerWithId implements IIntegrationEventHandler<OrderPlacedEvent
 
 @Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
-class MultiEventHandler
-  implements IIntegrationEventHandler<OrderPlacedEvent | OrderCancelledEvent>
-{
+class MultiEventHandler implements IIntegrationEventHandler<
+  OrderPlacedEvent | OrderCancelledEvent
+> {
   async handle(_event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {}
 }
 
@@ -174,9 +171,7 @@ describe('IntegrationEventsHandlerScanner', () => {
       await build({ extraProviders: [MultiEventHandler], withRegistrar: registrar });
 
       expect(registrar.register).toHaveBeenCalledTimes(2);
-      const ids = registrar.register.mock.calls.map(
-        ([entry]: [{ id: string }]) => entry.id,
-      );
+      const ids = registrar.register.mock.calls.map(([entry]: [{ id: string }]) => entry.id);
       expect(ids).toEqual([
         'MultiEventHandler#OrderPlacedEvent',
         'MultiEventHandler#OrderCancelledEvent',

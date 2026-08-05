@@ -55,9 +55,7 @@ describe('TransactionalModule multi-`forRoot`', () => {
       // Per-DS tokens registered for both adapters.
       expect(module.get(getTransactionalAdapterToken('billing'))).toBe(billing);
       expect(module.get(getTransactionalAdapterToken('inventory'))).toBe(inventory);
-      const billingView = module.get<TransactionContextView>(
-        getTransactionContextToken('billing'),
-      );
+      const billingView = module.get<TransactionContextView>(getTransactionContextToken('billing'));
       expect(billingView.dataSource).toBe('billing');
       expect(module.get(getTransactionManagerToken('billing'))).toBe(
         module.get(TransactionManager),
@@ -194,8 +192,7 @@ describe('TransactionalModule multi-`forRoot`', () => {
         expect(billingTx?.adapterInstanceName).toBe('billing');
 
         await manager.run({ dataSource: 'inventory' }, async () => {
-          const inventoryTx =
-            TransactionContext.getActiveTransactionByDataSource('inventory');
+          const inventoryTx = TransactionContext.getActiveTransactionByDataSource('inventory');
           expect(inventoryTx?.adapterName).toBe('in-memory');
           expect(inventoryTx?.adapterInstanceName).toBe('inventory');
           // Both transactions are concurrently observable — no key

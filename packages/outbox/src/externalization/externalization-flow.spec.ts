@@ -41,10 +41,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -55,7 +52,10 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
   headers: (e) => ({ 'x-tenant': e.tenantId }),
 })
 class OrderPlacedEvent {
-  constructor(readonly orderId: string, readonly tenantId: string) {}
+  constructor(
+    readonly orderId: string,
+    readonly tenantId: string,
+  ) {}
 }
 
 class InternalAuditEvent {

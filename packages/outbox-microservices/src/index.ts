@@ -3,7 +3,4 @@ export {
   OutboxMicroservicesModule,
   type OutboxMicroservicesAsyncOptions,
 } from './module/outbox-microservices.module';
-export {
-  OUTBOX_MICROSERVICES_OPTIONS,
-  type OutboxMicroservicesOptions,
-} from './types/options';
+export { OUTBOX_MICROSERVICES_OPTIONS, type OutboxMicroservicesOptions } from './types/options';

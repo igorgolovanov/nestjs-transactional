@@ -11,9 +11,7 @@ import { DEFAULT_DATA_SOURCE_NAME } from '@nestjs-transactional/core';
  * smart scanner routes the handler based on whether a registrar is
  * bound, not by inspecting shared metadata).
  */
-export const INTEGRATION_EVENTS_HANDLER_METADATA = Symbol(
-  'INTEGRATION_EVENTS_HANDLER_METADATA',
-);
+export const INTEGRATION_EVENTS_HANDLER_METADATA = Symbol('INTEGRATION_EVENTS_HANDLER_METADATA');
 
 /**
  * Options accepted by the long form of {@link IntegrationEventsHandler}.
@@ -123,9 +121,7 @@ export interface IntegrationEventsHandlerMetadata {
  * @throws {Error} If no event types are supplied.
  */
 export function IntegrationEventsHandler(...events: Type[]): ClassDecorator;
-export function IntegrationEventsHandler(
-  options: IntegrationEventsHandlerOptions,
-): ClassDecorator;
+export function IntegrationEventsHandler(options: IntegrationEventsHandlerOptions): ClassDecorator;
 export function IntegrationEventsHandler(
   ...args: [IntegrationEventsHandlerOptions] | Type[]
 ): ClassDecorator {
@@ -161,9 +157,7 @@ function resolveMetadata(
   };
 }
 
-function isOptionsObject(
-  candidate: unknown,
-): candidate is IntegrationEventsHandlerOptions {
+function isOptionsObject(candidate: unknown): candidate is IntegrationEventsHandlerOptions {
   return (
     candidate !== null &&
     typeof candidate === 'object' &&

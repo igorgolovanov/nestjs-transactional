@@ -11,10 +11,7 @@ import {
 
 import { TransactionPhase } from '../types/transactional-listener.types';
 
-import {
-  type DispatcherListenerMetadata,
-  TransactionalEventDispatcher,
-} from './event-dispatcher';
+import { type DispatcherListenerMetadata, TransactionalEventDispatcher } from './event-dispatcher';
 
 // Inline fake adapter — standing in for `InMemoryTransactionAdapter` from
 // `@nestjs-transactional/core/testing`. The subpath export can't be resolved

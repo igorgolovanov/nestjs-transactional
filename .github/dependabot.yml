@@ -1,0 +1,47 @@
+version: 2
+updates:
+  # pnpm workspaces: Dependabot reads the root lockfile and opens one PR
+  # per dependency across every workspace project, so the six packages,
+  # the 19 examples and the root tooling are all covered by this entry.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # These move together and are only ever bumped as a set, so one PR
+      # per group beats a dozen PRs that each fail until the others land.
+      nestjs:
+        patterns: ['@nestjs/*']
+      jest:
+        patterns: ['jest', 'ts-jest', '@types/jest']
+      eslint:
+        patterns: ['eslint', 'eslint-*', '@typescript-eslint/*', 'prettier']
+    ignore:
+      # The supported range is `^0.3.0 || ^1.0.0`, and which version the
+      # lockfile pins is a deliberate decision tied to the CI matrix and
+      # to what the examples declare — see the `examples` job in ci.yml.
+      # A bot bumping this silently would break the matrix's meaning.
+      - dependency-name: typeorm
+      # Peer-range decisions, not upgrades. Widening a peer range is a
+      # published-API change that needs a changeset and a compatibility
+      # argument (ADR-004), which is not something to accept from a bot.
+      - dependency-name: '@nestjs/cqrs'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@nestjs/common'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@nestjs/core'
+        update-types: ['version-update:semver-major']
+    commit-message:
+      # Matches the Conventional Commits convention in CONTRIBUTING, so
+      # commitlint does not reject the bot's own PRs.
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope

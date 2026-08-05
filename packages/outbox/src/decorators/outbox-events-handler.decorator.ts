@@ -110,9 +110,7 @@ export function OutboxEventsHandler(
   };
 }
 
-function resolveMetadata(
-  args: [OutboxEventsHandlerOptions] | Type[],
-): OutboxEventsHandlerMetadata {
+function resolveMetadata(args: [OutboxEventsHandlerOptions] | Type[]): OutboxEventsHandlerMetadata {
   if (args.length === 1 && isOptionsObject(args[0])) {
     const options = args[0];
     return {

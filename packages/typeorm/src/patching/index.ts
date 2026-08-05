@@ -12,10 +12,7 @@ import { applyEntityManagerPatches } from './entity-manager-patches';
 import { resetManagedRegistry } from './managed-registry';
 import { applyRepositoryPatches } from './repository-patches';
 
-export {
-  applyRepositoryPatches,
-  areRepositoryPatchesApplied,
-} from './repository-patches';
+export { applyRepositoryPatches, areRepositoryPatchesApplied } from './repository-patches';
 export {
   applyEntityManagerPatches,
   areEntityManagerPatchesApplied,

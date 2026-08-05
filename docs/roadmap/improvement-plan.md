@@ -610,25 +610,93 @@ Recorded, not scheduled. Ordered roughly by value.
   The gap was not hypothetical: the TypeORM 1.1.0 bump broke
   `examples/basic-transactional` at runtime through exactly that
   mechanism, and nothing in CI would have noticed.
-- **`.nvmrc` inconsistency** — pins `20` while `engines` demands
-  `>=22.11.0` and CI tests 22/24/26. Trivial fix, real contributor
-  friction.
-- **Dependency & security automation** — no Dependabot/Renovate, no
-  CodeQL/OSV scanning, no `format:check` job in CI.
-- **Community health files** — `SECURITY.md` (expected at 1.0 given
-  npm provenance is already wired), `CODE_OF_CONDUCT.md`, issue/PR
-  templates, `CODEOWNERS`.
-- **Local hooks** — no husky/lint-staged/commitlint despite
-  CONTRIBUTING's commit conventions; enforcement is CI-only.
+- ~~**`.nvmrc` inconsistency**~~ — *fixed.* Pinned `20` against an
+  `engines` floor of `>=22.11.0`. Now `22`, matching CI's
+  `node-version: 22`, and the root `engines` floor moved to `>=22.13.0`
+  — the real development floor, since TypeORM 1.x requires `^22.13.0`
+  on the 22 line. The two adapter packages already declared that;
+  the root and CONTRIBUTING still said 22.11.
+- ~~**Dependency & security automation**~~ — *fixed.* Dependabot
+  (weekly, npm + github-actions, grouped so a NestJS or ESLint bump is
+  one PR rather than a dozen that each fail until the others land) and
+  a CodeQL workflow with the `security-and-quality` query pack. Both
+  are GitHub-native, so neither added an npm dependency. `typeorm` is
+  on Dependabot's ignore list on purpose: which version the lockfile
+  pins is tied to the CI matrix and to what the examples declare, and a
+  bot bumping it would quietly change what the matrix means.
+
+  `format:check` now runs as the `format` job. Enabling it required a
+  one-off reformat of 72 source files — the script had existed since
+  the first release and had never been enforced, so the tree had
+  drifted. Prettier's scope was narrowed at the same time: root
+  markdown joined `docs/` and `CLAUDE.md` in `.prettierignore`, because
+  Prettier does not tidy hand-wrapped prose so much as rewrite it — on
+  `AGENTS.md` it turned a continuation line starting with `+` into a
+  `-` list item, changing what the sentence said. Formatting is
+  enforced on code; prose stays hand-wrapped.
+- ~~**Community health files**~~ — *fixed.* `SECURITY.md`,
+  `CODE_OF_CONDUCT.md`, `.github/CODEOWNERS`, two issue forms with a
+  `config.yml`, and a PR template.
+
+  The bug-report form asks for the dialect and whether the deployment
+  is multi-dataSource, because both change the answer — `readOnly` is
+  enforced only on the Postgres family (DD-027) and multi-DS has its
+  own documented limitations — and it points at
+  `known-limitations.md` and ADR-016 up front, since a fair share of
+  "bugs" here are documented trade-offs. `SECURITY.md` also records
+  the data-at-rest footprint (serialized payloads and listener
+  exception messages persist in `event_publication` until purged),
+  which is not a vulnerability but is worth not discovering by
+  surprise.
+
+  Vulnerability reports route through GitHub's private reporting,
+  which **must be enabled in repository settings** for the link to
+  work. CODEOWNERS likewise only gates merges once branch protection
+  requires code-owner review.
+- ~~**Local hooks**~~ — *fixed.* husky, lint-staged and commitlint.
+  pre-commit formats staged files through exactly the set the `format`
+  job checks, so hook and gate cannot disagree; commit-msg runs
+  commitlint. ESLint is deliberately absent from pre-commit — its
+  type-aware rules resolve cross-package imports through `dist/*.d.ts`,
+  so it would mean building six packages per commit.
+
+  Three commitlint defaults are relaxed, each because the default
+  rejected commits this history actually contains: `header-max-length`
+  raised to 120 (three headers run 103–108), `subject-case` disabled
+  (subjects legitimately open with identifiers — `ADR-019 — ...`,
+  `OutboxTypeOrmModule reshape ...`), and the body/footer line-length
+  caps disabled (bodies carry URLs). No `scope-enum`: the history uses
+  19 distinct scopes, including combined ones like `cqrs,outbox`.
 - **ESM dual packaging** — all packages are CJS-only (single
   `exports` condition set); already a
-  [future phase](README.md#future-phases-not-scheduled). Add
-  `sideEffects: false` to package manifests independently of the
-  ESM work.
+  [future phase](README.md#future-phases-not-scheduled).
+
+  `sideEffects` is now declared, and not uniformly, because the
+  uniform answer would have been false. `core`, `cqrs`, `outbox` and
+  `outbox-microservices` have no import-time statements and say
+  `false`. The other two do, so they list the files instead:
+  `typeorm` calls `applyAllPatches()` at module load, and a bundler
+  told the package is side-effect-free may drop that module when a
+  consumer imports only, say, `getCurrentEntityManager` — the
+  prototype patches would then never install and transparent
+  repositories would silently stop being transactional.
+  `outbox-typeorm`'s `@Entity()` decorators register into TypeORM's
+  global metadata storage at import time, so its entity files are
+  listed too.
 - **API reference & surface guard** — no TypeDoc/api-extractor;
   given [ADR-004](../adr/004-public-api-stability.md) commits to API
   stability, an `.api.md`-style surface snapshot would turn breaking
-  changes into reviewable diffs.
+  changes into reviewable diffs. The baseline is best taken *at*
+  `1.0.0` — snapshotting later means the first diff has nothing
+  meaningful to compare against.
+- **`publint` + `@arethetypeswrong/cli`** — not added; the dependencies
+  were not approved. ADR-004 has claimed since before the first release
+  that both "run in CI" and are "non-negotiable parts of the release
+  process"; neither was ever wired up. The ADR now states that
+  plainly rather than continuing to assert it. Until they exist,
+  nothing verifies that what a consumer resolves from the published
+  tarball matches what the sources declare — the `type-check` job
+  compiles the sources, which is a different question.
 - ~~**Broken relative doc links**~~ — *fixed.* 20 across 10 files,
   mostly example READMEs citing ADR/DD files by a guessed slug
   (`dd/019-single-unit-atomicity.md` for

@@ -5,10 +5,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 
-import {
-  OUTBOX_PROCESSING_BUNDLE,
-  type OutboxProcessingBundle,
-} from './outbox.module';
+import { OUTBOX_PROCESSING_BUNDLE, type OutboxProcessingBundle } from './outbox.module';
 
 /**
  * Auto-starts every configured per-dataSource

@@ -5,6 +5,15 @@ pnpm-lock.yaml
 .changeset/*.md
 CHANGELOG.md
 
-# Hand-authored docs with intentional line wrapping
-CLAUDE.md
+# Hand-authored prose with intentional line wrapping — every markdown
+# file at the repo root, plus everything under docs/. Prettier does not
+# merely reflow these, it rewrites them: on AGENTS.md it turned a
+# continuation line starting with `+` into a `-` list item, changing what
+# the sentence said, and it pads every table to its widest cell, which
+# defeats the hand wrapping the rest of the file depends on.
+#
+# Formatting is therefore enforced on code, not on prose. What
+# `format:check` actually covers is `packages/*/src/**/*.{ts,json}` plus
+# the root `package.json` and `pnpm-workspace.yaml`.
+/*.md
 docs/

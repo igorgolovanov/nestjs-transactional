@@ -17,9 +17,7 @@ import { DEFAULT_DATA_SOURCE_NAME } from '@nestjs-transactional/core';
  * default-injected publisher is the smart facade (DD-024); this
  * token resolves to the underlying per-dataSource publisher.
  */
-export function getOutboxPublisherToken(
-  dataSource: string = DEFAULT_DATA_SOURCE_NAME,
-): string {
+export function getOutboxPublisherToken(dataSource: string = DEFAULT_DATA_SOURCE_NAME): string {
   return `${dataSource}OutboxEventPublisher`;
 }
 
@@ -29,9 +27,7 @@ export function getOutboxPublisherToken(
  * the registry bound to the same dataSource — they do not bleed
  * across dataSources.
  */
-export function getEventTypeRegistryToken(
-  dataSource: string = DEFAULT_DATA_SOURCE_NAME,
-): string {
+export function getEventTypeRegistryToken(dataSource: string = DEFAULT_DATA_SOURCE_NAME): string {
   return `${dataSource}EventTypeRegistry`;
 }
 
@@ -94,9 +90,7 @@ export function getEventPublicationRepositoryToken(
  * — e.g. the `'billing'` outbox emits to Kafka, the `'audit'` outbox
  * is internal-only and binds no externalizer.
  */
-export function getEventExternalizerToken(
-  dataSource: string = DEFAULT_DATA_SOURCE_NAME,
-): string {
+export function getEventExternalizerToken(dataSource: string = DEFAULT_DATA_SOURCE_NAME): string {
   return `${dataSource}EventExternalizer`;
 }
 

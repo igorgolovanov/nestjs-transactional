@@ -8,10 +8,7 @@ import {
 import { EVENT_EXTERNALIZER } from '@nestjs-transactional/outbox';
 
 import { MicroservicesEventExternalizer } from '../externalizer/microservices-event-externalizer';
-import {
-  OUTBOX_MICROSERVICES_OPTIONS,
-  type OutboxMicroservicesOptions,
-} from '../types/options';
+import { OUTBOX_MICROSERVICES_OPTIONS, type OutboxMicroservicesOptions } from '../types/options';
 
 /**
  * Async-options shape for {@link OutboxMicroservicesModule.forRootAsync}.

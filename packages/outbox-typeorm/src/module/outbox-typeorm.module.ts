@@ -87,9 +87,7 @@ export interface OutboxTypeOrmAsyncOptions extends Pick<ModuleMetadata, 'imports
    */
   readonly useFactory: (
     ...args: never[]
-  ) =>
-    | Promise<Omit<OutboxTypeOrmOptions, 'dataSource'>>
-    | Omit<OutboxTypeOrmOptions, 'dataSource'>;
+  ) => Promise<Omit<OutboxTypeOrmOptions, 'dataSource'>> | Omit<OutboxTypeOrmOptions, 'dataSource'>;
 
   readonly inject?: readonly InjectionToken[];
 }
@@ -131,8 +129,7 @@ function getOutboxTypeOrmSchemaOptionsToken(dataSourceName: string): string {
   return `OUTBOX_TYPEORM_SCHEMA_OPTIONS_${dataSourceName}`;
 }
 
-const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
-  Symbol(`OUTBOX_TYPEORM_ASYNC_OPTIONS[${id}]`);
+const ASYNC_OPTIONS_TOKEN = (id: number): symbol => Symbol(`OUTBOX_TYPEORM_ASYNC_OPTIONS[${id}]`);
 
 /**
  * NestJS module that wires the TypeORM persistence backend for the
@@ -426,9 +423,7 @@ function buildPerDataSourceExports(dataSourceName: string): InjectionToken[] {
  * `useExisting` clause, which resolves to the private per-DS token
  * registered by `forRoot`.
  */
-export function typeOrmEventPublicationRepositoryProvider(
-  dataSourceName = 'default',
-): Provider {
+export function typeOrmEventPublicationRepositoryProvider(dataSourceName = 'default'): Provider {
   return {
     provide: EVENT_PUBLICATION_REPOSITORY,
     useExisting: getTypeOrmRepositoryProviderToken(dataSourceName),

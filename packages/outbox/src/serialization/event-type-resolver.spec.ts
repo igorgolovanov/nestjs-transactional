@@ -51,9 +51,7 @@ describe('resolveDataSourceByEventTypeName', () => {
     defaultEtr.register(FooEvent);
     billingEtr.register(FooEvent);
 
-    expect(() => resolveDataSourceByEventTypeName('FooEvent', registries)).toThrow(
-      OutboxError,
-    );
+    expect(() => resolveDataSourceByEventTypeName('FooEvent', registries)).toThrow(OutboxError);
     try {
       resolveDataSourceByEventTypeName('FooEvent', registries);
     } catch (err) {

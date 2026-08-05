@@ -33,10 +33,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -79,15 +76,11 @@ describe('OutboxProcessingModule', () => {
     monitorStart = jest
       .spyOn(module.get(StalenessMonitor), 'start')
       .mockImplementation(() => undefined);
-    monitorStop = jest
-      .spyOn(module.get(StalenessMonitor), 'stop')
-      .mockResolvedValue(undefined);
+    monitorStop = jest.spyOn(module.get(StalenessMonitor), 'stop').mockResolvedValue(undefined);
     retryStart = jest
       .spyOn(module.get(OutboxRetryScheduler), 'start')
       .mockImplementation(() => undefined);
-    retryStop = jest
-      .spyOn(module.get(OutboxRetryScheduler), 'stop')
-      .mockResolvedValue(undefined);
+    retryStop = jest.spyOn(module.get(OutboxRetryScheduler), 'stop').mockResolvedValue(undefined);
   });
 
   afterEach(async () => {

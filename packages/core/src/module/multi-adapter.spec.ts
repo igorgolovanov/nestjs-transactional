@@ -3,10 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 
 import { TransactionContextView } from '../context/transaction-context-view';
 import { TransactionContext } from '../context/transaction.context';
-import {
-  Transactional,
-  getTransactionalMetadata,
-} from '../decorators/transactional.decorator';
+import { Transactional, getTransactionalMetadata } from '../decorators/transactional.decorator';
 import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
 import { TransactionManager } from '../manager/transaction.manager';
 import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
@@ -178,8 +175,7 @@ describe('Multi-adapter', () => {
         // Open a nested inventory transaction. Both should be live.
         await manager.run({ dataSource: 'inventory' }, async () => {
           const innerBilling = TransactionContext.getActiveTransactionByDataSource('billing');
-          const innerInventory =
-            TransactionContext.getActiveTransactionByDataSource('inventory');
+          const innerInventory = TransactionContext.getActiveTransactionByDataSource('inventory');
           expect(innerBilling).toBe(billingTx);
           expect(innerInventory).toBeDefined();
           expect(innerInventory!.adapterInstanceName).toBe('inventory');
@@ -189,8 +185,7 @@ describe('Multi-adapter', () => {
 
         // After the nested inventory call returns, billing is still
         // active; inventory has been removed from the Map.
-        const billingAfterInner =
-          TransactionContext.getActiveTransactionByDataSource('billing');
+        const billingAfterInner = TransactionContext.getActiveTransactionByDataSource('billing');
         const inventoryAfterInner =
           TransactionContext.getActiveTransactionByDataSource('inventory');
         expect(billingAfterInner).toBe(billingTx);
@@ -246,8 +241,7 @@ describe('Multi-adapter', () => {
 
         await Promise.all([sleep(3), sleep(1), sleep(2)]);
 
-        const afterParallelAwaits =
-          TransactionContext.getActiveTransactionByDataSource('billing');
+        const afterParallelAwaits = TransactionContext.getActiveTransactionByDataSource('billing');
         expect(afterParallelAwaits).toBe(before);
       });
 

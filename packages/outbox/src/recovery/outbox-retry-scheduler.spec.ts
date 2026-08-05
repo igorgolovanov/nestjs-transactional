@@ -59,9 +59,7 @@ describe('OutboxRetryScheduler', () => {
     attempts: number;
     lastResubmissionAgeMs?: number;
   }): Promise<string> {
-    const [pub] = await repo.createAll([
-      sampleInput(new Date(Date.now() - args.ageMs)),
-    ]);
+    const [pub] = await repo.createAll([sampleInput(new Date(Date.now() - args.ageMs))]);
     const id = pub!.id;
     for (let i = 0; i < args.attempts; i++) {
       await repo.updateStatus(id, PublicationStatus.PROCESSING, { incrementAttempts: true });
@@ -234,9 +232,9 @@ describe('OutboxRetryScheduler', () => {
       const resubmitted = await scheduler.runOnce();
 
       expect(resubmitted).toBe(2);
-      expect(
-        repo.getAll().filter((p) => p.status === PublicationStatus.RESUBMITTED),
-      ).toHaveLength(2);
+      expect(repo.getAll().filter((p) => p.status === PublicationStatus.RESUBMITTED)).toHaveLength(
+        2,
+      );
     });
 
     it('reports zero on an empty pass without touching anything', async () => {

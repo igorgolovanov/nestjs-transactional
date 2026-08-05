@@ -3,6 +3,7 @@
   "version": "1.0.0-alpha.5",
   "description": "Event externalization for @nestjs-transactional/outbox via @nestjs/microservices ClientProxy — Spring Modulith @Externalized parity",
   "license": "MIT",
+  "sideEffects": false,
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",

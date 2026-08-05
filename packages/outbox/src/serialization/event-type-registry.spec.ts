@@ -39,9 +39,7 @@ describe('EventTypeRegistry', () => {
     expect(() => registry.getOrThrow('UnknownEvent')).toThrow(
       /Event type 'UnknownEvent' not registered/,
     );
-    expect(() => registry.getOrThrow('UnknownEvent')).toThrow(
-      /OutboxModule\.forFeature/,
-    );
+    expect(() => registry.getOrThrow('UnknownEvent')).toThrow(/OutboxModule\.forFeature/);
   });
 
   it('register throws on duplicate registration with a clear, actionable message', () => {
@@ -50,9 +48,7 @@ describe('EventTypeRegistry', () => {
     expect(() => registry.register(OrderPlacedEvent)).toThrow(
       /Event type 'OrderPlacedEvent' already registered/,
     );
-    expect(() => registry.register(OrderPlacedEvent)).toThrow(
-      /OutboxModule\.forFeature/,
-    );
+    expect(() => registry.register(OrderPlacedEvent)).toThrow(/OutboxModule\.forFeature/);
   });
 
   it('registerAll surfaces the duplicate-throw when a single array contains the same class twice', () => {

@@ -89,9 +89,7 @@ describe('Inject decorators (core)', () => {
         ) {}
       }
 
-      expect(readSelfParamTypes(TestClass)[0]!.param).toBe(
-        'reportingTransactionalAdapter',
-      );
+      expect(readSelfParamTypes(TestClass)[0]!.param).toBe('reportingTransactionalAdapter');
     });
   });
 });

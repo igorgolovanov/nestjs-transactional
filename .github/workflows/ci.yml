@@ -25,6 +25,34 @@ jobs:
       - name: Check relative markdown links
         run: ./scripts/check-doc-links.sh
 
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    # Single cell on purpose: Prettier's output does not vary by Node or
+    # TypeORM version, so matrixing this would buy nothing.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Covers code, not prose: `packages/*/src/**/*.{ts,json}` plus the
+      # root `package.json` and `pnpm-workspace.yaml`. Root markdown and
+      # everything under docs/ is hand-wrapped and excluded in
+      # .prettierignore — Prettier rewrites those rather than tidying them.
+      - name: Check formatting
+        run: pnpm format:check
+
   lint:
     name: Lint (Node ${{ matrix.node-version }}, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest

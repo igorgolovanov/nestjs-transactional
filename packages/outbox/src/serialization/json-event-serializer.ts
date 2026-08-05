@@ -27,9 +27,7 @@ export class JsonEventSerializer implements EventSerializer {
     try {
       return JSON.stringify(event);
     } catch (err) {
-      throw new SerializationError(
-        `Failed to serialize event: ${(err as Error).message}`,
-      );
+      throw new SerializationError(`Failed to serialize event: ${(err as Error).message}`);
     }
   }
 

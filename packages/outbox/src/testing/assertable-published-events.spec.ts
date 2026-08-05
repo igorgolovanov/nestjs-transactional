@@ -120,9 +120,7 @@ describe('AssertablePublishedEvents', () => {
       await seed(new OrderPlacedEvent('order-b', 300), 'L-other');
 
       const view = await assertable.contains(OrderPlacedEvent);
-      expect(() =>
-        view.matching((e) => e.orderId, 'order-b').hasSize(2),
-      ).not.toThrow();
+      expect(() => view.matching((e) => e.orderId, 'order-b').hasSize(2)).not.toThrow();
     });
   });
 });

@@ -75,28 +75,25 @@ const cases = [
 ] as const;
 
 describe('Inject decorators (outbox)', () => {
-  describe.each(cases)(
-    '$name',
-    ({ decorator, defaultToken, billingToken }) => {
-      it('binds the default-dataSource token when no argument is passed', () => {
-        class TestClass {
-          constructor(
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            @decorator() readonly dep: unknown,
-          ) {}
-        }
-        expect(readSelfParamTypes(TestClass)[0]!.param).toBe(defaultToken);
-      });
+  describe.each(cases)('$name', ({ decorator, defaultToken, billingToken }) => {
+    it('binds the default-dataSource token when no argument is passed', () => {
+      class TestClass {
+        constructor(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          @decorator() readonly dep: unknown,
+        ) {}
+      }
+      expect(readSelfParamTypes(TestClass)[0]!.param).toBe(defaultToken);
+    });
 
-      it('binds the supplied-dataSource token', () => {
-        class TestClass {
-          constructor(
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            @decorator('billing') readonly dep: unknown,
-          ) {}
-        }
-        expect(readSelfParamTypes(TestClass)[0]!.param).toBe(billingToken);
-      });
-    },
-  );
+    it('binds the supplied-dataSource token', () => {
+      class TestClass {
+        constructor(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          @decorator('billing') readonly dep: unknown,
+        ) {}
+      }
+      expect(readSelfParamTypes(TestClass)[0]!.param).toBe(billingToken);
+    });
+  });
 });
