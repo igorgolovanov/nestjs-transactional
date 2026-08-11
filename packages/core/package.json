@@ -55,7 +55,9 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "type-check": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "api:check": "api-extractor run && api-extractor run -c api-extractor.testing.json",
+    "api:update": "api-extractor run --local && api-extractor run --local -c api-extractor.testing.json"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",

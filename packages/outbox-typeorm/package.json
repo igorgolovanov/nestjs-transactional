@@ -54,7 +54,9 @@
     "test:cov": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.js",
     "type-check": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local"
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",

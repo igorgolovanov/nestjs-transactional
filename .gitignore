@@ -8,6 +8,11 @@ dist/
 coverage/
 .nyc_output/
 
+# api-extractor scratch output. The committed baseline lives in
+# packages/*/etc/*.api.md and must stay tracked — temp/ holds the
+# freshly-generated report the tool diffs that baseline against.
+temp/
+
 # Test artifacts
 junit.xml
 test-results/

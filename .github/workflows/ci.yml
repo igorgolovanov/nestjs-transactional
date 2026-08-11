@@ -373,6 +373,41 @@ jobs:
       - name: Integration tests
         run: pnpm -r --filter './packages/*' test:integration
 
+  api-surface:
+    name: API surface
+    runs-on: ubuntu-latest
+    # Single cell: the report is generated from the built `.d.ts`, which does
+    # not vary by Node version. It does vary by TypeORM version — the adapter
+    # packages re-export TypeORM types — so this runs on the version the
+    # lockfile pins, the same one the published packages are built against.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # api-extractor reads `dist/index.d.ts`, so the declarations have to
+      # exist before it can diff anything.
+      - name: Build packages
+        run: pnpm -r --filter './packages/*' build
+
+      # Fails when the built surface differs from the committed report in
+      # packages/*/etc/*.api.md. ADR-004 promises API stability; this is what
+      # turns that promise into a reviewable diff instead of something a
+      # reviewer has to notice. Run `pnpm api:update` to accept a change.
+      - name: Check the public API surface
+        run: pnpm api:check
+
   examples:
     name: Examples (Node 22, TypeORM 1.1)
     runs-on: ubuntu-latest

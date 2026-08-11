@@ -70,6 +70,10 @@ pnpm format          # rewrite
 # Relative markdown links resolve (ADR / DD / source references)
 pnpm lint:doc-links
 
+# Public API surface unchanged (api-extractor, needs a build first)
+pnpm api:check       # verify — CI fails if the surface moved
+pnpm api:update      # accept an intended change, then commit the diff
+
 # TypeORM integration tests (requires Docker)
 pnpm --filter @nestjs-transactional/typeorm test:integration
 ```
@@ -334,7 +338,11 @@ Smaller trade-offs that do not warrant a full ADR go in
 1. Branch from `main`. PRs target `main`.
 2. Changeset committed (if user-visible change).
 3. All of `lint`, `build`, `test`, `typecheck`, `format:check`,
-   `lint:doc-links` clean locally. CI runs the same gates.
+   `lint:doc-links`, `api:check` clean locally. CI runs the same gates.
+   If `api:check` fails and the change to the surface was intended, run
+   `pnpm api:update` and commit the report diff alongside the
+   changeset — the two together are what say "this is a minor" or
+   "this is a breaking change".
 4. Description explains the **why** — reviewers can read the diff for
    the what.
 5. Link related issues.

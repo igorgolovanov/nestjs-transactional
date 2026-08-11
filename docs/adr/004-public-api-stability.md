@@ -107,17 +107,29 @@ ADR). Pre-1.0 ADRs are encouraged but not required.
 - **Changesets** (`pnpm changeset`) is the source of truth for
   release intent. Every PR that touches public API ships a
   changeset.
+- **`@microsoft/api-extractor`** generates a signature report per
+  entry point into `packages/<name>/etc/*.api.md`, committed to the
+  repository. The `api-surface` CI job regenerates the reports from
+  the built `.d.ts` and fails when they differ from what is
+  committed. This is what makes the policy above checkable: a change
+  to the published surface arrives as a diff in a reviewable file
+  rather than as something a reviewer has to spot. `pnpm api:update`
+  accepts an intended change; the diff then belongs in the PR, next
+  to the changeset that classifies it as major, minor, or patch.
 - **`@arethetypeswrong/cli`** — *not wired up.* Intended to verify
   that the published types match the runtime exports.
 - **`publint`** — *not wired up.* Intended to verify package.json
   `exports` field consistency.
 
-Both were described here as running in CI before either was added,
-and the packages have shipped six alpha releases without them. Until
-they exist, `exports` correctness rests on review and on the
-`type-check` job, which verifies the sources compile but says nothing
-about what a consumer resolves from the published tarball. Tracked in
-the [improvement plan](../roadmap/improvement-plan.md).
+The last two were described here as running in CI before either was
+added, and the packages have shipped six alpha releases without them.
+The gap they leave is narrower now that the surface itself is
+reported, but it is not closed: `api-extractor` reads the built
+declarations, so it sees what the sources *declare*. Whether a
+consumer actually resolves those declarations through the `exports`
+map — the wrong-types and broken-subpath class of defect — is still
+verified by review alone. Tracked in the
+[improvement plan](../roadmap/improvement-plan.md).
 
 ### Process commitments
 
@@ -249,6 +261,11 @@ both public.
   guards `exports` today. Corrected rather than quietly
   dropped, because an unmet commitment in a decision record
   is more misleading than an absent one.
+- The `api-extractor` reports were baselined immediately
+  before the stable `1.0.0` release, which is the only moment
+  the baseline is worth much: taken later, the first diff has
+  nothing meaningful to compare against, and the surface
+  `1.0.0` actually froze would never have been recorded.
 - Future ADRs that introduce or change public API surface
   (ADR-018 token utilities, ADR-014 handler API redesign,
   any future ADR-NNN) cite this one for the stability

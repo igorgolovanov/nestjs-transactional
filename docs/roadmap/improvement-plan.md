@@ -683,12 +683,37 @@ Recorded, not scheduled. Ordered roughly by value.
   `outbox-typeorm`'s `@Entity()` decorators register into TypeORM's
   global metadata storage at import time, so its entity files are
   listed too.
-- **API reference & surface guard** — no TypeDoc/api-extractor;
-  given [ADR-004](../adr/004-public-api-stability.md) commits to API
-  stability, an `.api.md`-style surface snapshot would turn breaking
-  changes into reviewable diffs. The baseline is best taken *at*
-  `1.0.0` — snapshotting later means the first diff has nothing
-  meaningful to compare against.
+- ~~**API surface guard**~~ — *fixed.* `@microsoft/api-extractor`
+  reports the signature of every entry point into
+  `packages/<name>/etc/*.api.md`, committed, and the `api-surface` CI
+  job fails when the built surface differs. Eight reports rather than
+  six: api-extractor covers one entry point per run, and `core` and
+  `outbox` each publish a `./testing` subpath. 1658 lines total.
+
+  This is what makes [ADR-004](../adr/004-public-api-stability.md)
+  checkable — the stability promise had been resting on someone
+  noticing a changed export in review. Baselined deliberately *before*
+  `1.0.0`: later, the first diff would have nothing meaningful to
+  compare against and the surface `1.0.0` froze would never have been
+  recorded.
+
+  Two configuration notes worth keeping. `ae-unresolved-link` is off:
+  it fires on `{@link id}`-style shorthand for a sibling member, which
+  api-extractor cannot resolve but which is idiomatic TSDoc and works
+  in IDE tooltips — checked against a sample before silencing, and it
+  was dozens of warnings per package. `ae-missing-release-tag` is off
+  because ADR-004 draws the public/internal line by entry point rather
+  than with `@public` / `@internal` tags. `ae-forgotten-export` stays
+  on and currently reports nothing, which is the interesting part: no
+  public signature references a type a consumer cannot name.
+
+  Verified by mutation: adding one exported interface makes
+  `pnpm api:check` exit 1. Worth having checked — api-extractor calls
+  a changed surface a *warning* in its output, so the run reads as
+  benign; only the exit code is unambiguous.
+
+  Still not covered: TypeDoc-style rendered API reference. That is a
+  docs-site concern, below.
 - **`publint` + `@arethetypeswrong/cli`** — not added; the dependencies
   were not approved. ADR-004 has claimed since before the first release
   that both "run in CI" and are "non-negotiable parts of the release

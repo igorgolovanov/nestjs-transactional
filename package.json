@@ -33,13 +33,16 @@
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm build && changeset publish",
     "release": "changeset publish",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "api:check": "pnpm -r --filter './packages/*' api:check",
+    "api:update": "pnpm -r --filter './packages/*' api:update"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.27.9",
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
+    "@microsoft/api-extractor": "^7.58.13",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",

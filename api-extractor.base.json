@@ -1,0 +1,81 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+
+  /**
+   * Shared settings for every package's API surface report. Each package
+   * has its own `api-extractor.json` that extends this and only names its
+   * entry point; the two packages with a `./testing` subpath export have a
+   * second config, because api-extractor covers one entry point per run.
+   *
+   * The reports under `packages/<name>/etc/*.api.md` are the machine-checked
+   * form of the promise in ADR-004: a change to the published surface shows
+   * up as a diff in a reviewable file instead of relying on someone noticing
+   * it in a pull request. `etc/` is not in any package's `files` field, so
+   * none of this is published.
+   */
+
+  "apiReport": {
+    "enabled": true,
+    "reportFolder": "<projectFolder>/etc/"
+  },
+
+  /**
+   * The report is the whole point here. A doc model and a .d.ts rollup are
+   * both things we would have to keep and nothing would read — the packages
+   * ship tsc's own declarations, and there is no docs site yet.
+   */
+  "docModel": { "enabled": false },
+  "dtsRollup": { "enabled": false },
+  "tsdocMetadata": { "enabled": false },
+
+  "compiler": {
+    "tsconfigFilePath": "<projectFolder>/tsconfig.build.json"
+  },
+
+  "messages": {
+    "compilerMessageReporting": {
+      "default": { "logLevel": "warning" }
+    },
+
+    "extractorMessageReporting": {
+      "default": { "logLevel": "warning" },
+
+      /**
+       * We do not use `@public` / `@beta` / `@internal` release tags. ADR-004
+       * draws the public/internal line by entry point instead — anything
+       * reachable from an `exports` path is public, everything else is not —
+       * so this rule would fire once per export and say nothing.
+       */
+      "ae-missing-release-tag": { "logLevel": "none" },
+
+      /**
+       * Left at warning on purpose: it fires when a type appears in the
+       * public surface without being exported, which means a consumer cannot
+       * name it. Worth seeing rather than silencing.
+       */
+      "ae-forgotten-export": { "logLevel": "warning" },
+
+      /**
+       * Resolver limitation, not a documentation defect. `{@link id}`,
+       * `{@link code}`, `{@link REQUIRED}` and friends are the idiomatic
+       * TSDoc shorthand for a sibling member of the same class, interface or
+       * enum; api-extractor only resolves package-level exports and reports
+       * every one of them. Verified on a sample — each flagged symbol is a
+       * real member, reachable in IDE tooltips. Leaving this on would mean
+       * dozens of warnings per package burying the surface diffs the report
+       * exists to show.
+       */
+      "ae-unresolved-link": { "logLevel": "none" }
+    },
+
+    /**
+     * TSDoc strictness is not what this guard is for. The JSDoc here is prose
+     * with `{@link}` references across packages, which api-extractor cannot
+     * resolve and would report on heavily; that noise would bury the surface
+     * diffs the report exists to show.
+     */
+    "tsdocMessageReporting": {
+      "default": { "logLevel": "none" }
+    }
+  }
+}
