@@ -714,14 +714,39 @@ Recorded, not scheduled. Ordered roughly by value.
 
   Still not covered: TypeDoc-style rendered API reference. That is a
   docs-site concern, below.
-- **`publint` + `@arethetypeswrong/cli`** — not added; the dependencies
-  were not approved. ADR-004 has claimed since before the first release
-  that both "run in CI" and are "non-negotiable parts of the release
-  process"; neither was ever wired up. The ADR now states that
-  plainly rather than continuing to assert it. Until they exist,
-  nothing verifies that what a consumer resolves from the published
-  tarball matches what the sources declare — the `type-check` job
-  compiles the sources, which is a different question.
+- ~~**`publint` + `@arethetypeswrong/cli`**~~ — *fixed, and they earned
+  their keep on the first run.* Both now run in the `publish-check` CI
+  job via `pnpm publish:check`. ADR-004 had claimed since before the
+  first release that they were wired up and non-negotiable; they were
+  neither, for six alpha releases.
+
+  **attw found a real defect.**
+  `@nestjs-transactional/core/testing` and
+  `@nestjs-transactional/outbox/testing` did not resolve under
+  `node10` module resolution — which is what a `module: commonjs`
+  tsconfig selects when it does not name `moduleResolution`, i.e. what
+  a stock NestJS project gets. TypeScript's own message was explicit:
+  *"There are types at .../dist/testing/index.d.ts, but this result
+  could not be resolved under your current 'moduleResolution'
+  setting."* A documented entry point, unusable for a large share of
+  consumers, across six releases.
+
+  Fixed with `typesVersions`. Runtime was never affected — Node
+  honours `exports` regardless of the TypeScript setting — so the
+  defect was types-only, which is exactly why nothing else caught it:
+  the packages' own `tsconfig.base.json` uses `moduleResolution: node`
+  but imports `./testing` by relative path, and the examples override
+  to `Node16`. Neither configuration could have hit it.
+
+  publint additionally flagged two manifest gaps on all six packages:
+  no `type` field (now `"commonjs"`, making the intent explicit and
+  saving Node the detection) and a `repository.url` missing the `git+`
+  prefix.
+
+  Verified by mutation, since a tool that prints a problem and exits
+  `0` is not a gate: removing `typesVersions` makes attw exit 1, and
+  pointing an `exports` target at a nonexistent file makes publint
+  exit 1.
 - ~~**Broken relative doc links**~~ — *fixed.* 20 across 10 files,
   mostly example READMEs citing ADR/DD files by a guessed slug
   (`dd/019-single-unit-atomicity.md` for

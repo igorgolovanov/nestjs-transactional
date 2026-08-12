@@ -3,11 +3,12 @@
   "version": "1.0.0-alpha.5",
   "description": "@nestjs/cqrs integration for @nestjs-transactional/core — transactional event listeners with phases, handler wrapping, AggregateRoot integration",
   "license": "MIT",
+  "type": "commonjs",
   "sideEffects": false,
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",
-    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
     "directory": "packages/cqrs"
   },
   "bugs": {
@@ -55,7 +56,8 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
     "api:check": "api-extractor run",
-    "api:update": "api-extractor run --local"
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack ."
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",

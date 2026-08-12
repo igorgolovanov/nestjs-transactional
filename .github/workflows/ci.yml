@@ -408,6 +408,36 @@ jobs:
       - name: Check the public API surface
         run: pnpm api:check
 
+  publish-check:
+    name: Publishing correctness
+    runs-on: ubuntu-latest
+    # Answers the question the other jobs cannot: not "do the sources
+    # compile" but "does what we ship resolve for a consumer". publint reads
+    # the packed tarball's manifest; attw resolves every entry point under
+    # node10, node16 (from CJS and from ESM) and bundler.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Both tools pack each package, so dist/ has to exist first.
+      - name: Build packages
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Check publishing correctness
+        run: pnpm publish:check
+
   examples:
     name: Examples (Node 22, TypeORM 1.1)
     runs-on: ubuntu-latest

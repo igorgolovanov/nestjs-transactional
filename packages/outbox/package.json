@@ -3,11 +3,12 @@
   "version": "1.0.0-alpha.5",
   "description": "Persistent Event Publication Registry for @nestjs-transactional — Spring Modulith equivalent (ORM-agnostic core)",
   "license": "MIT",
+  "type": "commonjs",
   "sideEffects": false,
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",
-    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
     "directory": "packages/outbox"
   },
   "bugs": {
@@ -43,6 +44,13 @@
       "default": "./dist/testing/index.js"
     }
   },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing/index.d.ts"
+      ]
+    }
+  },
   "publishConfig": {
     "access": "public",
     "tag": "alpha",
@@ -57,7 +65,8 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
     "api:check": "api-extractor run && api-extractor run -c api-extractor.testing.json",
-    "api:update": "api-extractor run --local && api-extractor run --local -c api-extractor.testing.json"
+    "api:update": "api-extractor run --local && api-extractor run --local -c api-extractor.testing.json",
+    "publish:check": "publint && attw --pack ."
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",

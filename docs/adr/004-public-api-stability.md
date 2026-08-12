@@ -116,20 +116,27 @@ ADR). Pre-1.0 ADRs are encouraged but not required.
   rather than as something a reviewer has to spot. `pnpm api:update`
   accepts an intended change; the diff then belongs in the PR, next
   to the changeset that classifies it as major, minor, or patch.
-- **`@arethetypeswrong/cli`** — *not wired up.* Intended to verify
-  that the published types match the runtime exports.
-- **`publint`** — *not wired up.* Intended to verify package.json
-  `exports` field consistency.
+- **`@arethetypeswrong/cli`** resolves every entry point of the packed
+  tarball under `node10`, `node16` (from CJS and from ESM) and
+  `bundler`, and fails when any of them cannot reach the types.
+- **`publint`** lints the packed manifest: `exports` targets that do
+  not exist, missing `type`, malformed metadata.
 
-The last two were described here as running in CI before either was
-added, and the packages have shipped six alpha releases without them.
-The gap they leave is narrower now that the surface itself is
-reported, but it is not closed: `api-extractor` reads the built
-declarations, so it sees what the sources *declare*. Whether a
-consumer actually resolves those declarations through the `exports`
-map — the wrong-types and broken-subpath class of defect — is still
-verified by review alone. Tracked in the
-[improvement plan](../roadmap/improvement-plan.md).
+Both run in the `publish-check` CI job, via `pnpm publish:check`.
+
+These two answer a question the rest of the tooling cannot.
+`api-extractor` reads the built declarations, so it sees what the
+sources *declare*; `type-check` compiles those sources. Neither says
+whether a consumer can actually resolve them through the `exports`
+map. That distinction was not academic — the first `attw` run found
+that `@nestjs-transactional/core/testing` and
+`@nestjs-transactional/outbox/testing` did not resolve under `node10`
+resolution at all, which is what a stock `module: commonjs` tsconfig
+selects when it does not name `moduleResolution` explicitly. Six alpha
+releases shipped with a documented subpath that a large share of
+consumers could not import. Fixed with `typesVersions`; runtime
+resolution was never affected, since Node honours `exports` regardless
+of the TypeScript setting.
 
 ### Process commitments
 
@@ -255,12 +262,15 @@ both public.
   predates the actual 1.0 release (still pending) but the
   policy is in effect from the first published release.
 - The `@arethetypeswrong/cli` and `publint` checks were
-  recorded here as added and non-negotiable. They were
-  neither, and this ADR asserted otherwise for six alpha
-  releases — see the Tooling section for what actually
-  guards `exports` today. Corrected rather than quietly
-  dropped, because an unmet commitment in a decision record
-  is more misleading than an absent one.
+  recorded here as added in Phase 4 and non-negotiable. They
+  were neither, and this ADR asserted otherwise for six alpha
+  releases. They exist now, and the first run justified the
+  claim retroactively: it found a documented subpath that did
+  not resolve for consumers on the default CommonJS
+  resolution. The lesson worth keeping is not about these two
+  tools — it is that a decision record asserting a check
+  exists is precisely as good as no check at all, and reads
+  better.
 - The `api-extractor` reports were baselined immediately
   before the stable `1.0.0` release, which is the only moment
   the baseline is worth much: taken later, the first diff has
