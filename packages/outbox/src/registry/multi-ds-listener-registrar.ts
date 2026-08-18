@@ -33,8 +33,15 @@ export const OUTBOX_LISTENER_REGISTRAR_TOKEN = Symbol.for(
   '@nestjs-transactional/cqrs/outbox-listener-registrar',
 );
 
-/** Shape of an entry registered through the structural registrar port. */
-interface RegistrarListenerEntry {
+/**
+ * Shape of an entry registered through the structural registrar port.
+ *
+ * Exported because it is the parameter type of the public
+ * {@link MultiDsOutboxListenerRegistrar.register} — without it a consumer
+ * cannot name what that method takes. Flagged by api-extractor's
+ * `ae-forgotten-export`.
+ */
+export interface RegistrarListenerEntry {
   readonly id: string;
   readonly eventType: string;
   readonly invoke: (event: unknown) => Promise<void>;

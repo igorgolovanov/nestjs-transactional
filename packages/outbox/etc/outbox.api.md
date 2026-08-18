@@ -351,7 +351,6 @@ export class JsonEventSerializer implements EventSerializer {
 export class MultiDsOutboxListenerRegistrar {
     // Warning: (ae-incompatible-release-tags) The symbol "__constructor" is marked as @public, but its signature references "OutboxDataSourceNames" which is marked as @internal
     constructor(moduleRef: ModuleRef, dataSourceNames: OutboxDataSourceNames);
-    // Warning: (ae-forgotten-export) The symbol "RegistrarListenerEntry" needs to be exported by the entry point index.d.ts
     register(listener: RegistrarListenerEntry): void;
 }
 
@@ -593,6 +592,16 @@ export enum PublicationStatus {
 export interface RegisteredOutboxListener {
     readonly eventType: string;
     readonly id: string;
+    readonly invoke: (event: unknown) => Promise<void>;
+}
+
+// @public
+export interface RegistrarListenerEntry {
+    // (undocumented)
+    readonly eventType: string;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
     readonly invoke: (event: unknown) => Promise<void>;
 }
 

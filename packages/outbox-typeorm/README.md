@@ -3,369 +3,165 @@
 [![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
-TypeORM persistence backend for
-[`@nestjs-transactional/outbox`](../outbox). Ships the
-`event_publication` table schema, a TypeORM-backed implementation of
-the `EventPublicationRepository` SPI, and (in a later iteration) the
-NestJS module wiring.
+TypeORM storage for
+[`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox).
 
-## Status
+`outbox` defines the registry and the worker but ships no production
+storage. This package provides it: the `event_publication` table, its
+archive, a repository implementation, and a migration to create both.
 
-Alpha. Public API may change between 0.x releases. Current shape:
+Publication rows are written through the ambient transaction, so they
+commit with your business data or not at all — that is the guarantee the
+whole pattern rests on, and it comes from the transparent repository
+support in
+[`@nestjs-transactional/typeorm`](https://www.npmjs.com/package/@nestjs-transactional/typeorm).
 
-- `EventPublicationEntity` / `EventPublicationArchiveEntity` schema
-  with all four indexes for worker / operator / cleanup paths.
-- `TypeOrmEventPublicationRepository` integrates through the
-  transparent transactional repository patches in
-  [`@nestjs-transactional/typeorm`](../typeorm) — every read and
-  write commits atomically with the business transaction.
-- `OutboxTypeOrmModule.forRoot({ dataSource?, isDefault? })` and
-  `forRootAsync({...})` — DataSource is resolved from DI via
-  `@nestjs/typeorm`'s `getDataSourceToken(name)`, mirroring
-  `TypeOrmTransactionalModule`.
-- `SchemaInitializer` for development-time auto-init plus the
-  shipped TypeORM migration `CreateEventPublication1700000000000`.
+> **Alpha.** The public API is stable in intent but may still change
+> before `1.0.0`.
 
-Design notes: [`docs/roadmap/README.md`](../../docs/roadmap/README.md),
-[ADR-006](../../docs/adr/006-outbox-pattern.md),
-[ADR-019](../../docs/adr/019-outbox-multi-forroot-pattern.md).
-
-## What ships today
-
-### Entities
-
-- `EventPublicationEntity` (`event_publication`): the hot queue. Four
-  indexes cover the worker, operator, and cleanup paths:
-  - `(status, publicationDate)` — `findReadyForProcessing`,
-    `findStale`.
-  - `(status, listenerId)` — per-listener retries.
-  - `(eventType)` — operator queries and event externalization.
-  - `(completionDate)` — `findCompleted(olderThan)` and
-    `deleteCompleted(olderThan)`.
-  `status` is `varchar(32)` rather than a Postgres `enum`, to keep new
-  lifecycle states from forcing a type migration.
-
-- `EventPublicationArchiveEntity` (`event_publication_archive`): the
-  cold audit trail used by the `ARCHIVE` completion mode. Same fields
-  as `EventPublicationEntity` except `completionDate` is non-nullable
-  — rows only arrive here after having completed.
-
-### Repository
-
-`TypeOrmEventPublicationRepository` implements
-`EventPublicationRepository` from `outbox`. Highlights:
-
-- Every read and write goes through the ambient
-  `EntityManager` resolved by
-  `@nestjs-transactional/typeorm`'s `getCurrentEntityManager`, so
-  publication rows commit atomically with the business data when the
-  caller is inside a `@Transactional()` scope.
-- `tryClaim` issues a single conditional `UPDATE`
-  (`WHERE id = :id AND status IN (PUBLISHED, RESUBMITTED)`) and
-  returns whether the row was actually transitioned — atomic under
-  concurrent workers.
-- `findReadyForProcessing` polls ready rows in publication-date order
-  WITHOUT per-row locking. An earlier design used
-  `SELECT ... FOR UPDATE SKIP LOCKED`; it was dropped because
-  pessimistic locks need an enclosing transaction wide enough to hold
-  the lock across the listener invocation, which is unsafe for
-  long-running listeners. Concurrent workers may therefore see the
-  same rows — correctness comes from `tryClaim` above, and a losing
-  worker simply moves on. The duplicate-fetch cost is negligible at
-  typical worker counts (1–3); very high worker counts would want a
-  different claim strategy.
-- `archiveCompleted` copies the row into
-  `event_publication_archive` and then deletes it from the hot queue
-  — atomicity comes from the ambient transaction the processor wraps
-  the listener invocation in.
-
-## Installation (once published)
+## Install
 
 ```bash
-pnpm add @nestjs-transactional/core \
-         @nestjs-transactional/typeorm \
+pnpm add @nestjs-transactional/outbox-typeorm \
          @nestjs-transactional/outbox \
-         @nestjs-transactional/outbox-typeorm
+         @nestjs-transactional/typeorm \
+         @nestjs-transactional/core
 ```
 
-Peer dependencies: `@nestjs/common`, `@nestjs/core`, `@nestjs/typeorm`,
-`reflect-metadata`, `rxjs`, `typeorm`.
+## Quick start
 
-## Compatibility
+Register the two entities on your `DataSource`, then wire four modules
+in this order:
 
-| Peer                                | Supported range            |
-| ----------------------------------- | -------------------------- |
-| Node.js                             | `>=22.13.0`                |
-| `typeorm`                           | `^0.3.0 \|\| ^1.0.0`       |
-| `@nestjs/typeorm`                   | `^10.0.0 \|\| ^11.0.0`     |
-| `@nestjs/common` / `@nestjs/core`   | `^10.0.0 \|\| ^11.0.0`     |
-| `reflect-metadata`                  | `^0.1.13 \|\| ^0.2.0`      |
-| `rxjs`                              | `^7.0.0`                   |
-
-The TypeORM range covers both stable `0.3.x` and stable `1.x`
-releases. CI runs the full unit and integration matrix
-(testcontainers Postgres) against three points of it — `0.3.31`,
-`1.0.0` and `1.1.0`. TypeORM nightly / beta builds are not in the
-declared range; install them explicitly via `pnpm.overrides` if you
-need to pin to one.
-
-## Usage
-
-Full wiring for an application that publishes, processes, and
-recovers events against a TypeORM-backed registry:
-
-```typescript
+```ts
 import { Module } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
 import {
-  OutboxModule,
-  OutboxProcessingModule,
-} from '@nestjs-transactional/outbox';
-import {
-  EventPublicationEntity,
   EventPublicationArchiveEntity,
+  EventPublicationEntity,
   OutboxTypeOrmModule,
   typeOrmEventPublicationRepositoryProvider,
 } from '@nestjs-transactional/outbox-typeorm';
 
-import { OrderPlacedEvent } from './events';
-
-const dataSource = new DataSource({
-  type: 'postgres',
-  // ...
-  entities: [
-    EventPublicationEntity,
-    EventPublicationArchiveEntity,
-    // ...your domain entities
-  ],
-});
-
 @Module({
   imports: [
-    // 1. Core transaction infrastructure — must be global so
-    //    downstream modules can see TransactionManager.
-    TransactionalModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      entities: [EventPublicationEntity, EventPublicationArchiveEntity, Order],
+    }),
 
-    // 2. TypeORM adapter registration. `forRoot` resolves the
-    //    actual DataSource via @nestjs/typeorm's
-    //    `getDataSourceToken(name)` — so `TypeOrmModule.forRoot(...)`
-    //    must be imported above this. Activates transparent
-    //    transactional Repository dispatch.
+    TransactionalModule.forRoot({ isGlobal: true }),
     TypeOrmTransactionalModule.forRoot({ isDefault: true }),
 
-    // 3. Outbox-typeorm registration. `forRoot` resolves the
-    //    DataSource from DI (same pattern as
-    //    TypeOrmTransactionalModule). Registers the
-    //    `TypeOrmEventPublicationRepository` under a private per-DS
-    //    token; the cross-module bridge
-    //    `typeOrmEventPublicationRepositoryProvider()` (passed to
-    //    `OutboxModule.forRoot` below) aliases the official outbox
-    //    token to that private one. The `SchemaInitializer` is
-    //    instantiated per-DS — production should disable it and
-    //    apply the shipped TypeORM migration instead.
+    // Auto-create the tables in development only — production runs the
+    // migration instead. See Schema below.
     OutboxTypeOrmModule.forRoot({
       schemaInitialization: { enabled: process.env.NODE_ENV !== 'production' },
     }),
 
-    // 4. Outbox-core wiring. Forward the TypeORM repository via the
-    //    aliasing Provider so outbox does NOT install its
-    //    InMemory default.
     OutboxModule.forRoot({
+      // Required. Without it `outbox` keeps its in-memory default and
+      // nothing is persisted — see the warning below.
       repository: typeOrmEventPublicationRepositoryProvider(),
       republishOnStartup: true,
-      processor: { pollingInterval: 1000, batchSize: 100 },
-      staleness: { processing: 60_000, monitorInterval: 30_000 },
     }),
 
-    // 5. Register the event classes the outbox should know about.
-    //    Each feature module would normally call forFeature() for the
-    //    events it owns; this single-module example collapses them.
     OutboxModule.forFeature([OrderPlacedEvent]),
 
-    // 6. Only in worker processes — starts the processor and
-    //    staleness monitor on bootstrap. API-only apps that just
-    //    publish events should NOT import this.
-    OutboxProcessingModule,
+    OutboxProcessingModule, // worker processes only
   ],
 })
 export class AppModule {}
 ```
 
-### Why the `repository` forwarding provider
+> **`repository` is not optional in practice.** `OutboxModule.forRoot()`
+> installs `InMemoryEventPublicationRepository` when the option is
+> omitted, and that provider wins. The application works — publishes,
+> handles, completes — and every publication is lost on restart, with
+> nothing in the database and no error to notice.
+> `typeOrmEventPublicationRepositoryProvider()` aliases the outbox's
+> token to the TypeORM implementation this module registers.
 
-`OutboxModule.forRoot` defaults to
-`InMemoryEventPublicationRepository` for the
-`EVENT_PUBLICATION_REPOSITORY` token when `repository` is omitted.
-Passing `typeOrmEventPublicationRepositoryProvider` replaces that
-default with a `useExisting` alias pointing at the TypeORM
-implementation registered by `OutboxTypeOrmModule.forFeature`. Leaving
-the option out would install two providers for the same token —
-the InMemory one would win and your publications would never reach
-the database.
+## Schema
 
-### Publishing events
+Two tables. `event_publication` is the hot queue; `event_publication_archive`
+is the cold audit trail used by the `ARCHIVE` completion mode. Four
+indexes cover the worker, operator and cleanup paths — `(status,
+publicationDate)`, `(status, listenerId)`, `(eventType)` and
+`(completionDate)`. `status` is `varchar(32)` rather than an enum, so a
+new lifecycle state never forces a type migration.
 
-```typescript
-import { Injectable } from '@nestjs/common';
-import { Transactional } from '@nestjs-transactional/core';
-import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
+**In production, run the shipped migration:**
 
-@Injectable()
-export class PlaceOrderHandler {
-  constructor(private readonly outbox: OutboxEventPublisher) {}
-
-  @Transactional()
-  async handle(orderId: string): Promise<void> {
-    // ...persist business data in the same transaction...
-    await this.outbox.publish(new OrderPlacedEvent(orderId));
-  }
-}
-```
-
-The publication row commits atomically with the business data. If
-the transaction rolls back, the publication row is rolled back too
-— there is no "event published without the business change landing"
-failure mode.
-
-### Declaring a handler
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import {
-  type IOutboxEventHandler,
-  OutboxEventsHandler,
-} from '@nestjs-transactional/outbox';
-
-@Injectable()
-@OutboxEventsHandler(OrderPlacedEvent)
-export class InventoryReservationHandler
-  implements IOutboxEventHandler<OrderPlacedEvent>
-{
-  async handle(event: OrderPlacedEvent): Promise<void> {
-    // Runs in a fresh REQUIRES_NEW transaction after the publishing
-    // transaction has committed, retried on exception, resumable
-    // across process restarts.
-  }
-}
-```
-
-## Schema management
-
-Two supported paths, matching Spring Modulith's split between
-reviewed schema changes and the
-`spring.modulith.events.jdbc.schema-initialization.enabled`
-developer shortcut.
-
-### Production: run the TypeORM migration (preferred)
-
-The package ships a ready-to-use migration,
-`CreateEventPublication1700000000000`, that creates both
-`event_publication` and `event_publication_archive` with every
-index. Register it with your DataSource and run it through the
-TypeORM CLI as part of your deploy:
-
-```typescript
-// data-source.ts
-import { DataSource } from 'typeorm';
+```ts
 import { CreateEventPublication1700000000000 } from '@nestjs-transactional/outbox-typeorm';
 
-export const dataSource = new DataSource({
-  type: 'postgres',
-  // ...
-  migrations: [CreateEventPublication1700000000000, /* ...your own */],
-});
+// In your DataSource config:
+migrations: [CreateEventPublication1700000000000];
 ```
 
-```bash
-pnpm typeorm migration:run -d ./dist/data-source.js
+**In development**, `schemaInitialization: { enabled: true }` creates
+both tables at bootstrap instead. It is idempotent and checks for
+existing tables first, but it is still schema DDL at application
+startup: keep it out of production, where a migration gives you a
+reviewable, ordered, reversible change.
+
+## Concurrency
+
+`tryClaim` is one conditional `UPDATE`
+(`WHERE id = :id AND status IN (PUBLISHED, RESUBMITTED)`) that reports
+whether the row actually transitioned. That is where the safety lives,
+which is why `findReadyForProcessing` deliberately does **not** lock
+rows.
+
+`SELECT ... FOR UPDATE SKIP LOCKED` was tried and dropped: a pessimistic
+lock has to be held by a transaction wide enough to span the listener
+invocation, which is unsafe when listeners are slow. Concurrent workers
+may therefore fetch the same row; only one wins the claim, and the
+others move on without invoking anything. The cost is a wasted `SELECT`
+at typical worker counts
+([DD-025](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/025-claim-atomicity-obligation.md)).
+
+## Multiple dataSources
+
+One `forRoot` per dataSource, mirroring the other packages:
+
+```ts
+OutboxTypeOrmModule.forRoot(),                          // 'default'
+OutboxTypeOrmModule.forRoot({ dataSource: 'billing' }), // 'billing'
 ```
 
-The timestamp `1700000000000` is a placeholder chosen to sort
-before most application-owned migrations. Feel free to copy the
-migration file into your own `migrations/` directory and rename it
-to match your team's timestamp convention — the migration body is
-just a call to `applyEventPublicationSchema(queryRunner)` from this
-package, so keeping a thin wrapper in your own tree is encouraged.
+Each registers its repository under a per-dataSource token; pass the
+matching name to `typeOrmEventPublicationRepositoryProvider('billing')`
+when wiring that dataSource's `OutboxModule`
+([ADR-019](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/019-outbox-multi-forroot-pattern.md)).
+`forRootAsync` is available for config resolved at runtime.
 
-### Development: auto-init at bootstrap
+## Compatibility
 
-Useful for local development and integration suites that spin a
-fresh database up per run. `SchemaInitializer` is a
-NestJS-lifecycle-aware provider that creates both tables on
-application bootstrap when its `enabled` option is set:
+| Peer | Supported range |
+| --- | --- |
+| Node.js | `>=22.13.0` |
+| `typeorm` | `^0.3.0 \|\| ^1.0.0` |
+| `@nestjs/typeorm` | `^10.0.0 \|\| ^11.0.0` |
+| `@nestjs/common` / `@nestjs/core` | `^10.0.0 \|\| ^11.0.0` |
+| `reflect-metadata` | `^0.1.13 \|\| ^0.2.0` |
+| `rxjs` | `^7.0.0` |
 
-```typescript
-import { Module } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { getDataSourceToken } from '@nestjs/typeorm';
-import {
-  SchemaInitializer,
-  SCHEMA_INITIALIZATION_OPTIONS,
-} from '@nestjs-transactional/outbox-typeorm';
+CI exercises the repository against a real Postgres via testcontainers
+at three points of the TypeORM range: `0.3.31`, `1.0.0` and `1.1.0`.
 
-@Module({
-  providers: [
-    {
-      provide: SCHEMA_INITIALIZATION_OPTIONS,
-      useValue: { enabled: process.env.NODE_ENV !== 'production' },
-    },
-    {
-      provide: SchemaInitializer,
-      useFactory: (ds: DataSource, opts) => new SchemaInitializer(ds, opts),
-      inject: [getDataSourceToken(), SCHEMA_INITIALIZATION_OPTIONS],
-    },
-  ],
-})
-export class OutboxSchemaModule {}
-```
+## Documentation
 
-The initializer is a no-op when `enabled: false`. When enabled and
-the hot table already exists, it logs a debug line and bails out
-before running any DDL — safe to leave on across restarts. **Do
-not enable in production** — schema changes should always go
-through a reviewed migration.
-
-## Using with `@nestjs-transactional/cqrs`
-
-When the application uses `@nestjs/cqrs` aggregates, bind
-`OutboxEventPublisher` under the cqrs package's
-`OUTBOX_PUBLICATION_SCHEDULER` token AND bind
-`OutboxListenerRegistry` under `OUTBOX_LISTENER_REGISTRAR`.
-`HybridEventPublisher` (wired by `CqrsTransactionalModule.forRoot()`)
-then routes every `aggregate.commit()` through both the in-memory
-phase-aware dispatcher AND the outbox, and
-`IntegrationEventsHandlerScanner` routes
-`@IntegrationEventsHandler` classes through the outbox worker.
-See [`../cqrs/README.md#outbox-integration`](../cqrs/README.md#outbox-integration)
-for the full wiring recipe and the trade-offs between
-`@TransactionalEventsHandler`, `@OutboxEventsHandler`, and
-`@IntegrationEventsHandler`.
-
-## Testing
-
-Integration tests live under `test/integration/` and rely on
-[`testcontainers-node`](https://node.testcontainers.org/) to spin up
-a real Postgres 16 container for every run. Requires Docker to be
-running locally:
-
-```bash
-pnpm --filter @nestjs-transactional/outbox-typeorm test:integration
-```
-
-Unit-test-only runs (`pnpm test`) skip the integration suite per the
-shared Jest base config.
-
-## Worked examples
-
-- [`basic-typeorm-outbox`](../../examples/basic-typeorm-outbox) — single-DS outbox with Postgres, atomicity proven by testcontainers.
-- [`multi-datasource-outbox`](../../examples/multi-datasource-outbox) — per-DS `event_publication` tables (ADR-019 multi-`forRoot`).
-- [`shared-database-modular-monolith`](../../examples/shared-database-modular-monolith) — one Postgres, multi-schema, per-module outbox stacks.
-- [`saga-pattern`](../../examples/saga-pattern), [`audit-logging`](../../examples/audit-logging) — outbox-driven business saga and asymmetric audit-DS sink.
-- [`e-commerce-orders`](../../examples/e-commerce-orders) — three-DataSource flagship using `OutboxTypeOrmModule.forRoot` per DS.
-
-Full catalogue: [examples/README.md](../../examples/README.md).
+- [Getting started and full docs](https://github.com/igorgolovanov/nestjs-transactional#readme)
+- [Architecture: the outbox pattern](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/architecture/outbox-pattern.md)
+- [Outbox architecture (ADR-007)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/007-outbox-architecture.md)
+- Runnable examples:
+  [`basic-typeorm-outbox`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/basic-typeorm-outbox),
+  [`multi-datasource-outbox`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/multi-datasource-outbox),
+  [`shared-database-modular-monolith`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/shared-database-modular-monolith)
 
 ## License
 

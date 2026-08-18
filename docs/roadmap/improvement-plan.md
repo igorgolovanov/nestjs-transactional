@@ -703,9 +703,22 @@ Recorded, not scheduled. Ordered roughly by value.
   in IDE tooltips — checked against a sample before silencing, and it
   was dozens of warnings per package. `ae-missing-release-tag` is off
   because ADR-004 draws the public/internal line by entry point rather
-  than with `@public` / `@internal` tags. `ae-forgotten-export` stays
-  on and currently reports nothing, which is the interesting part: no
-  public signature references a type a consumer cannot name.
+  than with `@public` / `@internal` tags.
+
+  `ae-forgotten-export` stays on, and it found three real defects —
+  public signatures naming types a consumer could not import:
+  `CqrsTransactionalAsyncOptions` (the options type of
+  `forRootAsync`, missing from the cqrs index), `AggregateConstructor`
+  (the constraint on `mergeClassContext`'s type parameter) and
+  `RegistrarListenerEntry` (the parameter type of
+  `MultiDsOutboxListenerRegistrar.register`). All three are now
+  exported; every main entry point is clean.
+
+  The `/testing` entry points still report eleven, and those are an
+  artifact rather than a defect: api-extractor analyses one entry point
+  at a time, so types the main entry exports — `TransactionOptions`,
+  `EventPublicationRepository` and friends — look unexported from the
+  isolated `/testing` view. Verified individually before dismissing.
 
   Verified by mutation: adding one exported interface makes
   `pnpm api:check` exit 1. Worth having checked — api-extractor calls

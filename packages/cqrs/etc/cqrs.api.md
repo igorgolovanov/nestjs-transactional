@@ -20,6 +20,9 @@ import { TransactionalMetadata } from '@nestjs-transactional/core';
 import { TransactionManager } from '@nestjs-transactional/core';
 import { Type } from '@nestjs/common';
 
+// @public (undocumented)
+export type AggregateConstructor<T extends AggregateRoot> = new (...args: never[]) => T;
+
 // @public
 export const CQRS_HANDLER_WRAPPER_OPTIONS: unique symbol;
 
@@ -36,6 +39,18 @@ export class CqrsHandlerWrapper implements OnModuleDestroy {
 }
 
 // @public
+export type CqrsTransactionalAsyncFactoryResult = HandlerWrapperOptions;
+
+// @public
+export interface CqrsTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+    // (undocumented)
+    readonly inject?: readonly InjectionToken[];
+    // (undocumented)
+    readonly useFactory: (...args: never[]) => Promise<CqrsTransactionalAsyncFactoryResult> | CqrsTransactionalAsyncFactoryResult;
+    readonly useTransactionalEventPublisher?: boolean;
+}
+
+// @public
 export class CqrsTransactionalBootstrap implements OnApplicationBootstrap {
     constructor(wrapper: CqrsHandlerWrapper);
     // (undocumented)
@@ -46,7 +61,6 @@ export class CqrsTransactionalBootstrap implements OnApplicationBootstrap {
 export class CqrsTransactionalModule {
     // (undocumented)
     static forRoot(options?: CqrsTransactionalOptions): DynamicModule;
-    // Warning: (ae-forgotten-export) The symbol "CqrsTransactionalAsyncOptions" needs to be exported by the entry point index.d.ts
     static forRootAsync(options: CqrsTransactionalAsyncOptions): DynamicModule;
 }
 
@@ -179,8 +193,6 @@ export class TransactionalEventPublisher implements IEventPublisher {
 // @public
 export class TransactionalEventPublisherAdapter extends EventPublisher {
     constructor(strategy: IEventPublisher, eventBus: EventBus);
-    // Warning: (ae-forgotten-export) The symbol "AggregateConstructor" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     mergeClassContext<T extends AggregateConstructor<AggregateRoot>>(metatype: T): T;
     // (undocumented)

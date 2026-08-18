@@ -3,75 +3,42 @@
 [![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
-TypeORM adapter for [`@nestjs-transactional/core`](../core).
+TypeORM adapter for
+[`@nestjs-transactional/core`](https://www.npmjs.com/package/@nestjs-transactional/core).
 
-## Overview
+Two things come with it. The adapter itself, which maps `@Transactional()`
+onto TypeORM's transactions and savepoints — and **transparent
+transactional repositories**: your existing `@InjectRepository(Order)`
+instances start honouring the active transaction on their own, with no
+change to the code that uses them.
 
-- `TypeOrmTransactionAdapter` — implements the core
-  `TransactionAdapter` SPI over TypeORM's `DataSource`. Handles
-  BEGIN / COMMIT / ROLLBACK via `DataSource.transaction(...)` and
-  issues raw `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` /
-  `RELEASE SAVEPOINT` SQL for nested transactions.
-- **Transparent transactional repositories** —
-  `@InjectRepository(Entity)` instances,
-  `@InjectEntityManager() em.getRepository(E)`,
-  `@InjectDataSource() ds.manager.save(...)`, and
-  `ds.getRepository(E).save(...)` automatically dispatch through the
-  active `@Transactional()` scope's `EntityManager`. No
-  `getCurrentEntityManager()` boilerplate. Custom repositories via
-  `Repository.extend(...)` and `TreeRepository` work transparently.
-  See [Transparent transactional behaviour](#transparent-transactional-behaviour)
-  below.
-- `getCurrentEntityManager(dataSource?, fallback?)` — escape-hatch
-  helper that returns the transaction-aware `EntityManager` from the
-  current async context (or falls back to `dataSource.manager`
-  outside a transaction). Mostly needed for the documented
-  limitations below; standard injection paths cover everything else.
-- `isInTransaction(dataSource?)` — predicate for the current
-  context.
-- `TypeOrmTransactionalModule.forRoot({ dataSource?, isDefault? })` —
-  NestJS dynamic module that activates the transparent patches and
-  registers an adapter with the core `AdapterRegistry`. The
-  `DataSource` itself resolves from DI under
-  `getDataSourceToken(dataSource)` — the same convention
-  `@nestjs/typeorm` uses for `@InjectRepository(E, dataSource)`.
-- `TypeOrmTransactionalModule.forRootAsync({ useFactory, inject?, imports? })`
-  — async variant for `ConfigService`-driven setups. Registers via
-  `OnModuleInit` to defer DataSource resolution past `@nestjs/typeorm`'s
-  async DataSource provider settling
-  ([Convention #22](../../docs/status/conventions.md)).
-- Multi-DataSource: call `forRoot` once per dataSource. Mirrors
-  [`OutboxModule`](../outbox) (ADR-019) and
-  [`TransactionalModule`](../core).
+```ts
+@Injectable()
+export class OrderService {
+  constructor(@InjectRepository(Order) private readonly orders: Repository<Order>) {}
 
-## Installation
+  @Transactional()
+  async place(dto: PlaceOrderDto) {
+    // Runs in the transaction. Rolls back if anything below throws.
+    // Outside a @Transactional method, the same call autocommits.
+    return this.orders.save(dto);
+  }
+}
+```
+
+No `getCurrentEntityManager()`, no passing an `EntityManager` down
+through service layers, no separate "transactional" repository type.
+
+> **Alpha.** The public API is stable in intent but may still change
+> before `1.0.0`.
+
+## Install
 
 ```bash
 pnpm add @nestjs-transactional/typeorm @nestjs-transactional/core typeorm @nestjs/typeorm reflect-metadata
 ```
 
-## Compatibility
-
-| Peer                                | Supported range            |
-| ----------------------------------- | -------------------------- |
-| Node.js                             | `>=22.13.0`                |
-| `typeorm`                           | `^0.3.0 \|\| ^1.0.0`       |
-| `@nestjs/typeorm`                   | `^10.0.0 \|\| ^11.0.0`     |
-| `@nestjs/common` / `@nestjs/core`   | `^10.0.0 \|\| ^11.0.0`     |
-| `reflect-metadata`                  | `^0.1.13 \|\| ^0.2.0`      |
-| `rxjs`                              | `^7.0.0`                   |
-
-The TypeORM range covers both stable `0.3.x` and stable `1.x`
-releases. CI runs the full unit and integration matrix
-(testcontainers Postgres) against three points of it — `0.3.31`,
-`1.0.0` and `1.1.0` — so the adapter is exercised end-to-end on the
-newest `0.3.x`, the floor of `^1.0.0`, and the current release.
-TypeORM nightly / beta builds are not in the declared range; install
-them explicitly via `pnpm.overrides` if you need to pin to one.
-
 ## Quick start
-
-Minimal single-DataSource setup:
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -81,13 +48,8 @@ import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      entities: [User],
-      synchronize: false,
-    }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forRoot({ type: 'postgres', entities: [Order] }),
+    TypeOrmModule.forFeature([Order]),
 
     TransactionalModule.forRoot({ isGlobal: true }),
     TypeOrmTransactionalModule.forRoot(),
@@ -96,285 +58,153 @@ import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 export class AppModule {}
 ```
 
-**Import order matters** — `TransactionalModule.forRoot({ isGlobal: true })`
-must be present (with `isGlobal`) so the `AdapterRegistry` is visible
-inside `TypeOrmTransactionalModule`'s DI scope. The actual
-`DataSource` is resolved via `@nestjs/typeorm`'s
-`getDataSourceToken(name)` — `TypeOrmModule.forRoot(...)` registers
-it globally, so `TypeOrmTransactionalModule.forRoot` finds it
-automatically.
+`TransactionalModule.forRoot({ isGlobal: true })` has to be there, with
+`isGlobal` — that is how this module sees the core registry from its own
+DI scope. The `DataSource` is found through `@nestjs/typeorm`'s
+`getDataSourceToken(name)`, the same convention
+`@InjectRepository(E, dataSource)` uses, so nothing else needs wiring.
 
-## Transparent transactional behaviour
+## What becomes transparent
 
-Once the module is imported, every Repository reachable through the
-standard `@nestjs/typeorm` injection paths automatically dispatches
-through the active `@Transactional()` scope. No
-`getCurrentEntityManager()` calls in user code:
+These all dispatch through the active transaction:
 
-```ts
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Transactional } from '@nestjs-transactional/core';
-import { Repository } from 'typeorm';
-import { Order } from './order.entity';
+- `@InjectRepository(Entity)` — the common case.
+- `@InjectEntityManager() em.getRepository(E)`.
+- `@InjectDataSource() ds.getRepository(E)` and `ds.manager`.
+- Custom repositories built with `Repository.extend(...)`.
+- `TreeRepository` and `MongoRepository`, which inherit from `Repository`.
 
-@Injectable()
-export class OrderService {
-  constructor(
-    @InjectRepository(Order)
-    private readonly orderRepo: Repository<Order>,
-  ) {}
+Two patterns are **not** covered, and need an escape hatch:
 
-  @Transactional()
-  async placeOrder(dto: PlaceOrderDto): Promise<Order> {
-    // `orderRepo.save(...)` automatically uses the transactional
-    // EntityManager. If the method throws, the save rolls back.
-    // Outside a @Transactional scope, the same call autocommits.
-    return this.orderRepo.save(dto);
-  }
-}
-```
+1. **`em.save(Entity, ...)` called directly** on an injected
+   `EntityManager`. The patch covers `em.getRepository(E).save(...)`,
+   not the manager's own data methods — patching all ~14 of them would
+   require per-method recursion guards, which was judged not worth the
+   surface area.
+2. **`BaseEntity` static methods** (`User.save(...)`).
+   `BaseEntity.useDataSource(...)` captures a `DataSource` reference
+   that bypasses the patch. The library `typeorm-transactional` has the
+   same limitation.
 
-Supported transparent patterns:
-
-- `@InjectRepository(Entity) repo` — the headline case.
-- `@InjectEntityManager() em.getRepository(E).save(...)`.
-- `@InjectDataSource() ds.getRepository(E).save(...)`.
-- `@InjectDataSource() ds.manager.save(Entity, ...)` (the patched
-  DataSource manager getter routes through the active EM).
-- Custom repositories via `Repository.extend(...)`.
-- `TreeRepository` and `MongoRepository` (inherit from `Repository`).
-
-The mechanism is prototype-level patching modelled on the
-`typeorm-transactional` library; patches install at module-load
-time so they cover Repositories constructed by any DI factory,
-regardless of resolution order.
-
-### Documented limitations
-
-Two patterns are NOT covered by the patches and require an escape
-hatch:
-
-1. **`@InjectEntityManager() em.save(Entity, ...)` direct call** is
-   NOT transactional. The patches cover `em.getRepository(E).save(...)`
-   (the typical pattern) but not direct method calls on the injected
-   `EntityManager`. Use the Repository pattern instead, or call
-   `getCurrentEntityManager()`:
-
-   ```ts
-   @Transactional()
-   async createUser(name: string) {
-     // Option A — Repository pattern (recommended).
-     return this.em.getRepository(User).save({ name });
-
-     // Option B — escape hatch.
-     // const em = getCurrentEntityManager();
-     // return em.save(User, { name });
-   }
-   ```
-
-2. **`BaseEntity` static methods** (`User.save(...)` etc.) are NOT
-   supported. The `BaseEntity.useDataSource(...)` API stores a
-   captured DataSource reference that bypasses the patches. Use the
-   Repository pattern.
-
-The escape hatch:
+For both, either use a repository or reach for the escape hatch:
 
 ```ts
 import { getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 
-@Injectable()
-export class RawSqlService {
-  constructor(@InjectDataSource() private readonly ds: DataSource) {}
-
-  @Transactional()
-  async runRawSql() {
-    // Pass `ds` as fallback so the helper returns ds.manager when
-    // no transaction is active (autocommit). Inside a tx, returns
-    // the transactional EM.
-    const em = getCurrentEntityManager('default', this.ds);
-    await em.query(
-      'UPDATE accounts SET balance = balance - $1 WHERE id = $2',
-      [100, 1],
-    );
-  }
+@Transactional()
+async runRawSql() {
+  // Pass the DataSource as fallback so this also works outside a
+  // transaction, where it returns ds.manager.
+  const em = getCurrentEntityManager('default', this.ds);
+  await em.query('UPDATE accounts SET balance = balance - $1', [100]);
 }
 ```
 
-## Multi-DataSource
+## Dialect-dependent behaviour
+
+Two options behave differently per database, and both fail loudly or
+harmlessly rather than surprisingly:
+
+- **`readOnly`** is enforced on `postgres`, `cockroachdb` and
+  `aurora-postgres`, where the adapter issues `SET TRANSACTION READ ONLY`
+  as the transaction's first statement and the database refuses a write.
+  On other dialects it is a silent no-op. MySQL is not merely
+  unimplemented but unimplementable: `SET TRANSACTION` there applies to
+  the *next* transaction and errors inside a started one. Worth knowing
+  if you develop on SQLite and deploy to Postgres — the constraint
+  appears in production for the first time.
+  ([DD-027](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/027-readonly-and-timeout-semantics.md))
+- **`PropagationMode.NESTED`** needs savepoints. The adapter checks
+  TypeORM's own `driver.transactionSupport` flag and throws
+  `IllegalTransactionStateError` naming the driver and the alternatives,
+  instead of running your "nested" transaction as part of the outer one.
+
+## Multiple dataSources
+
+One `forRoot` call per dataSource:
 
 ```ts
-@Module({
-  imports: [
-    TypeOrmModule.forRoot({ name: 'default', /* ... */ }),
-    TypeOrmModule.forRoot({ name: 'billing',  /* ... */ }),
-
-    TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot({ isDefault: true }),       // 'default'
-    TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }), // 'billing'
-  ],
-})
-export class AppModule {}
+TypeOrmTransactionalModule.forRoot({ isDefault: true }),        // 'default'
+TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),  // 'billing'
 ```
 
-Target a specific dataSource in a transactional method:
-
 ```ts
-import { Transactional } from '@nestjs-transactional/core';
-
-@Injectable()
-export class BillingService {
-  constructor(
-    @InjectRepository(Invoice, 'billing')
-    private readonly invoiceRepo: Repository<Invoice>,
-  ) {}
-
-  @Transactional({ dataSource: 'billing' })
-  async chargeCard(/* ... */) {
-    // Repository is bound to 'billing' DS — saves go to billing.
-    return this.invoiceRepo.save(/* ... */);
-  }
+@Transactional({ dataSource: 'billing' })
+async chargeCard() {
+  return this.invoiceRepo.save(/* ... */); // repo bound to 'billing'
 }
 ```
 
-**Cross-DS isolation (DD-023)**: a Repository bound to dataSource A
-inside a `@Transactional({ dataSource: 'B' })` method autocommits —
-its patched `manager` getter looks up the active transaction for
-dataSource A, finds none, and falls back to its captured original
-manager. Distributed transactions across dataSources are explicitly
-NOT supported; cross-DS atomicity goes through the outbox.
-
-Each `forRoot` call registers its adapter under
-`typeorm:${dataSource}` in the core `AdapterRegistry`.
-`TransactionManager` routes based on `options.dataSource`.
+A repository bound to dataSource A, used inside a
+`@Transactional({ dataSource: 'B' })` method, autocommits: its patched
+manager looks for an active transaction on A, finds none, and falls back
+to its original manager. **Distributed transactions across dataSources
+are not supported** — that is deliberate, and cross-dataSource atomicity
+is what the outbox is for.
 
 ## Async configuration
 
 ```ts
-@Module({
-  imports: [
-    ConfigModule,
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (cfg: ConfigService) => ({
-        type: 'postgres',
-        url: cfg.get('DATABASE_URL'),
-        entities: [User],
-      }),
-    }),
-
-    TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (cfg: ConfigService) => ({
-        dataSource: cfg.get('DATA_SOURCE_NAME', 'default'),
-        isDefault: true,
-      }),
-    }),
-  ],
-})
-export class AppModule {}
+TypeOrmTransactionalModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (cfg: ConfigService) => ({
+    dataSource: cfg.get('DATA_SOURCE_NAME', 'default'),
+    isDefault: true,
+  }),
+});
 ```
 
-`forRootAsync` defers resolution of the dataSource name until the
-factory runs. Per-DS DI tokens (`getTransactionalAdapterToken(ds)`)
-are NOT registered in the async path because NestJS provider tokens
-must be declared statically — if you need direct adapter injection
-by per-DS token, use sync `forRoot({ dataSource })` instead.
+Registration is deferred to `OnModuleInit` so the dataSource resolves
+correctly even when paired with `TypeOrmModule.forRootAsync`. Per-dataSource
+adapter tokens are not registered on this path, because NestJS needs
+provider tokens at module-definition time; use sync `forRoot({ dataSource })`
+if you inject adapters by token.
 
-The async path uses an `OnModuleInit`-driven registration class so
-the DataSource resolves correctly even when paired with
-`TypeOrmModule.forRootAsync` (whose own DataSource provider is
-async). Pinned by
-[`packages/typeorm/test/integration/forrootasync.integration.spec.ts`](test/integration/forrootasync.integration.spec.ts).
+## Compatibility
+
+| Peer | Supported range |
+| --- | --- |
+| Node.js | `>=22.13.0` |
+| `typeorm` | `^0.3.0 \|\| ^1.0.0` |
+| `@nestjs/typeorm` | `^10.0.0 \|\| ^11.0.0` |
+| `@nestjs/common` / `@nestjs/core` | `^10.0.0 \|\| ^11.0.0` |
+| `reflect-metadata` | `^0.1.13 \|\| ^0.2.0` |
+| `rxjs` | `^7.0.0` |
+
+Both stable TypeORM lines are supported. CI runs the full unit and
+integration matrix — including savepoints and isolation against a real
+Postgres — at three points of that range: `0.3.31`, `1.0.0` and `1.1.0`.
 
 ## Testing
 
-### Unit tests — in-memory SQLite
-
-For fast unit tests that don't need a real database, use TypeORM's
-`sqljs` driver:
+For unit tests, TypeORM's in-memory `sqljs` driver is enough:
 
 ```ts
-import { DataSource } from 'typeorm';
-import { TypeOrmTransactionAdapter } from '@nestjs-transactional/typeorm';
-
-const ds = new DataSource({
-  type: 'sqljs',
-  synchronize: true,
-  entities: [YourEntity],
-});
+const ds = new DataSource({ type: 'sqljs', synchronize: true, entities: [Order] });
 await ds.initialize();
-
 const adapter = new TypeOrmTransactionAdapter(ds, 'default');
 ```
 
-### Integration tests — testcontainers-node + real Postgres
+Note that `readOnly` is not enforced on `sqljs`, so a read-only
+violation your tests miss can still surface on Postgres. For tests that
+need real dialect behaviour, run Postgres through
+[testcontainers](https://node.testcontainers.org/); the
+[`testing-patterns`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/testing-patterns)
+example shows both layers.
 
-Bundled helper for real Postgres integration:
+## Documentation
 
-```ts
-import {
-  startPostgresContainer,
-  stopPostgresContainer,
-  createAdditionalDatabase,
-} from '@nestjs-transactional/typeorm/test/setup-testcontainers';
+- [Getting started and full docs](https://github.com/igorgolovanov/nestjs-transactional#readme)
+- [`readOnly` and `timeout` semantics (DD-027)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/027-readonly-and-timeout-semantics.md)
+- [Multi-adapter architecture (ADR-018)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/018-multi-adapter-architecture.md)
+- [Known limitations](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/known-limitations.md)
+- Runnable examples:
+  [`basic-transactional`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/basic-transactional),
+  [`multi-datasource-basic`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/multi-datasource-basic),
+  [`read-write-separation`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/read-write-separation),
+  [`e-commerce-orders`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/e-commerce-orders)
 
-let ctx;
-beforeAll(async () => {
-  ctx = await startPostgresContainer({ entities: [User], synchronize: true });
-});
-afterAll(async () => {
-  await stopPostgresContainer(ctx);
-});
+## License
 
-// Multi-DS: a second database inside the same container.
-const secondary = await createAdditionalDatabase(ctx, 'billing_test', {
-  entities: [User],
-  synchronize: true,
-});
-```
-
-Run integration tests:
-
-```bash
-pnpm --filter @nestjs-transactional/typeorm test:integration
-```
-
-The bundled `docker-compose.yml` is for manual local use (`psql`
-against a persistent instance). Testcontainers manages its own
-containers and does not require compose.
-
-## Savepoints and NESTED propagation
-
-When a method uses `PropagationMode.NESTED` from inside an existing
-TypeORM transaction, the adapter issues a `SAVEPOINT sp_<uuid-30>`
-statement. Rollback rolls back to the savepoint; the outer
-transaction continues. Savepoint names are at most 33 characters
-long — valid on Postgres, MySQL, MariaDB, SQLite, and Oracle's
-identifier limit.
-
-## Worked examples
-
-- [`basic-transactional`](../../examples/basic-transactional) —
-  `@Transactional()` on `@InjectRepository`, single DataSource.
-  Transparent repository showcase.
-- [`multi-datasource-basic`](../../examples/multi-datasource-basic)
-  — two DataSources with `@Transactional({ dataSource })`, no
-  outbox.
-- [`read-write-separation`](../../examples/read-write-separation) —
-  master + replica, only the master gets
-  `TypeOrmTransactionalModule`.
-- [`async-config-from-environment`](../../examples/async-config-from-environment)
-  — `TypeOrmTransactionalModule.forRootAsync` end-to-end with
-  `ConfigService` + Joi profiles.
-- [`e-commerce-orders`](../../examples/e-commerce-orders) —
-  three-DataSource flagship combining transparent repositories +
-  per-DS outbox + CQRS + REST + Kafka externalization.
-
-Full catalogue: [examples/README.md](../../examples/README.md).
-
-## Status
-
-Alpha. Public API may change between 0.x releases.
+MIT

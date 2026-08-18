@@ -10,7 +10,11 @@ import {
 // Mirrors @nestjs/cqrs's internal `Constructor` type used by
 // `EventPublisher.mergeClassContext`'s signature. Re-declared here so we
 // don't import a non-public type from the CQRS package.
-type AggregateConstructor<T extends AggregateRoot> = new (...args: never[]) => T;
+//
+// Exported because it appears in `mergeClassContext`'s public signature:
+// without it a consumer cannot name the constraint on that type
+// parameter. api-extractor's `ae-forgotten-export` flagged exactly this.
+export type AggregateConstructor<T extends AggregateRoot> = new (...args: never[]) => T;
 
 /**
  * Drop-in replacement for `@nestjs/cqrs`'s `EventPublisher`. Wired
