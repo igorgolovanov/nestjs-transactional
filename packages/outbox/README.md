@@ -1,6 +1,6 @@
 # @nestjs-transactional/outbox
 
-[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox)
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
 The transactional outbox for NestJS — a persistent Event Publication
@@ -24,9 +24,6 @@ integrates with
 [`@nestjs-transactional/cqrs`](https://www.npmjs.com/package/@nestjs-transactional/cqrs),
 and can forward events to a broker through
 [`@nestjs-transactional/outbox-microservices`](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices).
-
-> **Alpha.** The public API is stable in intent but may still change
-> before `1.0.0`.
 
 ## Install
 

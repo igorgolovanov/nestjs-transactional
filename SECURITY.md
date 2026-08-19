@@ -27,15 +27,15 @@ needs longer than that.
 
 ## Supported versions
 
-| Version                   | Supported            |
-| ------------------------- | -------------------- |
-| `1.0.0-alpha.x`           | ✅ latest alpha only |
-| earlier `0.x` prereleases | ❌                   |
+| Version | Supported |
+| --- | --- |
+| `1.0.x` | ✅ |
+| `1.0.0-alpha.x` and earlier prereleases | ❌ |
 
-While the packages are pre-`1.0.0`, fixes land on the newest alpha and
-there are no backports — upgrading to the latest alpha is the
-supported path. Once `1.0.0` ships, security fixes will go to the
-latest minor of the current major.
+Fixes land on the latest minor of the current major; there are no
+backports to earlier minors, so upgrading within `1.x` is the supported
+path. The alpha series is not maintained — `1.0.0` is the first release
+under this policy.
 
 ## Scope
 

@@ -16,12 +16,12 @@ at-least-once delivery semantics.
 
 | Package | npm | Purpose |
 | --- | --- | --- |
-| [`@nestjs-transactional/core`](packages/core) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore/alpha?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core) | AsyncLocalStorage context, `TransactionManager`, `@Transactional` decorator, adapter SPI |
-| [`@nestjs-transactional/typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm/alpha?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | TypeORM adapter, transparent transactional repositories, multi-datasource support |
-| [`@nestjs-transactional/cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs/alpha?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsHandler`, `@IntegrationEventsHandler`, aggregate events |
-| [`@nestjs-transactional/outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox/alpha?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | Persistent Event Publication Registry — lifecycle states, async worker, staleness monitor, startup recovery, operator APIs, `@Externalized` SPI |
-| [`@nestjs-transactional/outbox-typeorm`](packages/outbox-typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm/alpha?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm) | TypeORM persistence backend for the outbox — `event_publication` table, atomic conditional-`UPDATE` claim, migration, dev-time auto-init |
-| [`@nestjs-transactional/outbox-microservices`](packages/outbox-microservices) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices/alpha?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices) | Event externalization to message brokers via `@nestjs/microservices` `ClientProxy` (Kafka, RabbitMQ, NATS, JMS, gRPC, custom) |
+| [`@nestjs-transactional/core`](packages/core) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core) | AsyncLocalStorage context, `TransactionManager`, `@Transactional` decorator, adapter SPI |
+| [`@nestjs-transactional/typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | TypeORM adapter, transparent transactional repositories, multi-datasource support |
+| [`@nestjs-transactional/cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | `@nestjs/cqrs` integration: handler wrapping, `@TransactionalEventsHandler`, `@IntegrationEventsHandler`, aggregate events |
+| [`@nestjs-transactional/outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | Persistent Event Publication Registry — lifecycle states, async worker, staleness monitor, startup recovery, operator APIs, `@Externalized` SPI |
+| [`@nestjs-transactional/outbox-typeorm`](packages/outbox-typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm) | TypeORM persistence backend for the outbox — `event_publication` table, atomic conditional-`UPDATE` claim, migration, dev-time auto-init |
+| [`@nestjs-transactional/outbox-microservices`](packages/outbox-microservices) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices) | Event externalization to message brokers via `@nestjs/microservices` `ClientProxy` (Kafka, RabbitMQ, NATS, JMS, gRPC, custom) |
 
 ## Why?
 
@@ -223,14 +223,14 @@ broker, or graceful shutdown — see the
 | 2 — `@nestjs-transactional/typeorm` | ✅ done | Adapter, `getCurrentEntityManager`, multi-datasource, savepoints |
 | 3 — `@nestjs-transactional/cqrs` | ✅ done | Phase-aware dispatching, handler wrapping, `TransactionalEventPublisher`, `AggregateRoot` integration |
 | 4 — Examples & CI | ✅ done | Initial runnable examples, GitHub Actions, coverage reports |
-| 5 — `@nestjs-transactional/outbox` | ✅ done (alpha) | Types, SPI, registry, publisher, processor, staleness monitor, startup recovery, operator APIs, in-memory repo, NestJS modules |
-| 6 — `@nestjs-transactional/outbox-typeorm` | ✅ done (alpha) | Entity, repository, migration, `SchemaInitializer`, `OutboxTypeOrmModule` |
-| 7 — CQRS ↔ outbox integration | ✅ done (alpha) | `HybridEventPublisher`, `@IntegrationEventsHandler`, `IntegrationEventsHandlerScanner` with outbox/in-memory routing |
-| 8 — Testing utilities | ✅ done (alpha) | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
-| 9 — Documentation & release | ✅ done (alpha) | Architecture docs, ADRs, migration guide, full-stack examples, first `1.0.0-alpha.0` release shipped to npm |
+| 5 — `@nestjs-transactional/outbox` | ✅ done | Types, SPI, registry, publisher, processor, staleness monitor, startup recovery, operator APIs, in-memory repo, NestJS modules |
+| 6 — `@nestjs-transactional/outbox-typeorm` | ✅ done | Entity, repository, migration, `SchemaInitializer`, `OutboxTypeOrmModule` |
+| 7 — CQRS ↔ outbox integration | ✅ done | `HybridEventPublisher`, `@IntegrationEventsHandler`, `IntegrationEventsHandlerScanner` with outbox/in-memory routing |
+| 8 — Testing utilities | ✅ done | `PublishedEvents`, `AssertablePublishedEvents` in `/testing` subpath |
+| 9 — Documentation & release | ✅ done | Architecture docs, ADRs, migration guide, full-stack examples, first `1.0.0-alpha.0` release shipped to npm |
 | 10 — Class-level handler API + naming refinement | ✅ done | Method-level → class-level migration (ADR-014); second pass renamed `@ApplicationModuleHandler` → `@IntegrationEventsHandler` |
-| 11 — Event externalization | ✅ done (alpha) | `EventExternalizer` SPI, `@Externalized` decorator, `outbox-microservices` package, ADR-015, ADR-016 (silent-success reliability finding), externalization example library coverage |
-| 14 — Multi-adapter architecture | ✅ done (alpha) | dataSource-name-keyed registration, multi-`forRoot` pattern (ADR-019), transparent transactional repositories, `OutboxTypeOrmModule` reshape, Tier 1–5 example library, ADR-018 |
+| 11 — Event externalization | ✅ done | `EventExternalizer` SPI, `@Externalized` decorator, `outbox-microservices` package, ADR-015, ADR-016 (silent-success reliability finding), externalization example library coverage |
+| 14 — Multi-adapter architecture | ✅ done | dataSource-name-keyed registration, multi-`forRoot` pattern (ADR-019), transparent transactional repositories, `OutboxTypeOrmModule` reshape, Tier 1–5 example library, ADR-018 |
 | *(future)* | 🗓 not scheduled | Broker-aware externalizers (native `kafkajs` / `amqplib` / `nats` under the same SPI for stricter delivery — see ADR-016), outbox-prisma, outbox-mongodb, OpenTelemetry, ESM dual packaging |
 
 ## Examples

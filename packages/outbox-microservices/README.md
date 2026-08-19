@@ -1,6 +1,6 @@
 # @nestjs-transactional/outbox-microservices
 
-[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices)
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
 Forwards outbox events to a message broker through
@@ -31,9 +31,6 @@ gRPC, and custom strategies.
 > guarantee, through `ClientProxy`, is at-least-once delivery to the
 > **broker**. Full analysis and the path forward:
 > [ADR-016](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/016-externalization-reliability-semantics.md).
-
-> **Alpha.** The public API is stable in intent but may still change
-> before `1.0.0`.
 
 ## Install
 

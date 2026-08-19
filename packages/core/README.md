@@ -1,6 +1,6 @@
 # @nestjs-transactional/core
 
-[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core)
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
 Declarative transactions for NestJS, with Spring's semantics.
@@ -18,9 +18,6 @@ automatically. For event delivery that survives a crash, add
 [`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox);
 for `@nestjs/cqrs` handlers,
 [`@nestjs-transactional/cqrs`](https://www.npmjs.com/package/@nestjs-transactional/cqrs).
-
-> **Alpha.** The public API is stable in intent but may still change
-> before `1.0.0`.
 
 ## Install
 

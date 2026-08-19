@@ -18,15 +18,15 @@ growing set of npm packages organised by concern.
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
   `@TransactionalEventsHandler` with Spring-like phases, `HybridEventPublisher`
   + `@IntegrationEventsHandler`, EventPublisher override for AggregateRoot.
-- **@nestjs-transactional/outbox** *(alpha)* — persistent Event Publication
+- **@nestjs-transactional/outbox** — persistent Event Publication
   Registry: lifecycle states, repository SPI, async worker, staleness
   monitor, startup recovery, operator APIs (Failed/Incomplete/Completed),
   testing utilities. ORM-agnostic.
-- **@nestjs-transactional/outbox-typeorm** *(alpha)* — TypeORM persistence
+- **@nestjs-transactional/outbox-typeorm** — TypeORM persistence
   backend for the outbox: `event_publication` + archive entities,
   `TypeOrmEventPublicationRepository` with an atomic conditional-`UPDATE`
   claim (`tryClaim`), shipped migration, `OutboxTypeOrmModule` wiring.
-- **@nestjs-transactional/outbox-microservices** *(alpha)* — event
+- **@nestjs-transactional/outbox-microservices** — event
   externalization to brokers (Kafka, RabbitMQ, NATS, JMS, gRPC, ...) via
   `@nestjs/microservices` `ClientProxy`. One package covers every transport
   the upstream supports. Reliability caveat: see ADR-016.
@@ -257,18 +257,29 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last update**: First public alpha shipped — six packages
-published to npm at `1.0.0-alpha.0` with `alpha` dist-tag:
-`@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`.
-Released via `release.yml`'s `changesets/action@v1` after merging the
-"Version Packages" PR. The repository is now a publicly installable
-NestJS infrastructure library; further iterations are public
-releases rather than pre-release prep work.
+**Last update**: releasing stable `1.0.0`. The cohort of six —
+`@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`
+— has left changesets pre-release mode and ships under the `latest`
+dist-tag rather than `alpha`. The release-readiness workstreams from
+the improvement plan are complete: API consistency, coverage
+governance, graceful shutdown and automatic retry in the outbox, plus
+the packaging guards (api-extractor surface reports, `publint`,
+`@arethetypeswrong/cli`).
+
+From here the public API is under ADR-004's stability policy: a
+breaking change needs a major bump *and* an ADR, and the committed
+`packages/*/etc/*.api.md` reports make any change to the surface show
+up as a reviewable diff.
 
 ### Blocked / Awaiting
 
-- *(none — alpha shipped; future releases follow the standard
-  changeset → version PR → publish flow.)*
+- **The `1.0.0` release itself.** Pre-release mode is exited and the
+  manifests no longer pin the `alpha` dist-tag, so the next
+  `changeset version` produces `1.0.0` for all six (verified locally:
+  every pending changeset resolves to `1.0.0`, since semver treats any
+  increment of `1.0.0-alpha.5` as `1.0.0`). What remains is the normal
+  flow — merge the "Version Packages" PR, `release.yml` publishes
+  under `latest`.
 
 ### Next
 
@@ -296,10 +307,10 @@ releases rather than pre-release prep work.
   (native `kafkajs` / `amqplib` / `nats` under the same SPI from
   DD-018 — closes the ADR-016 silent-success gap), `outbox-prisma`,
   `outbox-mongodb`, OpenTelemetry integration, ESM dual packaging.
-- **`1.0.0` stable progression**: when the API stabilises through
-  user feedback on the alpha series, `pnpm changeset pre exit`
-  followed by a regular `version` cycle promotes the cohort to
-  `1.0.0` with `latest` dist-tag.
+- **`1.0.0` stable progression**: done — the cohort has left
+  pre-release mode (`pnpm changeset pre exit`) and versions to
+  `1.0.0` under the `latest` dist-tag. Breaking changes from here
+  need a major bump plus an ADR (ADR-004).
 
 ### Five most recent decisions
 

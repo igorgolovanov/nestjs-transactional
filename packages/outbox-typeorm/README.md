@@ -1,6 +1,6 @@
 # @nestjs-transactional/outbox-typeorm
 
-[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm)
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
 TypeORM storage for
@@ -15,9 +15,6 @@ commit with your business data or not at all — that is the guarantee the
 whole pattern rests on, and it comes from the transparent repository
 support in
 [`@nestjs-transactional/typeorm`](https://www.npmjs.com/package/@nestjs-transactional/typeorm).
-
-> **Alpha.** The public API is stable in intent but may still change
-> before `1.0.0`.
 
 ## Install
 

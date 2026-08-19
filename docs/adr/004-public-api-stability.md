@@ -81,26 +81,25 @@ For each package:
   API as defined above. Includes signature changes, removed
   exports, changed default behaviour, changed token strings,
   changed migration semantics.
-- **Minor bump (`0.x.0`)** — backwards-compatible additions to
+- **Minor bump (`x.Y.0`)** — backwards-compatible additions to
   the public API. New exports, new option fields with safe
   defaults, new methods on existing classes.
-- **Patch bump (`0.0.x`)** — backwards-compatible bug fixes.
+- **Patch bump (`x.y.Z`)** — backwards-compatible bug fixes.
   Behaviour conforms to the documented contract; no new
   surface area.
 
-### Pre-1.0 (alpha/beta) phase
+### The pre-release phase (historical)
 
-While packages remain on `0.x.y`, breaking changes are
-acceptable but tracked: every breaking PR requires a
-[changeset](https://github.com/changesets/changesets) entry
-labelled `major`, and the breaking change is documented in
-the package's release notes. The intent is that consumers
-who pin to `0.x.0` can choose when to follow major bumps,
-even within the pre-1.0 phase.
+The cohort never sat on `0.x`; it shipped as `1.0.0-alpha.N`
+through changesets' pre-release mode. During that series
+breaking changes were acceptable but tracked — every breaking
+PR carried a changeset labelled `major` and said so in the
+release notes.
 
-After `1.0.0` ships, breaking changes additionally require an
-ADR documenting the rationale (or an addendum to an existing
-ADR). Pre-1.0 ADRs are encouraged but not required.
+That phase is over. From `1.0.0`, a breaking change costs a
+major bump **and** requires an ADR documenting the rationale
+(or an addendum to an existing one). The version number is now
+a promise rather than a signal of work in progress.
 
 ### Tooling
 
@@ -249,9 +248,10 @@ both public.
   *carefully-chosen* symbols from each package. We don't
   re-export internal helpers, even when they're convenient,
   because every export is a future obligation.
-- Pre-1.0 packages are explicitly labelled as alpha/beta in
-  the README so consumers know to expect breaking changes
-  during this phase.
+- The alpha series was explicitly labelled as such in every
+  README. Those labels came off with `1.0.0`: leaving them
+  would understate the guarantee, exactly as keeping them
+  absent during the alpha would have overstated it.
 - The `/testing` subpath isolates testing utilities from
   the main entry point — testing utilities can evolve
   without bleeding into production-facing exports.
@@ -259,8 +259,9 @@ both public.
 ## Notes
 
 - This ADR is process-level rather than architectural. It
-  predates the actual 1.0 release (still pending) but the
-  policy is in effect from the first published release.
+  predates the `1.0.0` release and the policy was in effect
+  from the first published alpha; `1.0.0` is where it starts
+  binding, since breaking changes now cost a major bump.
 - The `@arethetypeswrong/cli` and `publint` checks were
   recorded here as added in Phase 4 and non-negotiable. They
   were neither, and this ADR asserted otherwise for six alpha

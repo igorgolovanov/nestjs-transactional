@@ -1,6 +1,6 @@
 # @nestjs-transactional/cqrs
 
-[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
 Transactions and Spring-style event phases for
@@ -30,9 +30,6 @@ Built on
 Pair with
 [`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox)
 when a handler must survive a process crash.
-
-> **Alpha.** The public API is stable in intent but may still change
-> before `1.0.0`.
 
 ## Install
 
