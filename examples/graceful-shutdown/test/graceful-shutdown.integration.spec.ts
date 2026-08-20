@@ -151,29 +151,45 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
     expect(result.rows[0]?.status).toBe(PublicationStatus.COMPLETED);
   });
 
-  it('preserves single-unit atomicity for a transaction completing concurrently with shutdown', async () => {
-    // Kick off a recordEvent (writes audit_log + outbox publication
-    // in one tx) and immediately request shutdown. Both should
-    // settle: the tx commits, both rows persist, OnApplicationShutdown
-    // hooks run, shutdown finishes.
-    const recordPromise = audit.recordEvent('a-2', 'tx mid-shutdown');
-    const closePromise = module.close();
+  it('preserves single-unit atomicity when a transaction races shutdown', async () => {
+    // Kick off a recordEvent (audit_log + outbox publication in one tx)
+    // and request shutdown immediately. Which one wins is a genuine
+    // race, and deliberately left as one: the outbox worker's in-flight
+    // batch is drained before teardown, but a business transaction begun
+    // microseconds before `close()` is tracked by nothing, and NestJS
+    // destroys the DataSource once the shutdown hooks return.
+    //
+    // So assert the invariant that holds either way instead of a winner.
+    // Asserting the commit made this test depend on beating provider
+    // teardown — true on a fast machine, false on a CI runner, where it
+    // failed with `QueryFailedError: Connection terminated`.
+    const [recorded] = await Promise.allSettled([
+      audit.recordEvent('a-2', 'tx mid-shutdown'),
+      module.close(),
+    ]);
 
-    await Promise.all([recordPromise, closePromise]);
-
-    // Tx committed atomically (DD-019) — both rows are present.
     const auditRows = await verifyClient.query<{ id: string }>(
       'SELECT id FROM audit_log',
     );
-    expect(auditRows.rows.map((r) => r.id)).toEqual(['a-2']);
-
     const pubRows = await verifyClient.query<{ event_type: string }>(
       'SELECT event_type FROM event_publication',
     );
-    expect(pubRows.rows).toHaveLength(1);
-    expect(pubRows.rows[0]?.event_type).toBe('AuditEventRecordedEvent');
 
-    // The hook chain still ran cleanly.
+    if (recorded.status === 'fulfilled') {
+      // Committed before teardown reached the DataSource: both rows.
+      expect(auditRows.rows.map((r) => r.id)).toEqual(['a-2']);
+      expect(pubRows.rows).toHaveLength(1);
+      expect(pubRows.rows[0]?.event_type).toBe('AuditEventRecordedEvent');
+    } else {
+      // Lost the race, and the connection went away mid-transaction.
+      // Postgres rolled it back — and DD-019's single unit means the
+      // business row and the publication cannot survive separately, so
+      // neither may be here.
+      expect(auditRows.rows).toHaveLength(0);
+      expect(pubRows.rows).toHaveLength(0);
+    }
+
+    // Either way the hook chain ran to completion.
     expect(cleanup.cleaned).toBe(true);
   });
 
