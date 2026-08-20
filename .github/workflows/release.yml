@@ -42,6 +42,24 @@ jobs:
       - name: Test
         run: pnpm -r --filter './packages/*' test
 
+      # Duplicated from ci.yml on purpose. ci.yml gates pull requests;
+      # this gates the publish itself, and those are not the same event —
+      # a push straight to main, or a merge that landed without the
+      # required checks configured, reaches this workflow without ci.yml
+      # ever having passed.
+      #
+      # `publish:check` is the one that earns its place here rather than
+      # only there: publint and attw inspect the *packed tarball*, which
+      # is the artefact this job is about to push to npm. On the publish
+      # run the versions have already been bumped, so they see exactly
+      # what consumers will resolve. That check is how the `/testing`
+      # subpath was found to be unresolvable under node10 resolution
+      # after six releases had shipped it.
+      - name: Verify the published surface and packaging
+        run: |
+          pnpm api:check
+          pnpm publish:check
+
       # changesets/action will either:
       #   - open (or update) a "Version Packages" PR that bumps versions
       #     and writes CHANGELOG.md entries — when unreleased `.changeset/*.md`
