@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/outbox",
-  "version": "1.0.0-alpha.5",
+  "version": "1.0.0",
   "description": "Persistent Event Publication Registry for @nestjs-transactional — Spring Modulith equivalent (ORM-agnostic core)",
   "license": "MIT",
   "type": "commonjs",
