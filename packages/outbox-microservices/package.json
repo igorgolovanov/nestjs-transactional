@@ -3,10 +3,12 @@
   "version": "1.0.0-alpha.5",
   "description": "Event externalization for @nestjs-transactional/outbox via @nestjs/microservices ClientProxy — Spring Modulith @Externalized parity",
   "license": "MIT",
+  "type": "commonjs",
+  "sideEffects": false,
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",
-    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
     "directory": "packages/outbox-microservices"
   },
   "bugs": {
@@ -43,7 +45,6 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "alpha",
     "provenance": true
   },
   "scripts": {
@@ -53,7 +54,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "type-check": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack ."
   },
   "peerDependencies": {
     "@nestjs-transactional/outbox": "workspace:^",

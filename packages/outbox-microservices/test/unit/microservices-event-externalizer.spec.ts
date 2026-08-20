@@ -204,7 +204,7 @@ describe('MicroservicesEventExternalizer', () => {
       expect(resolved).toBe(true);
     });
 
-    it('logs but does not apply headers/routingKey to the wire payload (Phase 11.3 limitation)', async () => {
+    it('logs but does not apply headers/routingKey to the wire payload (current limitation)', async () => {
       const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
       const externalizer = buildExternalizer({ defaultClient: DEFAULT_TOKEN }, resolveClient);
       const event = new OrderPlacedEvent('o-headers');

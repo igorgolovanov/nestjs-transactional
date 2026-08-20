@@ -27,17 +27,17 @@ import { of } from 'rxjs';
 import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices.module';
 
 /**
- * Phase 14.6 verification test (Q1.A — verification only).
+ * Verification test.
  *
- * Asserts that the Phase 11 single-externalizer architecture in
- * `outbox-microservices` is compatible with Phase 14.3.2's
+ * Asserts that the single-externalizer architecture in
+ * `outbox-microservices` is compatible with
  * multi-`OutboxModule.forRoot()` shape. Multi-broker routing is driven
  * by the per-event `@Externalized({ client })` parameter, NOT by a
  * dataSource-keyed externalizer Map (Q1 / Q2 — explicit decision NOT
  * to add a `dataSource` option to `OutboxMicroservicesModule.forRoot`
  * for now).
  *
- * Mocked `ClientProxy` per Phase 11.4 / ADR-016 — real-broker
+ * Mocked `ClientProxy` per ADR-016 — real-broker
  * integration is intentionally out of scope here.
  */
 
@@ -161,7 +161,7 @@ function makeClientProxyMock(): ClientProxyMock {
   return { proxy, emit };
 }
 
-describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verification)', () => {
+describe('OutboxMicroservicesModule + multi-dataSource outbox (verification)', () => {
   let module: TestingModule;
   let billingClient: ClientProxyMock;
   let inventoryClient: ClientProxyMock;
@@ -198,7 +198,7 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
         TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('billing') }),
         TransactionalModule.forRoot({ adapter: new NamedFakeAdapter('inventory') }),
 
-        // Three outbox stacks — Phase 14.3.2 multi-forRoot.
+        // Three outbox stacks — multi-forRoot.
         OutboxModule.forRoot({}),
         OutboxModule.forRoot({ dataSource: 'billing' }),
         OutboxModule.forRoot({ dataSource: 'inventory' }),
@@ -228,7 +228,7 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
     }).compile();
     await module.init();
 
-    // Phase 14.3.1 — `OutboxListenerScanner` auto-routes every
+    // `OutboxListenerScanner` auto-routes every
     // `@OutboxEventsHandler` class to the per-DS registry whose
     // dataSource owns the decorated event class. The pre-Phase-14.3.1
     // workaround (`registerOutboxListenerOnDataSource(...)`) is gone —
@@ -309,7 +309,7 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
     ).toEqual(['SKU-13']);
   });
 
-  it('events without @Externalized are not externalized — single externalizer correctly skips them per DD-018 / Phase 11.2', async () => {
+  it('events without @Externalized are not externalized — single externalizer correctly skips them per DD-018', async () => {
     const auditService = module.get(AuditService);
     const defaultProcessor = module.get<EventPublicationProcessor>(
       getEventPublicationProcessorToken('default'),
@@ -390,7 +390,7 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (Phase 14.6 verifi
     expect(inventoryClient.emit).toHaveBeenCalledTimes(1);
   });
 
-  it('singleton externalizer instance — same MicroservicesEventExternalizer used for every DS (Phase 14.6 Option A: no per-DS externalizer)', () => {
+  it('singleton externalizer instance — same MicroservicesEventExternalizer used for every DS (no per-DS externalizer)', () => {
     // EVENT_EXTERNALIZER is bound process-wide. We verify the
     // facade-style assumption: a single externalizer handles every
     // dataSource, and per-DS processors all dispatch through it.

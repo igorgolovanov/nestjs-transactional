@@ -169,6 +169,6 @@ pnpm -C examples/audit-logging start
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
-- [DD-023 — multi-datasource isolation](../../docs/dd/023-multi-datasource-isolation.md)
-- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter.md)
+- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
+- [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
+- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)

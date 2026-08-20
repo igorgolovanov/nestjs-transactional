@@ -39,7 +39,7 @@ import type { ITransactionalEventHandler } from '../interfaces/transactional-eve
 import { CqrsTransactionalModule } from './cqrs-transactional.module';
 
 /**
- * Phase 14.7 verification — cqrs is dataSource-agnostic by design and
+ * Verification that cqrs is dataSource-agnostic by design and
  * survives multi-`OutboxModule.forRoot()` (ADR-019) without any
  * source-level dependence on the outbox package. The decoupling
  * relies on two structural ports — {@link OUTBOX_PUBLICATION_SCHEDULER}
@@ -60,13 +60,13 @@ import { CqrsTransactionalModule } from './cqrs-transactional.module';
  *  3. The same wiring resolves the per-DS `OutboxListenerRegistry`
  *     via the public token utility — multi-DS deployments register
  *     `@IntegrationEventsHandler` listeners against the right DS
- *     manually until the Phase 14.3.1 scanner-gap fix lands (see
+ *     manually until the scanner-gap fix lands (see
  *     `docs/known-limitations.md`).
  */
 
-class NamedFakeAdapter
-  implements TransactionAdapter<TransactionHandle & { id: string; adapterName: string }>
-{
+class NamedFakeAdapter implements TransactionAdapter<
+  TransactionHandle & { id: string; adapterName: string }
+> {
   readonly name = 'in-memory';
   constructor(readonly dataSourceName: string) {}
 
@@ -147,7 +147,7 @@ class PlaceBillingHandler implements ICommandHandler<PlaceBillingCommand, void> 
 
 /**
  * In-memory listeners — fire on AFTER_COMMIT via the cqrs
- * dispatcher. Phase 14.3.1: dispatcher hooks attach to a *specific*
+ * dispatcher. Dispatcher hooks attach to a *specific*
  * dataSource's active transaction (resolved via
  * `TransactionContext.getActiveTransactionByDataSource`), so handlers
  * declare the dataSource they belong to. Single class can NOT cover
@@ -174,7 +174,7 @@ class BillingInMemoryRecorder implements ITransactionalEventHandler<BillingEvent
 /**
  * Persistent listeners — one per dataSource. The decorator marks
  * them; we register manually with the per-DS listener registry to
- * sidestep the Phase 14.3.1 scanner gap.
+ * sidestep the scanner gap.
  */
 @Injectable()
 @OutboxEventsHandler({ events: [DefaultEvent], newTransaction: false })
@@ -198,7 +198,7 @@ class BillingPersistentListener implements IOutboxEventHandler<BillingEvent> {
  * Bridge module — binds the cqrs structural port for the
  * AggregateRoot publisher path. The listener registrar
  * (`OUTBOX_LISTENER_REGISTRAR`) is auto-bound by `OutboxModule.forRoot`
- * to `MultiDsOutboxListenerRegistrar` (Phase 14.3.1) — no manual
+ * to `MultiDsOutboxListenerRegistrar` — no manual
  * binding required.
  *
  * `@Global()` because the consumer (`HybridEventPublisher` inside
@@ -206,14 +206,12 @@ class BillingPersistentListener implements IOutboxEventHandler<BillingEvent> {
  */
 @Global()
 @Module({
-  providers: [
-    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-  ],
+  providers: [{ provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher }],
   exports: [OUTBOX_PUBLICATION_SCHEDULER],
 })
 class OutboxCqrsBridge {}
 
-describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupling)', () => {
+describe('CqrsTransactionalModule + multi-dataSource outbox (decoupling)', () => {
   it('cqrs source imports nothing from @nestjs-transactional/outbox', () => {
     // Compile-time guard: the structural-port architecture relies on
     // cqrs source code never reaching across the package boundary
@@ -268,7 +266,7 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
           OutboxModule.forFeature([DefaultEvent], { dataSource: 'default' }),
           OutboxModule.forFeature([BillingEvent], { dataSource: 'billing' }),
 
-          // Single CqrsTransactionalModule — DS-agnostic per Phase 14.7.
+          // Single CqrsTransactionalModule — DS-agnostic by design.
           CqrsTransactionalModule.forRoot(),
 
           OutboxCqrsBridge,
@@ -289,7 +287,7 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       defaultListener = module.get(DefaultPersistentListener);
       billingListener = module.get(BillingPersistentListener);
 
-      // Phase 14.3.1 — `OutboxListenerScanner` auto-routes
+      // `OutboxListenerScanner` auto-routes
       // `BillingPersistentListener` to the billing-DS registry by
       // walking the per-DS event-type registries. The pre-Phase-14.3.1
       // workaround (manual `billingRegistry.register(...)`) is gone —
@@ -308,7 +306,7 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
 
       // Hybrid publisher routed the AggregateRoot event to BOTH the
       // in-memory dispatcher (AFTER_COMMIT — already fired) AND the
-      // outbox smart facade. Phase 14.3.1 — only the default-DS-bound
+      // outbox smart facade — only the default-DS-bound
       // recorder fires for DefaultEvent.
       expect(defaultRecorder.received.map((e) => e.constructor.name)).toEqual(['DefaultEvent']);
       expect(billingRecorder.received).toHaveLength(0);
@@ -337,7 +335,7 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       await commandBus.execute(new PlaceBillingCommand('inv-42'));
       await flushMicrotasks();
 
-      // Phase 14.3.1 — only the billing-DS-bound recorder fires for
+      // only the billing-DS-bound recorder fires for
       // BillingEvent; the default-DS recorder skips because no
       // default-DS transaction was active when the event was published.
       expect(billingRecorder.received.map((e) => e.constructor.name)).toEqual(['BillingEvent']);
@@ -371,7 +369,7 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       await commandBus.execute(new PlaceBillingCommand('inv-A'));
       await flushMicrotasks();
 
-      // Phase 14.3.1 — both in-memory recorders fire on their own DS
+      // both in-memory recorders fire on their own DS
       // independently, with no cross-DS bleed.
       expect(defaultRecorder.received.map((e) => e.id)).toEqual(['order-A']);
       expect(billingRecorder.received.map((e) => e.invoiceId)).toEqual(['inv-A']);
@@ -399,17 +397,20 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
       const facade = module.get(OutboxEventPublisher);
       expect(scheduler).toBe(facade);
 
-      // Phase 14.3.1 — `OUTBOX_LISTENER_REGISTRAR` resolves to
+      // `OUTBOX_LISTENER_REGISTRAR` resolves to
       // outbox's `MultiDsOutboxListenerRegistrar` via `Symbol.for`
       // sharing (no source-level cqrs→outbox import). The class
       // identity is exposed only by structural shape — we test
       // behaviour: the registrar must possess a `register(...)`
       // method, and feeding it a billing event must land in the
       // billing-DS registry without further wiring.
-      const registrar = module.get<{ register: (l: { id: string; eventType: string; invoke: (e: unknown) => Promise<void> }) => void }>(
-        OUTBOX_LISTENER_REGISTRAR,
-        { strict: false },
-      );
+      const registrar = module.get<{
+        register: (l: {
+          id: string;
+          eventType: string;
+          invoke: (e: unknown) => Promise<void>;
+        }) => void;
+      }>(OUTBOX_LISTENER_REGISTRAR, { strict: false });
       expect(typeof registrar.register).toBe('function');
 
       // Sanity check on the auto-routing: scanner already registered
@@ -421,14 +422,10 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (Phase 14.7 decoupli
         getOutboxListenerRegistryToken('default'),
       );
       expect(
-        billingRegistry.getById(
-          composeListenerId(BillingPersistentListener.name, BillingEvent),
-        ),
+        billingRegistry.getById(composeListenerId(BillingPersistentListener.name, BillingEvent)),
       ).toBeDefined();
       expect(
-        defaultRegistry.getById(
-          composeListenerId(BillingPersistentListener.name, BillingEvent),
-        ),
+        defaultRegistry.getById(composeListenerId(BillingPersistentListener.name, BillingEvent)),
       ).toBeUndefined();
     });
   });

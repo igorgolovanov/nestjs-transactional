@@ -172,14 +172,14 @@ pnpm -C examples/saga-pattern start
   with the same saga pattern at multi-DataSource scale plus REST
   surface and Kafka externalization.
 - [`multi-datasource-outbox`](../multi-datasource-outbox) — outbox
-  per dataSource with decorator-driven routing (Phase 14.3.1).
+  per dataSource with decorator-driven handler routing.
 - [`externalization-with-fallback`](../externalization-with-fallback) —
   consumer-side inbox/dedup pattern complementing the producer
   outbox.
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
-- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-smart-facade-outbox-publisher.md)
+- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
+- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
 - [Convention #26 — idempotency gate at every outbox-driven step](../../docs/status/conventions.md)
 - [Convention #25 — inbox / dedup as consumer-side complement](../../docs/status/conventions.md)

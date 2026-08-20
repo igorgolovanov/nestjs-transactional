@@ -14,10 +14,7 @@ import {
 } from '@nestjs-transactional/outbox';
 import { firstValueFrom } from 'rxjs';
 
-import {
-  OUTBOX_MICROSERVICES_OPTIONS,
-  type OutboxMicroservicesOptions,
-} from '../types/options';
+import { OUTBOX_MICROSERVICES_OPTIONS, type OutboxMicroservicesOptions } from '../types/options';
 
 /**
  * {@link EventExternalizer} implementation backed by `@nestjs/microservices`
@@ -32,7 +29,7 @@ import {
  * overrides via `@Externalized({ client })` resolve through the same
  * `ModuleRef.get(token, { strict: false })` lookup.
  *
- * **Headers / routingKey limitation (Phase 11.3):** the
+ * **Headers / routingKey limitation:** the
  * `@nestjs/microservices` `ClientProxy.emit` API has no unified
  * headers / routing-key parameter — handling is transport-specific
  * (Kafka headers, AMQP properties, NATS subject suffixes, ...). For
@@ -43,9 +40,7 @@ import {
  * construction iteration.
  */
 @Injectable()
-export class MicroservicesEventExternalizer
-  implements EventExternalizer, OnApplicationBootstrap
-{
+export class MicroservicesEventExternalizer implements EventExternalizer, OnApplicationBootstrap {
   private readonly logger = new Logger(MicroservicesEventExternalizer.name);
 
   constructor(
@@ -56,7 +51,9 @@ export class MicroservicesEventExternalizer
 
   onApplicationBootstrap(): void {
     if (this.options.validateOnBootstrap === false) {
-      this.logger.log('Bootstrap validation disabled — defaultClient will be resolved on first externalize() call');
+      this.logger.log(
+        'Bootstrap validation disabled — defaultClient will be resolved on first externalize() call',
+      );
       return;
     }
 
@@ -113,12 +110,12 @@ export class MicroservicesEventExternalizer
     }
 
     if (metadata.headers !== undefined || metadata.routingKey !== undefined) {
-      // Phase 11.3 limitation — ClientProxy.emit has no unified
+      // Current limitation — ClientProxy.emit has no unified
       // headers / routing-key parameter. Logged for visibility; the
       // broker-aware message construction iteration will route them
       // through transport-specific envelopes.
       this.logger.debug(
-        `${metadata.eventType}: headers/routingKey are not applied to the wire payload in this version (Phase 11.3 limitation): ${JSON.stringify(
+        `${metadata.eventType}: headers/routingKey are not applied to the wire payload in this version (current limitation): ${JSON.stringify(
           { headers: metadata.headers, routingKey: metadata.routingKey },
         )}`,
       );

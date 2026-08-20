@@ -3,10 +3,14 @@
   "version": "1.0.0-alpha.5",
   "description": "TypeORM adapter for @nestjs-transactional/core — EntityManager propagation, savepoints, multi-datasource",
   "license": "MIT",
+  "type": "commonjs",
+  "sideEffects": [
+    "./dist/module/typeorm-transactional.module.js"
+  ],
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",
-    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
     "directory": "packages/typeorm"
   },
   "bugs": {
@@ -41,7 +45,6 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "alpha",
     "provenance": true
   },
   "scripts": {
@@ -52,7 +55,10 @@
     "test:cov": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.js",
     "type-check": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack ."
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",
@@ -75,6 +81,6 @@
     "rxjs": "^7.8.1",
     "sql.js": "^1.11.0",
     "testcontainers": "^10.13.0",
-    "typeorm": "^0.3.0 || ^1.0.0"
+    "typeorm": "^1.1.0"
   }
 }

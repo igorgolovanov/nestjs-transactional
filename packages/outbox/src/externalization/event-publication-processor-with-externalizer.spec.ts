@@ -44,10 +44,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -63,7 +60,10 @@ class OrderPlacedEvent {
   headers: (e) => ({ 'x-tenant': e.tenantId }),
 })
 class ExternalizedOrderPlacedEvent {
-  constructor(readonly orderId: string, readonly tenantId: string) {}
+  constructor(
+    readonly orderId: string,
+    readonly tenantId: string,
+  ) {}
 }
 
 @Externalized({ target: 'audit.events', headers: { 'x-source': 'audit-svc' } })
@@ -109,11 +109,7 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
       new JsonEventSerializer(eventTypes),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new DataSourceOutboxPublisher(
-      'default',
-      publicationRegistry,
-      listenerRegistry,
-    );
+    publisher = new DataSourceOutboxPublisher('default', publicationRegistry, listenerRegistry);
     externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
     processor = new EventPublicationProcessor(
       publicationRegistry,
@@ -123,8 +119,8 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
     );
   });
 
-  afterEach(() => {
-    processor.stop();
+  afterEach(async () => {
+    await processor.stop();
   });
 
   it('listener still runs and publication is COMPLETED when an externalizer is bound', async () => {
@@ -179,7 +175,6 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
     expect(pub!.status).toBe(PublicationStatus.FAILED);
     expect(pub!.failureReason).toBe('downstream unreachable');
   });
-
 });
 
 describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wired)', () => {
@@ -220,11 +215,7 @@ describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wire
       new JsonEventSerializer(eventTypes),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new DataSourceOutboxPublisher(
-      'default',
-      publicationRegistry,
-      listenerRegistry,
-    );
+    publisher = new DataSourceOutboxPublisher('default', publicationRegistry, listenerRegistry);
     externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
     processor = new EventPublicationProcessor(
       publicationRegistry,
@@ -235,8 +226,8 @@ describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wire
     );
   });
 
-  afterEach(() => {
-    processor.stop();
+  afterEach(async () => {
+    await processor.stop();
   });
 
   it('invokes the externalizer with resolved metadata for events carrying @Externalized', async () => {
@@ -390,7 +381,7 @@ describe('EventPublicationProcessor (without externalizer — backward compatibl
       const [pub] = repo.getAll();
       expect(pub!.status).toBe(PublicationStatus.COMPLETED);
     } finally {
-      processor.stop();
+      await processor.stop();
     }
   });
 });

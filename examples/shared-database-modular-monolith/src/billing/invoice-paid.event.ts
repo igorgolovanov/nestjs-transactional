@@ -1,7 +1,7 @@
 /**
  * Domain event owned by the `billing` module. Registered with the
  * billing-DS `OutboxModule.forFeature([InvoicePaidEvent], { dataSource: 'billing' })`
- * — Phase 14.3.1 Category A scanner routes any `@OutboxEventsHandler`
+ * — Category A scanner routes any `@OutboxEventsHandler`
  * for this event to the billing outbox listener registry.
  */
 export class InvoicePaidEvent {

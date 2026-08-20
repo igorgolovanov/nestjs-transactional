@@ -2,7 +2,7 @@
   "name": "@nestjs-transactional-examples/multi-datasource-basic",
   "version": "0.0.0",
   "private": true,
-  "description": "Two DataSources (billing + inventory) with @Transactional({ dataSource }) routing — Phase 14.8b Tier 2 foundational example",
+  "description": "Two DataSources (billing + inventory) with @Transactional({ dataSource }) routing — foundational multi-DataSource example",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
@@ -18,7 +18,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sql.js": "^1.11.0",
-    "typeorm": "^0.3.25"
+    "typeorm": "^1.1.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",

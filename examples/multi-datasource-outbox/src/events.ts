@@ -1,7 +1,7 @@
 /**
  * Domain event published from `BillingService.createInvoice`. Registered
  * with `OutboxModule.forFeature([InvoiceCreatedEvent])` (default DS) —
- * the per-DS `EventTypeRegistry` used by the Phase 14.3.1 scanner to
+ * the per-DS `EventTypeRegistry` used by the outbox listener scanner to
  * resolve which outbox owns this event.
  */
 export class InvoiceCreatedEvent {
@@ -15,7 +15,7 @@ export class InvoiceCreatedEvent {
 /**
  * Domain event published from `InventoryService.adjustStock`. Registered
  * with `OutboxModule.forFeature([StockAdjustedEvent], { dataSource: 'inventory' })`
- * — the inventory DS's outbox owns it; Phase 14.3.1's scanner routes
+ * — the inventory DS's outbox owns it; the outbox listener scanner routes
  * `@OutboxEventsHandler` listeners for this event to the inventory
  * registry automatically.
  */

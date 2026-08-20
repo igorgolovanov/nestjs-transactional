@@ -61,7 +61,7 @@ export const OUTBOX_PUBLICATION_SCHEDULER = Symbol('OUTBOX_PUBLICATION_SCHEDULER
  * hook flushes the buffer DO bubble up — they cause the transaction
  * to roll back, which is the intended behavior.
  *
- * **Multi-dataSource (Phase 14.7).** The outbox scheduler is the
+ * **Multi-dataSource.** The outbox scheduler is the
  * smart-facade `OutboxEventPublisher` (DD-024). When wired,
  * AggregateRoot events are routed to the per-dataSource publisher
  * that owns the event class — the same routing semantics as

@@ -16,7 +16,7 @@
  * The externalizer faithfully wraps that Observable: it considers
  * the publication "delivered" the moment the Observable completes.
  * It can NOT detect a silent broker-side failure — there is no
- * signal at this layer to detect it from. Phase 11.4 integration
+ * signal at this layer to detect it from. Integration
  * testing surfaced this finding while attempting a "broker
  * unreachable → publication FAILED" assertion against testcontainers
  * Kafka; the publication transitioned to `COMPLETED` despite no

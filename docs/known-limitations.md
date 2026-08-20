@@ -1,25 +1,63 @@
 # Known Limitations
 
-Limitations of the current implementation. Each entry names the
-phase in which it is slated for resolution (or "no fix planned"
-with rationale).
+Limitations of the current implementation. Each entry names where
+its fix is tracked (or "no fix planned" with rationale).
 
-## Phase 14 multi-adapter
+## Transaction options — `readOnly` is per-dialect, `timeout` is not implemented
+
+Resolved as far as it can be, by
+[DD-027](dd/027-readonly-and-timeout-semantics.md). What remains is a
+genuine limitation rather than an unimplemented intent.
+
+**`readOnly` is enforced on Postgres-family dialects only.**
+`TypeOrmTransactionAdapter` issues `SET TRANSACTION READ ONLY` as the
+transaction's first statement on `postgres`, `cockroachdb` and
+`aurora-postgres`, so a stray write is refused by the database. On every
+other dialect it is a silent no-op:
+
+- **MySQL / MariaDB** — not a gap we can close. `SET TRANSACTION`
+  applies to the *next* transaction there and raises `ERROR 1568` inside
+  a started one; the access mode must be given as
+  `START TRANSACTION READ ONLY`, and TypeORM never exposes that moment.
+- **SQLite and the rest** — no transaction access mode to set.
+
+The practical consequence worth planning around: the same code enforces
+on Postgres and does not on MySQL or SQLite, so a team developing
+against SQLite and deploying to Postgres meets the constraint for the
+first time in production. Failing there still beats the write silently
+landing, but it is a real difference between environments.
+
+`readOnly` also applies only when the adapter *starts* the transaction —
+a `REQUIRED` call joining an existing read-write transaction cannot make
+it read-only after the fact. Spring behaves the same way.
+
+**`timeout` is not implemented and deliberately not approximated.**
+TypeORM exposes no transaction-level timeout. The nearest dialect
+feature, Postgres' `statement_timeout`, bounds each statement rather
+than the transaction — `timeout: 5000` on a method issuing four queries
+would allow twenty seconds, not five — and a wall-clock deadline cannot
+interrupt a statement already in flight. The option stays in the type
+surface as the extension point for adapters whose driver has a real
+transaction budget; Prisma's `$transaction` accepts exactly this.
+
+**Fix:** none planned for `readOnly` beyond the dialects above. For
+`timeout`, a future Prisma adapter can implement it natively.
+
+## Multi-adapter
 
 Single-adapter (default-DS) deployments are unaffected by these
 limitations.
 
-The Phase 14.3.1 entry (decorator-driven handler registration in
-multi-DS deployments) was removed when Phase 14.3.1 shipped — both
+Decorator-driven handler registration in multi-DS deployments used
+to be listed here; per-dataSource handler routing resolved it. Both
 Category A (outbox-routed scanners auto-resolve owning DS via
 per-DS event-type registries) and Category B (cqrs in-memory
 dispatcher's per-DS hook attachment via explicit decorator
 `dataSource` option) now work transparently for multi-DS apps.
-See the
-[ADR-018](adr/018-multi-adapter-architecture.md) Phase 14.3.1
-addendum.
+See the revision history in
+[ADR-018](adr/018-multi-adapter-architecture.md) for the record.
 
-### Phase 14.20 transparent transactional repositories — escape-hatch patterns
+### Transparent transactional repositories — escape-hatch patterns
 
 Two patterns are NOT covered by the prototype patches and require
 the user to fall back to `getCurrentEntityManager()` or use a

@@ -20,7 +20,7 @@ import {
 } from '../setup-testcontainers';
 
 /**
- * Phase 14.20: `TypeOrmTransactionalModule.forRoot` resolves the
+ * `TypeOrmTransactionalModule.forRoot` resolves the
  * actual TypeORM `DataSource` via DI. For unit/integration tests
  * we provide that token via a `@Global()` fixture (in production
  * `TypeOrmModule.forRoot(...)` does this).

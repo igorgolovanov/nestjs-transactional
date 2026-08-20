@@ -41,10 +41,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -55,7 +52,10 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
   headers: (e) => ({ 'x-tenant': e.tenantId }),
 })
 class OrderPlacedEvent {
-  constructor(readonly orderId: string, readonly tenantId: string) {}
+  constructor(
+    readonly orderId: string,
+    readonly tenantId: string,
+  ) {}
 }
 
 class InternalAuditEvent {
@@ -83,7 +83,7 @@ class AuditListener implements IOutboxEventHandler<InternalAuditEvent> {
 }
 
 /**
- * Mocks how `OutboxMicroservicesModule` (Phase 11.3) will register
+ * Mocks how `OutboxMicroservicesModule` will register
  * the externalizer: as a global module that exports the
  * `EVENT_EXTERNALIZER` binding so the `OutboxModule` factory can
  * resolve it through DI.

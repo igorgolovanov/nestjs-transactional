@@ -30,10 +30,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -123,11 +120,7 @@ describe('OutboxModule.forFeature', () => {
 
   it('treats forFeature([]) as a no-op (no error, no registrations)', async () => {
     module = await Test.createTestingModule({
-      imports: [
-        transactionalModule(),
-        OutboxModule.forRoot({}),
-        OutboxModule.forFeature([]),
-      ],
+      imports: [transactionalModule(), OutboxModule.forRoot({}), OutboxModule.forFeature([])],
     }).compile();
     await module.init();
 
@@ -183,12 +176,7 @@ describe('OutboxModule.forFeature', () => {
     class ReportingModule {}
 
     module = await Test.createTestingModule({
-      imports: [
-        transactionalModule(),
-        OutboxModule.forRoot({}),
-        OrdersModule,
-        ReportingModule,
-      ],
+      imports: [transactionalModule(), OutboxModule.forRoot({}), OrdersModule, ReportingModule],
     }).compile();
     await module.init();
 

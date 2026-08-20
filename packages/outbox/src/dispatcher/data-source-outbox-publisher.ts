@@ -9,7 +9,7 @@ import type { EventPublicationRegistry } from '../registry/event-publication-reg
 import type { OutboxListenerRegistry } from '../registry/listener-registry';
 
 /**
- * Per-dataSource publisher (Phase 14.3). Owns the per-transaction
+ * Per-dataSource publisher. Owns the per-transaction
  * buffer, lifecycle hook registration, and delegate calls into the
  * `EventPublicationRegistry` bound to a single dataSource.
  *
@@ -96,8 +96,7 @@ export class DataSourceOutboxPublisher {
    * — `transactionManager.registerBeforeCommit` is NOT used because it
    * always targets "the first active transaction on the context",
    * which is the wrong target when multiple dataSources have live
-   * transactions in the same async stack (Phase 14.2 cross-DS
-   * simultaneous scenario).
+   * transactions in the same async stack.
    */
   scheduleForPublication(event: unknown): void {
     const tx = TransactionContext.getActiveTransactionByDataSource(this.dataSource);
@@ -144,4 +143,3 @@ export class DataSourceOutboxPublisher {
     }
   }
 }
-

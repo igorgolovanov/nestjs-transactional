@@ -1,13 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { ExternalizationError } from '../externalization/errors';
-import {
-  EVENT_EXTERNALIZER,
-  type EventExternalizer,
-} from '../externalization/event-externalizer';
+import { EVENT_EXTERNALIZER, type EventExternalizer } from '../externalization/event-externalizer';
 import { ExternalizationRegistry } from '../externalization/externalization-registry';
 import { EventPublicationRegistry } from '../registry/event-publication-registry';
 import { OutboxListenerRegistry } from '../registry/listener-registry';
+import { drainWithTimeout } from '../shutdown/drain';
 import type { EventPublication } from '../types/event-publication';
 
 import type { EventPublicationProcessorOptions } from './processor-options';
@@ -35,6 +33,12 @@ export class EventPublicationProcessor {
   private readonly logger = new Logger(EventPublicationProcessor.name);
   private running = false;
   private processingLoop: NodeJS.Timeout | null = null;
+  /**
+   * The batch currently being processed, or `null` when the worker is
+   * idle. Tracked so {@link stop} can drain it instead of leaving it
+   * running against providers NestJS is already tearing down.
+   */
+  private inFlightBatch: Promise<void> | null = null;
 
   constructor(
     private readonly registry: EventPublicationRegistry,
@@ -57,13 +61,37 @@ export class EventPublicationProcessor {
     this.logger.log('EventPublicationProcessor started');
   }
 
-  /** Stop the polling loop and cancel any pending scheduled tick. */
-  stop(): void {
+  /**
+   * Stop the polling loop and drain the batch already in flight.
+   *
+   * Resolves once no batch is running, or once
+   * `options.shutdownTimeout` elapses — whichever comes first. A
+   * publication abandoned at the deadline stays in `PROCESSING` and is
+   * recovered by the staleness monitor on a later boot; blocking
+   * shutdown indefinitely on a stuck listener would be worse.
+   *
+   * Idempotent, and safe to call while a drain from an earlier call is
+   * still in progress. Never rejects.
+   */
+  async stop(): Promise<void> {
     this.running = false;
     if (this.processingLoop !== null) {
       clearTimeout(this.processingLoop);
       this.processingLoop = null;
     }
+
+    const inFlight = this.inFlightBatch;
+    if (inFlight !== null) {
+      const drained = await drainWithTimeout(inFlight, this.options.shutdownTimeout);
+      if (!drained) {
+        this.logger.warn(
+          `EventPublicationProcessor drain timed out after ${this.options.shutdownTimeout}ms — ` +
+            'the in-flight batch was abandoned. Publications left in PROCESSING ' +
+            'will be recovered by the staleness monitor.',
+        );
+      }
+    }
+
     this.logger.log('EventPublicationProcessor stopped');
   }
 
@@ -89,10 +117,7 @@ export class EventPublicationProcessor {
         await Promise.all(chunk.map((pub) => this.processOne(pub)));
       }
     } catch (err) {
-      this.logger.error(
-        'Batch processing failed',
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error('Batch processing failed', err instanceof Error ? err.stack : String(err));
     }
   }
 
@@ -101,7 +126,17 @@ export class EventPublicationProcessor {
       return;
     }
     this.processingLoop = setTimeout(() => {
-      void this.processBatch().finally(() => this.scheduleNext());
+      this.processingLoop = null;
+      const batch = this.processBatch();
+      this.inFlightBatch = batch;
+      void batch.finally(() => {
+        // Guard against clearing a newer batch's handle: `stop()` may
+        // have already replaced or read it.
+        if (this.inFlightBatch === batch) {
+          this.inFlightBatch = null;
+        }
+        this.scheduleNext();
+      });
     }, this.options.pollingInterval);
   }
 
@@ -167,27 +202,19 @@ export class EventPublicationProcessor {
    * try / catch in `processOne` records the publication as `FAILED`,
    * which preserves the single-unit atomicity contract from DD-019.
    */
-  private async tryExternalize(
-    event: unknown,
-    publication: EventPublication,
-  ): Promise<void> {
+  private async tryExternalize(event: unknown, publication: EventPublication): Promise<void> {
     if (this.externalizer === undefined || this.externalizationRegistry === undefined) {
       return;
     }
 
-    const metadata = this.externalizationRegistry.buildMetadata(
-      publication.eventType,
-      event,
-    );
+    const metadata = this.externalizationRegistry.buildMetadata(publication.eventType, event);
     if (metadata === undefined) {
       return;
     }
 
     try {
       await this.externalizer.externalize(event, metadata);
-      this.logger.debug(
-        `Externalized ${publication.eventType} → ${metadata.target}`,
-      );
+      this.logger.debug(`Externalized ${publication.eventType} → ${metadata.target}`);
     } catch (err) {
       const cause = err instanceof Error ? err : undefined;
       const message = err instanceof Error ? err.message : String(err);

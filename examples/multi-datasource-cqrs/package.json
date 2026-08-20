@@ -2,7 +2,7 @@
   "name": "@nestjs-transactional-examples/multi-datasource-cqrs",
   "version": "0.0.0",
   "private": true,
-  "description": "Multi-DataSource CQRS: per-DS @Transactional command handlers + @TransactionalEventsHandler routing (Phase 14.3.1 Category B)",
+  "description": "Multi-DataSource CQRS: per-DS @Transactional command handlers + @TransactionalEventsHandler routing (Category B: cqrs in-memory dispatcher)",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
@@ -20,7 +20,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sql.js": "^1.11.0",
-    "typeorm": "^0.3.25"
+    "typeorm": "^1.1.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",

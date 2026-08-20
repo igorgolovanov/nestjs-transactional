@@ -4,7 +4,7 @@ import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transacti
 import { InvoicePaidEvent } from './events';
 
 /**
- * Local listener for the billing DS. The Phase 14.3.1 Category A
+ * Local listener for the billing DS. The Category A
  * `OutboxListenerScanner` resolves the owning DS by walking per-DS
  * `EventTypeRegistry` instances — `InvoicePaidEvent` is registered
  * via `OutboxModule.forFeature([...])` (default DS), so this

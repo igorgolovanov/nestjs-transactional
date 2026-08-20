@@ -73,7 +73,7 @@ const als = new AsyncLocalStorage<TransactionContextStore>();
  *
  * **Public dataSource-name access**:
  * {@link getActiveTransactionByDataSource} provides dataSource-name
- * lookup for Phase 14.2+ multi-adapter consumers — it scans the Map
+ * lookup for multi-adapter consumers — it scans the Map
  * for the entry whose `adapterInstanceName === dataSource`. Both
  * access patterns coexist; future cleanup is possible once
  * cross-package consumers migrate to the dataSource-name lookup and
@@ -130,9 +130,7 @@ export class TransactionContext {
    * dataSource?" without needing to know the adapter type that owns
    * the dataSource.
    */
-  static getActiveTransactionByDataSource(
-    dataSource: string,
-  ): ActiveTransaction | undefined {
+  static getActiveTransactionByDataSource(dataSource: string): ActiveTransaction | undefined {
     const store = als.getStore();
     if (store === undefined) {
       return undefined;

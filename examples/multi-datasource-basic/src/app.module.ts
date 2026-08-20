@@ -49,7 +49,7 @@ import { InvoiceEntity, StockItemEntity } from './entities';
     // One TypeOrmTransactionalModule.forRoot per DataSource (ADR-018).
     // The first call (default) marks itself with `isDefault: true`;
     // the second registers under its named identifier. Importing
-    // either module also activates the Phase 14.20 transparent-repository
+    // either module also activates the transparent-repository
     // patches at module-load time.
     TypeOrmTransactionalModule.forRoot({ isDefault: true }),
     TypeOrmTransactionalModule.forRoot({ dataSource: 'inventory' }),

@@ -17,7 +17,7 @@ import { TestUser } from '../shared/test-user.entity';
  * `TypeOrmModule.forRootAsync` and let the resulting app boot.
  *
  * Historical context: prior to the OnModuleInit-driven registration
- * (Phase 14.8e fix), the async path failed with
+ *, the async path failed with
  * `TypeError: this.postgres.Pool is not a constructor`, cascading
  * from a `markAsManaged(undefined)` because the registration's
  * `useFactory` ran before NestJS had resolved the DataSource
@@ -103,7 +103,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
   // The regression: `TypeOrmTransactionalModule.forRootAsync` paired
   // with `TypeOrmModule.forRootAsync` previously failed with
   // `TypeError: this.postgres.Pool is not a constructor`, surfaced
-  // in Phase 14.8e diagnosis as a cascade from
+  // diagnosed as a cascade from
   // `markAsManaged(undefined)` (because the registration ran via a
   // `useFactory` provider before the DataSource was available via
   // `ModuleRef`). The fix moved the registration into an

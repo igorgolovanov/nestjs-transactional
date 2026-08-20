@@ -38,10 +38,7 @@ class NamedFakeAdapter implements TransactionAdapter<FakeHandle> {
     return result;
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -85,9 +82,9 @@ class NoTxHandler implements IOutboxEventHandler<OrderPlacedEvent> {
 
 @Injectable()
 @OutboxEventsHandler(OrderPlacedEvent, PaymentCapturedEvent)
-class MultiSameDsEventHandler
-  implements IOutboxEventHandler<OrderPlacedEvent | PaymentCapturedEvent>
-{
+class MultiSameDsEventHandler implements IOutboxEventHandler<
+  OrderPlacedEvent | PaymentCapturedEvent
+> {
   invocations: (OrderPlacedEvent | PaymentCapturedEvent)[] = [];
   async handle(event: OrderPlacedEvent | PaymentCapturedEvent): Promise<void> {
     this.invocations.push(event);
@@ -163,7 +160,9 @@ describe('OutboxListenerScanner', () => {
         ]
       : [OutboxModule.forRoot({})];
 
-    const featureImports = (options.forFeature ?? [{ events: [OrderPlacedEvent, PaymentCapturedEvent] }]).map(
+    const featureImports = (
+      options.forFeature ?? [{ events: [OrderPlacedEvent, PaymentCapturedEvent] }]
+    ).map(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (entry) => OutboxModule.forFeature(entry.events as any[], { dataSource: entry.dataSource }),
     );
@@ -271,7 +270,9 @@ describe('OutboxListenerScanner', () => {
     it('does not register plain providers', async () => {
       await build({ extraProviders: [OrderPlacedHandler, UndecoratedService] });
 
-      const allIds = getRegistry().getAll().map((l) => l.id);
+      const allIds = getRegistry()
+        .getAll()
+        .map((l) => l.id);
       expect(allIds).toEqual(['OrderPlacedHandler#OrderPlacedEvent']);
     });
 
@@ -316,13 +317,13 @@ describe('OutboxListenerScanner', () => {
         async handle(_event: OrderPlacedEvent): Promise<void> {}
       }
 
-      await expect(
-        build({ extraProviders: [FirstHandler, SecondHandler] }),
-      ).rejects.toThrow(/shared-id/);
+      await expect(build({ extraProviders: [FirstHandler, SecondHandler] })).rejects.toThrow(
+        /shared-id/,
+      );
     });
   });
 
-  describe('multi-dataSource — Phase 14.3.1 routing', () => {
+  describe('multi-dataSource routing', () => {
     it('routes handlers to per-DS registries by event ownership', async () => {
       await build({
         multiDs: true,
@@ -335,23 +336,15 @@ describe('OutboxListenerScanner', () => {
       });
 
       // OrderPlacedHandler → default
-      expect(
-        getRegistry('default').getById('OrderPlacedHandler#OrderPlacedEvent'),
-      ).toBeDefined();
-      expect(
-        getRegistry('billing').getById('OrderPlacedHandler#OrderPlacedEvent'),
-      ).toBeUndefined();
+      expect(getRegistry('default').getById('OrderPlacedHandler#OrderPlacedEvent')).toBeDefined();
+      expect(getRegistry('billing').getById('OrderPlacedHandler#OrderPlacedEvent')).toBeUndefined();
       expect(
         getRegistry('inventory').getById('OrderPlacedHandler#OrderPlacedEvent'),
       ).toBeUndefined();
 
       // BillingHandler → billing
-      expect(
-        getRegistry('billing').getById('BillingHandler#BillingChargedEvent'),
-      ).toBeDefined();
-      expect(
-        getRegistry('default').getById('BillingHandler#BillingChargedEvent'),
-      ).toBeUndefined();
+      expect(getRegistry('billing').getById('BillingHandler#BillingChargedEvent')).toBeDefined();
+      expect(getRegistry('default').getById('BillingHandler#BillingChargedEvent')).toBeUndefined();
 
       // InventoryHandler → inventory
       expect(
@@ -365,9 +358,7 @@ describe('OutboxListenerScanner', () => {
     it('does not bleed registrations across dataSources', async () => {
       await build({
         multiDs: true,
-        forFeature: [
-          { events: [BillingChargedEvent], dataSource: 'billing' },
-        ],
+        forFeature: [{ events: [BillingChargedEvent], dataSource: 'billing' }],
         extraProviders: [BillingHandler],
       });
 
@@ -397,9 +388,7 @@ describe('OutboxListenerScanner', () => {
     it("throws when a handler's events span multiple dataSources", async () => {
       @Injectable()
       @OutboxEventsHandler(OrderPlacedEvent, BillingChargedEvent)
-      class CrossDsHandler
-        implements IOutboxEventHandler<OrderPlacedEvent | BillingChargedEvent>
-      {
+      class CrossDsHandler implements IOutboxEventHandler<OrderPlacedEvent | BillingChargedEvent> {
         async handle(_event: OrderPlacedEvent | BillingChargedEvent): Promise<void> {}
       }
 
@@ -416,7 +405,7 @@ describe('OutboxListenerScanner', () => {
     });
 
     it('throws when an event is registered to multiple dataSources (ambiguous)', async () => {
-      // Phase 14.3.2 — duplicate registration across DSes is allowed at
+      // Duplicate registration across DSes is allowed at
       // the EventTypeRegistry level (each registry is independent), but
       // resolveDataSourceByEventTypeName flags the ambiguity at scanner
       // time so the handler's destination is not silently picked.
@@ -435,9 +424,9 @@ describe('OutboxListenerScanner', () => {
     it('handles multi-event handlers when all events belong to the same non-default DS', async () => {
       @Injectable()
       @OutboxEventsHandler(BillingChargedEvent, InventoryReservedEvent)
-      class WontFitHandler
-        implements IOutboxEventHandler<BillingChargedEvent | InventoryReservedEvent>
-      {
+      class WontFitHandler implements IOutboxEventHandler<
+        BillingChargedEvent | InventoryReservedEvent
+      > {
         async handle(_event: BillingChargedEvent | InventoryReservedEvent): Promise<void> {}
       }
 

@@ -12,7 +12,10 @@ import { Externalized } from './externalized.decorator';
   client: 'KAFKA_CLIENT',
 })
 class OrderPlacedEvent {
-  constructor(readonly orderId: string, readonly tenantId: string) {}
+  constructor(
+    readonly orderId: string,
+    readonly tenantId: string,
+  ) {}
 }
 
 @Externalized({

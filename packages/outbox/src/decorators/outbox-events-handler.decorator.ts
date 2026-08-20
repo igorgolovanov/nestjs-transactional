@@ -81,7 +81,7 @@ export interface OutboxEventsHandlerMetadata {
  * `Reflect.defineMetadata`. The actual registration happens at
  * application bootstrap via `OutboxListenerScanner`.
  *
- * **Multi-dataSource (Phase 14.3.1).** The scanner walks every
+ * **Multi-dataSource.** The scanner walks every
  * per-dataSource `EventTypeRegistry` and routes the handler to the
  * `OutboxListenerRegistry` whose dataSource owns the decorated
  * events — automatic, no decorator option required. A handler
@@ -110,9 +110,7 @@ export function OutboxEventsHandler(
   };
 }
 
-function resolveMetadata(
-  args: [OutboxEventsHandlerOptions] | Type[],
-): OutboxEventsHandlerMetadata {
+function resolveMetadata(args: [OutboxEventsHandlerOptions] | Type[]): OutboxEventsHandlerMetadata {
   if (args.length === 1 && isOptionsObject(args[0])) {
     const options = args[0];
     return {

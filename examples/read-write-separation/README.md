@@ -187,6 +187,6 @@ pnpm -C examples/read-write-separation start
 
 ## Further reading
 
-- [DD-021 — dataSource name as primary identifier](../../docs/dd/021-datasource-name-primary-identifier.md)
-- [DD-023 — multi-datasource isolation](../../docs/dd/023-multi-datasource-isolation.md)
+- [DD-020 — multi-adapter through the dataSource-name identifier](../../docs/dd/020-multi-adapter-datasource-name.md)
+- [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [TypeORM replication docs](https://typeorm.io/multiple-data-sources#replication)

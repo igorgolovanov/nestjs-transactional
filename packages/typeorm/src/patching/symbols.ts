@@ -1,6 +1,6 @@
 /**
  * Hidden property keys used by the transparent transactional patching
- * machinery (Phase 14.20).
+ * machinery.
  *
  * `Symbol.for(...)` is used (not module-local `Symbol(...)`) so the same
  * key resolves identically across realms and across multiple copies of

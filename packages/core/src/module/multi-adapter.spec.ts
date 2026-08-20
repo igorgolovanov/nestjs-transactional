@@ -3,10 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 
 import { TransactionContextView } from '../context/transaction-context-view';
 import { TransactionContext } from '../context/transaction.context';
-import {
-  Transactional,
-  getTransactionalMetadata,
-} from '../decorators/transactional.decorator';
+import { Transactional, getTransactionalMetadata } from '../decorators/transactional.decorator';
 import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
 import { TransactionManager } from '../manager/transaction.manager';
 import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
@@ -19,13 +16,13 @@ import {
 import { TransactionalModule } from './transactional.module';
 
 /**
- * Phase 14.2 multi-adapter behaviour: token-based DI registration,
+ * Multi-adapter behaviour: token-based DI registration,
  * the `dataSource` option on `manager.run()` (and therefore on
  * `@Transactional`), and the structural guarantee that the
  * dataSource-keyed lookup isolates parallel transactions across
  * dataSources within a single async chain.
  */
-describe('Multi-adapter (Phase 14.2)', () => {
+describe('Multi-adapter', () => {
   let module: TestingModule;
 
   beforeEach(() => {
@@ -140,7 +137,7 @@ describe('Multi-adapter (Phase 14.2)', () => {
 
   describe('cross-dataSource simultaneous within a single async chain (DD-023)', () => {
     /**
-     * The user's listed concern test (Phase 14.2 prompt). Verifies the
+     * The user's listed concern test. Verifies the
      * structural guarantee: the dataSource-keyed Map lookup actually
      * isolates parallel transactions across dataSources inside the
      * same async stack. Failure here means the keying does not solve
@@ -178,8 +175,7 @@ describe('Multi-adapter (Phase 14.2)', () => {
         // Open a nested inventory transaction. Both should be live.
         await manager.run({ dataSource: 'inventory' }, async () => {
           const innerBilling = TransactionContext.getActiveTransactionByDataSource('billing');
-          const innerInventory =
-            TransactionContext.getActiveTransactionByDataSource('inventory');
+          const innerInventory = TransactionContext.getActiveTransactionByDataSource('inventory');
           expect(innerBilling).toBe(billingTx);
           expect(innerInventory).toBeDefined();
           expect(innerInventory!.adapterInstanceName).toBe('inventory');
@@ -189,8 +185,7 @@ describe('Multi-adapter (Phase 14.2)', () => {
 
         // After the nested inventory call returns, billing is still
         // active; inventory has been removed from the Map.
-        const billingAfterInner =
-          TransactionContext.getActiveTransactionByDataSource('billing');
+        const billingAfterInner = TransactionContext.getActiveTransactionByDataSource('billing');
         const inventoryAfterInner =
           TransactionContext.getActiveTransactionByDataSource('inventory');
         expect(billingAfterInner).toBe(billingTx);
@@ -246,8 +241,7 @@ describe('Multi-adapter (Phase 14.2)', () => {
 
         await Promise.all([sleep(3), sleep(1), sleep(2)]);
 
-        const afterParallelAwaits =
-          TransactionContext.getActiveTransactionByDataSource('billing');
+        const afterParallelAwaits = TransactionContext.getActiveTransactionByDataSource('billing');
         expect(afterParallelAwaits).toBe(before);
       });
 

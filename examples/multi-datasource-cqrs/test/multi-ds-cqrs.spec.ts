@@ -11,7 +11,7 @@ import { InventoryNotificationListener } from '../src/inventory.listener';
 import { IssueInvoiceCommand } from '../src/issue-invoice.handler';
 import { PlaceReservationCommand } from '../src/place-reservation.handler';
 
-describe('multi-datasource-cqrs (Phase 14.3.1 Category B)', () => {
+describe('multi-datasource-cqrs (Category B)', () => {
   let module: TestingModule;
   let commandBus: CommandBus;
   let billing: BillingNotificationListener;

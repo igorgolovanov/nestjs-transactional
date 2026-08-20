@@ -40,7 +40,7 @@ import {
 } from '../setup-testcontainers';
 
 /**
- * Phase 14.20: stand-in for `TypeOrmModule.forRoot(...)` registers
+ * Stand-in for `TypeOrmModule.forRoot(...)` registers
  * the `getDataSourceToken()` provider in a `@Global()` module so
  * `TypeOrmTransactionalModule.forRoot` can resolve it from DI.
  */
@@ -142,7 +142,7 @@ class IntegrationEventsHandlers implements IIntegrationEventHandler<OrderPlacedE
 // + OutboxModule together. Only the publisher-side structural binding
 // is required — `OUTBOX_LISTENER_REGISTRAR` is auto-bound by
 // `OutboxModule.forRoot` to `MultiDsOutboxListenerRegistrar`
-// (Phase 14.3.1).
+// .
 //
 // `@Global()` + explicit `exports` are required: HybridEventPublisher
 // (in CqrsTransactionalModule) injects OUTBOX_PUBLICATION_SCHEDULER.

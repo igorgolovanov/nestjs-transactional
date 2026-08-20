@@ -5,10 +5,7 @@ import { InMemoryEventPublicationRepository } from '../testing/in-memory-reposit
 import type { NewEventPublication } from '../types/event-publication';
 import { PublicationStatus } from '../types/publication-status';
 
-import {
-  type OutboxRecoveryOptions,
-  StartupRecoveryService,
-} from './startup-recovery';
+import { type OutboxRecoveryOptions, StartupRecoveryService } from './startup-recovery';
 
 function newInput(overrides: Partial<NewEventPublication> = {}): NewEventPublication {
   return {

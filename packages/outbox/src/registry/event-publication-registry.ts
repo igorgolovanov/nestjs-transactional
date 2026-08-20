@@ -1,15 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import {
-  EVENT_PUBLICATION_REPOSITORY,
-} from '../repository/event-publication-repository';
+import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository';
 import type { EventPublicationRepository } from '../repository/event-publication-repository';
 import { EVENT_SERIALIZER } from '../serialization/event-serializer';
 import type { EventSerializer } from '../serialization/event-serializer';
 import { CompletionMode } from '../types/completion-mode';
 import type { EventPublication, NewEventPublication } from '../types/event-publication';
 import { PublicationStatus } from '../types/publication-status';
-
 
 /**
  * Central service that coordinates the event publication lifecycle.
@@ -21,7 +18,7 @@ import { PublicationStatus } from '../types/publication-status';
  *   `COMPLETED` / `FAILED` → `RESUBMITTED`);
  * - hand out deserialized event payloads ready for listener invocation.
  *
- * Does NOT invoke listeners — that is the dispatcher's job (Phase 5.6).
+ * Does NOT invoke listeners — that is the dispatcher's job.
  * Inspired by the internals of Spring Modulith's Event Publication
  * Registry.
  */

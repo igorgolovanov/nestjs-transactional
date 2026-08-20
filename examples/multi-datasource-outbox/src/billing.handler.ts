@@ -4,7 +4,7 @@ import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transacti
 import { InvoiceCreatedEvent } from './events';
 
 /**
- * Phase 14.3.1 Category A — `OutboxListenerScanner` walks every
+ * Category A — `OutboxListenerScanner` walks every
  * per-DS `EventTypeRegistry` and routes this handler to the registry
  * whose dataSource owns `InvoiceCreatedEvent`. No `dataSource`
  * decorator option needed; the event registration in

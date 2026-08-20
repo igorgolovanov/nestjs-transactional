@@ -253,9 +253,9 @@ docker compose exec kafka kafka-console-consumer \
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
-- [DD-023 — multi-datasource isolation](../../docs/dd/023-multi-datasource-isolation.md)
-- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-smart-facade-outbox-publisher.md)
-- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter.md)
-- [Phase 14.8e Tier 5 status doc](../../docs/status/) (added on
+- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
+- [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
+- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
+- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
+- [Tier 5 status doc](../../docs/status/) (added on
   closure of this tier)

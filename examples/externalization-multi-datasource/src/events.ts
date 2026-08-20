@@ -4,7 +4,7 @@ import { BILLING_BROKER, INVENTORY_BROKER } from './clients';
 
 /**
  * Published from `BillingService.payInvoice`. Persisted to the
- * billing DS's `event_publication` table (Phase 14.3.2 per-DS outbox
+ * billing DS's `event_publication` table (per-DS outbox
  * stack); externalized to RabbitMQ via the BILLING_BROKER client to
  * the `billing.events` queue.
  *

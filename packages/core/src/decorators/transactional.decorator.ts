@@ -65,6 +65,11 @@ export function Transactional(
  * must not mutate state. Options are applied first and the `readOnly: true`
  * flag is overlaid on top, so callers cannot turn it off from here — use
  * `@Transactional` directly if that is the intent.
+ *
+ * Enforcement is per-dialect (DD-027). On Postgres-family databases
+ * `TypeOrmTransactionAdapter` issues `SET TRANSACTION READ ONLY`, so a
+ * stray write fails at the database. Elsewhere — MySQL, SQLite, ... —
+ * the flag documents intent but nothing stops the write.
  */
 export const ReadOnly = (
   options: Partial<TransactionalMetadata> = {},

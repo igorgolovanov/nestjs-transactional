@@ -16,12 +16,12 @@ import {
 import { TransactionalModule } from './transactional.module';
 
 /**
- * Phase 14.10 multi-`forRoot` coordination behaviour. Static class
+ * Multi-`forRoot` coordination behaviour. Static class
  * storage + first-call-special pattern (mirrors `OutboxModule` per
  * ADR-019). Covers the Q5 invariants surfaced in the audit and the
  * concern tests requested in the implementation prompt.
  */
-describe('TransactionalModule multi-`forRoot` (Phase 14.10)', () => {
+describe('TransactionalModule multi-`forRoot`', () => {
   let module: TestingModule | undefined;
 
   beforeEach(() => {
@@ -55,9 +55,7 @@ describe('TransactionalModule multi-`forRoot` (Phase 14.10)', () => {
       // Per-DS tokens registered for both adapters.
       expect(module.get(getTransactionalAdapterToken('billing'))).toBe(billing);
       expect(module.get(getTransactionalAdapterToken('inventory'))).toBe(inventory);
-      const billingView = module.get<TransactionContextView>(
-        getTransactionContextToken('billing'),
-      );
+      const billingView = module.get<TransactionContextView>(getTransactionContextToken('billing'));
       expect(billingView.dataSource).toBe('billing');
       expect(module.get(getTransactionManagerToken('billing'))).toBe(
         module.get(TransactionManager),
@@ -164,7 +162,7 @@ describe('TransactionalModule multi-`forRoot` (Phase 14.10)', () => {
     });
   });
 
-  describe('composite key contract preservation (DD-005 / Phase 14.2 B1)', () => {
+  describe('composite key contract preservation (DD-005)', () => {
     /**
      * Concern test — explicitly verifies the multi-`forRoot` rework
      * does not violate the composite key contract that typeorm
@@ -194,8 +192,7 @@ describe('TransactionalModule multi-`forRoot` (Phase 14.10)', () => {
         expect(billingTx?.adapterInstanceName).toBe('billing');
 
         await manager.run({ dataSource: 'inventory' }, async () => {
-          const inventoryTx =
-            TransactionContext.getActiveTransactionByDataSource('inventory');
+          const inventoryTx = TransactionContext.getActiveTransactionByDataSource('inventory');
           expect(inventoryTx?.adapterName).toBe('in-memory');
           expect(inventoryTx?.adapterInstanceName).toBe('inventory');
           // Both transactions are concurrently observable — no key
@@ -214,7 +211,7 @@ describe('TransactionalModule multi-`forRoot` (Phase 14.10)', () => {
 
       // Sanity-check: providers consumed from sibling DynamicModules
       // resolve through the global default of `isGlobal: true`
-      // (Phase 14.10 default flip).
+      // (the isGlobal default flip).
       @Injectable()
       class CrossDsService {
         constructor(

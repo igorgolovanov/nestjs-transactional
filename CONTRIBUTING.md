@@ -8,7 +8,10 @@ or a PR — stale instructions are worse than none.
 
 Requirements:
 
-- **Node.js 22.11+**. CI verifies the matrix [22, 24, 26].
+- **Node.js 22.13+**, which is what `.nvmrc` selects (`nvm use`). CI
+  verifies the matrix [22, 24, 26]. The floor is 22.13 rather than
+  22.11 because TypeORM 1.x requires `^22.13.0` on the 22 line, and
+  developing here means installing it.
 - **pnpm 9+**. Any pnpm 9 release works; the repo pins
   `packageManager` in `package.json`.
 - **Docker** — only for running TypeORM integration tests against a
@@ -24,6 +27,27 @@ pnpm -r --filter './packages/*' test
 ```
 
 All three of these should succeed on a clean clone.
+
+### Git hooks
+
+`pnpm install` installs two hooks through husky:
+
+- **pre-commit** runs `lint-staged`, which formats the staged files
+  Prettier owns. Exactly the set the `format` CI job checks, so the
+  hook and the gate cannot disagree.
+- **commit-msg** runs commitlint against the Conventional Commits rules
+  below. Three defaults are relaxed in `commitlint.config.js`, each
+  because the default rejected commits this repo legitimately makes —
+  the reasons are in the config.
+
+ESLint is deliberately not in the pre-commit hook: the config uses
+type-aware rules that resolve cross-package imports through
+`dist/*.d.ts`, so running it would mean building six packages on every
+commit. `pnpm lint` and the `lint` CI job cover it instead.
+
+To bypass a hook once — a work-in-progress commit on a local branch,
+say — `git commit --no-verify`. CI still checks everything, so nothing
+gets in that way.
 
 ## Running tests and gates
 
@@ -42,6 +66,16 @@ pnpm typecheck
 # Prettier formatting
 pnpm format:check    # verify — CI fails if dirty
 pnpm format          # rewrite
+
+# Relative markdown links resolve (ADR / DD / source references)
+pnpm lint:doc-links
+
+# Public API surface unchanged (api-extractor, needs a build first)
+pnpm api:check       # verify — CI fails if the surface moved
+pnpm api:update      # accept an intended change, then commit the diff
+
+# Publishing correctness (publint + attw, needs a build first)
+pnpm publish:check   # does what we ship actually resolve for a consumer?
 
 # TypeORM integration tests (requires Docker)
 pnpm --filter @nestjs-transactional/typeorm test:integration
@@ -229,26 +263,47 @@ cqrs → (optional) typeorm → core → NestJS platform + Node builtins
 
 ## Testing strategy
 
-### Per-package targets
+### Per-package shape
 
 - **core** — unit tests with `InMemoryTransactionAdapter` for
   TransactionContext, TransactionManager, AdapterRegistry,
-  decorators, interceptor. Coverage target: 90% lines, 85%
-  branches on public API.
-- **typeorm** — unit tests against SQLite in-memory; integration
-  tests with testcontainers (real Postgres) for savepoint
-  behavior, isolation levels, multi-DataSource scenarios,
-  connection pool behavior. Coverage target: 85% lines on units.
+  decorators, interceptor.
+- **typeorm** — unit tests against SQLite in-memory (`sql.js`);
+  integration tests with testcontainers (real Postgres) for
+  savepoint behavior, isolation levels, multi-DataSource
+  scenarios, connection pool behavior.
 - **cqrs** — unit tests for decorators, scanner, wrapper with a
-  mocked TransactionManager. Integration tests with a full NestJS
-  testing module: real `CqrsModule` + `InMemoryTransactionAdapter`
-  (or TypeORM SQLite). E2E tests for cross-package interaction
-  (cqrs + typeorm + core). Coverage target: 85% on handler logic.
-- **outbox** — coverage target 90% lines, 85% branches.
-- **outbox-typeorm** — coverage target 85% lines (the remainder
-  is TypeORM integration that is hard to cover in unit tests).
-- **outbox-microservices** — coverage target 90% lines on units
-  (ClientProxy mocked).
+  mocked TransactionManager, plus full NestJS testing modules
+  (real `CqrsModule` + `InMemoryTransactionAdapter`).
+- **outbox** — unit tests throughout, against
+  `InMemoryEventPublicationRepository`.
+- **outbox-typeorm** — integration tests (testcontainers) carry
+  the SQL and module wiring; `test/unit/` covers the Docker-free
+  surface, above all the `affected`-count claim contract from
+  DD-025 and the schema initializer's production-safety default.
+- **outbox-microservices** — unit tests with a mocked
+  `ClientProxy`, including the ADR-016 silent-success canary. No
+  real-broker suite exists (see ADR-016).
+
+### Coverage gate
+
+Coverage is enforced, not aspirational. Each package declares a
+`coverageThreshold` in its `jest.config.js`, and the `coverage`
+job in CI runs `pnpm -r --filter './packages/*' test:cov` — a
+package that drops below its floor fails the build. Run it
+locally the same way before opening a PR.
+
+The floors are **baselines, not targets**: they were set from
+measured coverage when the gate was introduced and are meant to
+ratchet upward. Two rules follow from that:
+
+- Raising a floor after improving coverage is welcome.
+- Lowering one is a deliberate, reviewable change. Say why in the
+  PR description; do not let it ride along with unrelated work.
+
+`passWithNoTests` is deliberately **not** set, so a package that
+ships without unit tests fails its own `test` script instead of
+reporting success.
 
 ### Test utilities
 
@@ -285,8 +340,13 @@ Smaller trade-offs that do not warrant a full ADR go in
 
 1. Branch from `main`. PRs target `main`.
 2. Changeset committed (if user-visible change).
-3. All of `lint`, `build`, `test`, `typecheck`, `format:check` clean
-   locally. CI runs the same gates.
+3. All of `lint`, `build`, `test`, `typecheck`, `format:check`,
+   `lint:doc-links`, `api:check`, `publish:check` clean locally. CI runs
+   the same gates.
+   If `api:check` fails and the change to the surface was intended, run
+   `pnpm api:update` and commit the report diff alongside the
+   changeset — the two together are what say "this is a minor" or
+   "this is a breaking change".
 4. Description explains the **why** — reviewers can read the diff for
    the what.
 5. Link related issues.

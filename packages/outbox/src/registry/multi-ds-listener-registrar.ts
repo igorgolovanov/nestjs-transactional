@@ -7,10 +7,7 @@ import {
 } from '../dispatcher/outbox-event-publisher';
 import { EventTypeRegistry } from '../serialization/event-type-registry';
 import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import {
-  getEventTypeRegistryToken,
-  getOutboxListenerRegistryToken,
-} from '../tokens/token-utils';
+import { getEventTypeRegistryToken, getOutboxListenerRegistryToken } from '../tokens/token-utils';
 
 import { OutboxListenerRegistry } from './listener-registry';
 
@@ -36,8 +33,15 @@ export const OUTBOX_LISTENER_REGISTRAR_TOKEN = Symbol.for(
   '@nestjs-transactional/cqrs/outbox-listener-registrar',
 );
 
-/** Shape of an entry registered through the structural registrar port. */
-interface RegistrarListenerEntry {
+/**
+ * Shape of an entry registered through the structural registrar port.
+ *
+ * Exported because it is the parameter type of the public
+ * {@link MultiDsOutboxListenerRegistrar.register} — without it a consumer
+ * cannot name what that method takes. Flagged by api-extractor's
+ * `ae-forgotten-export`.
+ */
+export interface RegistrarListenerEntry {
   readonly id: string;
   readonly eventType: string;
   readonly invoke: (event: unknown) => Promise<void>;
@@ -45,7 +49,7 @@ interface RegistrarListenerEntry {
 
 /**
  * Multi-dataSource implementation of the cqrs package's
- * `OutboxListenerRegistrar` structural port (Phase 14.3.1).
+ * `OutboxListenerRegistrar` structural port.
  *
  * Walks every per-dataSource {@link EventTypeRegistry} to resolve
  * which dataSource owns each incoming listener's event class, then
@@ -89,10 +93,7 @@ export class MultiDsOutboxListenerRegistrar {
    */
   register(listener: RegistrarListenerEntry): void {
     const eventTypeRegistries = this.collectEventTypeRegistries();
-    const dataSource = resolveDataSourceByEventTypeName(
-      listener.eventType,
-      eventTypeRegistries,
-    );
+    const dataSource = resolveDataSourceByEventTypeName(listener.eventType, eventTypeRegistries);
 
     const registry = this.moduleRef.get<OutboxListenerRegistry>(
       getOutboxListenerRegistryToken(dataSource),

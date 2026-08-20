@@ -18,7 +18,9 @@ import {
   OUTBOX_LISTENER_REGISTRAR_TOKEN,
 } from './multi-ds-listener-registrar';
 
-class NamedFakeAdapter implements TransactionAdapter<TransactionHandle & { id: string; adapterName: string }> {
+class NamedFakeAdapter implements TransactionAdapter<
+  TransactionHandle & { id: string; adapterName: string }
+> {
   readonly name = 'in-memory';
   constructor(readonly dataSourceName: string) {}
 
@@ -167,10 +169,9 @@ describe('MultiDsOutboxListenerRegistrar', () => {
   });
 
   it('OUTBOX_LISTENER_REGISTRAR_TOKEN aliases to the same registrar instance', () => {
-    const viaAlias = module.get<MultiDsOutboxListenerRegistrar>(
-      OUTBOX_LISTENER_REGISTRAR_TOKEN,
-      { strict: false },
-    );
+    const viaAlias = module.get<MultiDsOutboxListenerRegistrar>(OUTBOX_LISTENER_REGISTRAR_TOKEN, {
+      strict: false,
+    });
     expect(viaAlias).toBe(registrar);
   });
 

@@ -4,6 +4,7 @@ import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
 } from '../repository/event-publication-repository';
+import { drainWithTimeout } from '../shutdown/drain';
 import { PublicationStatus } from '../types/publication-status';
 import type { StalenessConfig } from '../types/staleness-config';
 
@@ -28,6 +29,8 @@ export class StalenessMonitor {
   private readonly logger = new Logger(StalenessMonitor.name);
   private running = false;
   private monitorLoop: NodeJS.Timeout | null = null;
+  /** The sweep currently running, or `null` when idle. See {@link stop}. */
+  private inFlightSweep: Promise<void> | null = null;
 
   constructor(
     @Inject(EVENT_PUBLICATION_REPOSITORY)
@@ -55,12 +58,29 @@ export class StalenessMonitor {
     this.logger.log(`StalenessMonitor started (interval: ${this.config.monitorInterval}ms)`);
   }
 
-  /** Stop the watchdog and cancel any pending scheduled tick. */
-  stop(): void {
+  /**
+   * Stop the watchdog and drain the sweep already in flight.
+   *
+   * Resolves once no sweep is running, or once
+   * `config.shutdownTimeout` elapses — whichever comes first. Idempotent
+   * and never rejects.
+   */
+  async stop(): Promise<void> {
     this.running = false;
     if (this.monitorLoop !== null) {
       clearTimeout(this.monitorLoop);
       this.monitorLoop = null;
+    }
+
+    const inFlight = this.inFlightSweep;
+    if (inFlight !== null) {
+      const drained = await drainWithTimeout(inFlight, this.config.shutdownTimeout);
+      if (!drained) {
+        this.logger.warn(
+          `StalenessMonitor drain timed out after ${this.config.shutdownTimeout}ms — ` +
+            'the in-flight sweep was abandoned.',
+        );
+      }
     }
   }
 
@@ -97,10 +117,7 @@ export class StalenessMonitor {
         );
       }
     } catch (err) {
-      this.logger.error(
-        'Staleness check failed',
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error('Staleness check failed', err instanceof Error ? err.stack : String(err));
     }
   }
 
@@ -109,7 +126,15 @@ export class StalenessMonitor {
       return;
     }
     this.monitorLoop = setTimeout(() => {
-      void this.checkStaleness().finally(() => this.scheduleNext());
+      this.monitorLoop = null;
+      const sweep = this.checkStaleness();
+      this.inFlightSweep = sweep;
+      void sweep.finally(() => {
+        if (this.inFlightSweep === sweep) {
+          this.inFlightSweep = null;
+        }
+        this.scheduleNext();
+      });
     }, this.config.monitorInterval);
   }
 

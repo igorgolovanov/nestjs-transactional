@@ -36,10 +36,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -71,9 +68,7 @@ describe('EventPublicationRegistry', () => {
   describe('publish', () => {
     it('persists an entry that survives transaction commit', async () => {
       await manager.run({}, async () => {
-        await registry.publish(new OrderPlacedEvent('order-1'), [
-          'Inventory.on(OrderPlacedEvent)',
-        ]);
+        await registry.publish(new OrderPlacedEvent('order-1'), ['Inventory.on(OrderPlacedEvent)']);
       });
 
       expect(repo.count()).toBe(1);
@@ -103,7 +98,12 @@ describe('EventPublicationRegistry', () => {
       });
 
       expect(repo.count()).toBe(3);
-      expect(repo.getAll().map((p) => p.listenerId).sort()).toEqual([
+      expect(
+        repo
+          .getAll()
+          .map((p) => p.listenerId)
+          .sort(),
+      ).toEqual([
         'Analytics.on(OrderPlacedEvent)',
         'Inventory.on(OrderPlacedEvent)',
         'Notification.on(OrderPlacedEvent)',
@@ -111,9 +111,7 @@ describe('EventPublicationRegistry', () => {
     });
 
     it('records eventType as the event class name', async () => {
-      await manager.run({}, () =>
-        registry.publish(new OrderPlacedEvent('x'), ['listener']),
-      );
+      await manager.run({}, () => registry.publish(new OrderPlacedEvent('x'), ['listener']));
 
       expect(repo.getAll()[0]!.eventType).toBe('OrderPlacedEvent');
     });

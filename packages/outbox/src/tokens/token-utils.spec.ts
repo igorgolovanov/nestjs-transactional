@@ -68,22 +68,19 @@ describe('Token utilities (outbox)', () => {
     },
   ] as const;
 
-  describe.each(allUtilities)(
-    '$name',
-    ({ fn, defaultToken, billingToken }) => {
-      it('defaults to the "default" dataSource when no argument is passed', () => {
-        expect(fn()).toBe(defaultToken);
-      });
+  describe.each(allUtilities)('$name', ({ fn, defaultToken, billingToken }) => {
+    it('defaults to the "default" dataSource when no argument is passed', () => {
+      expect(fn()).toBe(defaultToken);
+    });
 
-      it('uses the provided dataSource name', () => {
-        expect(fn('billing')).toBe(billingToken);
-      });
+    it('uses the provided dataSource name', () => {
+      expect(fn('billing')).toBe(billingToken);
+    });
 
-      it('is deterministic across calls', () => {
-        expect(fn('audit')).toBe(fn('audit'));
-      });
-    },
-  );
+    it('is deterministic across calls', () => {
+      expect(fn('audit')).toBe(fn('audit'));
+    });
+  });
 
   describe('cross-token uniqueness', () => {
     it('produces distinct tokens per component for the same dataSource', () => {

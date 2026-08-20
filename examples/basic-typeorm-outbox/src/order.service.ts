@@ -11,14 +11,14 @@ import { OrderPlacedEvent } from './order-placed.event';
  * The single-unit atomicity demo (DD-019). Inside `@Transactional()`
  * we:
  *
- *   1. INSERT into `orders` via the Phase 14.20 transparent repository
+ *   1. INSERT into `orders` via the transparent repository
  *      (`@InjectRepository(OrderEntity)`).
  *   2. Append a publication row through `OutboxEventPublisher.publish`
  *      — `TypeOrmEventPublicationRepository` writes to
  *      `event_publication` through the same active EntityManager.
  *
  * Both writes commit together (SAME database transaction) or roll back
- * together. Phase 14.21's atomicity invariant — pinned by the
+ * together. The atomicity invariant — pinned by the
  * integration test — applies verbatim to this example.
  */
 @Injectable()

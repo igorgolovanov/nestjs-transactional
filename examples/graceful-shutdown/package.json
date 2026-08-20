@@ -2,7 +2,7 @@
   "name": "@nestjs-transactional-examples/graceful-shutdown",
   "version": "0.0.0",
   "private": true,
-  "description": "Graceful shutdown — outbox processor drain, in-flight transaction completion, lifecycle hooks (Phase 14.8e Tier 5)",
+  "description": "Graceful shutdown — outbox processor drain, in-flight transaction completion, lifecycle hooks",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
@@ -21,7 +21,7 @@
     "pg": "^8.13.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.25"
+    "typeorm": "^1.1.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",

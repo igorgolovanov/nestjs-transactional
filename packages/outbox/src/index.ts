@@ -3,7 +3,10 @@ export * from './types/event-publication';
 export * from './types/completion-mode';
 export * from './types/resubmission-options';
 export * from './types/staleness-config';
+export * from './types/retry-config';
 export * from './types/errors';
+
+export { DEFAULT_DRAIN_TIMEOUT_MS } from './shutdown/drain';
 
 export * from './serialization/event-serializer';
 export * from './serialization/event-type-registry';
@@ -48,6 +51,7 @@ export {
 } from './externalization/externalization-registry';
 
 export * from './recovery/staleness-monitor';
+export * from './recovery/outbox-retry-scheduler';
 
 export * from './api/failed-event-publications';
 export * from './api/incomplete-event-publications';

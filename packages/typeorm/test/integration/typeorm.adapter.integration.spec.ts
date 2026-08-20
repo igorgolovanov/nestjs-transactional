@@ -124,4 +124,70 @@ describe('TypeOrmTransactionAdapter (integration, Postgres via testcontainers)',
     const users = await ctx.dataSource.getRepository(TestUser).find();
     expect(users.map((u) => u.name)).toEqual(['slow']);
   });
+
+  describe('readOnly (DD-027)', () => {
+    // The unit specs prove which statement is emitted per dialect. These
+    // prove the statement does what the option claims — that a stray
+    // write inside a readOnly transaction is refused by Postgres rather
+    // than committed.
+
+    it('refuses a write with a read-only-transaction error', async () => {
+      await expect(
+        adapter.runInTransaction({ readOnly: true }, async (h) => {
+          await h.entityManager.save(TestUser, { name: 'should-not-persist' });
+        }),
+      ).rejects.toThrow(/read-only transaction/i);
+
+      expect(await ctx.dataSource.getRepository(TestUser).count()).toBe(0);
+    });
+
+    it('still allows reads', async () => {
+      await ctx.dataSource.getRepository(TestUser).save({ name: 'existing' });
+
+      const names = await adapter.runInTransaction({ readOnly: true }, async (h) =>
+        (await h.entityManager.getRepository(TestUser).find()).map((u) => u.name),
+      );
+
+      expect(names).toEqual(['existing']);
+    });
+
+    it('does not leak read-only into the next transaction on the same pool', async () => {
+      // `SET TRANSACTION` is scoped to the transaction, but the pooled
+      // connection is reused — a leak here would turn one readOnly query
+      // handler into a silently read-only application.
+      await expect(
+        adapter.runInTransaction({ readOnly: true }, async () => 'read-only done'),
+      ).resolves.toBe('read-only done');
+
+      await adapter.runInTransaction({}, async (h) => {
+        await h.entityManager.save(TestUser, { name: 'writable-after' });
+      });
+
+      const names = (await ctx.dataSource.getRepository(TestUser).find()).map((u) => u.name);
+      expect(names).toEqual(['writable-after']);
+    });
+
+    it('combines with an isolation level', async () => {
+      const names = await adapter.runInTransaction(
+        { readOnly: true, isolation: 'REPEATABLE_READ' },
+        async (h) => (await h.entityManager.getRepository(TestUser).find()).map((u) => u.name),
+      );
+
+      expect(names).toEqual([]);
+    });
+
+    it('applies to a nested savepoint as well', async () => {
+      // NESTED runs inside the same transaction, so the read-only access
+      // mode is inherited — a write there must fail too.
+      await expect(
+        adapter.runInTransaction({ readOnly: true }, async (parent) => {
+          await adapter.runInSavepoint(parent, async () => {
+            await parent.entityManager.save(TestUser, { name: 'nested-write' });
+          });
+        }),
+      ).rejects.toThrow(/read-only transaction/i);
+
+      expect(await ctx.dataSource.getRepository(TestUser).count()).toBe(0);
+    });
+  });
 });

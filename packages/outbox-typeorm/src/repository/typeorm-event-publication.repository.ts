@@ -103,9 +103,7 @@ export class TypeOrmEventPublicationRepository implements EventPublicationReposi
       .update(EventPublicationEntity)
       .set({
         status,
-        ...(options.completionDate !== undefined
-          ? { completionDate: options.completionDate }
-          : {}),
+        ...(options.completionDate !== undefined ? { completionDate: options.completionDate } : {}),
         ...(options.failureReason !== undefined ? { failureReason: options.failureReason } : {}),
         ...(options.lastResubmissionDate !== undefined
           ? { lastResubmissionDate: options.lastResubmissionDate }
@@ -151,10 +149,7 @@ export class TypeOrmEventPublicationRepository implements EventPublicationReposi
     return entities.map(toDomain);
   }
 
-  async findStale(
-    beforeDate: Date,
-    statuses: PublicationStatus[],
-  ): Promise<EventPublication[]> {
+  async findStale(beforeDate: Date, statuses: PublicationStatus[]): Promise<EventPublication[]> {
     if (statuses.length === 0) {
       return [];
     }

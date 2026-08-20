@@ -144,7 +144,9 @@ describe('TransactionalListenerScanner', () => {
     const calls = registerSpy.mock.calls.filter(([inst]) => inst === handler);
 
     expect(calls).toHaveLength(2);
-    const eventTypes = calls.map(([, , metadata]) => (metadata as { eventType: unknown }).eventType);
+    const eventTypes = calls.map(
+      ([, , metadata]) => (metadata as { eventType: unknown }).eventType,
+    );
     expect(eventTypes).toContain(OrderPlaced);
     expect(eventTypes).toContain(PaymentCaptured);
   });
@@ -172,9 +174,7 @@ describe('TransactionalListenerScanner', () => {
     const broken = module.get(BrokenHandler);
     const call = registerSpy.mock.calls.find(([inst]) => inst === broken);
     expect(call).toBeUndefined();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('BrokenHandler'),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BrokenHandler'));
   });
 
   it('picks up multiple decorated handlers across providers', async () => {

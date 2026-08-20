@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose a capability the library does not have
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth checking first: the
+        [roadmap](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/roadmap/README.md)
+        and the
+        [improvement plan](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/roadmap/improvement-plan.md)
+        already record what is scheduled and what was deliberately
+        deferred. If your idea is in there, saying so in a comment
+        ("this is the item I keep hitting") is more useful than a new
+        issue — it is how priorities move.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What you were trying to do, and where the library stopped you.
+        Describe the situation rather than the API you have in mind —
+        the constraint usually admits solutions the requester has not
+        considered, and the API is the easier half to agree on.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: >
+        If you already have a shape in mind, sketch it. Rough is fine.
+    validations:
+      required: false
+
+  - type: input
+    id: spring-parity
+    attributes:
+      label: Spring / Spring Modulith equivalent
+      description: >
+        This project's mission is Spring parity for NestJS, so "Spring
+        does X, and here is the Spring documentation for it" is the
+        single strongest argument a request can carry. Leave this blank
+        if there is no equivalent — several features here go past Spring
+        deliberately, and that is a fine thing to propose, just a
+        different argument.
+      placeholder: e.g. Spring's @Transactional(timeout = 5)
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you are doing instead today
+      description: >
+        A workaround that is merely ugly and one that does not exist are
+        very different priorities.
+    validations:
+      required: false

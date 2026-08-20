@@ -1,0 +1,5 @@
+# Formatting only. ESLint is deliberately not here: the config uses
+# type-aware rules that resolve cross-package imports through
+# `dist/*.d.ts`, so running it would mean building six packages on every
+# commit. That check lives in the `lint` CI job, which builds first.
+pnpm lint-staged

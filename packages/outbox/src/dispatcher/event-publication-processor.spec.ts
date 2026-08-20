@@ -41,10 +41,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -59,6 +56,7 @@ describe('EventPublicationProcessor', () => {
   let listenerRegistry: OutboxListenerRegistry;
   let publisher: DataSourceOutboxPublisher;
   let processor: EventPublicationProcessor;
+  let eventTypeRegistry: EventTypeRegistry;
   let invocations: unknown[];
 
   const options: EventPublicationProcessorOptions = {
@@ -80,24 +78,20 @@ describe('EventPublicationProcessor', () => {
     adapterRegistry.register({ adapterName: 'in-memory', instanceName: 'default', adapter });
     manager = new TransactionManager(adapterRegistry);
     repo = new InMemoryEventPublicationRepository(manager);
-    const eventTypes = new EventTypeRegistry();
-    eventTypes.register(OrderPlacedEvent);
+    eventTypeRegistry = new EventTypeRegistry();
+    eventTypeRegistry.register(OrderPlacedEvent);
     const publicationRegistry = new EventPublicationRegistry(
       repo,
-      new JsonEventSerializer(eventTypes),
+      new JsonEventSerializer(eventTypeRegistry),
     );
     listenerRegistry = new OutboxListenerRegistry();
-    publisher = new DataSourceOutboxPublisher(
-      'default',
-      publicationRegistry,
-      listenerRegistry,
-    );
+    publisher = new DataSourceOutboxPublisher('default', publicationRegistry, listenerRegistry);
     processor = new EventPublicationProcessor(publicationRegistry, listenerRegistry, options);
     invocations = [];
   });
 
-  afterEach(() => {
-    processor.stop();
+  afterEach(async () => {
+    await processor.stop();
   });
 
   it('invokes the listener and marks the publication COMPLETED', async () => {
@@ -203,18 +197,166 @@ describe('EventPublicationProcessor', () => {
   });
 
   it('swallows infrastructure errors from findReadyForProcessing without throwing', async () => {
-    jest
-      .spyOn(repo, 'findReadyForProcessing')
-      .mockRejectedValueOnce(new Error('DB down'));
+    jest.spyOn(repo, 'findReadyForProcessing').mockRejectedValueOnce(new Error('DB down'));
 
     await expect(processor.processBatch()).resolves.toBeUndefined();
   });
 
-  it('start is idempotent — calling twice does not schedule twice', () => {
+  it('start is idempotent — calling twice does not schedule twice', async () => {
     processor.start();
     processor.start();
     // No assertion on the timer internals — this smoke-tests that the
     // second call does not throw and can be stopped cleanly.
-    expect(() => processor.stop()).not.toThrow();
+    await expect(processor.stop()).resolves.toBeUndefined();
+  });
+
+  describe('shutdown drain', () => {
+    // `stop()` used to only clear the next-tick timer, leaving a batch
+    // dispatched by the previous tick running unsupervised. NestJS then
+    // carried on tearing down the DataSource, which could cut a
+    // publication's PROCESSING → COMPLETED transition in half and strand
+    // the row for the staleness monitor to find later. These specs pin
+    // the drain that closes that window.
+
+    /** A promise plus its resolver, so a listener can be held open. */
+    function gate() {
+      let open!: () => void;
+      const held = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      return { held, open };
+    }
+
+    function sleep(ms: number): Promise<void> {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Register a listener that blocks on `held` and resolves
+     * `invoked` as soon as the processor calls it, so a test can wait
+     * for a batch to be genuinely in flight instead of guessing.
+     */
+    function blockingListener(held: Promise<void>) {
+      const entered = gate();
+      listenerRegistry.register({
+        id: 'Inventory.onOrderPlaced',
+        eventType: 'OrderPlacedEvent',
+        invoke: async () => {
+          entered.open();
+          await held;
+        },
+      });
+      return entered.held;
+    }
+
+    function drainingProcessor(shutdownTimeout: number): EventPublicationProcessor {
+      return new EventPublicationProcessor(
+        new EventPublicationRegistry(repo, new JsonEventSerializer(eventTypeRegistry)),
+        listenerRegistry,
+        { ...options, pollingInterval: 1, shutdownTimeout },
+      );
+    }
+
+    it('waits for an in-flight batch instead of abandoning it', async () => {
+      const listener = gate();
+      const invoked = blockingListener(listener.held);
+      await manager.run({}, () => publisher.publish(new OrderPlacedEvent('order-1')));
+
+      const draining = drainingProcessor(5_000);
+      draining.start();
+      await invoked;
+
+      let settled = false;
+      const stopped = draining.stop().then(() => {
+        settled = true;
+      });
+
+      // The listener is still running, so the drain must still be open.
+      await sleep(30);
+      expect(settled).toBe(false);
+
+      listener.open();
+      await stopped;
+
+      expect(settled).toBe(true);
+      // The whole point: the publication reached a terminal state rather
+      // than being stranded in PROCESSING.
+      expect(repo.getAll()[0]!.status).toBe(PublicationStatus.COMPLETED);
+    });
+
+    it('resolves immediately when no batch is in flight', async () => {
+      const idle = drainingProcessor(5_000);
+      idle.start();
+
+      const start = Date.now();
+      await idle.stop();
+
+      expect(Date.now() - start).toBeLessThan(1_000);
+    });
+
+    it('gives up after the drain timeout so a stuck listener cannot block shutdown', async () => {
+      const listener = gate();
+      const invoked = blockingListener(listener.held);
+      await manager.run({}, () => publisher.publish(new OrderPlacedEvent('order-1')));
+
+      const draining = drainingProcessor(25);
+      draining.start();
+      await invoked;
+
+      const warn = jest.spyOn(Logger.prototype, 'warn');
+      await draining.stop();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('drain timed out'));
+      // Still PROCESSING — the operator's trade-off: shutdown proceeds
+      // and the staleness monitor recovers the row on the next boot.
+      expect(repo.getAll()[0]!.status).toBe(PublicationStatus.PROCESSING);
+
+      listener.open();
+    });
+
+    it('does not wait at all when the drain timeout is 0', async () => {
+      const listener = gate();
+      const invoked = blockingListener(listener.held);
+      await manager.run({}, () => publisher.publish(new OrderPlacedEvent('order-1')));
+
+      const draining = drainingProcessor(0);
+      draining.start();
+      await invoked;
+
+      const start = Date.now();
+      await draining.stop();
+
+      expect(Date.now() - start).toBeLessThan(1_000);
+      expect(repo.getAll()[0]!.status).toBe(PublicationStatus.PROCESSING);
+
+      listener.open();
+    });
+
+    it('starts no further batch once stopped', async () => {
+      const listener = gate();
+      const invoked = blockingListener(listener.held);
+      await manager.run({}, () => publisher.publish(new OrderPlacedEvent('order-1')));
+
+      const draining = drainingProcessor(5_000);
+      draining.start();
+      await invoked;
+      listener.open();
+      await draining.stop();
+
+      const findReady = jest.spyOn(repo, 'findReadyForProcessing');
+      await sleep(30);
+
+      expect(findReady).not.toHaveBeenCalled();
+    });
+
+    it('is safe to stop twice', async () => {
+      const draining = drainingProcessor(5_000);
+      draining.start();
+
+      await expect(Promise.all([draining.stop(), draining.stop()])).resolves.toEqual([
+        undefined,
+        undefined,
+      ]);
+    });
   });
 });

@@ -17,7 +17,7 @@ import { OrderRow } from './order.entity';
  * billing context's outbox; the orders worker (this DS owns no
  * publication for this event, but the cross-package
  * `OUTBOX_LISTENER_REGISTRAR` registrar resolves the owning DS via
- * the per-DS `EventTypeRegistry` — Phase 14.3.1 Cat A) delivers it.
+ * the per-DS `EventTypeRegistry` — Cat A) delivers it.
  *
  * The handler:
  *   1. Loads the persisted `OrderRow`, hydrates an `Order` aggregate.

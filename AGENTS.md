@@ -18,15 +18,15 @@ growing set of npm packages organised by concern.
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
   `@TransactionalEventsHandler` with Spring-like phases, `HybridEventPublisher`
   + `@IntegrationEventsHandler`, EventPublisher override for AggregateRoot.
-- **@nestjs-transactional/outbox** *(alpha)* — persistent Event Publication
+- **@nestjs-transactional/outbox** — persistent Event Publication
   Registry: lifecycle states, repository SPI, async worker, staleness
   monitor, startup recovery, operator APIs (Failed/Incomplete/Completed),
   testing utilities. ORM-agnostic.
-- **@nestjs-transactional/outbox-typeorm** *(alpha)* — TypeORM persistence
+- **@nestjs-transactional/outbox-typeorm** — TypeORM persistence
   backend for the outbox: `event_publication` + archive entities,
-  `TypeOrmEventPublicationRepository` with `FOR UPDATE SKIP LOCKED`,
-  shipped migration, `OutboxTypeOrmModule` wiring.
-- **@nestjs-transactional/outbox-microservices** *(alpha)* — event
+  `TypeOrmEventPublicationRepository` with an atomic conditional-`UPDATE`
+  claim (`tryClaim`), shipped migration, `OutboxTypeOrmModule` wiring.
+- **@nestjs-transactional/outbox-microservices** — event
   externalization to brokers (Kafka, RabbitMQ, NATS, JMS, gRPC, ...) via
   `@nestjs/microservices` `ClientProxy`. One package covers every transport
   the upstream supports. Reliability caveat: see ADR-016.
@@ -53,7 +53,10 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
 - **Language**: TypeScript 5.5+ in strict mode
 - **Core peer deps**: `@nestjs/common ^10.0.0 || ^11.0.0`,
   `@nestjs/core ^10.0.0 || ^11.0.0`, `reflect-metadata`, `rxjs ^7.0.0`
-- **TypeORM peer**: `typeorm ^0.3.25`, `@nestjs/typeorm ^10.0.0 || ^11.0.0`
+- **TypeORM peer**: `typeorm ^0.3.0 || ^1.0.0`,
+  `@nestjs/typeorm ^10.0.0 || ^11.0.0`. Development happens against
+  `1.1.0` (what the lockfile pins); CI additionally forces `0.3.31`
+  and `1.0.0` via `pnpm.overrides`
 - **CQRS peer**: `@nestjs/cqrs ^11.0.0`
 - **Package manager**: pnpm workspaces
 - **Build**: tsc with project references (no bundler — pure TypeScript)
@@ -78,6 +81,7 @@ the linked docs for depth.
 | Architecture Decision Records | [docs/adr/](docs/adr/) — see ADR index below |
 | Design Decisions | [docs/dd/](docs/dd/) — see DD index below |
 | Implementation roadmap (per phase) | [docs/roadmap/README.md](docs/roadmap/README.md) |
+| Improvement plan (path to stable 1.0.0) | [docs/roadmap/improvement-plan.md](docs/roadmap/improvement-plan.md) |
 | Empirically-discovered conventions | [docs/status/conventions.md](docs/status/conventions.md) |
 | Coding conventions, testing strategy, dev workflow | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Multi-adapter migration guide | [docs/migration/multi-adapter.md](docs/migration/multi-adapter.md) |
@@ -151,6 +155,9 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-022](docs/dd/022-inject-decorators-datasource.md) — Inject decorators accept a dataSource parameter
 - [DD-023](docs/dd/023-independent-tx-contexts-per-ds.md) — Independent transaction contexts per dataSource
 - [DD-024](docs/dd/024-outbox-publisher-facade.md) — Smart `OutboxEventPublisher` facade
+- [DD-025](docs/dd/025-claim-atomicity-obligation.md) — The claim carries the concurrency guarantee, not the poll
+- [DD-026](docs/dd/026-automatic-retry-policy.md) — Automatic retry is an opt-in scheduler, not a new lifecycle state
+- [DD-027](docs/dd/027-readonly-and-timeout-semantics.md) — `readOnly` honoured per dialect; `timeout` stays an extension point
 
 ## DO NOT cheat-sheet
 
@@ -204,7 +211,14 @@ Before merging into main:
 - [ ] Integration tests green (`pnpm -r test:integration`)
 - [ ] Build with no warnings (`pnpm -r build`)
 - [ ] Lint clean (`pnpm -r lint`)
+- [ ] Relative doc links resolve (`pnpm lint:doc-links` — gated by the
+      `doc-links` CI job; ADR / DD slugs are easy to mistype)
 - [ ] Coverage has not dropped below baseline
+      (`pnpm -r --filter './packages/*' test:cov` — enforced by
+      per-package `coverageThreshold`, gated by the `coverage` CI job)
+- [ ] Examples still build and run (covered by the `-r` runs above,
+      gated by the `examples` CI job — they consume the packages the
+      way a user does, so they catch breakage the package suites miss)
 - [ ] Changeset added (for user-facing changes)
 - [ ] README / docs updated when the public API changed
 - [ ] ADR added for significant architectural decisions
@@ -243,21 +257,39 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last update**: First public alpha shipped — six packages
-published to npm at `1.0.0-alpha.0` with `alpha` dist-tag:
-`@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`.
-Released via `release.yml`'s `changesets/action@v1` after merging the
-"Version Packages" PR. The repository is now a publicly installable
-NestJS infrastructure library; further iterations are public
-releases rather than pre-release prep work.
+**Last update**: releasing stable `1.0.0`. The cohort of six —
+`@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`
+— has left changesets pre-release mode and ships under the `latest`
+dist-tag rather than `alpha`. The release-readiness workstreams from
+the improvement plan are complete: API consistency, coverage
+governance, graceful shutdown and automatic retry in the outbox, plus
+the packaging guards (api-extractor surface reports, `publint`,
+`@arethetypeswrong/cli`).
+
+From here the public API is under ADR-004's stability policy: a
+breaking change needs a major bump *and* an ADR, and the committed
+`packages/*/etc/*.api.md` reports make any change to the surface show
+up as a reviewable diff.
 
 ### Blocked / Awaiting
 
-- *(none — alpha shipped; future releases follow the standard
-  changeset → version PR → publish flow.)*
+- **The `1.0.0` release itself.** Pre-release mode is exited and the
+  manifests no longer pin the `alpha` dist-tag, so the next
+  `changeset version` produces `1.0.0` for all six (verified locally:
+  every pending changeset resolves to `1.0.0`, since semver treats any
+  increment of `1.0.0-alpha.5` as `1.0.0`). What remains is the normal
+  flow — merge the "Version Packages" PR, `release.yml` publishes
+  under `latest`.
 
 ### Next
 
+- **Improvement plan (post-alpha assessment)** — the prioritised
+  workstreams for the stable-`1.0.0` push (API consistency, coverage
+  governance, outbox production readiness) live in
+  [`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md).
+  Architectural items there (A1 `readOnly`/`timeout`, C2 retry
+  policy, C3 observability SPI, C5 broker-aware externalizers) start
+  as DD/ADR discussions.
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
   the six published packages to Trusted Publishing would let the
@@ -275,13 +307,45 @@ releases rather than pre-release prep work.
   (native `kafkajs` / `amqplib` / `nats` under the same SPI from
   DD-018 — closes the ADR-016 silent-success gap), `outbox-prisma`,
   `outbox-mongodb`, OpenTelemetry integration, ESM dual packaging.
-- **`1.0.0` stable progression**: when the API stabilises through
-  user feedback on the alpha series, `pnpm changeset pre exit`
-  followed by a regular `version` cycle promotes the cohort to
-  `1.0.0` with `latest` dist-tag.
+- **`1.0.0` stable progression**: done — the cohort has left
+  pre-release mode (`pnpm changeset pre exit`) and versions to
+  `1.0.0` under the `latest` dist-tag. Breaking changes from here
+  need a major bump plus an ADR (ADR-004).
 
 ### Five most recent decisions
 
+- Improvement-plan items shipped — post-alpha assessment
+  ([`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md))
+  and its first three iterations. **Docs accuracy**: `readOnly` /
+  `timeout` documented as unimplemented (item A1 stopgap; the
+  implement-or-deprecate DD is still open), the
+  `CqrsTransactionalModule` `@example` no longer violates
+  convention #6 or calls a non-existent `forFeature`, and the
+  `FOR UPDATE SKIP LOCKED` claim was corrected everywhere —
+  [DD-025](docs/dd/025-claim-atomicity-obligation.md) relocates the
+  atomicity obligation from the poll to `tryClaim`, with ADR-007's
+  SPI appendix amended inline. **Coverage governance**:
+  `passWithNoTests` removed, per-package `coverageThreshold` floors
+  set from measured baselines, a `coverage` CI job enforcing them,
+  and `outbox-typeorm`'s first unit suite (it previously reported
+  success with zero tests). **C1 graceful drain**:
+  `EventPublicationProcessor.stop()` and `StalenessMonitor.stop()`
+  are now `async` and await the work already in flight, bounded by
+  `processor.shutdownTimeout` / `staleness.shutdownTimeout`
+  (`DEFAULT_DRAIN_TIMEOUT_MS`, 10 s; `0` restores the old no-wait
+  behaviour); `OutboxProcessingModule.onApplicationShutdown` awaits
+  all of them concurrently. Convention #24's user-side
+  `OutboxDrainService` workaround is retired and deleted from the
+  `graceful-shutdown` example. **C2 automatic retry**: opt-in
+  `OutboxRetryScheduler` ([DD-026](docs/dd/026-automatic-retry-policy.md))
+  resubmits `FAILED` publications on an exponential backoff, capped by
+  `retry.maxAttempts` (`0` = off, the default). Checking the reference
+  corrected the assessment's framing — Spring Modulith has no automatic
+  retry or dead-letter state either, so this is a deliberate step past
+  parity, layered over `FailedEventPublications.resubmit()` rather than
+  beside it. No sixth lifecycle state: an exhausted publication stays
+  `FAILED` and queryable. `ResubmissionOptions.maxInFlight` (dead
+  option, item A5) removed.
 - First public alpha shipped — six packages at `1.0.0-alpha.0` on
   npm with `alpha` dist-tag. Linked-cohort versioning via
   changesets keeps the six packages in lockstep. Final blocker
@@ -299,7 +363,8 @@ releases rather than pre-release prep work.
   series leads naturally into a future stable `1.0.0`.
 - Phase 14.8f shipped — comprehensive documentation sweep closing
   the multi-adapter era. Five commits: per-package READMEs synced
-  with the example catalogue + Phase 14.20/14.21 alignment;
+  with the example catalogue, plus alignment with transparent
+  transactional repositories and the `OutboxTypeOrmModule` reshape;
   pre-tier `cqrs-full-stack` and `outbox-full-stack` examples
   retired; ADR-018 / ADR-019 deep rewrite collapsed running
   addendum history into final-form Decision prose;
@@ -338,8 +403,9 @@ releases rather than pre-release prep work.
   `TypeOrmTransactionalModule.forRootAsync` bug (now fixed — see
   decision above); #23 dotenv refuses to overwrite `process.env`
   (snapshot/restore between tests); #24 user-side
-  `OutboxDrainService` complement to the framework's sync
-  `OutboxProcessingModule.onApplicationShutdown`. LoC envelope
+  `OutboxDrainService` complement to the then-synchronous
+  `OutboxProcessingModule.onApplicationShutdown` (superseded — the
+  framework now drains; see the C1 decision above). LoC envelope
   updated for flagship multi-multi-axis examples (1800–2100 floor).
 - Phase 14.8d shipped — Tier 4 advanced-pattern examples (saga
   with compensation; cross-DS audit through outbox; master/replica

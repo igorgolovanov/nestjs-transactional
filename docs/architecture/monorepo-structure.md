@@ -28,7 +28,7 @@ nestjs-transactional-monorepo/
 │   │   ├── src/
 │   │   │   ├── adapter/                   # TypeOrmTransactionAdapter
 │   │   │   ├── helpers/                   # getCurrentEntityManager, isInTransaction
-│   │   │   ├── patches/                   # Phase 14.20 prototype patches
+│   │   │   ├── patches/                   # transparent-repository prototype patches
 │   │   │   ├── module/                    # TypeOrmTransactionalModule
 │   │   │   └── index.ts
 │   │   └── test/                          # unit + integration (testcontainers)

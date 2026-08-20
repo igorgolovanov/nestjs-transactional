@@ -107,8 +107,8 @@ loudest if it ever happens.
 
 ## Per-event vs per-DataSource routing
 
-Phase 14.6 (Q1.A) explicitly chose **per-event** routing over
-**per-DataSource** routing. There is ONE
+The outbox-microservices multi-adapter migration explicitly chose
+**per-event** routing over **per-DataSource** routing. There is ONE
 `MicroservicesEventExternalizer` instance for every dataSource —
 the `@nestjs-transactional/outbox-microservices` module is `@Global`.
 `@Externalized({ client })` is the routing axis. This composes with

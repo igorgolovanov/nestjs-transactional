@@ -10,12 +10,23 @@ discoveries during implementation live in
 
 ## Current status
 
-The framework is alpha / in-development. Public API not yet stable;
-breaking changes are accepted between 0.x releases. The core
-transactional contract, multi-adapter architecture, outbox pattern,
-CQRS integration, externalization SPI, and the Tier 1–5 example
-library have all shipped. Phase 9 release automation and the
-broker-aware externalizers (Phase 12+) remain ahead.
+Releasing `1.0.0`. The core transactional contract, multi-adapter
+architecture, outbox pattern, CQRS integration, externalization SPI and
+the Tier 1–5 example library have all shipped, and the public API is now
+under the stability policy in
+[ADR-004](../adr/004-public-api-stability.md): breaking changes need a
+major bump and an ADR.
+
+The surface itself is machine-checked from `1.0.0` onward — the
+committed api-extractor reports under `packages/*/etc/*.api.md` turn any
+change to it into a reviewable diff, and `publint` plus
+`@arethetypeswrong/cli` verify that what consumers resolve from the
+published tarball matches.
+
+Scheduled after `1.0.0`: observability (C3), the scheduled cleanup job
+(C4) and broker-aware externalizers (C5) — see
+[`improvement-plan.md`](improvement-plan.md), which also records the
+post-alpha assessment this release came out of.
 
 ## Era 1 — Foundation (Phases 0–9)
 
@@ -112,7 +123,11 @@ TypeORM persistence backend:
   worker / operator / cleanup indexes.
 - `TypeOrmEventPublicationRepository` implementing the SPI from
   outbox; `tryClaim` conditional `UPDATE`,
-  `findReadyForProcessing` using `SELECT ... FOR UPDATE SKIP LOCKED`.
+  `findReadyForProcessing` using `SELECT ... FOR UPDATE SKIP LOCKED`
+  (the row locking was dropped before release — pessimistic locks
+  need an enclosing transaction wide enough to span the listener
+  invocation; the shipped poll takes no locks and relies on
+  `tryClaim` alone).
 - Schema migration `CreateEventPublication1700000000000` plus
   `SchemaInitializer` for development-time auto-init.
 - `OutboxTypeOrmModule` (later reshaped in Phase 14.21 — see
@@ -576,7 +591,10 @@ Three production-realism examples:
 - `graceful-shutdown` — `app.enableShutdownHooks()` plus a
   user-side `OutboxDrainService` that polls
   `findIncomplete()` until no row is in `PROCESSING`
-  state (Convention #24).
+  state (Convention #24). The workaround was retired once the
+  framework grew its own bounded drain (improvement-plan item
+  C1); the example now configures `processor.shutdownTimeout`
+  instead.
 
 #### Phase 14.8f — Comprehensive documentation pass
 

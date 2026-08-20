@@ -145,4 +145,4 @@ The full enum is in `@nestjs-transactional/cqrs`'s
 - [ADR-003 — not patching `@nestjs/cqrs`](../../docs/adr/003-not-patching-nestjs-cqrs.md)
 - [ADR-005 — method wrapping strategy](../../docs/adr/005-method-wrapping-strategy.md)
 - [ADR-014 — class-level handler API](../../docs/adr/014-handler-api-redesign.md)
-- [`docs/architecture/cqrs-integration.md`](../../docs/architecture/cqrs-integration.md)
+- [`@nestjs-transactional/cqrs` README — public API and usage](../../packages/cqrs/README.md)

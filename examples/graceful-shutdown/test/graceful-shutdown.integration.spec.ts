@@ -26,7 +26,6 @@ import {
   SlowArchivalHandler,
 } from '../src/audit/slow-archival.handler';
 import { ExampleCleanupService } from '../src/shutdown/example-cleanup.service';
-import { OutboxDrainService } from '../src/shutdown/outbox-drain.service';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now();
@@ -51,7 +50,6 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
   let dataSource: DataSource;
   let audit: AuditService;
   let archival: SlowArchivalHandler;
-  let drain: OutboxDrainService;
   let cleanup: ExampleCleanupService;
   // Separate connection for post-close verification — `module.close()`
   // closes the TypeORM DataSource so any reads through it after that
@@ -101,7 +99,6 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
     dataSource = module.get<DataSource>(getDataSourceToken());
     audit = module.get(AuditService);
     archival = module.get(SlowArchivalHandler);
-    drain = module.get(OutboxDrainService);
     cleanup = module.get(ExampleCleanupService);
 
     await dataSource.getRepository(EventPublicationArchiveEntity).clear();
@@ -115,10 +112,12 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
     // still executes — that's the contract callers depend on.
     expect(archival.started).toBe(0);
 
+    const closeStarted = Date.now();
     await module.close();
 
-    expect(drain.drained).toBe(true);
-    expect(drain.drainTimedOut).toBe(false);
+    // An idle drain must not cost the shutdown budget — nothing is in
+    // flight, so `stop()` resolves without waiting.
+    expect(Date.now() - closeStarted).toBeLessThan(1_000);
     expect(cleanup.cleaned).toBe(true);
   });
 
@@ -135,14 +134,13 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
     await module.close();
     const closeDuration = Date.now() - closeStarted;
 
-    // The drain awaits the handler's remaining latency. Total close
-    // time should be at least the handler latency (the handler
-    // started before close() was invoked).
+    // `OutboxProcessingModule.onApplicationShutdown` awaits the
+    // in-flight batch, so close() cannot return before the handler's
+    // remaining latency has elapsed.
     expect(closeDuration).toBeGreaterThanOrEqual(HANDLER_LATENCY_MS / 2);
 
     // Handler finished cleanly — no row stuck in PROCESSING.
     expect(archival.finished).toBe(1);
-    expect(drain.drained).toBe(true);
 
     // Verify via the side pg client (the Nest-managed DataSource is
     // already closed at this point).

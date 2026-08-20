@@ -13,14 +13,12 @@ export type ResubmissionFilter = (publication: EventPublication) => boolean;
  * ```ts
  * ResubmissionOptions.defaults()
  *   .withBatchSize(50)
- *   .withMaxInFlight(5)
  *   .withMinAge(10_000)
  *   .withMaxAttempts(3);
  * ```
  */
 export class ResubmissionOptions {
   private _batchSize = 100;
-  private _maxInFlight = 10;
   private _minAge = 0;
   private _maxCompletionAttempts: number | null = null;
   private _filter: ResubmissionFilter | null = null;
@@ -31,11 +29,6 @@ export class ResubmissionOptions {
 
   withBatchSize(size: number): this {
     this._batchSize = size;
-    return this;
-  }
-
-  withMaxInFlight(n: number): this {
-    this._maxInFlight = n;
     return this;
   }
 
@@ -56,10 +49,6 @@ export class ResubmissionOptions {
 
   get batchSize(): number {
     return this._batchSize;
-  }
-
-  get maxInFlight(): number {
-    return this._maxInFlight;
   }
 
   get minAge(): number {

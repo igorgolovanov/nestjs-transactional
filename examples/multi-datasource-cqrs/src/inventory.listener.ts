@@ -7,7 +7,7 @@ import {
 import { ReservationPlacedEvent } from './reservation.aggregate';
 
 /**
- * Phase 14.3.1 Category B in action. The `dataSource: 'inventory'`
+ * Category B in action. The `dataSource: 'inventory'`
  * option tells `TransactionalEventDispatcher.scheduleDispatch` to
  * resolve the active transaction via
  * `TransactionContext.getActiveTransactionByDataSource('inventory')`

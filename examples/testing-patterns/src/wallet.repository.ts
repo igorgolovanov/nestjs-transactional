@@ -19,7 +19,7 @@ export const WALLET_REPOSITORY = Symbol('WALLET_REPOSITORY');
 /**
  * Production implementation. `@InjectRepository(WalletRow)` resolves
  * to the default DataSource's TypeORM `Repository<WalletRow>`. The
- * Phase 14.20 prototype patches make `this.wallets.update(...)` join
+ * The prototype patches make `this.wallets.update(...)` join
  * the ambient `@Transactional` scope automatically.
  */
 @Injectable()

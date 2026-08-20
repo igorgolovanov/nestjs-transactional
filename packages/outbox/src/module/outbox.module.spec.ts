@@ -15,12 +15,17 @@ import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorat
 import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
 import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
 import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface';
+import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
-import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository';
+import {
+  EVENT_PUBLICATION_REPOSITORY,
+  type EventPublicationRepository,
+} from '../repository/event-publication-repository';
 import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
 import { PublicationStatus } from '../types/publication-status';
+import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config';
 
-import { OutboxModule } from './outbox.module';
+import { OUTBOX_RETRY_CONFIG, OutboxModule } from './outbox.module';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -39,10 +44,7 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
     return fn(handle);
   }
 
-  async runInSavepoint<T>(
-    parent: FakeHandle,
-    fn: (handle: FakeHandle) => Promise<T>,
-  ): Promise<T> {
+  async runInSavepoint<T>(parent: FakeHandle, fn: (handle: FakeHandle) => Promise<T>): Promise<T> {
     return fn(parent);
   }
 }
@@ -224,5 +226,53 @@ describe('OutboxModule (integration)', () => {
     await processor.processBatch();
 
     expect(listener.invocations).toHaveLength(1);
+  });
+
+  describe('automatic retry wiring (DD-026)', () => {
+    it('resolves a scheduler that is disabled by default', async () => {
+      await buildModule();
+
+      const config = module.get<OutboxRetryConfig>(OUTBOX_RETRY_CONFIG);
+
+      expect(config.maxAttempts).toBe(0);
+      expect(module.get(OutboxRetryScheduler)).toBeInstanceOf(OutboxRetryScheduler);
+    });
+
+    it('carries the configured retry policy through to the scheduler', async () => {
+      await buildModule({ retry: { maxAttempts: 4, baseDelay: 250, jitter: 0 } });
+
+      const config = module.get<OutboxRetryConfig>(OUTBOX_RETRY_CONFIG);
+
+      expect(config).toMatchObject({ maxAttempts: 4, baseDelay: 250, jitter: 0 });
+      // Unspecified fields keep their defaults rather than becoming undefined.
+      expect(config.factor).toBe(DEFAULT_RETRY_CONFIG.factor);
+      expect(config.interval).toBe(DEFAULT_RETRY_CONFIG.interval);
+    });
+
+    it('drives a failed publication back to COMPLETED without operator involvement', async () => {
+      // End-to-end proof that the scheduler is wired to the right
+      // repository: fail once, let the scheduler resubmit, process again.
+      await buildModule({ retry: { maxAttempts: 3, baseDelay: 0, jitter: 0 } });
+      const manager = module.get(TransactionManager);
+      const publisher = module.get(OutboxEventPublisher);
+      const processor = module.get(EventPublicationProcessor);
+      const scheduler = module.get(OutboxRetryScheduler);
+      const listener = module.get(FlakyListener);
+      listener.failuresRemaining = 1;
+
+      await manager.run({}, async () => {
+        await publisher.publish(new OrderPlacedEvent('retry-order'));
+      });
+      await processor.processBatch();
+
+      const repository = module.get<EventPublicationRepository>(EVENT_PUBLICATION_REPOSITORY);
+      expect(await repository.findFailed()).toHaveLength(1);
+
+      expect(await scheduler.runOnce()).toBe(1);
+      await processor.processBatch();
+
+      expect(await repository.findFailed()).toHaveLength(0);
+      expect(listener.invocations).toHaveLength(2);
+    });
   });
 });

@@ -2,7 +2,7 @@
 
 Outbox externalization to **Apache Kafka** via `@nestjs/microservices`
 `ClientProxy` — single Postgres DataSource, single Kafka broker. The
-canonical Phase 11 / Tier 3 baseline.
+canonical event-externalization / Tier 3 baseline.
 
 A successful `@Transactional` method commits the business INSERT and
 the `event_publication` row in one transaction; the worker dispatches
@@ -16,7 +16,7 @@ atomicity (DD-019) is preserved end-to-end.
 - You want a regression template for externalization-publishing
   services with mocked `ClientProxy` (fast jest tests) plus a real
   Kafka stack via `docker-compose` (visual demo).
-- You're evaluating Phase 11 externalization before adopting it.
+- You're evaluating event externalization before adopting it.
 
 For multi-broker per-event routing see
 [`externalization-multi-broker`](../externalization-multi-broker).
@@ -61,7 +61,7 @@ docker-compose -f examples/externalization-kafka/docker-compose.yml down -v
                                   |
                                   v
                   +---------------------------+
-                  | EventPublicationProcessor |  poll FOR UPDATE SKIP LOCKED
+                  | EventPublicationProcessor |  poll, claim by UPDATE
                   +-------------+-------------+
                                 |
                   +-------------+-------------+

@@ -223,8 +223,8 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
-- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter.md)
-- [ADR-019 — multi-`forRoot` per dataSource](../../docs/adr/019-multi-forroot.md)
+- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
+- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
+- [ADR-019 — multi-`forRoot` per dataSource](../../docs/adr/019-outbox-multi-forroot-pattern.md)
 - `@nestjs/config` upstream docs:
   https://docs.nestjs.com/techniques/configuration

@@ -6,7 +6,7 @@ import { Repository } from 'typeorm';
 import { UserEntity } from './user.entity';
 
 /**
- * Phase 14.20 transparent repositories — `@InjectRepository(UserEntity)`
+ * Transparent transactional repositories — `@InjectRepository(UserEntity)`
  * resolves a regular TypeORM `Repository`, but its `manager` getter is
  * patched at module load to consult the active `@Transactional()` scope.
  * No `getCurrentEntityManager()` call, no `EntityManager` plumbing in

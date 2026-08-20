@@ -3,10 +3,14 @@
   "version": "1.0.0-alpha.5",
   "description": "TypeORM persistence backend for @nestjs-transactional/outbox — event_publication table, FOR UPDATE SKIP LOCKED worker safety",
   "license": "MIT",
+  "type": "commonjs",
+  "sideEffects": [
+    "./dist/entity/*.js"
+  ],
   "author": "Igor Golovanov",
   "repository": {
     "type": "git",
-    "url": "https://github.com/igorgolovanov/nestjs-transactional.git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
     "directory": "packages/outbox-typeorm"
   },
   "bugs": {
@@ -40,7 +44,6 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "alpha",
     "provenance": true
   },
   "scripts": {
@@ -51,7 +54,10 @@
     "test:cov": "jest --coverage",
     "test:integration": "jest --config jest.integration.config.js",
     "type-check": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack ."
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",
@@ -81,7 +87,7 @@
     "rxjs": "^7.8.1",
     "testcontainers": "^10.13.0",
     "ts-jest": "^29.2.5",
-    "typeorm": "^0.3.0 || ^1.0.0",
+    "typeorm": "^1.1.0",
     "typescript": "^5.5.4"
   }
 }

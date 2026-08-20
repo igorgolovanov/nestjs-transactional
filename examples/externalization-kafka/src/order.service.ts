@@ -10,7 +10,7 @@ import { OrderPlacedEvent } from './order-placed.event';
 /**
  * Single-unit atomicity (DD-019) extended to externalization:
  *
- *   1. INSERT into `orders` via the Phase 14.20 transparent repository.
+ *   1. INSERT into `orders` via the transparent repository.
  *   2. APPEND a publication row through `OutboxEventPublisher.publish`.
  *
  * Both writes commit together. The `EventPublicationProcessor` worker

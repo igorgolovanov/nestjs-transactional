@@ -51,8 +51,8 @@ been delivered":
    at all). The event is now durable.
 
 2. **Dispatch phase** — an asynchronous worker polls the
-   `event_publication` table, claims rows atomically
-   (`FOR UPDATE SKIP LOCKED`), invokes the corresponding listener,
+   `event_publication` table, claims rows atomically (one
+   conditional `UPDATE` per row), invokes the corresponding listener,
    and marks the row `COMPLETED` on success or `FAILED` on error.
    A failed row can be retried; a lost worker leaves the row in
    `PROCESSING`, which the staleness monitor flips back so another
@@ -84,8 +84,8 @@ back.
  │                                     │        ▲
  │  Worker process                     │        │
  │  ┌─────────────────────────┐        │        │
- │  │EventPublicationProcessor│        │        │ FOR UPDATE
- │  │  - polls `PUBLISHED`    │  ◀─────┼────────┘  SKIP LOCKED
+ │  │EventPublicationProcessor│        │        │ poll, then
+ │  │  - polls `PUBLISHED`    │  ◀─────┼────────┘  claim by UPDATE
  │  │  - tryClaim()           │        │
  │  │  - invokes listener     │        │
  │  │  - marks COMPLETED      │        │
@@ -189,12 +189,14 @@ the cost is typically sub-millisecond per publication.
 
 **Dispatch phase.** The worker polls at a configurable interval
 (`processor.pollingInterval`, default 1 second) and reads up to
-`batchSize` rows (default 100) with `FOR UPDATE SKIP LOCKED`. Each
-claim is one `UPDATE` with a conditional `WHERE`; the listener
-invocation is what dominates wall-clock. Up to `maxConcurrent`
-invocations run in parallel per batch (default 10) via `Promise.all`.
-Scaling up horizontally means running more worker processes —
-`SKIP LOCKED` ensures they do not fight over the same rows.
+`batchSize` rows (default 100) without row locks. Each claim is one
+`UPDATE` with a conditional `WHERE`; the listener invocation is what
+dominates wall-clock. Up to `maxConcurrent` invocations run in
+parallel per batch (default 10) via `Promise.all`. Scaling up
+horizontally means running more worker processes — they may fetch
+overlapping row sets, but only one wins each `tryClaim`, so the
+duplicate work is a wasted `SELECT`, never a duplicate dispatch.
+That trade-off is sized for typical worker counts (1–3).
 
 **Cleanup.** `CompletedEventPublications.purge(olderThan)` deletes
 rows in bulk with a single `DELETE ... WHERE completion_date < ?`

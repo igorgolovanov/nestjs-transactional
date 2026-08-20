@@ -1,5 +1,5 @@
 {
-  "mode": "pre",
+  "mode": "exit",
   "tag": "alpha",
   "initialVersions": {
     "@nestjs-transactional-examples/async-config-from-environment": "0.0.0",

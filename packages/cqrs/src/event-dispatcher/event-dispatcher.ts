@@ -20,7 +20,7 @@ export interface DispatcherListenerMetadata {
   readonly fallbackExecution: boolean;
   readonly async: boolean;
   /**
-   * dataSource the listener's phase hooks attach to (Phase 14.3.1).
+   * dataSource the listener's phase hooks attach to.
    * Optional for backward compatibility — when omitted, defaults to
    * `'default'`. Scanners normalise from decorator metadata before
    * calling {@link TransactionalEventDispatcher.registerListener}.
@@ -74,7 +74,7 @@ interface RegisteredListener {
  *   their failures are logged but never reach the enclosing
  *   transaction, even in BEFORE_COMMIT phase.
  *
- * **Multi-dataSource (Phase 14.3.1).** Hook attachment is per-dataSource:
+ * **Multi-dataSource.** Hook attachment is per-dataSource:
  * the dispatcher resolves the listener's bound dataSource via
  * `TransactionContext.getActiveTransactionByDataSource(dataSource)`
  * and pushes hooks directly onto that transaction's hook list,
@@ -94,7 +94,7 @@ export class TransactionalEventDispatcher {
   private readonly listenersByType = new Map<string, RegisteredListener[]>();
 
   /**
-   * `manager` is no longer consulted after Phase 14.3.1 — the
+   * `manager` is no longer consulted — the
    * dispatcher pushes hooks directly onto the per-dataSource
    * `ActiveTransaction` resolved via `TransactionContext`. The
    * parameter is preserved as a constructor argument so existing
@@ -215,7 +215,7 @@ export class TransactionalEventDispatcher {
     // Push hooks directly onto THIS specific transaction's hook lists,
     // bypassing TransactionManager.registerBeforeCommit's
     // first-active-tx resolution. Same pattern as
-    // DataSourceOutboxPublisher.scheduleForPublication (Phase 14.3).
+    // DataSourceOutboxPublisher.scheduleForPublication.
     switch (listener.metadata.phase) {
       case TransactionPhase.BEFORE_COMMIT:
         tx.beforeCommitHooks.push(invoke);

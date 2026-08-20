@@ -29,7 +29,8 @@ externalization).
   (worker died mid-flight) flip back to `FAILED` for another
   attempt.
 - **Horizontal scale-out** — multiple worker processes poll the
-  same table without fighting each other (`FOR UPDATE SKIP LOCKED`).
+  same table; an atomic conditional-`UPDATE` claim guarantees only
+  one of them dispatches each publication.
 - **At-least-once delivery semantics** — publications commit
   atomically with the business write. A committed publication is
   guaranteed to be delivered; a publication whose transaction
@@ -49,7 +50,7 @@ externalization).
 - Any `@TransactionalEventsHandler` you leave untouched. It keeps
   running in-memory, at its current phase, exactly as before.
 - Your `@nestjs/typeorm` `@InjectRepository` injection points —
-  Phase 14.20 transparent transactional repositories make them
+  transparent transactional repositories make them
   dispatch through the active `@Transactional()` scope
   automatically. No `getCurrentEntityManager()` calls in service
   code.
@@ -330,10 +331,12 @@ The `OutboxProcessingModule` auto-starts the processor and the
 staleness monitor on `OnApplicationBootstrap` and auto-stops
 them on `OnApplicationShutdown` — no manual hooks required.
 
-For graceful shutdown of in-flight publications during deploys,
-see the user-side `OutboxDrainService` pattern in
-[`examples/graceful-shutdown`](../../examples/graceful-shutdown/)
-(Convention #24).
+Shutdown drains in-flight work rather than abandoning it: the hook
+awaits the batch already running, bounded by
+`processor.shutdownTimeout` (10 s default — keep it under your
+platform's grace period). Anything abandoned at the deadline is
+recovered by the staleness monitor on a later boot. See
+[`examples/graceful-shutdown`](../../examples/graceful-shutdown/).
 
 ## Step 7 — test the migration
 
@@ -368,9 +371,9 @@ for the three-tier scaffold (unit / outbox unit / integration).
 
 If your application runs multiple `DataSource`s (modular monolith,
 audit-store split, ORM migration), each DS gets its own outbox
-stack. Phase 14.3.1 + 14.21 made this transparent: handler
-registration auto-routes to the owning DS, and per-DS event
-publication tables don't contend.
+stack. This works transparently: handler registration auto-routes
+to the owning DS, and per-DS event publication tables don't
+contend.
 
 Module wiring (mirrors the
 [`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/)
@@ -558,11 +561,14 @@ adapter reports commit failures correctly. The
 pins this contract end-to-end against real Postgres.
 
 **"Two workers each grab the same row."**
-Should not happen — `findReadyForProcessing` uses
-`SELECT ... FOR UPDATE SKIP LOCKED` (Postgres) and `tryClaim`
-uses a conditional `UPDATE ... WHERE status IN (...)`. If you
-are running the worker on a database without `SKIP LOCKED`
-support, you need a different backend adapter.
+They may both *fetch* it — `findReadyForProcessing` does not take
+row locks — but only one can *claim* it: `tryClaim` issues a
+conditional `UPDATE ... WHERE id = :id AND status IN (...)` and
+reports whether the row was actually transitioned. The loser sees
+zero affected rows and moves on without invoking the listener. So
+duplicate fetches are possible by design; duplicate dispatches are
+not. If you scale far past a handful of workers, the wasted
+`SELECT`s add up — that is the point to revisit the claim strategy.
 
 **"`@IntegrationEventsHandler` fires twice."**
 Each class is routed to exactly one path by
@@ -574,8 +580,9 @@ overlapping event types from separate classes (which would be
 two deliveries, one per class — the intended behaviour).
 
 **"Multi-DS handler fires on the wrong DataSource."**
-Phase 14.3.1 Category B requires `@TransactionalEventsHandler`
-classes to declare their owning DS via the decorator option:
+The cqrs in-memory dispatcher (Category B) requires
+`@TransactionalEventsHandler` classes to declare their owning DS
+via the decorator option:
 
 ```ts
 @TransactionalEventsHandler({

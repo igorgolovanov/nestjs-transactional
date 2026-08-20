@@ -32,7 +32,9 @@ import { OutboxModule } from './outbox.module';
  * (DD-023). Unlike the default-named-only adapter used in the
  * single-DS spec, this version takes the name in the constructor.
  */
-class NamedFakeAdapter implements TransactionAdapter<TransactionHandle & { id: string; adapterName: string }> {
+class NamedFakeAdapter implements TransactionAdapter<
+  TransactionHandle & { id: string; adapterName: string }
+> {
   readonly name = 'in-memory';
   constructor(readonly dataSourceName: string) {}
 
@@ -144,8 +146,9 @@ describe('OutboxModule multi-forRoot (integration, in-memory)', () => {
     billingService = module.get(BillingService);
     inventoryService = module.get(InventoryService);
 
-    // Manual per-DS listener registration (Phase 14.3.1 will fix the
-    // scanner to do this automatically based on event ownership).
+    // Manual per-DS listener registration. The scanner does this
+    // automatically from event ownership; wiring it by hand here
+    // keeps the test focused on the registry itself.
     const defaultRegistry = module.get<OutboxListenerRegistry>(
       getOutboxListenerRegistryToken('default'),
     );
@@ -320,9 +323,7 @@ describe('OutboxModule.forRoot — duplicate-dataSource detection', () => {
 
   it('throws when the same dataSource is registered twice', () => {
     OutboxModule.forRoot({});
-    expect(() => OutboxModule.forRoot({})).toThrow(
-      "OutboxModule.forRoot('default') called twice",
-    );
+    expect(() => OutboxModule.forRoot({})).toThrow("OutboxModule.forRoot('default') called twice");
   });
 
   it('throws when a non-default dataSource is registered twice', () => {

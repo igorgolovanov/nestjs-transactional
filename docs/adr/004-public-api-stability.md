@@ -81,36 +81,61 @@ For each package:
   API as defined above. Includes signature changes, removed
   exports, changed default behaviour, changed token strings,
   changed migration semantics.
-- **Minor bump (`0.x.0`)** — backwards-compatible additions to
+- **Minor bump (`x.Y.0`)** — backwards-compatible additions to
   the public API. New exports, new option fields with safe
   defaults, new methods on existing classes.
-- **Patch bump (`0.0.x`)** — backwards-compatible bug fixes.
+- **Patch bump (`x.y.Z`)** — backwards-compatible bug fixes.
   Behaviour conforms to the documented contract; no new
   surface area.
 
-### Pre-1.0 (alpha/beta) phase
+### The pre-release phase (historical)
 
-While packages remain on `0.x.y`, breaking changes are
-acceptable but tracked: every breaking PR requires a
-[changeset](https://github.com/changesets/changesets) entry
-labelled `major`, and the breaking change is documented in
-the package's release notes. The intent is that consumers
-who pin to `0.x.0` can choose when to follow major bumps,
-even within the pre-1.0 phase.
+The cohort never sat on `0.x`; it shipped as `1.0.0-alpha.N`
+through changesets' pre-release mode. During that series
+breaking changes were acceptable but tracked — every breaking
+PR carried a changeset labelled `major` and said so in the
+release notes.
 
-After `1.0.0` ships, breaking changes additionally require an
-ADR documenting the rationale (or an addendum to an existing
-ADR). Pre-1.0 ADRs are encouraged but not required.
+That phase is over. From `1.0.0`, a breaking change costs a
+major bump **and** requires an ADR documenting the rationale
+(or an addendum to an existing one). The version number is now
+a promise rather than a signal of work in progress.
 
 ### Tooling
 
 - **Changesets** (`pnpm changeset`) is the source of truth for
   release intent. Every PR that touches public API ships a
   changeset.
-- **`@arethetypeswrong/cli`** runs in CI to verify that the
-  published types match the runtime exports.
-- **`publint`** runs in CI to verify package.json `exports`
-  field consistency.
+- **`@microsoft/api-extractor`** generates a signature report per
+  entry point into `packages/<name>/etc/*.api.md`, committed to the
+  repository. The `api-surface` CI job regenerates the reports from
+  the built `.d.ts` and fails when they differ from what is
+  committed. This is what makes the policy above checkable: a change
+  to the published surface arrives as a diff in a reviewable file
+  rather than as something a reviewer has to spot. `pnpm api:update`
+  accepts an intended change; the diff then belongs in the PR, next
+  to the changeset that classifies it as major, minor, or patch.
+- **`@arethetypeswrong/cli`** resolves every entry point of the packed
+  tarball under `node10`, `node16` (from CJS and from ESM) and
+  `bundler`, and fails when any of them cannot reach the types.
+- **`publint`** lints the packed manifest: `exports` targets that do
+  not exist, missing `type`, malformed metadata.
+
+Both run in the `publish-check` CI job, via `pnpm publish:check`.
+
+These two answer a question the rest of the tooling cannot.
+`api-extractor` reads the built declarations, so it sees what the
+sources *declare*; `type-check` compiles those sources. Neither says
+whether a consumer can actually resolve them through the `exports`
+map. That distinction was not academic — the first `attw` run found
+that `@nestjs-transactional/core/testing` and
+`@nestjs-transactional/outbox/testing` did not resolve under `node10`
+resolution at all, which is what a stock `module: commonjs` tsconfig
+selects when it does not name `moduleResolution` explicitly. Six alpha
+releases shipped with a documented subpath that a large share of
+consumers could not import. Fixed with `typesVersions`; runtime
+resolution was never affected, since Node honours `exports` regardless
+of the TypeScript setting.
 
 ### Process commitments
 
@@ -223,9 +248,10 @@ both public.
   *carefully-chosen* symbols from each package. We don't
   re-export internal helpers, even when they're convenient,
   because every export is a future obligation.
-- Pre-1.0 packages are explicitly labelled as alpha/beta in
-  the README so consumers know to expect breaking changes
-  during this phase.
+- The alpha series was explicitly labelled as such in every
+  README. Those labels came off with `1.0.0`: leaving them
+  would understate the guarantee, exactly as keeping them
+  absent during the alpha would have overstated it.
 - The `/testing` subpath isolates testing utilities from
   the main entry point — testing utilities can evolve
   without bleeding into production-facing exports.
@@ -233,11 +259,24 @@ both public.
 ## Notes
 
 - This ADR is process-level rather than architectural. It
-  predates the actual 1.0 release (still pending) but the
-  policy is in effect from the first published release.
+  predates the `1.0.0` release and the policy was in effect
+  from the first published alpha; `1.0.0` is where it starts
+  binding, since breaking changes now cost a major bump.
 - The `@arethetypeswrong/cli` and `publint` checks were
-  added in Phase 4 (CI/CD setup) and are non-negotiable
-  parts of the release process.
+  recorded here as added in Phase 4 and non-negotiable. They
+  were neither, and this ADR asserted otherwise for six alpha
+  releases. They exist now, and the first run justified the
+  claim retroactively: it found a documented subpath that did
+  not resolve for consumers on the default CommonJS
+  resolution. The lesson worth keeping is not about these two
+  tools — it is that a decision record asserting a check
+  exists is precisely as good as no check at all, and reads
+  better.
+- The `api-extractor` reports were baselined immediately
+  before the stable `1.0.0` release, which is the only moment
+  the baseline is worth much: taken later, the first diff has
+  nothing meaningful to compare against, and the surface
+  `1.0.0` actually froze would never have been recorded.
 - Future ADRs that introduce or change public API surface
   (ADR-018 token utilities, ADR-014 handler API redesign,
   any future ADR-NNN) cite this one for the stability

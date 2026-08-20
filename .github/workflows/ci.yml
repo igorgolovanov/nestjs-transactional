@@ -11,6 +11,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  doc-links:
+    name: Doc links
+    runs-on: ubuntu-latest
+    # No pnpm install, no build: the check is plain shell over
+    # `git ls-files`, so it runs in seconds and fails fast on a rotted
+    # ADR/DD reference. Twenty had accumulated unnoticed before this
+    # gate existed.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check relative markdown links
+        run: ./scripts/check-doc-links.sh
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    # Single cell on purpose: Prettier's output does not vary by Node or
+    # TypeORM version, so matrixing this would buy nothing.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Covers code, not prose: `packages/*/src/**/*.{ts,json}` plus the
+      # root `package.json` and `pnpm-workspace.yaml`. Root markdown and
+      # everything under docs/ is hand-wrapped and excluded in
+      # .prettierignore — Prettier rewrites those rather than tidying them.
+      - name: Check formatting
+        run: pnpm format:check
+
   lint:
     name: Lint (Node ${{ matrix.node-version }}, TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
@@ -18,7 +60,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22, 24, 26]
-        typeorm-version: ['0.3', '1.0']
+        typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,12 +76,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
-            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
-            pnpm install --no-frozen-lockfile
-          else
+          # `1.1.0` is the version the lockfile pins, so that leg installs
+          # frozen — it doubles as the check that the lockfile is in sync.
+          # Every other point of the `^0.3.0 || ^1.0.0` peer range is forced
+          # with a pnpm override, which wins over the declared devDependency.
+          if [ "${{ matrix.typeorm-version }}" = "1.1.0" ]; then
             pnpm install --frozen-lockfile
+          else
+            npm pkg set 'pnpm.overrides.typeorm=${{ matrix.typeorm-version }}'
+            pnpm install --no-frozen-lockfile
           fi
+
+      # The override is a silent mechanism: pnpm 10 stopped reading
+      # `pnpm.overrides` from package.json, and when it is ignored the leg
+      # quietly installs the lockfile version and still passes — claiming a
+      # compatibility we never tested. Assert what actually landed.
+      - name: Verify the TypeORM version under test
+        run: |
+          actual=$(node -p "require('./packages/typeorm/node_modules/typeorm/package.json').version")
+          if [ "$actual" != "${{ matrix.typeorm-version }}" ]; then
+            echo "::error::expected typeorm ${{ matrix.typeorm-version }}, resolved $actual"
+            exit 1
+          fi
+          echo "typeorm $actual"
 
       # Cross-package type resolution goes through `dist/*.d.ts`
       # (each package.json's `types` field). ESLint's
@@ -59,7 +118,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22, 24, 26]
-        typeorm-version: ['0.3', '1.0']
+        typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,12 +134,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
-            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
-            pnpm install --no-frozen-lockfile
-          else
+          # `1.1.0` is the version the lockfile pins, so that leg installs
+          # frozen — it doubles as the check that the lockfile is in sync.
+          # Every other point of the `^0.3.0 || ^1.0.0` peer range is forced
+          # with a pnpm override, which wins over the declared devDependency.
+          if [ "${{ matrix.typeorm-version }}" = "1.1.0" ]; then
             pnpm install --frozen-lockfile
+          else
+            npm pkg set 'pnpm.overrides.typeorm=${{ matrix.typeorm-version }}'
+            pnpm install --no-frozen-lockfile
           fi
+
+      # The override is a silent mechanism: pnpm 10 stopped reading
+      # `pnpm.overrides` from package.json, and when it is ignored the leg
+      # quietly installs the lockfile version and still passes — claiming a
+      # compatibility we never tested. Assert what actually landed.
+      - name: Verify the TypeORM version under test
+        run: |
+          actual=$(node -p "require('./packages/typeorm/node_modules/typeorm/package.json').version")
+          if [ "$actual" != "${{ matrix.typeorm-version }}" ]; then
+            echo "::error::expected typeorm ${{ matrix.typeorm-version }}, resolved $actual"
+            exit 1
+          fi
+          echo "typeorm $actual"
 
       - name: Build
         run: pnpm -r --filter './packages/*' build
@@ -92,7 +168,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22, 24, 26]
-        typeorm-version: ['0.3', '1.0']
+        typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,12 +184,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
-            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
-            pnpm install --no-frozen-lockfile
-          else
+          # `1.1.0` is the version the lockfile pins, so that leg installs
+          # frozen — it doubles as the check that the lockfile is in sync.
+          # Every other point of the `^0.3.0 || ^1.0.0` peer range is forced
+          # with a pnpm override, which wins over the declared devDependency.
+          if [ "${{ matrix.typeorm-version }}" = "1.1.0" ]; then
             pnpm install --frozen-lockfile
+          else
+            npm pkg set 'pnpm.overrides.typeorm=${{ matrix.typeorm-version }}'
+            pnpm install --no-frozen-lockfile
           fi
+
+      # The override is a silent mechanism: pnpm 10 stopped reading
+      # `pnpm.overrides` from package.json, and when it is ignored the leg
+      # quietly installs the lockfile version and still passes — claiming a
+      # compatibility we never tested. Assert what actually landed.
+      - name: Verify the TypeORM version under test
+        run: |
+          actual=$(node -p "require('./packages/typeorm/node_modules/typeorm/package.json').version")
+          if [ "$actual" != "${{ matrix.typeorm-version }}" ]; then
+            echo "::error::expected typeorm ${{ matrix.typeorm-version }}, resolved $actual"
+            exit 1
+          fi
+          echo "typeorm $actual"
 
       # ts-jest resolves `@nestjs-transactional/*` cross-package
       # imports through the package.json `types` / `main` paths,
@@ -126,13 +219,55 @@ jobs:
       - name: Test
         run: pnpm -r --filter './packages/*' test
 
+  coverage:
+    name: Coverage (Node 22, TypeORM 1.1)
+    runs-on: ubuntu-latest
+    # Single cell on purpose: coverage does not vary by Node or TypeORM
+    # version, and the `test` job already proves the suite passes across
+    # the full matrix. What this job adds is the per-package
+    # `coverageThreshold` gate — the enforcement behind the "coverage has
+    # not dropped below baseline" quality gate, which was previously
+    # unverifiable in CI.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
+      # Fails when any package drops below its baseline floor, and — with
+      # `passWithNoTests` gone — when a package ships no unit tests at all.
+      - name: Test with coverage
+        run: pnpm -r --filter './packages/*' test:cov
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: packages/*/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
+
   type-check:
     name: Type check (TypeORM ${{ matrix.typeorm-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        typeorm-version: ['0.3', '1.0']
+        typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -148,12 +283,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
-            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
-            pnpm install --no-frozen-lockfile
-          else
+          # `1.1.0` is the version the lockfile pins, so that leg installs
+          # frozen — it doubles as the check that the lockfile is in sync.
+          # Every other point of the `^0.3.0 || ^1.0.0` peer range is forced
+          # with a pnpm override, which wins over the declared devDependency.
+          if [ "${{ matrix.typeorm-version }}" = "1.1.0" ]; then
             pnpm install --frozen-lockfile
+          else
+            npm pkg set 'pnpm.overrides.typeorm=${{ matrix.typeorm-version }}'
+            pnpm install --no-frozen-lockfile
           fi
+
+      # The override is a silent mechanism: pnpm 10 stopped reading
+      # `pnpm.overrides` from package.json, and when it is ignored the leg
+      # quietly installs the lockfile version and still passes — claiming a
+      # compatibility we never tested. Assert what actually landed.
+      - name: Verify the TypeORM version under test
+        run: |
+          actual=$(node -p "require('./packages/typeorm/node_modules/typeorm/package.json').version")
+          if [ "$actual" != "${{ matrix.typeorm-version }}" ]; then
+            echo "::error::expected typeorm ${{ matrix.typeorm-version }}, resolved $actual"
+            exit 1
+          fi
+          echo "typeorm $actual"
 
       # Per-package `tsc --noEmit` resolves cross-package imports
       # via `node_modules/@nestjs-transactional/*/dist/*.d.ts`.
@@ -172,7 +324,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        typeorm-version: ['0.3', '1.0']
+        typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     # ubuntu-latest ships with Docker — testcontainers spins up Postgres
     # per-suite. Currently `typeorm` and `outbox-typeorm` define
     # `test:integration`; pnpm filter-run skips packages without it.
@@ -191,15 +343,145 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ "${{ matrix.typeorm-version }}" = "1.0" ]; then
-            npm pkg set 'pnpm.overrides.typeorm=1.0.0'
-            pnpm install --no-frozen-lockfile
-          else
+          # `1.1.0` is the version the lockfile pins, so that leg installs
+          # frozen — it doubles as the check that the lockfile is in sync.
+          # Every other point of the `^0.3.0 || ^1.0.0` peer range is forced
+          # with a pnpm override, which wins over the declared devDependency.
+          if [ "${{ matrix.typeorm-version }}" = "1.1.0" ]; then
             pnpm install --frozen-lockfile
+          else
+            npm pkg set 'pnpm.overrides.typeorm=${{ matrix.typeorm-version }}'
+            pnpm install --no-frozen-lockfile
           fi
+
+      # The override is a silent mechanism: pnpm 10 stopped reading
+      # `pnpm.overrides` from package.json, and when it is ignored the leg
+      # quietly installs the lockfile version and still passes — claiming a
+      # compatibility we never tested. Assert what actually landed.
+      - name: Verify the TypeORM version under test
+        run: |
+          actual=$(node -p "require('./packages/typeorm/node_modules/typeorm/package.json').version")
+          if [ "$actual" != "${{ matrix.typeorm-version }}" ]; then
+            echo "::error::expected typeorm ${{ matrix.typeorm-version }}, resolved $actual"
+            exit 1
+          fi
+          echo "typeorm $actual"
 
       - name: Build
         run: pnpm -r --filter './packages/*' build
 
       - name: Integration tests
         run: pnpm -r --filter './packages/*' test:integration
+
+  api-surface:
+    name: API surface
+    runs-on: ubuntu-latest
+    # Single cell: the report is generated from the built `.d.ts`, which does
+    # not vary by Node version. It does vary by TypeORM version — the adapter
+    # packages re-export TypeORM types — so this runs on the version the
+    # lockfile pins, the same one the published packages are built against.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # api-extractor reads `dist/index.d.ts`, so the declarations have to
+      # exist before it can diff anything.
+      - name: Build packages
+        run: pnpm -r --filter './packages/*' build
+
+      # Fails when the built surface differs from the committed report in
+      # packages/*/etc/*.api.md. ADR-004 promises API stability; this is what
+      # turns that promise into a reviewable diff instead of something a
+      # reviewer has to notice. Run `pnpm api:update` to accept a change.
+      - name: Check the public API surface
+        run: pnpm api:check
+
+  publish-check:
+    name: Publishing correctness
+    runs-on: ubuntu-latest
+    # Answers the question the other jobs cannot: not "do the sources
+    # compile" but "does what we ship resolve for a consumer". publint reads
+    # the packed tarball's manifest; attw resolves every entry point under
+    # node10, node16 (from CJS and from ESM) and bundler.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Both tools pack each package, so dist/ has to exist first.
+      - name: Build packages
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Check publishing correctness
+        run: pnpm publish:check
+
+  examples:
+    name: Examples (Node 22, TypeORM 1.1)
+    runs-on: ubuntu-latest
+    # Deliberately NOT on the TypeORM matrix the jobs above use. The
+    # examples declare `typeorm ^1.1.0`, and the override those legs apply
+    # is repo-wide: forcing 0.3.31 onto an example that asks for ^1.1.0
+    # puts two TypeORM copies in one workspace, and since
+    # `getDataSourceToken()` returns the `DataSource` class itself for the
+    # default source, the example then registers one copy's class and the
+    # adapter looks up the other's. Peer-range coverage is the matrix
+    # above's job; this one answers a different question — does an ordinary
+    # consumer app still build and run against the library as it stands?
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Examples consume the packages through `workspace:*` links and
+      # type-check against their `dist/*.d.ts`, so the library has to be
+      # built before anything under `examples/` compiles.
+      - name: Build packages
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Build examples
+        run: pnpm -r --filter './examples/*' build
+
+      - name: Test examples
+        run: pnpm -r --filter './examples/*' test
+
+      # Same testcontainers Postgres the library's integration job uses. The
+      # externalization examples stub the broker rather than starting Kafka
+      # or RabbitMQ, so their `docker-compose.yml` is for `pnpm start` demos
+      # only and no broker is needed here. Five examples define no
+      # `test:integration`; pnpm filter-run skips them.
+      - name: Integration tests
+        run: pnpm -r --filter './examples/*' test:integration

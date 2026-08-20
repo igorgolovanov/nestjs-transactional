@@ -1,3 +1,5 @@
+import { DEFAULT_DRAIN_TIMEOUT_MS } from '../shutdown/drain';
+
 /**
  * Configuration for detecting stale publications that should be marked
  * as {@link PublicationStatus.FAILED}.
@@ -13,6 +15,14 @@ export interface StalenessConfig {
   readonly resubmitted: number;
   /** How often (ms) the staleness monitor runs. Defaults to 60000 (1 minute). */
   readonly monitorInterval: number;
+  /**
+   * How long (ms) `stop()` waits for an in-flight staleness sweep to
+   * finish before abandoning it. A sweep is framework-controlled
+   * database work rather than user code, so it normally completes well
+   * inside the budget; the bound exists so a hung query cannot stall
+   * shutdown. `0` disables the wait entirely.
+   */
+  readonly shutdownTimeout: number;
 }
 
 export const DEFAULT_STALENESS_CONFIG: StalenessConfig = {
@@ -20,4 +30,5 @@ export const DEFAULT_STALENESS_CONFIG: StalenessConfig = {
   processing: 0,
   resubmitted: 0,
   monitorInterval: 60_000,
+  shutdownTimeout: DEFAULT_DRAIN_TIMEOUT_MS,
 };

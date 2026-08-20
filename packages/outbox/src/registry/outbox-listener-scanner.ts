@@ -9,10 +9,7 @@ import {
 } from '../dispatcher/outbox-event-publisher';
 import { EventTypeRegistry } from '../serialization/event-type-registry';
 import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import {
-  getEventTypeRegistryToken,
-  getOutboxListenerRegistryToken,
-} from '../tokens/token-utils';
+import { getEventTypeRegistryToken, getOutboxListenerRegistryToken } from '../tokens/token-utils';
 import { OutboxError } from '../types/errors';
 
 import { OutboxListenerRegistry } from './listener-registry';
@@ -26,7 +23,7 @@ type OutboxListenerMethod = (event: unknown) => Promise<void>;
  * the per-dataSource {@link OutboxListenerRegistry} that owns each
  * decorated event class.
  *
- * **Per-dataSource routing (Phase 14.3.1).** Multi-`OutboxModule.forRoot`
+ * **Per-dataSource routing.** Multi-`OutboxModule.forRoot`
  * deployments register events to per-DS `EventTypeRegistry`
  * instances via `OutboxModule.forFeature(events, { dataSource })`.
  * The scanner walks every per-DS `EventTypeRegistry`, resolves which
@@ -154,10 +151,7 @@ export class OutboxListenerScanner implements OnModuleInit {
   ): string {
     const dataSourcePerEvent = new Map<string, string>();
     for (const eventType of eventTypes) {
-      const dataSource = resolveDataSourceByEventTypeName(
-        eventType.name,
-        eventTypeRegistries,
-      );
+      const dataSource = resolveDataSourceByEventTypeName(eventType.name, eventTypeRegistries);
       dataSourcePerEvent.set(eventType.name, dataSource);
     }
 

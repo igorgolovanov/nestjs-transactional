@@ -38,13 +38,11 @@ integration tests.
          │ 3. onApplicationShutdown
          │     │                  │
          │     ├─ OutboxProcessingModule.onApplicationShutdown
-         │     │     processor.stop()  (sync, sets running=false,
-         │     │                        cancels next setTimeout)
-         │     │
-         │     ├─ OutboxDrainService.onApplicationShutdown
-         │     │     processor.stop()  (idempotent re-call)
-         │     │     poll findIncomplete() until status===PROCESSING
-         │     │       count is 0, OR DRAIN_TIMEOUT_MS elapses
+         │     │     await processor.stop()   sets running=false,
+         │     │       cancels the next setTimeout, then awaits the
+         │     │       batch already in flight — bounded by
+         │     │       processor.shutdownTimeout
+         │     │     await monitor.stop()     same, for the sweep
          │     │
          │     └─ ExampleCleanupService.onApplicationShutdown
          │           your custom cleanup runs here
@@ -55,31 +53,40 @@ integration tests.
          └────────────────────────┘
 ```
 
-## What's the gap that `OutboxDrainService` plugs?
+## How the drain works
 
-The framework's `OutboxProcessingModule.onApplicationShutdown`
-calls `processor.stop()`, which:
+`OutboxProcessingModule.onApplicationShutdown` awaits
+`processor.stop()` and `monitor.stop()`. Each of those:
 
-- Sets the `running = false` flag (no more polls scheduled).
+- Sets `running = false`, so no further poll is scheduled.
 - Cancels the pending `setTimeout` for the next batch.
+- **Awaits the work already in flight** from the previous tick,
+  bounded by `processor.shutdownTimeout` /
+  `staleness.shutdownTimeout`.
 
-It does NOT await the `processBatch()` Promise that's already
-in flight from the previous tick. NestJS keeps walking through
-`onApplicationShutdown` hooks and then disposes providers — at
-which point TypeORM's `DataSource` calls `pool.end()`. If the
-in-flight `processOne` is still running its `PROCESSING →
-COMPLETED` status update, the pool teardown can race the update,
-leaving the row stuck in `PROCESSING`. The staleness monitor
-recovers it on the next boot, but a clean drain avoids that
-back-pressure entirely.
+That last step is the load-bearing one. Without it, NestJS walks
+on through the remaining hooks and disposes providers — at which
+point TypeORM's `DataSource` calls `pool.end()`. An in-flight
+`processOne` still running its `PROCESSING → COMPLETED` update
+would race the pool teardown and leave the row stuck in
+`PROCESSING`, waiting for the staleness monitor to recover it on
+a later boot.
 
-[`OutboxDrainService`](src/shutdown/outbox-drain.service.ts) is
-the user-side complement: an async `OnApplicationShutdown` that
-polls `findIncomplete()` until no row is in `PROCESSING`, with
-a configurable timeout (default 10 s) so a genuinely-stuck
-handler doesn't block deployment indefinitely. Pair this with
-the platform's grace period (e.g. Kubernetes' default 30 s) and
-you get a deterministic drain envelope.
+The timeout is the safety valve: a genuinely stuck handler
+(deadlocked, or waiting on a service that is also shutting down)
+must not block a deployment forever. Set it below the platform's
+grace period — Kubernetes' `terminationGracePeriodSeconds`
+defaults to 30 s, so 10 s of drain leaves room for the pool to
+close and logs to flush. Past the deadline the batch is abandoned,
+not cancelled: whatever it left in `PROCESSING` is recovered on the
+next boot. This trades shutdown latency against recovery lag,
+never durability.
+
+Earlier versions of this example shipped a user-side
+`OutboxDrainService` that polled `findIncomplete()` until nothing
+was `PROCESSING`, because the framework hook was synchronous. That
+workaround is gone — if you carried it into your own app, you can
+delete it and set `shutdownTimeout` instead.
 
 ## Prerequisites
 
@@ -111,11 +118,12 @@ You should see, in this order:
 
 ```
 EventPublicationProcessor stopped
-Draining outbox (signal=SIGTERM)…
-Outbox drained cleanly in 412ms
 ExampleCleanupService done (signal=SIGTERM)
 [TypeOrmModule] Database connection closed
 ```
+
+The `stopped` line appears only after the in-flight batch has
+finished — the drain happens before it is logged, not after.
 
 `Ctrl+C` in the foreground works too — Node maps it to `SIGINT`,
 which `app.enableShutdownHooks()` registers alongside `SIGTERM`.
@@ -124,16 +132,17 @@ which `app.enableShutdownHooks()` registers alongside `SIGTERM`.
 
 1. **Idle shutdown is uneventful.** `app.close()` from a quiet
    state walks every `OnApplicationShutdown` hook (framework +
-   user) and resolves cleanly. No in-flight work, nothing to
-   wait on, but the user-side cleanup STILL runs — that's the
-   contract.
+   user) and resolves cleanly. Nothing is in flight, so the drain
+   costs nothing — the test asserts close takes under a second —
+   and the user-side cleanup STILL runs. That's the contract.
 2. **In-flight handler invocations complete before the
    DataSource closes.** The slow archival handler takes 400 ms
    per event. The test triggers one event, waits for the handler
    to start (`started === 1, finished === 0`), then calls
    `app.close()`. Total close duration covers the remaining
-   handler latency, the publication ends up `COMPLETED` (not
-   `PROCESSING`), and `OutboxDrainService.drained` is `true`.
+   handler latency and the publication ends up `COMPLETED`, not
+   `PROCESSING` — verified through a side pg client, since the
+   Nest-managed DataSource is closed by then.
 3. **Single-unit atomicity holds across shutdown.** A
    `recordEvent()` (one `@Transactional()` writing both an
    `audit_log` row and an `event_publication` row) is fired
@@ -164,35 +173,35 @@ which `app.enableShutdownHooks()` registers alongside `SIGTERM`.
   destroyed. `onApplicationShutdown` runs LAST among lifecycle
   hooks, after every module has had a chance to settle. Drain
   there.
-- **No timeout on the drain poll.** A genuinely-stuck handler
-  (deadlocked, waiting on an external service that's also
-  shutting down) would block deployment forever. The
-  10-second default in `DRAIN_TIMEOUT_MS` is a safety valve;
-  past that, the staleness monitor recovers stuck rows on the
-  next boot. Tune it to your platform's grace period (e.g.
-  Kubernetes' `terminationGracePeriodSeconds` minus a few
-  seconds for everything else to wind down).
-- **Relying on hook ordering between sibling providers.**
-  NestJS calls hooks in REVERSE module-init order, but within
-  a module the order between sibling providers isn't
-  documented. The example's `OutboxDrainService` calls
-  `processor.stop()` itself BEFORE polling, so it doesn't care
-  whether `OutboxProcessingModule.onApplicationShutdown` ran
-  first or not.
+- **Setting `shutdownTimeout: 0` to make shutdown fast.** That
+  restores the pre-drain behaviour: the batch in flight is
+  abandoned immediately, and its publications sit in `PROCESSING`
+  until the staleness monitor picks them up. Fine if you *want*
+  the old semantics; surprising if you set it for speed and then
+  wonder why rows keep needing recovery.
+- **Setting `shutdownTimeout` above the platform's grace
+  period.** The platform will `SIGKILL` mid-drain, which is
+  strictly worse than a bounded abandon — you lose the pool
+  teardown and log flush too. Keep the budget under the grace
+  period with margin.
+- **Writing your own drain service.** Not needed any more, and
+  two drains racing each other is harder to reason about than
+  one. Use `shutdownTimeout`.
 
 ## Related examples
 
 - [`basic-typeorm-outbox`](../basic-typeorm-outbox) — the
   simpler baseline. Compare to see what shutdown wiring adds.
 - [`async-config-from-environment`](../async-config-from-environment)
-  — Tier 5 sibling. `DRAIN_TIMEOUT_MS` is a great candidate to
-  surface as a `forRootAsync`-injected env var in a real app
-  (the example here keeps it as a constant for clarity).
+  — Tier 5 sibling. `shutdownTimeout` is a good candidate to
+  surface as a `forRootAsync`-injected env var in a real app, so
+  the drain budget can track each environment's grace period (the
+  example here hard-codes it for clarity).
 - [`e-commerce-orders`](../e-commerce-orders) — Tier 5
-  flagship. The shutdown pattern here applies verbatim to
-  the multi-DS deployment there: register one
-  `OutboxDrainService` per dataSource, or generalise it to
-  iterate over every `EventPublicationProcessor`.
+  flagship. Nothing extra to wire there: the module drains every
+  configured processor and monitor, so multi-dataSource
+  deployments get the same behaviour, and the drains run
+  concurrently rather than adding up their budgets.
 
 ## Further reading
 
@@ -200,4 +209,4 @@ which `app.enableShutdownHooks()` registers alongside `SIGTERM`.
   https://docs.nestjs.com/fundamentals/lifecycle-events
 - Kubernetes pod termination:
   https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-single-unit-atomicity.md)
+- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)

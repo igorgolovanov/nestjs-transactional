@@ -4,7 +4,7 @@ import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transacti
 import { StockAdjustedEvent } from './events';
 
 /**
- * Phase 14.3.1 Category A auto-routing — same as
+ * Category A auto-routing — same as
  * `BillingProjectionsHandler`. The scanner finds `StockAdjustedEvent`
  * registered to the inventory DS via
  * `OutboxModule.forFeature([StockAdjustedEvent], { dataSource: 'inventory' })`

@@ -93,7 +93,7 @@ This is the Spring Modulith equivalent. The integration test pins
 the round trip: emit throws → publication FAILED → operator calls
 `resubmit()` → next poll succeeds → publication COMPLETED.
 
-`StartupRecoveryService` (Phase 5) calls
+The outbox's `StartupRecoveryService` calls
 `incomplete.resubmitIncompletePublications` at boot for crashed
 in-flight rows; `FailedEventPublications` is the operator-driven
 equivalent for explicit failures.

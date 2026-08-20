@@ -25,9 +25,7 @@ describe('@Externalized', () => {
   });
 
   it('throws synchronously when target is missing (decorator-application time)', () => {
-    expect(() =>
-      Externalized({} as unknown as { target: string }),
-    ).toThrow(/non-empty string/);
+    expect(() => Externalized({} as unknown as { target: string })).toThrow(/non-empty string/);
   });
 
   it('throws when target is an empty string', () => {
@@ -35,12 +33,10 @@ describe('@Externalized', () => {
   });
 
   it('throws when target is a non-string (e.g. number, undefined)', () => {
-    expect(() =>
-      Externalized({ target: undefined as unknown as string }),
-    ).toThrow(/non-empty string/);
-    expect(() =>
-      Externalized({ target: 42 as unknown as string }),
-    ).toThrow(/non-empty string/);
+    expect(() => Externalized({ target: undefined as unknown as string })).toThrow(
+      /non-empty string/,
+    );
+    expect(() => Externalized({ target: 42 as unknown as string })).toThrow(/non-empty string/);
   });
 
   it('returns undefined for classes that were not decorated', () => {

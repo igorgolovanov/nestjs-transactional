@@ -230,12 +230,12 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
     });
 
     // ----------------------------------------------------------------
-    // Phase 14.2 syntax: `manager.run({ dataSource: '...' })` routes
+    // `manager.run({ dataSource: '...' })` routes
     // through `AdapterRegistry.getByDataSource(name)` to find the
     // adapter registered under the matching dataSource name.
     // ----------------------------------------------------------------
 
-    it('routes writes to billing using Phase 14.2 syntax `manager.run({ dataSource })`', async () => {
+    it('routes writes to billing using `manager.run({ dataSource })`', async () => {
       await manager.run({ dataSource: 'billing' }, async () => {
         await billingService.save('billed-via-new-syntax');
       });
@@ -247,7 +247,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
       expect(primaryUsers).toHaveLength(0);
     });
 
-    it('legacy `adapterInstance` and Phase 14.2 `dataSource` options are interchangeable', async () => {
+    it('legacy `adapterInstance` and `dataSource` options are interchangeable', async () => {
       // Same logical operation, two equivalent ways to spell it.
       await manager.run({ adapterInstance: 'billing' }, async () => {
         await billingService.save('legacy-syntax');

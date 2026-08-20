@@ -49,8 +49,11 @@ Two root causes:
   to mutate.
 - Even if an instance were available, `@nestjs/cqrs` dispatches each
   non-singleton handler via a fresh `ModuleRef.resolve(metatype,
-  context.id, {strict:false})` ([`query-bus.js:81-88`](../../node_modules/.pnpm/@nestjs+cqrs@11.0.3_@nestjs+common@11.1.19_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+core@11_ofzkycwadycmtosxe2ee7gne2q/node_modules/@nestjs/cqrs/dist/query-bus.js),
-  [`command-bus.js:81-89`](../../node_modules/.pnpm/@nestjs+cqrs@11.0.3_@nestjs+common@11.1.19_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+core@11_ofzkycwadycmtosxe2ee7gne2q/node_modules/@nestjs/cqrs/dist/command-bus.js)).
+  context.id, {strict:false})` — observed in `@nestjs/cqrs@11.0.3`'s
+  compiled `dist/query-bus.js:81-88` and `dist/command-bus.js:81-89`;
+  upstream sources:
+  [`query-bus.ts`](https://github.com/nestjs/cqrs/blob/master/src/query-bus.ts),
+  [`command-bus.ts`](https://github.com/nestjs/cqrs/blob/master/src/command-bus.ts)).
   Each dispatch yields a new instance on which any bootstrap-time wrap
   has not landed.
 
@@ -332,21 +335,23 @@ Epicentre: [`packages/cqrs/src/handlers/handler-wrapper.ts`](../../packages/cqrs
 kind-specific defaults (`pickDefaults`), and the logger surface are
 unchanged.
 
-Tests to add under
-[`packages/cqrs/test/integration/`](../../packages/cqrs/test/integration/):
+Tests to add — planned as three files under
+`packages/cqrs/test/integration/`; they shipped instead as one
+colocated suite,
+[`packages/cqrs/src/handlers/handler-wrapper-scopes.spec.ts`](../../packages/cqrs/src/handlers/handler-wrapper-scopes.spec.ts),
+with a `describe` block per scope. The cqrs package colocates its specs
+(conventions #4), so no `test/integration/` directory was created:
 
-- `scope-default.integration.spec.ts` — singleton regression: a
-  command + a query handler with no explicit scope, both wrapped, both
-  observe the active transaction; `defaultQueryOptions: { readOnly:
-  true }` still applies.
-- `scope-request.integration.spec.ts` — request-scoped query handler
-  injecting `AsyncContext`. Two dispatches in one HTTP request share
-  one `AsyncContext` via `AsyncContext.merge(query, ctx)` → one
-  handler instance reused, both calls transactional, context populated
-  inside both.
-- `scope-transient.integration.spec.ts` — transient command handler.
-  Two dispatches yield two distinct instances; both wrapped, both
-  transactional.
+- `scope-default` — singleton regression: a command + a query handler
+  with no explicit scope, both wrapped, both observe the active
+  transaction; `defaultQueryOptions: { readOnly: true }` still applies.
+- `scope-request` — request-scoped query handler injecting
+  `AsyncContext`. Two dispatches in one HTTP request share one
+  `AsyncContext` via `AsyncContext.merge(query, ctx)` → one handler
+  instance reused, both calls transactional, context populated inside
+  both.
+- `scope-transient` — transient command handler. Two dispatches yield
+  two distinct instances; both wrapped, both transactional.
 
 Unit additions to [`packages/cqrs/src/handlers/handler-wrapper.spec.ts`](../../packages/cqrs/src/handlers/handler-wrapper.spec.ts):
 

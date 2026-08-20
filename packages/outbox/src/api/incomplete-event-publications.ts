@@ -8,7 +8,6 @@ import type { EventPublication } from '../types/event-publication';
 import { PublicationStatus } from '../types/publication-status';
 import { ResubmissionOptions } from '../types/resubmission-options';
 
-
 /**
  * Operator-facing query + resubmit API for every publication that has
  * not yet reached the terminal `COMPLETED` state. Equivalent to Spring
@@ -52,10 +51,7 @@ export class IncompleteEventPublications {
 
     let resubmitted = 0;
     for (const pub of toProcess) {
-      if (
-        pub.status === PublicationStatus.FAILED ||
-        pub.status === PublicationStatus.PUBLISHED
-      ) {
+      if (pub.status === PublicationStatus.FAILED || pub.status === PublicationStatus.PUBLISHED) {
         await this.repository.updateStatus(pub.id, PublicationStatus.RESUBMITTED, {
           lastResubmissionDate: new Date(),
         });

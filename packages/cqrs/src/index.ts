@@ -40,7 +40,10 @@ export {
 export { CqrsTransactionalBootstrap } from './handlers/bootstrap';
 
 export { TransactionalEventPublisher } from './event-publisher/transactional-event-publisher';
-export { TransactionalEventPublisherAdapter } from './event-publisher/transactional-event-publisher-adapter';
+export {
+  type AggregateConstructor,
+  TransactionalEventPublisherAdapter,
+} from './event-publisher/transactional-event-publisher-adapter';
 export {
   HybridEventPublisher,
   OUTBOX_PUBLICATION_SCHEDULER,
@@ -50,5 +53,7 @@ export {
 export {
   CQRS_TRANSACTIONAL_OPTIONS,
   CqrsTransactionalModule,
+  type CqrsTransactionalAsyncFactoryResult,
+  type CqrsTransactionalAsyncOptions,
   type CqrsTransactionalOptions,
 } from './module/cqrs-transactional.module';

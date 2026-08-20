@@ -102,7 +102,7 @@ export class AppModule {
           processor: { pollingInterval: 100, batchSize: 50 },
         }),
 
-        // Per-DS event-class registrations — Phase 14.3.1's
+        // Per-DS event-class registrations — the scanner's
         // `OutboxListenerScanner` walks these to route
         // `@OutboxEventsHandler` classes to the matching registry.
         OutboxModule.forFeature([InvoiceCreatedEvent]),

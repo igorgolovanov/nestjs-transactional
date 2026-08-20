@@ -2,10 +2,7 @@ import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 
 import { EventTypeRegistry } from '../serialization/event-type-registry';
 
-import {
-  type ExternalizedMetadata,
-  getExternalizedMetadata,
-} from './externalized.decorator';
+import { type ExternalizedMetadata, getExternalizedMetadata } from './externalized.decorator';
 import type { ExternalizationMetadata } from './types';
 
 /**
@@ -42,16 +39,12 @@ export class ExternalizationRegistry implements OnModuleInit {
       const metadata = getExternalizedMetadata(type);
       if (metadata !== undefined) {
         this.mapping.set(name, metadata);
-        this.logger.debug(
-          `Registered externalization for ${name} → ${metadata.target}`,
-        );
+        this.logger.debug(`Registered externalization for ${name} → ${metadata.target}`);
       }
     }
 
     if (this.mapping.size > 0) {
-      this.logger.log(
-        `Externalization configured for ${this.mapping.size} event type(s)`,
-      );
+      this.logger.log(`Externalization configured for ${this.mapping.size} event type(s)`);
     }
   }
 
@@ -81,8 +74,7 @@ export class ExternalizationRegistry implements OnModuleInit {
       return undefined;
     }
 
-    const headers =
-      typeof config.headers === 'function' ? config.headers(event) : config.headers;
+    const headers = typeof config.headers === 'function' ? config.headers(event) : config.headers;
 
     return {
       eventType,

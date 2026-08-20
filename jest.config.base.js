@@ -26,5 +26,8 @@ module.exports = {
   clearMocks: true,
   restoreMocks: true,
   verbose: false,
-  passWithNoTests: true,
+  // No `passWithNoTests` on purpose: a package that ships without unit
+  // tests must fail its own `test` script rather than report success.
+  // Per-package `coverageThreshold` floors live in each
+  // `packages/*/jest.config.js`.
 };

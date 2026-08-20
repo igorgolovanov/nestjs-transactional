@@ -39,7 +39,7 @@ export interface ExternalizedOptions<TEvent = unknown> {
    * Optional override for which `ClientProxy` registration the
    * externalizer should use when more than one is bound. Resolution
    * semantics are owned by the externalizer; `outbox-microservices`
-   * (Phase 11.3) interprets it as a token in the user's
+   * interprets it as a token in the user's
    * `ClientsModule` registration (DD-017).
    */
   readonly client?: string | symbol;
@@ -79,10 +79,9 @@ export interface ExternalizedMetadata {
  * `EventExternalizer` (see DD-018) with the resolved
  * {@link ExternalizationMetadata}. Reliability — retry on broker
  * failure, recovery on restart — is provided by the existing outbox
- * machinery (single-unit atomicity per DD-019). For Phase 11.1 / 11.2
- * the actual broker delivery requires a concrete externalizer
+ * machinery (single-unit atomicity per DD-019). The actual broker delivery requires a concrete externalizer
  * implementation (e.g.
- * `@nestjs-transactional/outbox-microservices`, Phase 11.3); without
+ * `@nestjs-transactional/outbox-microservices`); without
  * one, decorated events are processed locally and the externalization
  * step is skipped without error.
  *

@@ -1,469 +1,200 @@
 # @nestjs-transactional/cqrs
 
-[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs/alpha?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)
+[![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
-Integration between [@nestjs-transactional/core](../core) and
-[`@nestjs/cqrs`](https://docs.nestjs.com/recipes/cqrs). Gives
-`@CommandHandler` / `@QueryHandler` / `@EventsHandler` classes
-declarative transaction management and Spring-style event handler
-phases without forking `@nestjs/cqrs` (see ADR-003).
+Transactions and Spring-style event phases for
+[`@nestjs/cqrs`](https://docs.nestjs.com/recipes/cqrs).
 
-## What it provides
-
-- **`@TransactionalEventsHandler(...events)`** — class-level event
-  handler decorator with Spring-compatible phases: `BEFORE_COMMIT`,
-  `AFTER_COMMIT` (default), `AFTER_ROLLBACK`, `AFTER_COMPLETION`. The
-  decorated class implements `ITransactionalEventHandler<T>` and
-  exposes a single `handle(event)` method. Matches the ergonomics of
-  `@nestjs/cqrs`'s own `@EventsHandler` (see ADR-014).
-- **`@IntegrationEventsHandler(...events)`** — class-level smart
-  default for cross-module handlers. Delivers via the outbox when the
-  `OUTBOX_LISTENER_REGISTRAR` structural port is bound (durable,
-  retried, resumable), falls back to in-memory `AFTER_COMMIT` + `async:
-  true` dispatch otherwise. Matches Spring Modulith's
-  `@ApplicationModuleListener` contract.
-- **`TransactionalEventPublisher` + `TransactionalEventPublisherAdapter`** —
-  drop-in replacement for `@nestjs/cqrs`'s `EventPublisher`.
-  `AggregateRoot.commit()` routes events through the transactional
-  dispatcher, so `AFTER_COMMIT` handlers only fire once the
-  transaction actually commits — no more "event published, then
-  transaction rolled back" race.
-- **`HybridEventPublisher`** — the strategy wired by
-  `CqrsTransactionalModule.forRoot()` into the `EventPublisher`
-  override. Routes aggregate events through the in-memory dispatcher
-  AND, when an outbox scheduler is bound to the
-  `OUTBOX_PUBLICATION_SCHEDULER` token, also through
-  `@nestjs-transactional/outbox` for durable delivery. Without
-  the outbox binding, behaves identically to
-  `TransactionalEventPublisher`.
-- **`CqrsHandlerWrapper` + `CqrsTransactionalBootstrap`** — bootstrap-time
-  wrapping of every `@CommandHandler` / `@QueryHandler` / `@EventsHandler`
-  instance that carries `@Transactional()` metadata (method-level or
-  class-level), or matches kind-specific defaults (e.g. read-only
-  wrapping for queries).
-- **`TransactionalListenerScanner` +
-  `IntegrationEventsHandlerScanner`** — `OnModuleInit` scanners that
-  auto-register every `@TransactionalEventsHandler` /
-  `@IntegrationEventsHandler` class with the appropriate delivery
-  path.
-- **`CqrsTransactionalModule.forRoot({...})`** — single entry point that
-  wires all of the above.
-
-Peer dependencies: `@nestjs-transactional/core`, `@nestjs/cqrs ^11`,
-`@nestjs/common ^10 || ^11`, `@nestjs/core ^10 || ^11`, `rxjs ^7`,
-`reflect-metadata`.
-
-## Module configuration
+It solves the race everyone hits with domain events: an aggregate emits
+an event, a handler reacts, and then the transaction rolls back — the
+side effect already happened. Here, event handlers declare *when* they
+run relative to the commit, and `AFTER_COMMIT` means the row really is
+in the database.
 
 ```ts
-import { Module } from '@nestjs/common';
-import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
+@Injectable()
+@TransactionalEventsHandler(OrderPlacedEvent) // AFTER_COMMIT by default
+export class NotifyCustomer implements ITransactionalEventHandler<OrderPlacedEvent> {
+  async handle(event: OrderPlacedEvent) {
+    // The order is committed and visible. Safe to send the email.
+  }
+}
+```
 
+Command and query handlers get transactions by decoration, and
+`@nestjs/cqrs` is used as-is — not forked, not patched.
+
+Built on
+[`@nestjs-transactional/core`](https://www.npmjs.com/package/@nestjs-transactional/core).
+Pair with
+[`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox)
+when a handler must survive a process crash.
+
+## Install
+
+```bash
+pnpm add @nestjs-transactional/cqrs @nestjs-transactional/core @nestjs/cqrs
+```
+
+## Quick start
+
+```ts
 @Module({
   imports: [
     TransactionalModule.forRoot({ isGlobal: true }),
     TypeOrmTransactionalModule.forRoot(),
-    CqrsTransactionalModule.forRoot({
-      // every option has a sensible default — shown here for completeness
-      wrapCommandHandlers: true,
-      wrapQueryHandlers: true,
-      wrapEventHandlers: true,
-      defaultQueryOptions: { readOnly: true },
-      // defaultCommandOptions: { propagation: PropagationMode.REQUIRED },
-      useTransactionalEventPublisher: true,
-    }),
+    CqrsTransactionalModule.forRoot(),
   ],
 })
 export class AppModule {}
 ```
 
-**Important**: do NOT import `CqrsModule` separately alongside
-`CqrsTransactionalModule.forRoot()`. The transactional module imports
-`CqrsModule` internally and overrides the `EventPublisher` DI token —
-importing `CqrsModule` a second time in the consumer shadows the
-override with the original.
+> **Do not import `CqrsModule` as well.** This module imports it
+> internally and overrides the `EventPublisher` token. A second import
+> in your app shadows that override, and aggregate events silently stop
+> reaching the dispatcher — no error, just handlers that never fire.
 
-## Full example
-
-An order placement flow, end-to-end:
+Then a command handler, transactional by decoration:
 
 ```ts
-// aggregate.ts
-import { AggregateRoot } from '@nestjs/cqrs';
-
-export class OrderPlacedEvent {
-  constructor(public readonly orderId: string) {}
-}
-
-export class Order extends AggregateRoot {
-  constructor(public readonly id: string) {
-    super();
-  }
-  place(): void {
-    this.apply(new OrderPlacedEvent(this.id));
-  }
-}
-```
-
-```ts
-// order.repository.ts
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { OrderRow } from './order.entity';
-
-@Injectable()
-export class OrderRepository {
-  constructor(
-    @InjectRepository(OrderRow) private readonly rows: Repository<OrderRow>,
-  ) {}
-
-  async save(order: { id: string }): Promise<void> {
-    // The @InjectRepository instance auto-dispatches through the
-    // active @Transactional() scope's EntityManager — no
-    // getCurrentEntityManager() boilerplate needed.
-    await this.rows.save({ id: order.id });
-  }
-}
-```
-
-```ts
-// place-order.handler.ts
-import { CommandHandler, EventPublisher, type ICommandHandler } from '@nestjs/cqrs';
-import { Transactional } from '@nestjs-transactional/core';
-import { Order } from './aggregate';
-import { OrderRepository } from './order.repository';
-
-export class PlaceOrderCommand {
-  constructor(public readonly orderId: string) {}
-}
-
 @CommandHandler(PlaceOrderCommand)
-export class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, void> {
+export class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand> {
   constructor(
     private readonly publisher: EventPublisher,
-    private readonly repo: OrderRepository,
+    private readonly orders: OrderRepository,
   ) {}
 
   @Transactional()
-  async execute(command: PlaceOrderCommand): Promise<void> {
+  async execute(command: PlaceOrderCommand) {
     const order = this.publisher.mergeObjectContext(new Order(command.orderId));
     order.place();
-    await this.repo.save(order);
-    order.commit(); // events attach as AFTER_COMMIT hooks on the current tx
+    await this.orders.save(order);
+    order.commit(); // events become hooks on this transaction
   }
 }
 ```
 
+`order.commit()` does not dispatch immediately. Each event attaches to
+the current transaction at its handler's phase, so the commit decides
+what runs.
+
+## Event phases
+
+| Phase | Fires | If the handler throws |
+| --- | --- | --- |
+| `BEFORE_COMMIT` | before COMMIT is issued | the transaction rolls back |
+| `AFTER_COMMIT` *(default)* | after COMMIT succeeds | logged and swallowed |
+| `AFTER_ROLLBACK` | after ROLLBACK, with the causing error | logged and swallowed |
+| `AFTER_COMPLETION` | on either outcome | logged and swallowed |
+
 ```ts
-// order.projection.ts
-import { Injectable } from '@nestjs/common';
-import {
-  type ITransactionalEventHandler,
-  TransactionPhase,
-  TransactionalEventsHandler,
-} from '@nestjs-transactional/cqrs';
-import { OrderPlacedEvent } from './aggregate';
-
-@Injectable()
-@TransactionalEventsHandler(OrderPlacedEvent)
-export class OrderCommittedProjection
-  implements ITransactionalEventHandler<OrderPlacedEvent>
-{
-  async handle(event: OrderPlacedEvent): Promise<void> {
-    // Runs AFTER the transaction commits, not before. Safe to do side
-    // effects here — the DB write is durable.
-  }
-}
-
-@Injectable()
 @TransactionalEventsHandler({
   events: [OrderPlacedEvent],
   phase: TransactionPhase.AFTER_ROLLBACK,
 })
-export class OrderRollbackProjection
-  implements ITransactionalEventHandler<OrderPlacedEvent>
-{
-  handle(event: OrderPlacedEvent, error?: unknown): void {
-    // Compensating action; receives the rollback cause as the second
-    // argument (added beyond the interface signature — TypeScript
-    // permits widening the parameter list on the implementation).
-  }
-}
 ```
 
-Note the class-per-reaction shape: `OrderCommittedProjection` reacts
-to the AFTER_COMMIT phase, `OrderRollbackProjection` to
-AFTER_ROLLBACK. Each class has one `handle` method because each class
-has one responsibility — see ADR-014 for the rationale.
+Two flags worth knowing: `fallbackExecution: true` makes a handler fire
+even when the event is published outside any transaction (otherwise such
+events are dropped with a warning), and `async: true` fires it through
+`queueMicrotask` so its errors can never reach the rollback path.
 
-What happens when `commandBus.execute(new PlaceOrderCommand('o-1'))` is
-dispatched:
+## What gets wrapped
 
-1. `CqrsHandlerWrapper` has replaced `PlaceOrderHandler.execute` with a
-   `TransactionManager.run(...)` wrapper at application bootstrap. The
-   dispatch enters a new transaction.
-2. Inside the wrapped execute, the aggregate's `publishAll` goes through
-   `TransactionalEventPublisher`, which calls
-   `TransactionalEventDispatcher.scheduleDispatch(event)`. The
-   dispatcher attaches `OrderCommittedProjection.handle` as an
-   `AFTER_COMMIT` hook on the current transaction, and
-   `OrderRollbackProjection.handle` as an `AFTER_ROLLBACK` hook.
-3. The repository's `@InjectRepository(OrderRow)` Repository
-   auto-dispatches through the active transaction (the transparent
-   transactional repository feature in
-   [`@nestjs-transactional/typeorm`](../typeorm)) — both writes go
-   through the same DB connection.
-4. `execute` resolves; `TransactionManager` commits the transaction;
-   the adapter flushes to the database.
-5. After the commit succeeds, the manager runs `AFTER_COMMIT` hooks —
-   `OrderCommittedProjection.handle` fires once, with a row already
-   visible in the database.
-6. On a thrown error, step 4 rolls back instead; step 5 runs
-   `AFTER_ROLLBACK` hooks — `OrderRollbackProjection.handle` fires,
-   receiving the original error.
+`CqrsTransactionalModule.forRoot()` wraps handlers at bootstrap:
 
-## Decorator shapes — rest params vs. options object
+- **Command handlers** carrying `@Transactional()` (method- or
+  class-level). Set `defaultCommandOptions` to wrap them all.
+- **Query handlers** — wrapped read-only by default
+  (`defaultQueryOptions: { readOnly: true }`). Pass `undefined` to opt
+  out. Note that `readOnly` is enforced by the database only on
+  Postgres-family dialects.
+- **Event handlers** only when they carry `@Transactional()`. There is
+  no kind-level default, because event handlers are often out-of-band
+  side effects where a transaction is the wrong thing.
 
-Every handler decorator accepts two equivalent forms:
+Async configuration works the same way, with one wrinkle:
 
 ```ts
-// Short form — rest params. Use when defaults are fine.
-@TransactionalEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
-@OutboxEventsHandler(OrderPlacedEvent)
-@IntegrationEventsHandler(OrderPlacedEvent)
-
-// Long form — options object. Use when you need non-default phase,
-// async, fallbackExecution, or a stable listener id.
-@TransactionalEventsHandler({
-  events: [OrderPlacedEvent],
-  phase: TransactionPhase.BEFORE_COMMIT,
-  async: false,
-  fallbackExecution: true,
-})
-@IntegrationEventsHandler({
-  events: [OrderPlacedEvent],
-  id: 'Inventory.stable-id',
-})
+CqrsTransactionalModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (cfg: ConfigService) => ({ wrapQueryHandlers: cfg.get('WRAP') !== 'false' }),
+  // Structural, so it stays outside the factory: it decides whether the
+  // EventPublisher override provider exists at all, and NestJS needs
+  // provider tokens before any factory has run.
+  useTransactionalEventPublisher: true,
+});
 ```
 
-## Handler phases at a glance
+## Choosing a handler decorator
 
-| Phase | When it fires | If handler throws |
-|---|---|---|
-| `BEFORE_COMMIT` | Before the adapter issues COMMIT | Transaction rolls back |
-| `AFTER_COMMIT` *(default)* | After a successful COMMIT | Logged and swallowed |
-| `AFTER_ROLLBACK` | After ROLLBACK; receives the causing error as second arg | Logged and swallowed |
-| `AFTER_COMPLETION` | On any completion (commit OR rollback) | Logged and swallowed |
+| | Persisted | Retried | Survives restart |
+| --- | --- | --- | --- |
+| `@TransactionalEventsHandler` | no | no | no |
+| `@OutboxEventsHandler` *(outbox package)* | yes | yes | yes |
+| `@IntegrationEventsHandler` | if the outbox is wired | if wired | if wired |
 
-`{ fallbackExecution: true }` makes a handler fire directly (via
-`queueMicrotask`) when the event is published outside any transaction.
-Otherwise out-of-transaction events are dropped with a warning.
+Use `@TransactionalEventsHandler` for in-process work that is fine to
+lose on a crash — cache invalidation, metrics. Use
+`@OutboxEventsHandler` when at-least-once delivery matters: external
+API calls, emails, billing.
 
-`{ async: true }` fires the handler via `queueMicrotask` even inside a
-transaction — its errors never reach the transaction's rollback path.
-Useful for genuinely fire-and-forget side effects.
+`@IntegrationEventsHandler` is the one to reach for by default in
+cross-module code. It routes through the outbox when
+`OUTBOX_LISTENER_REGISTRAR` is bound and falls back to in-memory
+delivery when it is not — decided at bootstrap by module wiring, not at
+the call site. The same handler therefore runs in-memory during early
+development and durably once a worker exists, without touching the
+handler. It mirrors Spring Modulith's `@ApplicationModuleListener`.
 
-## Defaults baked into `CqrsTransactionalModule.forRoot()`
-
-- Command handlers are wrapped in `REQUIRED`-propagation transactions.
-  Without method- or class-level `@Transactional()`, they remain unwrapped
-  unless `defaultCommandOptions` is provided.
-- Query handlers are wrapped as read-only transactions by default
-  (`defaultQueryOptions: { readOnly: true }`). Pass
-  `defaultQueryOptions: undefined` to opt out.
-- Event handlers are wrapped only if they carry `@Transactional()` (no
-  kind-level default is applied to events — they are often used for
-  out-of-band side effects where wrapping is inappropriate).
-- `AggregateRoot.commit()` routes events through the dispatcher — set
-  `useTransactionalEventPublisher: false` to leave `@nestjs/cqrs`'s
-  standard `EventPublisher` in place (useful for gradual adoption).
-
-## Outbox integration
-
-`CqrsTransactionalModule.forRoot()` always wires `HybridEventPublisher`
-into the `EventPublisher` DI override. By default, `HybridEventPublisher`
-routes events only through the in-memory dispatcher — no outbox side
-effects. To turn on durable delivery, bind BOTH structural ports in
-your app module:
+To turn on durable delivery, bind both structural ports:
 
 ```ts
-import { Module } from '@nestjs/common';
-import {
-  OutboxEventPublisher,
-  OutboxListenerRegistry,
-  OutboxModule,
-} from '@nestjs-transactional/outbox';
-import {
-  CqrsTransactionalModule,
-  OUTBOX_LISTENER_REGISTRAR,
-  OUTBOX_PUBLICATION_SCHEDULER,
-} from '@nestjs-transactional/cqrs';
-
-@Module({
-  imports: [
-    // ...the usual wiring — TransactionalModule, a typeorm adapter,
-    // OutboxTypeOrmModule, OutboxModule, CqrsTransactionalModule...
-    CqrsTransactionalModule.forRoot(),
-  ],
-  providers: [
-    // Routes AggregateRoot.commit() events to the outbox for durable
-    // publication.
-    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-    // Routes @IntegrationEventsHandler classes to the outbox registry
-    // for durable delivery.
-    { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
-  ],
-})
-export class AppModule {}
+providers: [
+  { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
+  { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
+];
 ```
 
-With both bindings in place, a single `aggregate.commit()` call:
+A rollback then undoes all of it: no in-memory handler fires, no
+publication row persists, nothing downstream runs.
 
-1. Attaches one `AFTER_COMMIT` hook per `@TransactionalEventsHandler`
-   class registered for the event — fires after the transaction
-   commits, entirely in-memory, no DB rows.
-2. Buffers the event for outbox publication — a single
-   `beforeCommit` hook per transaction flushes the whole buffer into
-   `event_publication` rows, atomically with the business write.
-3. Once the transaction commits, the outbox processor (running in
-   a worker) polls those rows and invokes every
-   `@OutboxEventsHandler` / `@IntegrationEventsHandler` class
-   registered for the event.
-
-Rollback rolls back all three: no in-memory handlers fire, no
-publication rows are persisted, nothing downstream runs. This is the
-core guarantee of the outbox pattern — "event published only if the
-business change landed".
-
-## Choosing between handler flavours
-
-- **`@TransactionalEventsHandler`** — cheap, in-process, phase-aware,
-  non-durable. Use for side effects that are OK to lose on a crash
-  between commit and invocation (metrics, cache invalidation,
-  enrichment of in-memory state).
-- **`@OutboxEventsHandler`** *(from outbox)* — durable,
-  retry-on-failure, resumable-across-restart, delivered by a worker.
-  Use for integration with external systems, email sends, billing
-  events, or any side effect where at-least-once delivery matters.
-  Requires `OutboxModule` to be wired.
-- **`@IntegrationEventsHandler`** — smart default, class-level
-  composite. When the outbox registrar is bound, delivery goes
-  through the outbox (durable). Without it, delivery falls back to
-  the in-memory dispatcher with `AFTER_COMMIT` + `async: true` +
-  fresh-transaction semantics. Matches Spring Modulith's
-  `@ApplicationModuleListener` contract — "the thing you reach for by
-  default when wiring cross-module listeners, so you do not have to
-  revisit every call site when persistence comes online".
-
-### Delivery guarantees at a glance
-
-| Decorator | Persisted? | Retry on failure? | Survives process restart? | Transaction | Typical use case |
-| --- | --- | --- | --- | --- | --- |
-| `@TransactionalEventsHandler` | No — in-memory only | No | No | Joins the publishing transaction's lifecycle (fires at configured phase) | Cache invalidation, metrics, in-process enrichment |
-| `@OutboxEventsHandler` | Yes — `event_publication` row per listener | Yes — via operator-triggered resubmit | Yes — `republishOnStartup` replays | `REQUIRES_NEW` per invocation (default) | External API calls, emails, billing events, cross-module integration where loss is unacceptable |
-| `@IntegrationEventsHandler` | Yes if outbox registrar bound, No otherwise | Yes if outbox bound | Yes if outbox bound | `REQUIRES_NEW` (outbox) or `AFTER_COMMIT + async: true` inside a fresh tx (fallback) | Default choice for cross-module handlers — upgrades gracefully when the outbox comes online |
-
-How `@IntegrationEventsHandler` routes depends on module wiring, not
-on call-site configuration: write one decorator, and the same handler
-runs via the in-memory path during early development and via the
-durable outbox once the team is ready to stand up the worker process.
-`IntegrationEventsHandlerScanner` decides at bootstrap based on
-whether the `OUTBOX_LISTENER_REGISTRAR` provider is bound — so the
-handler fires exactly once.
-
-```ts
-@Injectable()
-@IntegrationEventsHandler(OrderPlacedEvent)
-export class InventoryReservationHandler
-  implements IIntegrationEventHandler<OrderPlacedEvent>
-{
-  async handle(event: OrderPlacedEvent): Promise<void> {
-    // with outbox wired: runs from the worker, retried on failure.
-    // without outbox:    runs in-memory after commit, fire-and-forget.
-  }
-}
-```
-
-Supply a stable `id` when the class name might change:
-
-```ts
-@IntegrationEventsHandler({
-  events: [OrderPlacedEvent],
-  id: 'Inventory.stable-id',
-})
-```
-
-The listener id format is `${baseId}#${EventName}` where baseId
-defaults to the class name — so class renames invalidate stored
-publications unless `options.id` is set.
-
-## Worked examples
-
-- [`basic-cqrs`](../../examples/basic-cqrs) — Command + Query (auto-readonly) + AFTER_COMMIT `@TransactionalEventsHandler`, no DB.
-- [`multi-datasource-cqrs`](../../examples/multi-datasource-cqrs) — `@Transactional({ dataSource })` per handler with per-DS hook attachment.
-- [`saga-pattern`](../../examples/saga-pattern), [`audit-logging`](../../examples/audit-logging) — `@TransactionalEventsHandler` + `@OutboxEventsHandler` against the same event class.
-- [`e-commerce-orders`](../../examples/e-commerce-orders) — full CQRS + REST controller + outbox-driven saga + multi-DS.
-
-Full catalogue: [examples/README.md](../../examples/README.md).
-
-## Handler scopes
-
-Works with handlers of any `@nestjs/cqrs` scope —
-`Scope.DEFAULT` (singleton), `Scope.REQUEST`, and `Scope.TRANSIENT` —
-since [ADR-020](../../docs/adr/020-prototype-level-cqrs-wrapping.md):
-the wrap is applied to the handler class **prototype**, which
-intercepts `@nestjs/cqrs`'s late-bound `instance.execute(query)` lookup
-regardless of how the instance is resolved.
-
-A common request-scoped pattern uses `@nestjs/cqrs`'s own `AsyncContext`
-mechanism to carry per-request data (user, geo, A/B flags, ...) into
-the handler via the standard `REQUEST` token:
-
-```ts
-import { Inject, Scope } from '@nestjs/common';
-import { REQUEST } from '@nestjs/core';
-import { AsyncContext, QueryHandler, IQueryHandler } from '@nestjs/cqrs';
-
-@QueryHandler(ListUserContributionsQuery, { scope: Scope.REQUEST })
-export class ListUserContributionsQueryHandler
-  implements IQueryHandler<ListUserContributionsQuery> {
-  constructor(@Inject(REQUEST) private readonly ctx: AsyncContext) {}
-
-  async execute(query: ListUserContributionsQuery) {
-    // this.ctx carries the per-request data, the wrap opens a transaction
-  }
-}
-```
-
-Multiple dispatches that should share one handler instance per HTTP
-request need to share one `AsyncContext` — either pass it as the second
-argument (`queryBus.execute(query, ctx)`) or attach it to each query
-via `AsyncContext.merge(source, query)`. Without sharing, each dispatch
-gets a new `AsyncContext` (and a new instance) — that is `@nestjs/cqrs`
-behaviour and unrelated to the transaction wrap.
+Listener ids are `${baseId}#${EventName}`, with `baseId` defaulting to
+the class name — so pass an explicit `id` if the class may be renamed,
+or stored publications will be orphaned.
 
 ## Limitations
 
-- Direct `eventBus.publish(...)` calls (outside of an aggregate) do NOT
-  go through the transactional dispatcher — only `AggregateRoot.commit()`
-  -emitted events via `mergeObjectContext` / `mergeClassContext`. If you
-  need phase-aware handlers on bus-published events, publish them from
-  an aggregate instead.
-- Arrow-function `execute = async (q) => {...}` /
-  `handle = async (e) => {...}` defined as instance fields are not
-  wrapped. The wrap point is the class prototype, and instance arrow
-  fields shadow the prototype. Use regular method syntax
-  (`async execute(q) { ... }`) so the method lives on the prototype.
-- `@nestjs/cqrs`'s handler-metadata constants are read via hardcoded
-  string literals (`__commandHandler__`, etc.) because `@nestjs/cqrs`
-  does not re-export them. See `handler-wrapper.ts` —
-  [DD-002](../../docs/dd/002-no-fork-nestjs-cqrs.md) documents this
-  coupling.
+- **`eventBus.publish(...)` bypasses the dispatcher.** Only events
+  emitted by an aggregate through `mergeObjectContext` /
+  `mergeClassContext` and `commit()` become phase-aware.
+- **Arrow-function class fields are not wrapped.** The wrap point is the
+  prototype, and `execute = async (q) => {}` shadows it. Use method
+  syntax.
+- **`@nestjs/cqrs@11` only**, deliberately, while the other peers accept
+  `^10 || ^11`. The wrapping mechanism would work on v10, but
+  `AsyncContext` — which request-scoped handler support depends on —
+  does not exist there, and advertising `^10` would promise a documented
+  feature that cannot work.
 
-## Status
+Handlers of any scope are supported, including `Scope.REQUEST` and
+`Scope.TRANSIENT`, because the wrap is applied to the prototype
+([ADR-020](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/020-prototype-level-cqrs-wrapping.md)).
 
-Alpha. Public API may change between 0.x releases.
+## Documentation
+
+- [Getting started and full docs](https://github.com/igorgolovanov/nestjs-transactional#readme)
+- [Transactional events and Spring semantics (ADR-002)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/002-transactional-events-spring-semantics.md)
+- [Handler API design (ADR-014)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/014-handler-api-redesign.md)
+- [Why `@nestjs/cqrs` is not forked (DD-002)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/002-no-fork-nestjs-cqrs.md)
+- Runnable examples:
+  [`basic-cqrs`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/basic-cqrs),
+  [`multi-datasource-cqrs`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/multi-datasource-cqrs),
+  [`saga-pattern`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/saga-pattern),
+  [`e-commerce-orders`](https://github.com/igorgolovanov/nestjs-transactional/tree/main/examples/e-commerce-orders)
+
+## License
+
+MIT

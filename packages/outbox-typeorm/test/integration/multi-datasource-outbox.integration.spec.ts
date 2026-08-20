@@ -31,7 +31,7 @@ import {
 } from '../setup-testcontainers';
 
 /**
- * Phase 14.20: stand-in for `TypeOrmModule.forRoot(...)` registers
+ * Stand-in for `TypeOrmModule.forRoot(...)` registers
  * the per-DS `getDataSourceToken(name)` providers in a `@Global()`
  * module so `TypeOrmTransactionalModule.forRoot` can resolve them.
  */
@@ -80,16 +80,16 @@ class BillingService {
 }
 
 /**
- * NOTE — Phase 14.5 multi-DS test deliberately uses **manual**
+ * NOTE — this multi-DS test deliberately uses **manual**
  * per-DS listener registration rather than `@OutboxEventsHandler`.
  *
- * Phase 14.3 design gap: `OutboxListenerScanner` injects
+ * Historical design gap: `OutboxListenerScanner` injects
  * `OutboxListenerRegistry` by class token, which is aliased only to
  * the `'default'` dataSource's registry. Decorator-driven scanning
  * therefore registers *every* `@OutboxEventsHandler` with the
  * default-DS registry regardless of which dataSource owns the events
  * the handler subscribes to. Multi-DS deployments needing
- * non-default-DS listener routing must — until Phase 14.3.1 lands —
+ * non-default-DS listener routing had to, before per-dataSource routing landed,
  * register listeners manually:
  *
  * ```ts
@@ -100,7 +100,7 @@ class BillingService {
  * This is also a legitimate real-world usage pattern (programmatic
  * registration is supported by design — the scanner is a
  * convenience). See `docs/known-limitations.md` and the planned
- * Phase 14.3.1 in `docs/roadmap/README.md`.
+ * the roadmap in `docs/roadmap/README.md`.
  */
 describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testcontainers)', () => {
   let ctx: PostgresTestContext;
@@ -309,7 +309,7 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
     expect(billingRows).toHaveLength(0);
   });
 
-  // Phase 14.21 removed the `dataSourceName` and `adapterInstance`
+  // A later reshape removed the `dataSourceName` and `adapterInstance`
   // option fields entirely (both replaced by the unified `dataSource`
   // string identifier). The two tests that previously verified the
   // deprecated `adapterInstance` alias behaviour and its precedence

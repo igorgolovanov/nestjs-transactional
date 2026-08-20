@@ -1,9 +1,6 @@
 import type { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
 
-import {
-  HybridEventPublisher,
-  type OutboxPublicationScheduler,
-} from './hybrid-event-publisher';
+import { HybridEventPublisher, type OutboxPublicationScheduler } from './hybrid-event-publisher';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}
@@ -33,7 +30,11 @@ describe('HybridEventPublisher', () => {
       const dispatcher = fakeDispatcher();
       const publisher = new HybridEventPublisher(dispatcher);
 
-      const events = [new OrderPlacedEvent('a'), new OrderPlacedEvent('b'), new OrderPlacedEvent('c')];
+      const events = [
+        new OrderPlacedEvent('a'),
+        new OrderPlacedEvent('b'),
+        new OrderPlacedEvent('c'),
+      ];
       publisher.publishAll(events);
 
       expect(dispatcher.scheduleDispatch).toHaveBeenCalledTimes(3);

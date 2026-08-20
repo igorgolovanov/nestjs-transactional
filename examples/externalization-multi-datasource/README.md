@@ -108,10 +108,10 @@ These are deliberately different: per ADR-019 the outbox stack is
 `OutboxListenerRegistry` — per DS). Each DS owns its own publication
 table and its own worker.
 
-The externalizer is **process-wide singleton** (Phase 14.6 Q1.A
-verification). Multi-broker routing happens via per-event
-`@Externalized({ client })` — there is no need for a per-DS
-externalizer Map. One `MicroservicesEventExternalizer` is injected
+The externalizer is **process-wide singleton** (verified during the
+outbox-microservices multi-adapter migration). Multi-broker routing
+happens via per-event `@Externalized({ client })` — there is no need
+for a per-DS externalizer Map. One `MicroservicesEventExternalizer` is injected
 into BOTH per-DS `EventPublicationProcessor`s through the
 `@Global()` `EVENT_EXTERNALIZER` token; each processor calls
 `externalize(event, metadata)` and the externalizer picks the right
@@ -144,7 +144,7 @@ go there. The two axes don't interact.
    publication ends up `FAILED`. The inventory DS's publication
    completes independently — single-unit atomicity is per-row, and
    the rows live in different DBs.
-5. **Phase 14.3.1 Category A scanner routing.** The
+5. **Per-dataSource handler-scanner routing.** The
    `OutboxListenerScanner` walks per-DS `EventTypeRegistry`
    instances to bind handlers to the right registry — no manual
    per-DS plumbing in user code.
@@ -162,7 +162,7 @@ go there. The two axes don't interact.
   multi-DS).
 - [`src/billing.handler.ts`](src/billing.handler.ts) and
   [`src/inventory.handler.ts`](src/inventory.handler.ts) — local
-  handlers; Phase 14.3.1 Category A scanner auto-routes them to
+  handlers; the outbox handler scanner auto-routes them to
   the right per-DS registry based on the event's
   `forFeature` registration.
 - [`src/app.module.ts`](src/app.module.ts) — composition root: two
@@ -188,10 +188,11 @@ go there. The two axes don't interact.
   publication table regardless of which `@Transactional({ dataSource })`
   scope is active. Both services in this example carry an explicit
   comment about this.
-- **One DS must be bound to `'default'`.** Phase 14.3 binds the
-  outbox class-token aliases (e.g. `StartupRecoveryService`) to the
-  default-DS's `forRoot` only. Multi-DS deployments pick whichever
-  module makes the most sense to be default — billing here.
+- **One DS must be bound to `'default'`.** The outbox's multi-adapter
+  support binds the class-token aliases (e.g.
+  `StartupRecoveryService`) to the default-DS's `forRoot` only.
+  Multi-DS deployments pick whichever module makes the most sense to be
+  default — billing here.
 - **Postgres CREATEDB privilege** for the integration test. The
   testcontainers default user has it; if you swap in a different
   Postgres image with a restricted user, the second-DB creation

@@ -31,9 +31,7 @@ import { DEFAULT_DATA_SOURCE_NAME } from './constants';
  * private readonly txManager: TransactionManager;
  * ```
  */
-export function getTransactionManagerToken(
-  dataSource: string = DEFAULT_DATA_SOURCE_NAME,
-): string {
+export function getTransactionManagerToken(dataSource: string = DEFAULT_DATA_SOURCE_NAME): string {
   return `${dataSource}TransactionManager`;
 }
 
@@ -43,9 +41,7 @@ export function getTransactionManagerToken(
  * DD-023 — so cross-dataSource calls do not silently enrol into a
  * sibling transaction.
  */
-export function getTransactionContextToken(
-  dataSource: string = DEFAULT_DATA_SOURCE_NAME,
-): string {
+export function getTransactionContextToken(dataSource: string = DEFAULT_DATA_SOURCE_NAME): string {
   return `${dataSource}TransactionContext`;
 }
 

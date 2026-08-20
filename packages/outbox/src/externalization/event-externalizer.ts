@@ -5,7 +5,7 @@ import type { ExternalizationMetadata } from './types';
  * external message broker.
  *
  * Implementations are provided by extension packages — primarily
- * `@nestjs-transactional/outbox-microservices` (Phase 11.3), which
+ * `@nestjs-transactional/outbox-microservices`, which
  * delegates to `@nestjs/microservices` `ClientProxy` and therefore
  * covers every transport that NestJS already supports (Kafka,
  * RabbitMQ, NATS, JMS, gRPC, custom). Future native (broker-specific)
@@ -33,7 +33,7 @@ export interface EventExternalizer {
    *   was passed to the local listener).
    * @param metadata Resolved routing metadata for this event. The
    *   processor obtains it from the `ExternalizationRegistry`
-   *   (Phase 11.2).
+   *  .
    */
   externalize(event: unknown, metadata: ExternalizationMetadata): Promise<void>;
 }

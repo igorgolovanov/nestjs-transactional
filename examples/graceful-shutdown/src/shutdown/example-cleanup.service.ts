@@ -6,12 +6,11 @@ import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
  * Redis connection that isn't owned by Nest, telling a sidecar
  * proxy to stop accepting traffic, etc.
  *
- * Both NestJS hooks compose: the framework's
- * `OutboxProcessingModule.onApplicationShutdown` (stops polling),
- * `OutboxDrainService.onApplicationShutdown` (awaits in-flight),
- * and *this* one all run during `app.close()` — the order is
- * NestJS's reverse-init order, but their effects are independent
- * so order doesn't matter here.
+ * Hooks compose: the framework's
+ * `OutboxProcessingModule.onApplicationShutdown` (stops polling and
+ * awaits the in-flight batch) and *this* one both run during
+ * `app.close()` — the order is NestJS's reverse-init order, but
+ * their effects are independent so order doesn't matter here.
  *
  * The integration test asserts this hook fires (via the public
  * `cleaned` flag) so users see the wiring works without having to

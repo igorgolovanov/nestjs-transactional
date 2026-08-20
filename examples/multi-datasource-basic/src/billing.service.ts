@@ -11,7 +11,7 @@ import { InvoiceEntity } from './entities';
  * explicit `dataSource` option routes here.
  *
  * `@InjectRepository(InvoiceEntity)` resolves the Repository bound
- * to the default DataSource. Phase 14.20 patches dispatch through
+ * to the default DataSource. The prototype patches dispatch through
  * the active `@Transactional()` scope — no manual EntityManager
  * lookup.
  */

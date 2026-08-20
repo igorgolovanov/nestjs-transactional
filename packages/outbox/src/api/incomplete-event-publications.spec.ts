@@ -36,7 +36,11 @@ describe('IncompleteEventPublications', () => {
 
     const incomplete = await api.findAll();
 
-    expect(incomplete.map((p) => p.listenerId).sort()).toEqual(['failed', 'processing', 'published']);
+    expect(incomplete.map((p) => p.listenerId).sort()).toEqual([
+      'failed',
+      'processing',
+      'published',
+    ]);
     expect(incomplete.map((p) => p.id)).not.toContain(completed!.id);
     // silence unused-variable warnings for destructured pubs we do not touch further
     void published;
@@ -94,10 +98,7 @@ describe('IncompleteEventPublications', () => {
   });
 
   it('respects the filter predicate', async () => {
-    await repo.createAll([
-      newInput({ listenerId: 'keep' }),
-      newInput({ listenerId: 'skip' }),
-    ]);
+    await repo.createAll([newInput({ listenerId: 'keep' }), newInput({ listenerId: 'skip' })]);
 
     const resubmitted = await api.resubmitIncompletePublications(
       ResubmissionOptions.defaults().withFilter((p) => p.listenerId === 'keep'),
