@@ -62,7 +62,7 @@
     "@nestjs/typeorm": "^10.0.0 || ^11.0.0",
     "reflect-metadata": "^0.1.13 || ^0.2.0",
     "rxjs": "^7.0.0",
-    "typeorm": "^0.3.0 || ^1.0.0"
+    "typeorm": "^0.3.31"
   },
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
@@ -81,7 +81,7 @@
     "rxjs": "^7.8.1",
     "testcontainers": "^10.13.0",
     "ts-jest": "^29.2.5",
-    "typeorm": "^0.3.0 || ^1.0.0",
+    "typeorm": "^0.3.31",
     "typescript": "^5.5.4"
   }
 }
