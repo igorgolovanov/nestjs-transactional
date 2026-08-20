@@ -135,8 +135,12 @@ describe('externalization-multi-broker (Postgres real, three ClientProxy mocked)
 
     await waitFor(() => shipping.handled.some((e) => e.orderId === 'o-1'));
     await waitFor(() => kafka.emit.mock.calls.length >= 1);
-    // Cache invalidation always fires.
+    // Cache invalidation always fires. Wait for the Redis *emit*, not just
+    // the local handler: externalization runs after the local listener
+    // completes (DD-019 ordering), so the handler having run does not mean
+    // the broker call has happened — and this test asserts on it below.
     await waitFor(() => cache.handled.some((e) => e.key.includes('alice@example.com')));
+    await waitFor(() => redis.emit.mock.calls.length >= 1);
 
     expect(kafka.emit).toHaveBeenCalledTimes(1);
     expect(kafka.emit).toHaveBeenCalledWith(
@@ -159,7 +163,19 @@ describe('externalization-multi-broker (Postgres real, three ClientProxy mocked)
     await orders.placeOrder('o-2', 'bob@example.com', 7_500, { refundCents: 2_000 });
 
     await waitFor(() => accounting.handled.some((e) => e.orderId === 'o-2'));
-    await waitFor(() => rabbitmq.emit.mock.calls.length >= 1);
+    // Wait for all three emits, not just RabbitMQ's: this test asserts on
+    // the Kafka and Redis call lists too, and one `placeOrder` produces
+    // three publications that the worker externalizes concurrently within
+    // a batch. Waiting only for the one under test made the other two
+    // assertions a race — locally the batch always finished first, on a CI
+    // runner it did not, and the failure read as "Redis got nothing"
+    // rather than "Redis had not got there yet".
+    await waitFor(
+      () =>
+        rabbitmq.emit.mock.calls.length >= 1 &&
+        kafka.emit.mock.calls.length >= 1 &&
+        redis.emit.mock.calls.length >= 1,
+    );
 
     // RabbitMQ got the refund event, with target = 'refunds' queue.
     expect(rabbitmq.emit).toHaveBeenCalledWith(
