@@ -23,14 +23,33 @@ import { InvoiceEntity, StockItemEntity } from '../src/entities';
 import { InventoryProjectionsHandler } from '../src/inventory.handler';
 import { InventoryService } from '../src/inventory.service';
 
-async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
+async function waitFor(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 5_000,
+): Promise<void> {
   const start = Date.now();
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() - start > timeoutMs) {
       throw new Error(`waitFor: timed out after ${timeoutMs} ms`);
     }
     await new Promise((r) => setTimeout(r, 50));
   }
+}
+
+/**
+ * Wait until this dataSource's publication rows satisfy `predicate`.
+ *
+ * The worker sets a row's terminal status *after* the handler — and, when
+ * externalization is configured, after the broker emit — has returned.
+ * So waiting on a handler flag or on an emit mock is not the same as
+ * waiting on the row reaching COMPLETED: the gap is invisible on a fast
+ * machine and real on a CI runner.
+ */
+async function waitForPublications(
+  ds: DataSource,
+  predicate: (rows: EventPublicationEntity[]) => boolean,
+): Promise<void> {
+  await waitFor(async () => predicate(await ds.getRepository(EventPublicationEntity).find()));
 }
 
 describe('multi-datasource-outbox (Postgres via testcontainers)', () => {
@@ -134,6 +153,10 @@ describe('multi-datasource-outbox (Postgres via testcontainers)', () => {
 
     // Worker delivers and marks COMPLETED.
     await waitFor(() => billingProjections.handled.some((e) => e.invoiceId === 'inv-1'));
+    await waitForPublications(
+      billingDs,
+      (rows) => rows[0]?.status === PublicationStatus.COMPLETED,
+    );
     const completed = await billingDs.getRepository(EventPublicationEntity).findOne({
       where: { id: billingPubs[0]!.id },
     });

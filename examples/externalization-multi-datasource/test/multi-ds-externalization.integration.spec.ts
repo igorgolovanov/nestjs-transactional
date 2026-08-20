@@ -50,6 +50,22 @@ async function waitFor(
   }
 }
 
+/**
+ * Wait until this dataSource's publication rows satisfy `predicate`.
+ *
+ * The worker sets a row's terminal status *after* the handler — and, when
+ * externalization is configured, after the broker emit — has returned.
+ * So waiting on a handler flag or on an emit mock is not the same as
+ * waiting on the row reaching COMPLETED: the gap is invisible on a fast
+ * machine and real on a CI runner.
+ */
+async function waitForPublications(
+  ds: DataSource,
+  predicate: (rows: EventPublicationEntity[]) => boolean,
+): Promise<void> {
+  await waitFor(async () => predicate(await ds.getRepository(EventPublicationEntity).find()));
+}
+
 describe('externalization-multi-datasource (Postgres × 2 real, two ClientProxy mocked)', () => {
   let container: StartedPostgreSqlContainer;
   let billingDs: DataSource;
@@ -162,6 +178,11 @@ describe('externalization-multi-datasource (Postgres × 2 real, two ClientProxy 
     );
     expect(inventoryBroker.emit).not.toHaveBeenCalled();
 
+    await waitForPublications(
+      billingDs,
+      (rows) => rows[0]?.status === PublicationStatus.COMPLETED,
+    );
+
     // Publication landed in the BILLING DB only (not the inventory DB).
     const billingPub = await billingDs.getRepository(EventPublicationEntity).find();
     const inventoryPub = await inventoryDs.getRepository(EventPublicationEntity).find();
@@ -185,6 +206,11 @@ describe('externalization-multi-datasource (Postgres × 2 real, two ClientProxy 
       expect.objectContaining({ reservationId: 'res-1', sku: 'sku-A' }),
     );
     expect(billingBroker.emit).not.toHaveBeenCalled();
+
+    await waitForPublications(
+      inventoryDs,
+      (rows) => rows[0]?.status === PublicationStatus.COMPLETED,
+    );
 
     // Publication landed in the INVENTORY DB only.
     const billingPub = await billingDs.getRepository(EventPublicationEntity).find();
@@ -259,6 +285,11 @@ describe('externalization-multi-datasource (Postgres × 2 real, two ClientProxy 
 
     expect(new Set(billingTargets)).toEqual(new Set(['billing.events']));
     expect(new Set(inventoryTargets)).toEqual(new Set(['inventory.events']));
+
+    const bothCompleted = (rows: EventPublicationEntity[]): boolean =>
+      rows.length === 2 && rows.every((r) => r.status === PublicationStatus.COMPLETED);
+    await waitForPublications(billingDs, bothCompleted);
+    await waitForPublications(inventoryDs, bothCompleted);
 
     // Two completed publications per DS (DD-023 — independent
     // publication queues).
