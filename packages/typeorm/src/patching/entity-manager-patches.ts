@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/unbound-method */
 // The patching machinery wraps `EntityManager.prototype.getRepository`
 // and stamps hidden symbol-keyed properties on returned
 // `Repository` instances. These properties live outside TypeORM's

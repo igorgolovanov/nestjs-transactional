@@ -33,8 +33,7 @@ type TransactionHook = (error?: unknown) => Promise<void>;
  * manager re-raises the error to the caller outside the adapter call.
  */
 type InternalResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly error: unknown };
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: unknown };
 
 /**
  * Runtime that executes a callback inside a transaction, following the

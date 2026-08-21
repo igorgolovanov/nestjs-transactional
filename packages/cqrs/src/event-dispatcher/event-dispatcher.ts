@@ -102,7 +102,6 @@ export class TransactionalEventDispatcher {
    * keep compiling. NestJS DI continues to inject the manager
    * automatically. A future cleanup phase may drop it.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(private readonly manager: TransactionManager) {}
 
   /**

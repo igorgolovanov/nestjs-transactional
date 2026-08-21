@@ -129,9 +129,7 @@ export function Externalized<TEvent = unknown>(
     client: options.client,
     routingKey: options.routingKey as ((event: unknown) => string) | undefined,
     headers: options.headers as
-      | Record<string, string>
-      | ((event: unknown) => Record<string, string>)
-      | undefined,
+      Record<string, string> | ((event: unknown) => Record<string, string>) | undefined,
   };
 
   return (target: object): void => {

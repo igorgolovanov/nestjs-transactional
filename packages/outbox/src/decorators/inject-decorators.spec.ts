@@ -13,7 +13,7 @@ import {
 } from './inject-decorators';
 
 function readSelfParamTypes(target: unknown): { index: number; param: unknown }[] {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return Reflect.getMetadata('self:paramtypes', target as any) ?? [];
 }
 
@@ -78,20 +78,14 @@ describe('Inject decorators (outbox)', () => {
   describe.each(cases)('$name', ({ decorator, defaultToken, billingToken }) => {
     it('binds the default-dataSource token when no argument is passed', () => {
       class TestClass {
-        constructor(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          @decorator() readonly dep: unknown,
-        ) {}
+        constructor(@decorator() readonly dep: unknown) {}
       }
       expect(readSelfParamTypes(TestClass)[0]!.param).toBe(defaultToken);
     });
 
     it('binds the supplied-dataSource token', () => {
       class TestClass {
-        constructor(
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          @decorator('billing') readonly dep: unknown,
-        ) {}
+        constructor(@decorator('billing') readonly dep: unknown) {}
       }
       expect(readSelfParamTypes(TestClass)[0]!.param).toBe(billingToken);
     });

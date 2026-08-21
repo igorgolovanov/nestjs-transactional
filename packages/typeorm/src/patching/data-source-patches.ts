@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 // The patching machinery overrides instance-level methods on
 // TypeORM `DataSource` objects (`manager` getter/setter,
 // `query`, `createQueryBuilder`) via runtime property descriptors.
