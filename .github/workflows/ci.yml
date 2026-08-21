@@ -20,7 +20,7 @@ jobs:
     # gate existed.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check relative markdown links
         run: ./scripts/check-doc-links.sh
@@ -32,7 +32,7 @@ jobs:
     # TypeORM version, so matrixing this would buy nothing.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -63,7 +63,7 @@ jobs:
         typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -121,7 +121,7 @@ jobs:
         typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -171,7 +171,7 @@ jobs:
         typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -230,7 +230,7 @@ jobs:
     # unverifiable in CI.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -270,7 +270,7 @@ jobs:
         typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -330,7 +330,7 @@ jobs:
     # `test:integration`; pnpm filter-run skips packages without it.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -382,7 +382,7 @@ jobs:
     # lockfile pins, the same one the published packages are built against.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -417,7 +417,7 @@ jobs:
     # node10, node16 (from CJS and from ESM) and bundler.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -452,7 +452,7 @@ jobs:
     # consumer app still build and run against the library as it stands?
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3

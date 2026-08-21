@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # No build step: CodeQL's javascript-typescript extractor reads the
       # TypeScript sources directly, so the compiled output would only be
