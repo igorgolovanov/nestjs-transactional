@@ -112,7 +112,7 @@ nestjs-transactional-monorepo/
 ├── tsconfig.base.json                     # shared TS settings
 ├── tsconfig.json                          # solution-style root (project references)
 ├── jest.config.base.js
-├── .eslintrc.js
+├── eslint.config.mjs                      # flat config (ESLint 10)
 ├── .prettierrc
 └── .gitignore
 ```

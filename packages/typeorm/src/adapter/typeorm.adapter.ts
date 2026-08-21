@@ -16,10 +16,7 @@ import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-hand
  * the type from its main entry.
  */
 type TypeOrmIsolationLevel =
-  | 'READ UNCOMMITTED'
-  | 'READ COMMITTED'
-  | 'REPEATABLE READ'
-  | 'SERIALIZABLE';
+  'READ UNCOMMITTED' | 'READ COMMITTED' | 'REPEATABLE READ' | 'SERIALIZABLE';
 
 /**
  * TypeORM implementation of {@link TransactionAdapter}. Delegates begin /

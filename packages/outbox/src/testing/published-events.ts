@@ -84,7 +84,8 @@ export class PublishedEventsView<T extends object> {
     fnOrGetter: ((event: T) => boolean) | ((event: T) => K),
     expected?: K,
   ): PublishedEventsView<T> {
-    // eslint-disable-next-line prefer-rest-params -- arguments.length distinguishes the two overloads reliably, including when `expected` is intentionally `undefined`.
+    // `arguments.length` distinguishes the two overloads reliably,
+    // including when `expected` is intentionally passed as `undefined`.
     const argCount = arguments.length;
     const predicate: (event: T) => boolean =
       argCount > 1

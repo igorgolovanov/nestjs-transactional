@@ -16,7 +16,7 @@ import {
  * pin the exact token string the decorator produced.
  */
 function readSelfParamTypes(target: unknown): { index: number; param: unknown }[] {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return Reflect.getMetadata('self:paramtypes', target as any) ?? [];
 }
 

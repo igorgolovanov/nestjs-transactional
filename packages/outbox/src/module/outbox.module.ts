@@ -966,5 +966,4 @@ function privateRegistrations(
 // no longer used directly in this file (the per-DS
 // publisher pushes hooks directly onto the active-transaction object,
 // bypassing manager.registerBeforeCommit's single-tx assumption).
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _txManagerRef = TransactionManager;

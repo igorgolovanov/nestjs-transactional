@@ -70,13 +70,14 @@ export class MicroservicesEventExternalizer implements EventExternalizer, OnAppl
         `Externalization configured with default client: ${formatToken(this.options.defaultClient)}`,
       );
     } catch (err) {
-      const cause = err instanceof Error ? err.message : String(err);
+      const reason = err instanceof Error ? err.message : String(err);
       throw new Error(
         `OutboxMicroservicesModule: defaultClient '${formatToken(this.options.defaultClient)}' ` +
           `is not registered in the DI container. Register the ClientProxy via ` +
           `ClientsModule.register() / ClientsModule.registerAsync(), or pass ` +
           `validateOnBootstrap: false to defer resolution to the first event. ` +
-          `Original error: ${cause}`,
+          `Original error: ${reason}`,
+        { cause: err },
       );
     }
   }

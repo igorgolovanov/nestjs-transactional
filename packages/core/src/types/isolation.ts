@@ -8,7 +8,4 @@
  * level; adapters map unsupported levels to an adapter-level error.
  */
 export type IsolationLevel =
-  | 'READ_UNCOMMITTED'
-  | 'READ_COMMITTED'
-  | 'REPEATABLE_READ'
-  | 'SERIALIZABLE';
+  'READ_UNCOMMITTED' | 'READ_COMMITTED' | 'REPEATABLE_READ' | 'SERIALIZABLE';
