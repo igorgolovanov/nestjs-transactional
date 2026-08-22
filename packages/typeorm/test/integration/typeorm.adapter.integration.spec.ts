@@ -8,6 +8,30 @@ import { TestUser } from '../shared/test-user.entity';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+interface Barrier {
+  readonly reached: Promise<void>;
+  readonly reach: () => void;
+}
+
+/**
+ * A one-shot barrier for ordering two concurrent transactions.
+ *
+ * The isolation properties below only hold while both transactions are
+ * open at the same time, and sleeps can only *hope* for that overlap:
+ * they encode a margin (one side sleeps 50 ms, the other 100 ms) that a
+ * loaded CI runner can erase, at which point the transactions run one
+ * after another and Postgres correctly reports what a serial execution
+ * sees. That is a broken test, not a broken library. Barriers make the
+ * interleaving each test needs the only one reachable.
+ */
+function barrier(): Barrier {
+  let reach!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    reach = resolve;
+  });
+  return { reached, reach };
+}
+
 describe('TypeOrmTransactionAdapter (integration, Postgres via testcontainers)', () => {
   let ctx: PostgresTestContext;
   let adapter: TypeOrmTransactionAdapter;
@@ -32,17 +56,33 @@ describe('TypeOrmTransactionAdapter (integration, Postgres via testcontainers)',
     let tx1InnerCount = -1;
     let tx2InnerCount = -1;
 
+    // Postgres takes a REPEATABLE READ snapshot at the transaction's
+    // first statement, not at BEGIN. So the order that has to be forced
+    // is: tx1 writes, then tx2 writes (taking its snapshot while tx1 is
+    // still uncommitted), then both count.
+    const tx1HasWritten = barrier();
+    const tx2HasCounted = barrier();
+
     await Promise.all([
       adapter.runInTransaction({ isolation: 'REPEATABLE_READ' }, async (h) => {
         await h.entityManager.save(TestUser, { name: 'tx1' });
-        await sleep(100);
-        // With REPEATABLE READ snapshot isolation, tx1 sees only its own write.
+        tx1HasWritten.reach();
+        await tx2HasCounted.reached;
+        // With REPEATABLE READ snapshot isolation, tx1 sees only its own
+        // write — its snapshot predates tx2's insert, so this holds
+        // whether or not tx2 has committed by now.
         tx1InnerCount = await h.entityManager.getRepository(TestUser).count();
       }),
       adapter.runInTransaction({ isolation: 'REPEATABLE_READ' }, async (h) => {
-        await sleep(50);
-        await h.entityManager.save(TestUser, { name: 'tx2' });
-        tx2InnerCount = await h.entityManager.getRepository(TestUser).count();
+        await tx1HasWritten.reached;
+        try {
+          await h.entityManager.save(TestUser, { name: 'tx2' });
+          tx2InnerCount = await h.entityManager.getRepository(TestUser).count();
+        } finally {
+          // Released in `finally` so a failure here surfaces as that
+          // failure rather than as tx1 waiting out the test timeout.
+          tx2HasCounted.reach();
+        }
       }),
     ]);
 
@@ -56,19 +96,33 @@ describe('TypeOrmTransactionAdapter (integration, Postgres via testcontainers)',
   it('SERIALIZABLE: conflicting concurrent updates cause exactly one transaction to fail', async () => {
     const seeded = await ctx.dataSource.getRepository(TestUser).save({ name: 'initial' });
 
+    // The conflict only exists if tx1's snapshot predates tx2's commit.
+    // tx1 therefore reads first, and waits to write until tx2 has
+    // committed — the barrier is released outside `runInTransaction`,
+    // which is where COMMIT has already been issued.
+    const tx1HasRead = barrier();
+    const tx2HasCommitted = barrier();
+
     const results = await Promise.allSettled([
       adapter.runInTransaction({ isolation: 'SERIALIZABLE' }, async (h) => {
         const user = await h.entityManager.findOneByOrFail(TestUser, { id: seeded.id });
-        await sleep(100);
+        tx1HasRead.reach();
+        await tx2HasCommitted.reached;
         user.name = 'tx1';
         await h.entityManager.save(user);
       }),
-      adapter.runInTransaction({ isolation: 'SERIALIZABLE' }, async (h) => {
-        await sleep(50);
-        const user = await h.entityManager.findOneByOrFail(TestUser, { id: seeded.id });
-        user.name = 'tx2';
-        await h.entityManager.save(user);
-      }),
+      (async () => {
+        await tx1HasRead.reached;
+        try {
+          await adapter.runInTransaction({ isolation: 'SERIALIZABLE' }, async (h) => {
+            const user = await h.entityManager.findOneByOrFail(TestUser, { id: seeded.id });
+            user.name = 'tx2';
+            await h.entityManager.save(user);
+          });
+        } finally {
+          tx2HasCommitted.reach();
+        }
+      })(),
     ]);
 
     const rejected = results.filter((r) => r.status === 'rejected');
@@ -80,7 +134,10 @@ describe('TypeOrmTransactionAdapter (integration, Postgres via testcontainers)',
     const reason = rejected[0] as PromiseRejectedResult;
     expect(String(reason.reason)).toMatch(/serializ|could not serialize/i);
 
-    // Exactly one update won.
+    // Exactly one update won. Which one is left open on purpose: the
+    // ordering above makes tx1 the loser under Postgres's
+    // first-updater-wins rule, but the guarantee under test is that one
+    // side is refused rather than that a particular side is.
     const user = await ctx.dataSource.getRepository(TestUser).findOneByOrFail({ id: seeded.id });
     expect(['tx1', 'tx2']).toContain(user.name);
   });
