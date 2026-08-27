@@ -88,6 +88,6 @@
     "testcontainers": "^12.1.0",
     "ts-jest": "^29.4.12",
     "typeorm": "^1.1.0",
-    "typescript": "^5.5.4"
+    "typescript": "^6.0.3"
   }
 }
