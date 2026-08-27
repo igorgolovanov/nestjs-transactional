@@ -23,6 +23,18 @@ updates:
       # to what the examples declare — see the `examples` job in ci.yml.
       # A bot bumping this silently would break the matrix's meaning.
       - dependency-name: typeorm
+      # `typeorm` declares `ioredis` as an optional peer at `^5.0.4`, and
+      # `.npmrc` sets `auto-install-peers`, so pnpm materialises that peer
+      # for every importer that pulls TypeORM. Because pnpm encodes peers
+      # into package identity, an importer on a different major gets its
+      # own `typeorm@x(ioredis@y)` instance — two `DataSource` classes,
+      # and `getDataSourceToken()` uses the class itself as the DI token.
+      # The install stays quiet about it (`strict-peer-dependencies` is
+      # off) and the failure surfaces much later as an unresolvable
+      # provider. Majors stay out until TypeORM widens the range; minors
+      # and patches still come through.
+      - dependency-name: ioredis
+        update-types: ['version-update:semver-major']
       # Peer-range decisions, not upgrades. Widening a peer range is a
       # published-API change that needs a changeset and a compatibility
       # argument (ADR-004), which is not something to accept from a bot.
