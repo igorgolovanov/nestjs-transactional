@@ -35,6 +35,16 @@ updates:
       # and patches still come through.
       - dependency-name: ioredis
         update-types: ['version-update:semver-major']
+      # The major here has to match `engines.node`, which every published
+      # package sets to `>=22.11.0`. On @types/node 22 the compiler
+      # refuses an API that Node 22 does not have; on 26 it accepts one
+      # and the call fails at runtime for anyone honouring the declared
+      # floor. Nothing else in CI covers that: `Type check` uses whatever
+      # is installed, and the Node 22 test legs only notice an API a test
+      # actually executes. Raise this together with `engines.node` and
+      # `.nvmrc`, as a deliberate major, not as a bot bump.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
       # Peer-range decisions, not upgrades. Widening a peer range is a
       # published-API change that needs a changeset and a compatibility
       # argument (ADR-004), which is not something to accept from a bot.
