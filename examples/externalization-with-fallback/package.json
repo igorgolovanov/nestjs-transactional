@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.2.1",
-    "@testcontainers/postgresql": "^10.13.0",
+    "@testcontainers/postgresql": "^12.1.0",
     "@types/amqplib": "^0.10.5",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
