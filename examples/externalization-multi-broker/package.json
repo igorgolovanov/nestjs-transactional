@@ -22,7 +22,7 @@
     "@nestjs/typeorm": "^11.0.3",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.4",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.11.1",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
