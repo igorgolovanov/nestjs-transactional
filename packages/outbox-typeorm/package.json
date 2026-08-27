@@ -80,7 +80,7 @@
     "@nestjs/cqrs": "^11.0.0",
     "@nestjs/testing": "^11.2.1",
     "@nestjs/typeorm": "^11.0.3",
-    "@testcontainers/postgresql": "^10.13.0",
+    "@testcontainers/postgresql": "^12.1.0",
     "@types/jest": "^30.0.0",
     "jest": "^30.4.2",
     "reflect-metadata": "^0.2.2",
