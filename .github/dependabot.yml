@@ -64,6 +64,17 @@ updates:
     directory: '/'
     schedule:
       interval: weekly
+    ignore:
+      # Every other action this repository uses appears in `ci.yml`, so a
+      # bump is exercised by the pull request that proposes it.
+      # `changesets/action` is the exception: it lives only in
+      # `release.yml`, which runs on push to main, so its bumps land
+      # green and break afterwards. v1 to v2 renamed every input and
+      # output used here and failed six release runs before it was
+      # noticed. Majors want a human reading the changelog; minors and
+      # patches still come through.
+      - dependency-name: changesets/action
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: ci
       include: scope
