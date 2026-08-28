@@ -70,10 +70,21 @@ jobs:
         id: changesets
         uses: changesets/action@v2
         with:
-          version: pnpm changeset:version
-          publish: pnpm release
-          commit: 'chore(release): version packages'
-          title: 'chore(release): version packages'
+          # v2 renamed every input this step passes (`version`,
+          # `publish`, `commit`, `title`) and fails the job outright on
+          # the old names. `commit-message` and `pr-title` also have to
+          # be restated: their v2 defaults are both `Version Packages`,
+          # which commitlint rejects on this repository.
+          version-script: pnpm changeset:version
+          publish-script: pnpm release
+          commit-message: 'chore(release): version packages'
+          pr-title: 'chore(release): version packages'
+          # v1 pushed with the Git CLI and had no way not to; v2 defaults
+          # to the GitHub API instead, which signs the release commit and
+          # tags with GitHub's GPG key. That is a behaviour change to make
+          # deliberately, not to inherit from a bot's version bump, and
+          # this pipeline cannot be rehearsed before it runs for real.
+          push-with-git-cli: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # `actions/setup-node@v4` with `registry-url:` generates an
@@ -97,12 +108,20 @@ jobs:
       #   2. Per-version skip on missing prerelease segment (no `-` in the
       #      semver) — safety net for mixed publishes or a misconfigured
       #      pre-exit.
+      #
+      # `published-packages` is the v2 spelling; v1 called it
+      # `publishedPackages`. An unknown output resolves to the empty
+      # string rather than failing, so the old name would leave
+      # `PUBLISHED` empty and this loop would re-tag nothing while the
+      # job still reported success. The index syntax is required, not
+      # stylistic: in an expression `outputs.published-packages` parses
+      # as a subtraction of two undefined properties.
       - name: Tag pre-releases as alpha
         if: steps.changesets.outputs.published == 'true' && hashFiles('.changeset/pre.json') != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED: ${{ steps.changesets.outputs['published-packages'] }}
         run: |
           echo "$PUBLISHED" | jq -c '.[]' | while read -r pkg; do
             name=$(echo "$pkg" | jq -r '.name')
