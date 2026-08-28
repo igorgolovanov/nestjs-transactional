@@ -71,9 +71,9 @@
   },
   "devDependencies": {
     "@nestjs-transactional/core": "workspace:*",
-    "@nestjs/common": "^11.2.1",
-    "@nestjs/core": "^11.2.1",
-    "@nestjs/testing": "^11.2.1",
+    "@nestjs/common": "^11.2.3",
+    "@nestjs/core": "^11.2.3",
+    "@nestjs/testing": "^11.2.3",
     "@nestjs/typeorm": "^11.0.3",
     "@testcontainers/postgresql": "^12.1.0",
     "@types/jest": "^30.0.0",
