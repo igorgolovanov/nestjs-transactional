@@ -4,7 +4,11 @@
   "compilerOptions": {
     "noEmit": true,
     "composite": false,
-    "incremental": false
+    "incremental": false,
+
+    // ts-jest compiles the specs through this config, so it needs the
+    // jest globals on top of the base list.
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*", "test/**/*"]
 }

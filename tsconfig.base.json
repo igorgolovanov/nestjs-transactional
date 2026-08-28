@@ -3,8 +3,14 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+
+    // TypeScript 6 no longer pulls in every package under
+    // `node_modules/@types` on its own, so the ambient types each
+    // project needs are named explicitly. Configs that also compile
+    // specs add "jest" to this list.
+    "types": ["node"],
 
     "strict": true,
     "noImplicitReturns": true,
