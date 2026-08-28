@@ -82,12 +82,13 @@
     "@nestjs/typeorm": "^11.0.3",
     "@testcontainers/postgresql": "^12.1.0",
     "@types/jest": "^30.0.0",
+    "@types/node": "^22.0.0",
     "jest": "^30.4.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "testcontainers": "^12.1.0",
     "ts-jest": "^29.4.12",
     "typeorm": "^1.1.0",
-    "typescript": "^5.5.4"
+    "typescript": "^6.0.3"
   }
 }
