@@ -81,7 +81,7 @@
     "@types/sql.js": "^1.4.9",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "sql.js": "^1.11.0",
+    "sql.js": "^1.14.2",
     "testcontainers": "^12.1.0",
     "typeorm": "^1.1.0"
   }
