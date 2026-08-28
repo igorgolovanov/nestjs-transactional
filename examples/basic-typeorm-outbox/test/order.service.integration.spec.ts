@@ -151,17 +151,21 @@ describe('basic-typeorm-outbox (Postgres via testcontainers)', () => {
     await orders.placeOrder('o-3', 'carol@example.com', 1_000);
     await orders.placeOrder('o-4', 'dave@example.com', 2_000);
 
-    await waitFor(
-      () =>
-        shipping.handled.some((e) => e.orderId === 'o-3') &&
-        shipping.handled.some((e) => e.orderId === 'o-4'),
+    // Wait on the publication rows rather than on the handler flag.
+    // `shipping.handled` is appended to inside the handler, while the
+    // row moves to COMPLETED only after the handler returns and the
+    // worker writes the status back. Waiting on the flag and then
+    // asserting the status leaves exactly that window open, and CI
+    // landed in it.
+    await waitForPublications(
+      dataSource,
+      (rows) =>
+        rows.length === 2 && rows.every((r) => r.status === PublicationStatus.COMPLETED),
     );
 
+    // Both handlers have necessarily run by now: a row cannot reach
+    // COMPLETED without its handler returning first.
     const ids = shipping.handled.map((e) => e.orderId).sort();
     expect(ids).toEqual(['o-3', 'o-4']);
-
-    const completedRows = await dataSource.getRepository(EventPublicationEntity).find();
-    expect(completedRows).toHaveLength(2);
-    expect(completedRows.every((r) => r.status === PublicationStatus.COMPLETED)).toBe(true);
   });
 });
