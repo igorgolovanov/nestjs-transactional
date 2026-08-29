@@ -261,6 +261,18 @@ cqrs → (optional) typeorm → core → NestJS platform + Node builtins
 - `typeorm` does NOT import `@nestjs/cqrs`.
 - Reverse dependencies are forbidden and should fail code review.
 
+Every package declares what it imports, including type-only packages
+such as `@types/node`. Both of pnpm's hoists are disabled in `.npmrc`,
+so an undeclared import fails with `Cannot find module` rather than
+resolving to whatever copy another project happened to install. If a
+new import stops resolving, add it to that package's `package.json`
+instead of relying on the workspace root.
+
+A peer range that cannot be satisfied fails the install too, rather
+than printing a warning. When `pnpm install` reports
+`ERR_PNPM_PEER_DEP_ISSUES`, the two versions genuinely are
+incompatible; pick versions that agree instead of relaxing the setting.
+
 ## Testing strategy
 
 ### Per-package shape
