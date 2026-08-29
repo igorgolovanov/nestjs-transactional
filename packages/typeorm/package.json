@@ -52,7 +52,7 @@
     "clean": "rimraf dist *.tsbuildinfo coverage",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test:cov": "jest --config jest.coverage.config.js --coverage",
     "test:integration": "jest --config jest.integration.config.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",

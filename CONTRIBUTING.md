@@ -300,10 +300,21 @@ incompatible; pick versions that agree instead of relaxing the setting.
 ### Coverage gate
 
 Coverage is enforced, not aspirational. Each package declares a
-`coverageThreshold` in its `jest.config.js`, and the `coverage`
-job in CI runs `pnpm -r --filter './packages/*' test:cov` — a
-package that drops below its floor fails the build. Run it
-locally the same way before opening a PR.
+`coverageThreshold`, and the `coverage` job in CI runs
+`pnpm -r --filter './packages/*' test:cov` — a package that drops
+below its floor fails the build. Run it locally the same way before
+opening a PR.
+
+`typeorm` and `outbox-typeorm` keep their floors in
+`jest.coverage.config.js` rather than `jest.config.js`, because their
+coverage run includes the testcontainers suites. Both therefore need
+Docker for `test:cov`, though `pnpm test` stays Docker-free. Measuring
+without those suites was misleading: `outbox-typeorm` reported 62%
+statements and 31% branches where the real figures are 90% and 69%,
+because `src/module/` is exercised almost entirely from integration
+tests. The floors are set so that the gate cannot be satisfied by the
+unit suite alone; if the integration tests stop running, coverage
+fails rather than quietly passing.
 
 The floors are **baselines, not targets**: they were set from
 measured coverage when the gate was introduced and are meant to
