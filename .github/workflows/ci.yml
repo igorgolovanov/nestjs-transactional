@@ -228,6 +228,13 @@ jobs:
     # `coverageThreshold` gate — the enforcement behind the "coverage has
     # not dropped below baseline" quality gate, which was previously
     # unverifiable in CI.
+    #
+    # `typeorm` and `outbox-typeorm` measure coverage through
+    # `jest.coverage.config.js`, which includes their testcontainers
+    # suites, so this job needs Docker and takes about as long as the
+    # integration job. That cost buys numbers that mean something: with
+    # the integration tests excluded, `outbox-typeorm` reported 62 / 31
+    # against real figures of 90 / 69.
     steps:
       - name: Checkout
         uses: actions/checkout@v7

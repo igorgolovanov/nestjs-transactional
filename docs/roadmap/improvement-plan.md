@@ -432,6 +432,20 @@ suite uses) would have allowed a real in-memory database instead of a
 mocked `EntityManager`, but the outbox entities use Postgres-specific
 `timestamptz` columns, and adding a dependency needs sign-off.
 
+**Revised afterwards.** The floors above were measured through a test
+selection that excluded `*.integration.spec.ts`, which is most of what
+exercises `outbox-typeorm`: the gate saw 21 of its 55 tests and
+reported 62 / 31 / 42 / 61 against real figures of 90 / 69 / 83 / 90.
+`typeorm` and `outbox-typeorm` now measure coverage through a
+`jest.coverage.config.js` that includes those suites, and their floors
+are set so the gate cannot be satisfied without them. The four
+packages with no integration suite are unaffected.
+
+| Package | statements | branches | functions | lines |
+|---|---|---|---|---|
+| typeorm | 93 | 82 | 94 | 93 |
+| outbox-typeorm | 88 | 66 | 80 | 88 |
+
 ## Workstream C — Outbox production readiness
 
 ### C1. Graceful shutdown does not drain in-flight work — *shipped*

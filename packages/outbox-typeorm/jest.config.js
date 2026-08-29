@@ -13,17 +13,9 @@ module.exports = {
     // covers directly.
     '!src/migrations/**',
   ],
-  // Baseline floors, not targets. `src/module/` is deliberately included
-  // even though its coverage comes almost entirely from the
-  // testcontainers integration suite — the numbers stay honest about
-  // what the Docker-free suite actually exercises, and ratchet up as
-  // unit coverage grows (improvement plan, item B3).
-  coverageThreshold: {
-    global: {
-      statements: 60,
-      branches: 20,
-      functions: 40,
-      lines: 59,
-    },
-  },
+  // No `coverageThreshold` here on purpose. This config excludes the
+  // integration suite so `pnpm test` needs no Docker, and `src/module/`
+  // is exercised almost entirely from testcontainers, so gating on this
+  // selection reported roughly half the real coverage. The floors live
+  // in `jest.coverage.config.js`, which is what `test:cov` runs.
 };
