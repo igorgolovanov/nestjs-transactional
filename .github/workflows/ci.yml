@@ -25,6 +25,23 @@ jobs:
       - name: Check relative markdown links
         run: ./scripts/check-doc-links.sh
 
+  test-races:
+    name: Test races
+    runs-on: ubuntu-latest
+    # Same shape as `doc-links`: plain Node over `git ls-files`, no
+    # install and no build, so it fails in seconds. It catches integration
+    # specs that wait on a handler flag or an emit mock and then assert a
+    # publication's status, which the worker writes only after that call
+    # returns. Three separate debugging sessions have gone into that one
+    # mistake, including a green pull request that broke `main` once an
+    # unrelated bump shifted the timing.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check integration specs for status races
+        run: node ./scripts/check-test-races.js
+
   format:
     name: Format
     runs-on: ubuntu-latest
