@@ -33,7 +33,7 @@ docs corpus (20 ADRs, 24 DDs, tiered example library).
 |---|---|---|
 | A | Public API promises the implementation does not keep | yes |
 | B | No coverage governance (thresholds, CI reporting) | yes |
-| C | Outbox operational gaps (shutdown, retry, observability) | yes |
+| C | Outbox operational gaps (shutdown, retry, cleanup, delivery) | yes |
 | D | Infrastructure / ecosystem (CI breadth, ESM, community files) | deferred |
 
 ## Workstream A — API consistency for 1.0.0
@@ -556,7 +556,19 @@ recorded decision).
 specs including backoff timing and terminal-state transitions;
 operator APIs extended to query the terminal state.
 
-### C3. No observability: metrics, health, tracing — *needs DD/ADR*
+### C3. No observability: metrics, health, tracing — *deferred*
+
+**Not scheduled.** Telemetry is something each application wires to its
+own stack, and an outbox observer SPI here would be one more surface to
+keep stable for little that a project cannot already do. The pieces that
+make that possible are shipped: `TransactionObserver` and the
+`TRANSACTION_OBSERVERS` token in
+[`packages/core/src/observability/`](../../packages/core/src/observability/transaction-observer.ts)
+give a metrics exporter a binding point, and a publication's whole
+lifecycle is a row in the database that an operator can query directly.
+
+Revisit if a concrete need appears that those two do not cover. The
+original assessment follows, unchanged.
 
 No counters, gauges, histograms, health indicators, or spans anywhere
 in the outbox stack. Core already has an observer pattern

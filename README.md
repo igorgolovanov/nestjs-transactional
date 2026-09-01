@@ -218,10 +218,10 @@ picking a starting point.
 [stability policy](docs/adr/004-public-api-stability.md): breaking
 changes cost a major version and an ADR explaining why.
 
-Next up: observability hooks for the outbox worker, a scheduled cleanup
-job for completed publications, and broker-aware externalizers that
-close the delivery gap above. Prisma and MongoDB storage backends are
-unblocked by the adapter contract but unscheduled — the
+Next up: a scheduled cleanup job for completed publications, and
+broker-aware externalizers that close the delivery gap above. Prisma and
+MongoDB storage backends are unblocked by the adapter contract but
+unscheduled — the
 [improvement plan](docs/roadmap/improvement-plan.md) tracks all of it.
 
 ## Contributing

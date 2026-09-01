@@ -23,10 +23,12 @@ change to it into a reviewable diff, and `publint` plus
 `@arethetypeswrong/cli` verify that what consumers resolve from the
 published tarball matches.
 
-Scheduled after `1.0.0`: observability (C3), the scheduled cleanup job
-(C4) and broker-aware externalizers (C5) — see
-[`improvement-plan.md`](improvement-plan.md), which also records the
-post-alpha assessment this release came out of.
+Scheduled after `1.0.0`: the scheduled cleanup job (C4) and
+broker-aware externalizers (C5). An observability SPI for the outbox
+(C3) is deferred, since applications wire telemetry to their own stack
+and `TransactionObserver` already gives an exporter a binding point.
+See [`improvement-plan.md`](improvement-plan.md), which also records
+the post-alpha assessment this release came out of.
 
 ## Era 1 — Foundation (Phases 0–9)
 

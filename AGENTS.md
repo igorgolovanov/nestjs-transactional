@@ -288,8 +288,10 @@ up as a reviewable diff.
   governance, outbox production readiness) live in
   [`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md).
   Architectural items there (A1 `readOnly`/`timeout`, C2 retry
-  policy, C3 observability SPI, C5 broker-aware externalizers) start
-  as DD/ADR discussions.
+  policy, C5 broker-aware externalizers) start as DD/ADR discussions.
+  C3, an observability SPI for the outbox, is deferred: applications
+  wire telemetry to their own stack, and `TransactionObserver` already
+  gives an exporter a binding point.
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
   the six published packages to Trusted Publishing would let the
