@@ -135,6 +135,9 @@ OutboxModule.forRoot({
   // Automatic retry, off unless you ask for it. maxAttempts counts the
   // first delivery, so 3 means the original plus two retries.
   retry: { maxAttempts: 3, baseDelay: 1_000, factor: 2, maxDelay: 300_000 },
+  // Retention for COMPLETED publications, also off unless asked for.
+  // 0 = off, which leaves purging to you.
+  cleanup: { interval: 3_600_000, retention: 7 * 24 * 3_600_000, batchSize: 500 },
 });
 ```
 
@@ -147,6 +150,19 @@ otherwise an operator action. A publication that exhausts its attempts
 stays `FAILED`; there is no separate dead-letter state, and it remains
 visible and resubmittable
 ([DD-026](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/026-automatic-retry-policy.md)).
+
+Under the default `UPDATE` completion mode a delivered publication
+stays as an audit row and nothing removes it, so the table grows until
+someone purges it. `cleanup` puts that purge on a timer: each pass takes
+up to `batchSize` publications whose `completionDate` is older than
+`retention` and deletes them. The bound matters, because the first pass
+after enabling this on an existing deployment meets the table at its
+largest, and one unbounded `DELETE` there is a long transaction holding
+locks your writers need. Passes drain from the oldest end, so a job that
+cannot keep up still shrinks the backlog rather than stranding its tail.
+
+`completed.purge(olderThan)` is unchanged and remains the right tool for
+a deliberate one-shot bulk purge.
 
 Three injectable APIs for operators, matching Spring Modulith's:
 

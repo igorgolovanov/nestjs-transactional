@@ -173,7 +173,10 @@ export class TypeOrmEventPublicationRepository implements EventPublicationReposi
     const entities = await this.em.find(EventPublicationEntity, {
       where,
       ...(options?.limit !== undefined ? { take: options.limit } : {}),
-      order: { completionDate: 'DESC' },
+      // Oldest first, per the SPI contract: `limit` turns the order into
+      // a correctness property for the retention job, which has to drain
+      // from the old end of the table rather than the new one.
+      order: { completionDate: 'ASC' },
     });
     return entities.map(toDomain);
   }
