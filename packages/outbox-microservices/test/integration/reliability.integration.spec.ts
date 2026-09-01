@@ -9,7 +9,6 @@ import { Kafka } from 'kafkajs';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 
 import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';
-import { OUTBOX_MICROSERVICES_OPTIONS } from '../../src/types/options';
 
 /**
  * What `ClientProxy.emit()` actually guarantees, measured against real
