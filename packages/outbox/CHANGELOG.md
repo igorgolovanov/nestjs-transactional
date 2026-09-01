@@ -1,5 +1,62 @@
 # @nestjs-transactional/outbox
 
+## 1.1.0
+
+### Minor Changes
+
+- [#57](https://github.com/igorgolovanov/nestjs-transactional/pull/57) [`8f57523`](https://github.com/igorgolovanov/nestjs-transactional/commit/8f57523271654691de9e635b2e854c56e7319495) Thanks [@igorgolovanov](https://github.com/igorgolovanov)! - Scheduled retention for completed publications. `OutboxModule.forRoot({ cleanup: { interval, retention, batchSize } })` starts a per-dataSource job that deletes publications whose `completionDate` is older than the retention window. Off by default; `interval: 0` keeps it off, and `CompletedEventPublications.purge(...)` stays available for a one-shot purge.
+  
+  `EventPublicationRepository.findCompleted` now documents and guarantees oldest-first ordering, and both repositories were aligned to it. The order was previously unspecified: the TypeORM repository returned newest-first, the in-memory one returned insertion order, and no test pinned either. It becomes a contract because `limit` makes it one — a bounded retention pass reading newest-first would delete only recent rows and never reach the old ones. If you relied on `CompletedEventPublications.findAll(...)` returning newest-first, sort at the call site.
+
+- [#59](https://github.com/igorgolovanov/nestjs-transactional/pull/59) [`4ab3916`](https://github.com/igorgolovanov/nestjs-transactional/commit/4ab3916aa0ae503e42da1849745c6231162ff4fb) Thanks [@igorgolovanov](https://github.com/igorgolovanov)! - Correct what externalization actually guarantees, per transport
+  
+  ADR-016 recorded that `ClientProxy.emit()` cannot report broker
+  failures on any transport, and on that basis the real-broker test
+  suite was deleted and a "your messages may be silently dropped"
+  warning was placed at the top of the `outbox-microservices` README.
+  Re-measured against live Kafka and RabbitMQ, and read out of the
+  `@nestjs/microservices` source, that claim does not hold: an
+  unreachable broker rejects and marks the publication `FAILED`, a
+  reachable one delivers, and `emit()` resolves on a real
+  acknowledgement. Kafka settles `producer.send()` with `kafkajs`'
+  default `acks: -1`; RabbitMQ waits for a publisher confirm, which
+  `amqp-connection-manager` enables by default.
+  
+  The guarantee is transport-specific rather than absent, so the
+  documentation now carries a per-transport table instead of a blanket
+  warning. Two things that table surfaced, both worth acting on:
+  
+  - gRPC was listed as a supported externalization transport and has
+    never worked: `ClientGrpcProxy.dispatchEvent` throws
+    unconditionally.
+  - RabbitMQ publishes non-persistent by default, so a confirmed
+    message is still lost across a broker restart. Set
+    `persistent: true` in your `ClientsModule.register()` options. The
+    advice that was there before, to add a confirm channel, described
+    something that was already on.
+  
+  NATS core and TCP genuinely do not acknowledge, and that is now
+  stated plainly rather than being folded into a claim about every
+  transport.
+  
+  `@nestjs-transactional/outbox` gains one public export,
+  `describeThrown`, which renders an unknown thrown value as something
+  an operator can read. Broker clients reject with values that are not
+  `Error` instances, and the previous `String(err)` fallback rendered
+  RabbitMQ's rejections as `[object Object]` in the `failureReason`
+  field of a `FAILED` publication, which is exactly the field read when
+  deciding whether to resubmit. The externalizer now uses it at all
+  three sites. Third-party implementations of the public
+  `EVENT_EXTERNALIZER` SPI hit the same problem, which is why it is
+  exported rather than kept internal.
+  
+  The suite ADR-016 removed is restored as
+  `reliability.integration.spec.ts` and runs in CI against
+  testcontainers Kafka and RabbitMQ, so a future regression to silent
+  success fails a build instead of reaching a user.
+  
+  Full measurements and reasoning: ADR-021, superseding ADR-016.
+
 ## 1.0.0
 
 ### Minor Changes
