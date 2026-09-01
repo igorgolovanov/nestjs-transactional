@@ -167,8 +167,12 @@ Breaking changes: append `!` to the type (`feat(core)!: ...`) or put
   auto-completion matters)
 - **Never use `any`** without `@ts-expect-error` and a comment;
   prefer `unknown` plus type narrowing.
-  `@typescript-eslint/no-explicit-any` is `error` on non-test
-  code.
+  `@typescript-eslint/no-explicit-any` is `error` everywhere,
+  tests included. Where a test genuinely needs one — building a
+  fake `TypeOrmModule` whose shape only Nest's internals know —
+  suppress it on the line with
+  `// eslint-disable-next-line @typescript-eslint/no-explicit-any`,
+  so the exception is visible and countable.
 - **No emojis in code, comments, or docs** unless a user
   explicitly asks.
 - **No `console.log`** in production paths — use NestJS

@@ -11,10 +11,7 @@
  * decorator honest across refactors.
  */
 
-import {
-  type IOutboxEventHandler,
-  OutboxEventsHandler,
-} from '../src';
+import { type IOutboxEventHandler, OutboxEventsHandler } from '../src';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}
@@ -38,9 +35,9 @@ export class SingleEventHandler implements IOutboxEventHandler<OrderPlacedEvent>
 
 // 2. Short form with multiple events, narrowed generic to their union.
 @OutboxEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
-export class MultiEventHandler
-  implements IOutboxEventHandler<OrderPlacedEvent | OrderCancelledEvent>
-{
+export class MultiEventHandler implements IOutboxEventHandler<
+  OrderPlacedEvent | OrderCancelledEvent
+> {
   async handle(event: OrderPlacedEvent | OrderCancelledEvent): Promise<void> {
     void event;
   }
@@ -75,8 +72,7 @@ export class LooselyTypedHandler implements IOutboxEventHandler {
 
 // N1. Missing `handle` method.
 // @ts-expect-error — `implements` requires a `handle` method.
-export class MissingHandleHandler
-  implements IOutboxEventHandler<OrderPlacedEvent> {}
+export class MissingHandleHandler implements IOutboxEventHandler<OrderPlacedEvent> {}
 
 // N2. `handle` returning `void` (sync) instead of `Promise<void>`.
 //     `IOutboxEventHandler` is async-only — handlers run from the
@@ -89,9 +85,7 @@ export class SyncHandler implements IOutboxEventHandler<OrderPlacedEvent> {
 }
 
 // N3. `handle` returning a non-void-resolving Promise.
-export class WrongResolvedTypeHandler
-  implements IOutboxEventHandler<OrderPlacedEvent>
-{
+export class WrongResolvedTypeHandler implements IOutboxEventHandler<OrderPlacedEvent> {
   // @ts-expect-error — handle must resolve to void, not a string.
   async handle(event: OrderPlacedEvent): Promise<string> {
     void event;
@@ -105,7 +99,7 @@ export function assertsEmptyEventsThrows(): void {
     OutboxEventsHandler({ events: [] });
     throw new Error('unreachable');
   } catch (err) {
-    if (!(err instanceof Error) || !/at least one event type/.test(err.message)) {
+    if (!(err instanceof Error) || !err.message.includes('at least one event type')) {
       throw err;
     }
   }
@@ -117,7 +111,7 @@ export function assertsNoArgsThrows(): void {
     (OutboxEventsHandler as () => ClassDecorator)();
     throw new Error('unreachable');
   } catch (err) {
-    if (!(err instanceof Error) || !/at least one event type/.test(err.message)) {
+    if (!(err instanceof Error) || !err.message.includes('at least one event type')) {
       throw err;
     }
   }

@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Covers code, not prose: `packages/*/src/**/*.{ts,json}` plus the
+      # Covers code, not prose: `packages/*/{src,test}/**/*.{ts,json}` plus the
       # root `package.json` and `pnpm-workspace.yaml`. Root markdown and
       # everything under docs/ is hand-wrapped and excluded in
       # .prettierignore — Prettier rewrites those rather than tidying them.

@@ -7,10 +7,7 @@ import {
 import { DataSource } from 'typeorm';
 
 import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter';
-import {
-  getCurrentEntityManager,
-  isInTransaction,
-} from '../../src/helpers/get-entity-manager';
+import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager';
 import { TestUser } from '../shared/test-user.entity';
 
 async function createSqlJsDataSource(): Promise<DataSource> {

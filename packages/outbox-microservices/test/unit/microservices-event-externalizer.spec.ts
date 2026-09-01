@@ -1,10 +1,7 @@
 import { type InjectionToken, Logger } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 import { type ClientProxy } from '@nestjs/microservices';
-import {
-  ExternalizationError,
-  type ExternalizationMetadata,
-} from '@nestjs-transactional/outbox';
+import { ExternalizationError, type ExternalizationMetadata } from '@nestjs-transactional/outbox';
 import { Observable, of, throwError } from 'rxjs';
 
 import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';
@@ -71,9 +68,7 @@ describe('MicroservicesEventExternalizer', () => {
 
     emit = jest.fn().mockReturnValue(of(undefined));
     client = { emit } as unknown as ClientProxy;
-    resolveClient = jest
-      .fn<ClientProxy | null, ResolveClientArgs>()
-      .mockReturnValue(client);
+    resolveClient = jest.fn<ClientProxy | null, ResolveClientArgs>().mockReturnValue(client);
   });
 
   describe('externalize()', () => {
@@ -103,7 +98,10 @@ describe('MicroservicesEventExternalizer', () => {
     it('symbol client tokens are forwarded unchanged to ModuleRef.get', async () => {
       const externalizer = buildExternalizer({ defaultClient: SYMBOL_TOKEN }, resolveClient);
 
-      await externalizer.externalize(new OrderPlacedEvent('order-3'), metadataFor('OrderPlacedEvent'));
+      await externalizer.externalize(
+        new OrderPlacedEvent('order-3'),
+        metadataFor('OrderPlacedEvent'),
+      );
 
       expect(resolveClient).toHaveBeenCalledWith(SYMBOL_TOKEN, { strict: false });
     });

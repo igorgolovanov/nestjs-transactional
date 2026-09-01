@@ -55,7 +55,7 @@
     "test:integration": "jest --config jest.integration.config.js",
     "test:cov": "jest --coverage",
     "type-check": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\"",
+    "lint": "eslint .",
     "api:check": "api-extractor run",
     "api:update": "api-extractor run --local",
     "publish:check": "publint && attw --pack ."

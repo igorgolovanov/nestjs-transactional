@@ -1,5 +1,4 @@
 import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
-import { getDataSourceToken } from '@nestjs/typeorm';
 import {
   AggregateRoot,
   CommandBus,
@@ -8,6 +7,7 @@ import {
   type ICommandHandler,
 } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
   IntegrationEventsHandler,
@@ -168,7 +168,6 @@ describe('CQRS + outbox hybrid (integration, Postgres via testcontainers)', () =
   async function buildApp(): Promise<TestingModule> {
     const app = await Test.createTestingModule({
       imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

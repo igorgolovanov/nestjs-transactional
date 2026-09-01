@@ -1,16 +1,12 @@
 import { Global, Injectable, Module, type Provider } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { getDataSourceToken, getRepositoryToken, InjectRepository } from '@nestjs/typeorm';
 import {
   PropagationMode,
   TransactionManager,
   Transactional,
   TransactionalModule,
 } from '@nestjs-transactional/core';
-import {
-  getDataSourceToken,
-  getRepositoryToken,
-  InjectRepository,
-} from '@nestjs/typeorm';
-import { Test, type TestingModule } from '@nestjs/testing';
 import { Column, DataSource, Entity, PrimaryGeneratedColumn, Repository } from 'typeorm';
 
 import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
@@ -191,7 +187,6 @@ describe('Transparent transactional repositories — multi-DS', () => {
 
     moduleRef = await Test.createTestingModule({
       imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           { provide: getDataSourceToken('billing'), useValue: billingDs },

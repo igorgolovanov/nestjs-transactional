@@ -157,9 +157,9 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
       const del = jest.fn().mockResolvedValue({ affected: 1 });
       const completionDate = new Date('2020-02-02T00:00:00.000Z');
       entityManager({
-        findOne: jest.fn().mockResolvedValue(
-          entity({ status: PublicationStatus.COMPLETED, completionDate }),
-        ),
+        findOne: jest
+          .fn()
+          .mockResolvedValue(entity({ status: PublicationStatus.COMPLETED, completionDate })),
         save,
         delete: del,
       });

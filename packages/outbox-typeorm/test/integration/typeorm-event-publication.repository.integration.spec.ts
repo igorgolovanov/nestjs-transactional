@@ -1,12 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { Global, Module, type Provider } from '@nestjs/common';
-import { getDataSourceToken } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
-import {
-  TransactionManager,
-  TransactionalModule,
-} from '@nestjs-transactional/core';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { TransactionManager, TransactionalModule } from '@nestjs-transactional/core';
 import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
@@ -35,12 +32,14 @@ function buildFakeTypeOrmModule(providers: Provider[]): unknown {
   return FakeTypeOrmModule;
 }
 
-function seedInput(overrides: {
-  listenerId?: string;
-  eventType?: string;
-  serializedEvent?: string;
-  publicationDate?: Date;
-} = {}): {
+function seedInput(
+  overrides: {
+    listenerId?: string;
+    eventType?: string;
+    serializedEvent?: string;
+    publicationDate?: Date;
+  } = {},
+): {
   listenerId: string;
   eventType: string;
   serializedEvent: string;
@@ -72,7 +71,6 @@ describe('TypeOrmEventPublicationRepository (integration, Postgres via testconta
 
     module = await Test.createTestingModule({
       imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

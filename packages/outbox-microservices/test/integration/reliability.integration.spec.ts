@@ -44,10 +44,10 @@ function externalizerFor(token: string, client: unknown): MicroservicesEventExte
       throw new Error(`no provider for ${String(requested)}`);
     },
   };
-  return new MicroservicesEventExternalizer(
-    moduleRef as never,
-    { defaultClient: token, validateOnBootstrap: false } as never,
-  );
+  return new MicroservicesEventExternalizer(moduleRef as never, {
+    defaultClient: token,
+    validateOnBootstrap: false,
+  });
 }
 
 beforeAll(() => {
@@ -136,14 +136,19 @@ describe('externalization reliability (Kafka via testcontainers)', () => {
   let externalizer: MicroservicesEventExternalizer;
 
   beforeAll(async () => {
-    container = await new KafkaContainer('confluentinc/cp-kafka:7.6.0').withExposedPorts(9093).start();
+    container = await new KafkaContainer('confluentinc/cp-kafka:7.6.0')
+      .withExposedPorts(9093)
+      .start();
     broker = `${container.getHost()}:${container.getMappedPort(9093)}`;
 
     // Pre-create the topic so the test measures delivery rather than
     // auto-creation timing.
     const admin = new Kafka({ clientId: 'probe-admin', brokers: [broker], logLevel: 0 }).admin();
     await admin.connect();
-    await admin.createTopics({ topics: [{ topic: TOPIC, numPartitions: 1 }], waitForLeaders: true });
+    await admin.createTopics({
+      topics: [{ topic: TOPIC, numPartitions: 1 }],
+      waitForLeaders: true,
+    });
     await admin.disconnect();
 
     client = new ClientKafka({ client: { clientId: 'probe', brokers: [broker], logLevel: 0 } });
@@ -158,9 +163,11 @@ describe('externalization reliability (Kafka via testcontainers)', () => {
 
   it('delivers to a consumer that subscribed before the publish', async () => {
     const received: string[] = [];
-    const consumer = new Kafka({ clientId: 'probe-consumer', brokers: [broker], logLevel: 0 }).consumer(
-      { groupId: 'probe-group' },
-    );
+    const consumer = new Kafka({
+      clientId: 'probe-consumer',
+      brokers: [broker],
+      logLevel: 0,
+    }).consumer({ groupId: 'probe-group' });
     await consumer.connect();
     await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
     await consumer.run({

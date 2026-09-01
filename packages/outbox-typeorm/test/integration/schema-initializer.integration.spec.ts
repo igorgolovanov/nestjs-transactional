@@ -13,7 +13,7 @@ import {
 } from '../setup-testcontainers';
 
 async function tableExists(ctx: PostgresTestContext, table: string): Promise<boolean> {
-  const rows = await ctx.dataSource.query<Array<{ exists: string | null }>>(
+  const rows = await ctx.dataSource.query<{ exists: string | null }[]>(
     `SELECT to_regclass($1)::text AS exists`,
     [table],
   );
@@ -21,7 +21,7 @@ async function tableExists(ctx: PostgresTestContext, table: string): Promise<boo
 }
 
 async function listIndexes(ctx: PostgresTestContext, table: string): Promise<string[]> {
-  const rows = await ctx.dataSource.query<Array<{ indexname: string }>>(
+  const rows = await ctx.dataSource.query<{ indexname: string }[]>(
     `SELECT indexname FROM pg_indexes WHERE tablename = $1`,
     [table],
   );

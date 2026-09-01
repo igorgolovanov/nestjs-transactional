@@ -13,7 +13,7 @@ CHANGELOG.md
 # defeats the hand wrapping the rest of the file depends on.
 #
 # Formatting is therefore enforced on code, not on prose. What
-# `format:check` actually covers is `packages/*/src/**/*.{ts,json}` plus
-# the root `package.json` and `pnpm-workspace.yaml`.
+# `format:check` actually covers is `packages/*/{src,test}/**/*.{ts,json}`
+# plus the root `package.json` and `pnpm-workspace.yaml`.
 /*.md
 docs/
