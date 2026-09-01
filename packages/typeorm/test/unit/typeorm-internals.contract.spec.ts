@@ -75,7 +75,7 @@ describe('TypeORM internals contract (patching layer)', () => {
     // If TypeORM inlined the connection or captured the manager in the
     // constructor closure, patching `manager` would no longer redirect
     // anything.
-    const calls: Array<{ method: string; target: unknown }> = [];
+    const calls: { method: string; target: unknown }[] = [];
     const recordingManager = {
       save: (target: unknown) => {
         calls.push({ method: 'save', target });
@@ -113,9 +113,7 @@ describe('TypeORM internals contract (patching layer)', () => {
     // bound to the active manager. An own-instance method would escape
     // the wrap.
     expect(typeof EntityManager.prototype.getRepository).toBe('function');
-    expect(
-      Object.getOwnPropertyDescriptor(EntityManager.prototype, 'getRepository'),
-    ).toBeDefined();
+    expect(Object.getOwnPropertyDescriptor(EntityManager.prototype, 'getRepository')).toBeDefined();
   });
 
   it('exposes `extend` on `Repository.prototype` and builds the child through the constructor', () => {
@@ -128,9 +126,11 @@ describe('TypeORM internals contract (patching layer)', () => {
     const manager = { marker: 'extend-probe' } as unknown as EntityManager;
     const parent = new Repository(TestUser, manager, undefined);
 
-    const child = parent.extend({ custom(): string {
-      return 'ok';
-    } });
+    const child = parent.extend({
+      custom(): string {
+        return 'ok';
+      },
+    });
 
     expect(child).toBeInstanceOf(Repository);
     expect(child).not.toBe(parent);
@@ -164,8 +164,7 @@ describe('TypeORM internals contract (patching layer)', () => {
       // PropagationMode.NESTED on drivers that cannot do savepoints. If
       // the flag disappears the adapter falls back to permissive, so
       // this test is the only thing that would notice.
-      const support = (ds.driver as unknown as { transactionSupport?: unknown })
-        .transactionSupport;
+      const support = (ds.driver as unknown as { transactionSupport?: unknown }).transactionSupport;
 
       expect(['nested', 'simple', 'none']).toContain(support);
       // sqljs is SQLite-backed, which does support savepoints.

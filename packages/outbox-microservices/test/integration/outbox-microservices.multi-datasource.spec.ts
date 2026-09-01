@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
 import { type ClientProxy } from '@nestjs/microservices';
+import { Test, type TestingModule } from '@nestjs/testing';
 import {
   Transactional,
   TransactionalModule,
@@ -47,9 +47,9 @@ import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices
 // outbox package's own multi-DS spec.
 // ---------------------------------------------------------------------------
 
-class NamedFakeAdapter
-  implements TransactionAdapter<TransactionHandle & { id: string; adapterName: string }>
-{
+class NamedFakeAdapter implements TransactionAdapter<
+  TransactionHandle & { id: string; adapterName: string }
+> {
   readonly name = 'in-memory';
   constructor(readonly dataSourceName: string) {}
 
@@ -250,10 +250,7 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (verification)', (
     await billingProcessor.processBatch();
 
     expect(billingClient.emit).toHaveBeenCalledTimes(1);
-    expect(billingClient.emit).toHaveBeenCalledWith(
-      'billing-topic',
-      expect.any(BillingEvent),
-    );
+    expect(billingClient.emit).toHaveBeenCalledWith('billing-topic', expect.any(BillingEvent));
     expect(inventoryClient.emit).not.toHaveBeenCalled();
     expect(fallbackClient.emit).not.toHaveBeenCalled();
   });
@@ -299,14 +296,10 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (verification)', (
     expect(fallbackClient.emit).not.toHaveBeenCalled();
 
     expect(
-      (billingClient.emit.mock.calls as Array<[string, BillingEvent]>).map(
-        ([, e]) => e.invoiceId,
-      ),
+      (billingClient.emit.mock.calls as [string, BillingEvent][]).map(([, e]) => e.invoiceId),
     ).toEqual(['inv-9', 'inv-10']);
     expect(
-      (inventoryClient.emit.mock.calls as Array<[string, InventoryEvent]>).map(
-        ([, e]) => e.sku,
-      ),
+      (inventoryClient.emit.mock.calls as [string, InventoryEvent][]).map(([, e]) => e.sku),
     ).toEqual(['SKU-13']);
   });
 
@@ -403,4 +396,3 @@ describe('OutboxMicroservicesModule + multi-dataSource outbox (verification)', (
     ]);
   });
 });
-

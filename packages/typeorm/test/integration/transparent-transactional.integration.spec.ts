@@ -1,17 +1,17 @@
 import { Global, Injectable, Module, type Provider } from '@nestjs/common';
-import {
-  TransactionManager,
-  TransactionalModule,
-  Transactional,
-  PropagationMode,
-} from '@nestjs-transactional/core';
+import { Test, type TestingModule } from '@nestjs/testing';
 import {
   getDataSourceToken,
   InjectDataSource,
   InjectEntityManager,
   InjectRepository,
 } from '@nestjs/typeorm';
-import { Test, type TestingModule } from '@nestjs/testing';
+import {
+  TransactionManager,
+  TransactionalModule,
+  Transactional,
+  PropagationMode,
+} from '@nestjs-transactional/core';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
 import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
@@ -176,7 +176,6 @@ describe('Transparent transactional repositories (Postgres via testcontainers)',
         // providers under the standard `@nestjs/typeorm` tokens
         // (and inside a `@Global()` module so the
         // `TypeOrmTransactionalModule` child scope can see them).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           { provide: EntityManager, useValue: ctx.dataSource.manager },

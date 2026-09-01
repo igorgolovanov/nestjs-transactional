@@ -131,7 +131,7 @@ describe('TypeOrmTransactionAdapter (integration, Postgres via testcontainers)',
     expect(rejected).toHaveLength(1);
     expect(fulfilled).toHaveLength(1);
 
-    const reason = rejected[0] as PromiseRejectedResult;
+    const reason = rejected[0]!;
     expect(String(reason.reason)).toMatch(/serializ|could not serialize/i);
 
     // Exactly one update won. Which one is left open on purpose: the

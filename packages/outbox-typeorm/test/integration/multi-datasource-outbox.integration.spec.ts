@@ -1,6 +1,6 @@
 import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
-import { getDataSourceToken } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
   EventPublicationProcessor,
@@ -129,7 +129,6 @@ describe('OutboxTypeOrmModule multi-dataSource (integration, Postgres via testco
 
     app = await Test.createTestingModule({
       imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           { provide: getDataSourceToken('billing'), useValue: billingDs },

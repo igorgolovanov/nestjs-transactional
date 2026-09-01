@@ -62,9 +62,7 @@ describe('MicroservicesEventExternalizer — completion contract (ADR-021)', () 
 
     emit = jest.fn();
     const proxy = { emit } as unknown as ClientProxy;
-    resolveClient = jest
-      .fn<ClientProxy | null, ResolveClientArgs>()
-      .mockReturnValue(proxy);
+    resolveClient = jest.fn<ClientProxy | null, ResolveClientArgs>().mockReturnValue(proxy);
   });
 
   it('considers a synchronous `of(undefined)` completion a successful externalization', async () => {

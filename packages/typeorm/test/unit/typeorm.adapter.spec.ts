@@ -74,16 +74,16 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
     });
 
     it('forwards the isolation level to DataSource.transaction (underscore → space)', async () => {
-      const transactionCalls: Array<[unknown, unknown]> = [];
+      const transactionCalls: [unknown, unknown][] = [];
       const mockDataSource = {
         transaction: (
           isoOrRunner: unknown,
           maybeRunner?: (em: EntityManager) => Promise<unknown>,
         ) => {
           transactionCalls.push([isoOrRunner, maybeRunner]);
-          const runner = (
-            typeof isoOrRunner === 'function' ? isoOrRunner : maybeRunner
-          ) as (em: EntityManager) => Promise<unknown>;
+          const runner = (typeof isoOrRunner === 'function' ? isoOrRunner : maybeRunner) as (
+            em: EntityManager,
+          ) => Promise<unknown>;
           return runner({
             query: (): Promise<unknown> => Promise.resolve([]),
           } as unknown as EntityManager);
@@ -192,9 +192,9 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
           maybeRunner?: (em: EntityManager) => Promise<unknown>,
         ) => {
           isolationArg = isoOrRunner;
-          const runner = (
-            typeof isoOrRunner === 'function' ? isoOrRunner : maybeRunner
-          ) as (em: EntityManager) => Promise<unknown>;
+          const runner = (typeof isoOrRunner === 'function' ? isoOrRunner : maybeRunner) as (
+            em: EntityManager,
+          ) => Promise<unknown>;
           return runner({
             query: (sql: string): Promise<unknown> => {
               statements.push(sql);
@@ -341,9 +341,9 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
         const parent = await parentHandle();
         const restricted = withTransactionSupport('none');
 
-        await expect(restricted.runInSavepoint(parent, async () => undefined)).rejects.toMatchObject(
-          { code: 'ILLEGAL_TRANSACTION_STATE' },
-        );
+        await expect(
+          restricted.runInSavepoint(parent, async () => undefined),
+        ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSACTION_STATE' });
       });
 
       it('stays permissive when the driver does not report the capability', async () => {
@@ -353,9 +353,7 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
         const parent = await parentHandle();
         const unknown = withTransactionSupport(undefined);
 
-        await expect(
-          unknown.runInSavepoint(parent, async () => 'ran'),
-        ).resolves.toBe('ran');
+        await expect(unknown.runInSavepoint(parent, async () => 'ran')).resolves.toBe('ran');
       });
     });
   });

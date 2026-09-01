@@ -1,12 +1,9 @@
 import 'reflect-metadata';
 
-import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TransactionalModule } from '@nestjs-transactional/core';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
 import { TestUser } from '../shared/test-user.entity';

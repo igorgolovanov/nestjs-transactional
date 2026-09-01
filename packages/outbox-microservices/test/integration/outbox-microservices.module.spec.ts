@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
 import { type ClientProxy } from '@nestjs/microservices';
+import { Test, type TestingModule } from '@nestjs/testing';
 import {
   EVENT_EXTERNALIZER,
   type EventExternalizer,

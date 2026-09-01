@@ -1,6 +1,6 @@
 import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
-import { getDataSourceToken, InjectRepository } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { getDataSourceToken, InjectRepository } from '@nestjs/typeorm';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
   type IOutboxEventHandler,
@@ -134,7 +134,6 @@ describe('Outbox + business INSERT atomicity (Postgres via testcontainers)', () 
 
     app = await Test.createTestingModule({
       imports: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           {
@@ -199,9 +198,7 @@ describe('Outbox + business INSERT atomicity (Postgres via testcontainers)', () 
   it('rollback in @Transactional discards BOTH the business row AND the event_publication row', async () => {
     const svc = app.get(UserService);
 
-    await expect(
-      svc.createUserWithEventThenThrow('u-2', 'bob'),
-    ).rejects.toThrow('forced rollback');
+    await expect(svc.createUserWithEventThenThrow('u-2', 'bob')).rejects.toThrow('forced rollback');
 
     const users = await ctx.dataSource.getRepository(AtomicityUser).find();
     const publications = await ctx.dataSource.getRepository(EventPublicationEntity).find();
@@ -216,9 +213,9 @@ describe('Outbox + business INSERT atomicity (Postgres via testcontainers)', () 
     const svc = app.get(UserService);
 
     await svc.createUserWithEvent('u-3', 'charlie');
-    await expect(
-      svc.createUserWithEventThenThrow('u-4', 'dani'),
-    ).rejects.toThrow('forced rollback');
+    await expect(svc.createUserWithEventThenThrow('u-4', 'dani')).rejects.toThrow(
+      'forced rollback',
+    );
     await svc.createUserWithEvent('u-5', 'eve');
 
     const users = await ctx.dataSource.getRepository(AtomicityUser).find();
@@ -227,7 +224,10 @@ describe('Outbox + business INSERT atomicity (Postgres via testcontainers)', () 
     expect(users.map((u) => u.id).sort()).toEqual(['u-3', 'u-5']);
     expect(publications).toHaveLength(2);
     expect(
-      publications.map((p) => JSON.parse(p.serializedEvent) as { userId: string }).map((e) => e.userId).sort(),
+      publications
+        .map((p) => JSON.parse(p.serializedEvent) as { userId: string })
+        .map((e) => e.userId)
+        .sort(),
     ).toEqual(['u-3', 'u-5']);
   });
 });

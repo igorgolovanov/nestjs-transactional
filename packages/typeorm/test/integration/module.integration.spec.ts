@@ -1,18 +1,15 @@
 import { Global, Injectable, Module, type Provider } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { getDataSourceToken, InjectDataSource } from '@nestjs/typeorm';
 import {
   ADAPTER_REGISTRY,
   type AdapterRegistry,
   TransactionalModule,
   TransactionManager,
 } from '@nestjs-transactional/core';
-import { getDataSourceToken, InjectDataSource } from '@nestjs/typeorm';
-import { Test, type TestingModule } from '@nestjs/testing';
 import type { DataSource } from 'typeorm';
 
-import {
-  getCurrentEntityManager,
-  isInTransaction,
-} from '../../src/helpers/get-entity-manager';
+import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager';
 import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
 import {
   createAdditionalDatabase,
@@ -100,7 +97,6 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
       moduleRef = await Test.createTestingModule({
         imports: [
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           buildFakeTypeOrmModule([
             { provide: getDataSourceToken(), useValue: ctx.dataSource },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,7 +159,6 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
       moduleRef = await Test.createTestingModule({
         imports: [
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           buildFakeTypeOrmModule([
             { provide: getDataSourceToken(), useValue: ctx.dataSource },
             { provide: getDataSourceToken('billing'), useValue: billingDs },
@@ -322,7 +317,6 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
       moduleRef = await Test.createTestingModule({
         imports: [
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           buildFakeTypeOrmModule([
             { provide: getDataSourceToken(), useValue: ctx.dataSource },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
