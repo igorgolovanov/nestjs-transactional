@@ -52,6 +52,9 @@ export class DataSourceOutboxPublisher {
 }
 
 // @public
+export const DEFAULT_CLEANUP_CONFIG: OutboxCleanupConfig;
+
+// @public
 export const DEFAULT_DRAIN_TIMEOUT_MS = 10000;
 
 // @public
@@ -394,6 +397,22 @@ export const OUTBOX_RETRY_CONFIG: unique symbol;
 // @public
 export const OUTBOX_STALENESS_CONFIG: unique symbol;
 
+// @public
+export interface OutboxCleanupConfig {
+    readonly batchSize: number;
+    readonly interval: number;
+    readonly retention: number;
+    readonly shutdownTimeout: number;
+}
+
+// @public
+export class OutboxCleanupScheduler {
+    constructor(repository: EventPublicationRepository, config: OutboxCleanupConfig);
+    runOnce(): Promise<number>;
+    start(): void;
+    stop(): Promise<void>;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "OutboxDataSourceNames" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal
@@ -473,6 +492,7 @@ export class OutboxModule {
 
 // @public
 export interface OutboxModuleAsyncFactoryResult {
+    readonly cleanup?: Partial<OutboxCleanupConfig>;
     // (undocumented)
     readonly completionMode?: CompletionMode;
     // (undocumented)
@@ -504,6 +524,7 @@ export interface OutboxModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'
 
 // @public
 export interface OutboxModuleOptions {
+    readonly cleanup?: Partial<OutboxCleanupConfig>;
     // (undocumented)
     readonly completionMode?: CompletionMode;
     readonly dataSource?: string;
@@ -523,6 +544,8 @@ export interface OutboxModuleOptions {
 
 // @public
 export interface OutboxProcessingBundle {
+    // (undocumented)
+    readonly cleanupSchedulers: readonly OutboxCleanupScheduler[];
     // (undocumented)
     readonly monitors: readonly StalenessMonitor[];
     // (undocumented)

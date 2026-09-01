@@ -146,6 +146,17 @@ export class InMemoryEventPublicationRepository implements EventPublicationRepos
       result = result.filter((p) => p.completionDate !== null && p.completionDate < olderThan);
     }
 
+    // Oldest first, per the SPI contract. Insertion order happened to be
+    // close enough until `limit` made the order a correctness property
+    // for the retention job. A publication still in `COMPLETED` without a
+    // completion date cannot be ordered, so it sorts last rather than
+    // being dropped.
+    result = [...result].sort((a, b) => {
+      const left = a.completionDate?.getTime() ?? Number.POSITIVE_INFINITY;
+      const right = b.completionDate?.getTime() ?? Number.POSITIVE_INFINITY;
+      return left - right;
+    });
+
     const limit = options?.limit;
     if (limit !== undefined) {
       result = result.slice(0, limit);

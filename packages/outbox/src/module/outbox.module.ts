@@ -25,6 +25,7 @@ import {
 } from '../dispatcher/processor-options';
 import { EVENT_EXTERNALIZER, type EventExternalizer } from '../externalization/event-externalizer';
 import { ExternalizationRegistry } from '../externalization/externalization-registry';
+import { OutboxCleanupScheduler } from '../recovery/outbox-cleanup-scheduler';
 import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
 import { StalenessMonitor } from '../recovery/staleness-monitor';
 import {
@@ -57,6 +58,7 @@ import {
   getOutboxListenerRegistryToken,
   getOutboxPublisherToken,
 } from '../tokens/token-utils';
+import { DEFAULT_CLEANUP_CONFIG, type OutboxCleanupConfig } from '../types/cleanup-config';
 import { CompletionMode } from '../types/completion-mode';
 import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config';
 import { DEFAULT_STALENESS_CONFIG, type StalenessConfig } from '../types/staleness-config';
@@ -100,6 +102,8 @@ export interface OutboxModuleOptions {
   readonly staleness?: Partial<StalenessConfig>;
   /** Automatic retry policy for FAILED publications (DD-026). Off unless `maxAttempts > 0`. */
   readonly retry?: Partial<OutboxRetryConfig>;
+  /** Retention policy for COMPLETED publications (C4). Off unless `interval > 0`. */
+  readonly cleanup?: Partial<OutboxCleanupConfig>;
   readonly republishOnStartup?: boolean;
   readonly startupBatchSize?: number;
   readonly completionMode?: CompletionMode;
@@ -129,6 +133,8 @@ export interface OutboxModuleAsyncFactoryResult {
   readonly staleness?: Partial<StalenessConfig>;
   /** Automatic retry policy for FAILED publications (DD-026). Off unless `maxAttempts > 0`. */
   readonly retry?: Partial<OutboxRetryConfig>;
+  /** Retention policy for COMPLETED publications (C4). Off unless `interval > 0`. */
+  readonly cleanup?: Partial<OutboxCleanupConfig>;
   readonly republishOnStartup?: boolean;
   readonly startupBatchSize?: number;
   readonly completionMode?: CompletionMode;
@@ -174,6 +180,7 @@ export interface OutboxProcessingBundle {
   readonly processors: readonly EventPublicationProcessor[];
   readonly monitors: readonly StalenessMonitor[];
   readonly retrySchedulers: readonly OutboxRetryScheduler[];
+  readonly cleanupSchedulers: readonly OutboxCleanupScheduler[];
   readonly recoveryServices: readonly StartupRecoveryService[];
 }
 
@@ -187,6 +194,7 @@ interface OutboxRegistrationRecord {
   readonly processorOptions: EventPublicationProcessorOptions;
   readonly stalenessConfig: StalenessConfig;
   readonly retryConfig: OutboxRetryConfig;
+  readonly cleanupConfig: OutboxCleanupConfig;
   readonly recoveryOptions: OutboxRecoveryOptions;
 }
 
@@ -210,6 +218,12 @@ function resolveStalenessConfig(staleness: Partial<StalenessConfig> | undefined)
 
 function resolveRetryConfig(retry: Partial<OutboxRetryConfig> | undefined): OutboxRetryConfig {
   return { ...DEFAULT_RETRY_CONFIG, ...retry };
+}
+
+function resolveCleanupConfig(
+  cleanup: Partial<OutboxCleanupConfig> | undefined,
+): OutboxCleanupConfig {
+  return { ...DEFAULT_CLEANUP_CONFIG, ...cleanup };
 }
 
 function resolveRecoveryOptions(
@@ -308,6 +322,7 @@ export class OutboxModule {
       options.startupBatchSize,
     );
     const retryCfg = resolveRetryConfig(options.retry);
+    const cleanupCfg = resolveCleanupConfig(options.cleanup);
 
     this.registrations.set(ds, {
       dataSource: ds,
@@ -315,6 +330,7 @@ export class OutboxModule {
       stalenessConfig: stalenessCfg,
       recoveryOptions: recoveryOpts,
       retryConfig: retryCfg,
+      cleanupConfig: cleanupCfg,
     });
 
     const providers: Provider[] = [
@@ -326,6 +342,7 @@ export class OutboxModule {
         stalenessCfg,
         recoveryOpts,
         retryCfg,
+        cleanupCfg,
       ),
     ];
     const exportTokens: InjectionToken[] = [...perDataSourceExports(ds)];
@@ -399,6 +416,7 @@ export class OutboxModule {
       stalenessConfig: resolveStalenessConfig(undefined),
       recoveryOptions: resolveRecoveryOptions(undefined, undefined),
       retryConfig: resolveRetryConfig(undefined),
+      cleanupConfig: resolveCleanupConfig(undefined),
     });
 
     const asyncToken = ASYNC_OPTIONS_TOKEN(ds);
@@ -423,6 +441,8 @@ export class OutboxModule {
     const recoveryOptionsToken = perDsRecoveryOptionsToken(ds);
     const retryToken = perDsRetrySchedulerToken(ds);
     const retryConfigToken = perDsRetryConfigToken(ds);
+    const cleanupToken = perDsCleanupSchedulerToken(ds);
+    const cleanupConfigToken = perDsCleanupConfigToken(ds);
 
     const providers: Provider[] = [
       asyncOptionsProvider,
@@ -526,6 +546,21 @@ export class OutboxModule {
           // class-token one, which is bound to the default dataSource.
           new OutboxRetryScheduler(new FailedEventPublications(repo), cfg),
         inject: [repositoryToken, retryConfigToken],
+      },
+
+      {
+        provide: cleanupConfigToken,
+        useFactory: (opts: OutboxModuleAsyncFactoryResult): OutboxCleanupConfig =>
+          resolveCleanupConfig(opts.cleanup),
+        inject: [asyncToken],
+      },
+      {
+        provide: cleanupToken,
+        useFactory: (
+          repo: EventPublicationRepository,
+          cfg: OutboxCleanupConfig,
+        ): OutboxCleanupScheduler => new OutboxCleanupScheduler(repo, cfg),
+        inject: [repositoryToken, cleanupConfigToken],
       },
 
       {
@@ -668,6 +703,12 @@ function perDsRetrySchedulerToken(ds: string): string {
 function perDsRetryConfigToken(ds: string): string {
   return `${ds}OutboxRetryConfig`;
 }
+function perDsCleanupSchedulerToken(ds: string): string {
+  return `${ds}OutboxCleanupScheduler`;
+}
+function perDsCleanupConfigToken(ds: string): string {
+  return `${ds}OutboxCleanupConfig`;
+}
 
 function buildPerDataSourceProviders(
   ds: string,
@@ -677,6 +718,7 @@ function buildPerDataSourceProviders(
   stalenessCfg: StalenessConfig,
   recoveryOpts: OutboxRecoveryOptions,
   retryCfg: OutboxRetryConfig,
+  cleanupCfg: OutboxCleanupConfig,
 ): Provider[] {
   const eventTypeRegistryToken = getEventTypeRegistryToken(ds);
   const repositoryToken = getEventPublicationRepositoryToken(ds);
@@ -693,6 +735,8 @@ function buildPerDataSourceProviders(
   const recoveryOptionsToken = perDsRecoveryOptionsToken(ds);
   const retryToken = perDsRetrySchedulerToken(ds);
   const retryConfigToken = perDsRetryConfigToken(ds);
+  const cleanupToken = perDsCleanupSchedulerToken(ds);
+  const cleanupConfigToken = perDsCleanupConfigToken(ds);
 
   return [
     {
@@ -781,6 +825,16 @@ function buildPerDataSourceProviders(
       inject: [repositoryToken, retryConfigToken],
     },
 
+    { provide: cleanupConfigToken, useValue: cleanupCfg },
+    {
+      provide: cleanupToken,
+      useFactory: (
+        repo: EventPublicationRepository,
+        cfg: OutboxCleanupConfig,
+      ): OutboxCleanupScheduler => new OutboxCleanupScheduler(repo, cfg),
+      inject: [repositoryToken, cleanupConfigToken],
+    },
+
     { provide: recoveryOptionsToken, useValue: recoveryOpts },
     // StartupRecoveryService for non-default dataSources alias to the
     // class-token instance registered by the default-DS forRoot. The
@@ -838,6 +892,7 @@ function buildDefaultDataSourceAliases(): Provider[] {
     { provide: EventPublicationProcessor, useExisting: getEventPublicationProcessorToken(ds) },
     { provide: StalenessMonitor, useExisting: perDsStalenessMonitorToken(ds) },
     { provide: OutboxRetryScheduler, useExisting: perDsRetrySchedulerToken(ds) },
+    { provide: OutboxCleanupScheduler, useExisting: perDsCleanupSchedulerToken(ds) },
     { provide: OUTBOX_PROCESSOR_OPTIONS, useExisting: perDsProcessorOptionsToken(ds) },
     { provide: OUTBOX_STALENESS_CONFIG, useExisting: perDsStalenessConfigToken(ds) },
     { provide: OUTBOX_RETRY_CONFIG, useExisting: perDsRetryConfigToken(ds) },
@@ -936,6 +991,9 @@ function buildProcessingBundleProvider(moduleClass: typeof OutboxModule): Provid
         },
         get retrySchedulers(): readonly OutboxRetryScheduler[] {
           return dsNames.map((ds) => get<OutboxRetryScheduler>(perDsRetrySchedulerToken(ds)));
+        },
+        get cleanupSchedulers(): readonly OutboxCleanupScheduler[] {
+          return dsNames.map((ds) => get<OutboxCleanupScheduler>(perDsCleanupSchedulerToken(ds)));
         },
         get recoveryServices(): readonly StartupRecoveryService[] {
           return dsNames.map((ds) => get<StartupRecoveryService>(perDsStartupRecoveryToken(ds)));

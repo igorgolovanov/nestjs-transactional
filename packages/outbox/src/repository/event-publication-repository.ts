@@ -110,7 +110,18 @@ export interface EventPublicationRepository {
    */
   findStale(beforeDate: Date, statuses: PublicationStatus[]): Promise<EventPublication[]>;
 
-  /** Find all completed publications, with optional pagination / cutoff. */
+  /**
+   * Find all completed publications, with optional pagination / cutoff,
+   * ordered by `completionDate` **oldest first**.
+   *
+   * The ordering is part of the contract because `limit` makes it one.
+   * A retention job asks for a bounded page and deletes it; if the page
+   * came back newest-first, a job that cannot keep up with the
+   * completion rate would delete only the recent rows and never reach
+   * the old ones, which is the exact opposite of what a retention window
+   * promises. Draining from the oldest end degrades correctly instead:
+   * falling behind shrinks the backlog, it does not strand its tail.
+   */
   findCompleted(options?: FindCompletedOptions): Promise<EventPublication[]>;
 
   /**

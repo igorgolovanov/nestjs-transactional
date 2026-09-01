@@ -46,6 +46,11 @@ export class OutboxProcessingModule implements OnApplicationBootstrap, OnApplica
     for (const scheduler of this.bundle.retrySchedulers) {
       scheduler.start();
     }
+    // Likewise a no-op unless `cleanup.interval > 0` (C4) — retention
+    // of completed publications is opt-in, and stays manual otherwise.
+    for (const scheduler of this.bundle.cleanupSchedulers) {
+      scheduler.start();
+    }
   }
 
   /**
@@ -69,6 +74,7 @@ export class OutboxProcessingModule implements OnApplicationBootstrap, OnApplica
       ...this.bundle.processors.map((processor) => processor.stop()),
       ...this.bundle.monitors.map((monitor) => monitor.stop()),
       ...this.bundle.retrySchedulers.map((scheduler) => scheduler.stop()),
+      ...this.bundle.cleanupSchedulers.map((scheduler) => scheduler.stop()),
     ]);
   }
 }
