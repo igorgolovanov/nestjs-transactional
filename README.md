@@ -126,7 +126,7 @@ them changes code you have already written.
 | [`cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | Transactions for `@nestjs/cqrs` handlers, phase-aware event handlers, `AggregateRoot` integration |
 | [`outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | The Event Publication Registry: worker, retry, recovery, operator APIs |
 | [`outbox-typeorm`](packages/outbox-typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm) | Storage for the outbox — the `event_publication` tables, a repository, and a migration |
-| [`outbox-microservices`](packages/outbox-microservices) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices) | Forwarding events to Kafka, RabbitMQ, NATS, Redis, gRPC via `ClientProxy` |
+| [`outbox-microservices`](packages/outbox-microservices) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices) | Forwarding events to Kafka, RabbitMQ, MQTT, Redis, NATS via `ClientProxy` |
 
 ## Where the sharp edges are
 
@@ -143,11 +143,12 @@ These are documented, tested, and worth knowing before you adopt:
   approximated: Postgres' `statement_timeout` bounds each statement, not
   the transaction, so it would mean something quietly different from
   what it says.
-- **Broker delivery is fire-and-forget.** `ClientProxy.emit()` cannot
-  report that a broker rejected a message, so a publication can be
-  marked complete when nothing arrived. Native broker-aware
-  externalizers are the fix and are not written yet.
-  ([ADR-016](docs/adr/016-externalization-reliability-semantics.md))
+- **Broker acknowledgement depends on the transport.** Kafka and
+  RabbitMQ wait for a real acknowledgement, so a broker that is down
+  marks the publication failed and the retry machinery engages. NATS
+  core and TCP acknowledge nothing, and gRPC cannot be used for
+  externalization at all. Per-transport table and measurements:
+  ([ADR-021](docs/adr/021-externalization-acknowledgement-per-transport.md))
 - **No distributed transactions across dataSources.** That is a design
   decision, not a gap — cross-dataSource atomicity goes through the
   outbox.

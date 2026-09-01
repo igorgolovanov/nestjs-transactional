@@ -8,6 +8,7 @@ import {
 import { ModuleRef } from '@nestjs/core';
 import { type ClientProxy } from '@nestjs/microservices';
 import {
+  describeThrown,
   type EventExternalizer,
   ExternalizationError,
   type ExternalizationMetadata,
@@ -70,7 +71,7 @@ export class MicroservicesEventExternalizer implements EventExternalizer, OnAppl
         `Externalization configured with default client: ${formatToken(this.options.defaultClient)}`,
       );
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
+      const reason = describeThrown(err);
       throw new Error(
         `OutboxMicroservicesModule: defaultClient '${formatToken(this.options.defaultClient)}' ` +
           `is not registered in the DI container. Register the ClientProxy via ` +
@@ -99,7 +100,7 @@ export class MicroservicesEventExternalizer implements EventExternalizer, OnAppl
       client = this.resolveClient(clientToken);
     } catch (err) {
       const cause = err instanceof Error ? err : undefined;
-      const causeMessage = err instanceof Error ? err.message : String(err);
+      const causeMessage = describeThrown(err);
       throw new ExternalizationError(
         `ClientProxy '${formatToken(clientToken)}' not found in the DI container. ` +
           `Ensure it is registered via ClientsModule.register() / registerAsync(). ` +
@@ -129,7 +130,7 @@ export class MicroservicesEventExternalizer implements EventExternalizer, OnAppl
       );
     } catch (err) {
       const cause = err instanceof Error ? err : undefined;
-      const causeMessage = err instanceof Error ? err.message : String(err);
+      const causeMessage = describeThrown(err);
       throw new ExternalizationError(
         `Failed to publish ${metadata.eventType} to ${metadata.target}: ${causeMessage}`,
         metadata.eventType,

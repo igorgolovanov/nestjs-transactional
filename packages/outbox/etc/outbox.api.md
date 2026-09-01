@@ -67,6 +67,9 @@ export const DEFAULT_RETRY_CONFIG: OutboxRetryConfig;
 export const DEFAULT_STALENESS_CONFIG: StalenessConfig;
 
 // @public
+export function describeThrown(err: unknown): string;
+
+// @public
 export class DeserializationError extends OutboxError {
     // (undocumented)
     readonly code = "DESERIALIZATION_ERROR";

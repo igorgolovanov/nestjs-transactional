@@ -48,8 +48,8 @@ Out of scope, though still worth telling us about as ordinary issues:
   those to the project that owns the code;
 - the documented limitations in
   [`docs/known-limitations.md`](docs/known-limitations.md) and the
-  reliability gap recorded in
-  [ADR-016](docs/adr/016-externalization-reliability-semantics.md).
+  per-transport delivery guarantees recorded in
+  [ADR-021](docs/adr/021-externalization-acknowledgement-per-transport.md).
   These are known and deliberate, with rationale; a report that they
   exist will be closed with a pointer. A report that one of them is
   _worse than documented_ is very much in scope;

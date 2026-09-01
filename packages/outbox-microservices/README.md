@@ -10,27 +10,44 @@ Mark an event `@Externalized`, and once its local handlers have
 completed, [`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox)
 hands it to this package, which emits it over a `ClientProxy` you
 already configured. One implementation covers every transport
-`@nestjs/microservices` supports — Kafka, RabbitMQ, NATS, MQTT, Redis,
-gRPC, and custom strategies.
+`@nestjs/microservices` supports — Kafka, RabbitMQ, MQTT, Redis, NATS,
+and custom strategies. gRPC is the exception; see below.
 
-> ## Read this before production
->
-> `ClientProxy.emit()` cannot tell you whether the broker accepted the
-> message. Its Observable completes when the transport has *accepted the
-> handoff*, not when the broker has *durably acknowledged* — so a
-> `ClientKafka` pointed at an unreachable broker resolves successfully,
-> this package reports success, and the publication is finalised as
-> `COMPLETED` even though nothing was ever delivered.
->
-> Because the layer believes delivery succeeded, the outbox's retry,
-> staleness and resubmit machinery never engages: there is no `FAILED`
-> row to act on.
->
-> What the outbox still guarantees is crash-consistent **enqueueing**
-> and at-least-once delivery to **local** handlers. What it does not yet
-> guarantee, through `ClientProxy`, is at-least-once delivery to the
-> **broker**. Full analysis and the path forward:
-> [ADR-016](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/016-externalization-reliability-semantics.md).
+## What a successful publish means on your transport
+
+A publication is marked `COMPLETED` when `emit()` resolves, and what
+`emit()` waits for is not the same on every transport. Kafka and
+RabbitMQ wait for a real broker acknowledgement, so an unreachable
+broker marks the publication `FAILED` and the outbox's retry and
+resubmit machinery engages. NATS and TCP do not wait for anything.
+
+| Transport | `emit()` resolves when | Acknowledged by the broker? |
+| --- | --- | --- |
+| Kafka | `producer.send()` settles; `kafkajs` defaults to `acks: -1`, every in-sync replica | Yes |
+| RabbitMQ | the publisher confirm arrives (`amqp-connection-manager` enables confirms by default) | Yes, but set `persistent: true` |
+| MQTT | PUBACK at QoS 1 and above, immediately at QoS 0 | At QoS 1 and above |
+| Redis | the `PUBLISH` command replies | The server got it, but Redis pub/sub does not persist: only live subscribers receive it |
+| TCP | the message is written to the socket | No |
+| NATS | immediately: core `publish()` returns `void`, and the client resolves unconditionally | No |
+| gRPC | never: `dispatchEvent` throws `Method is not supported in gRPC mode` | Not usable for externalization |
+
+Two things worth acting on:
+
+- **RabbitMQ publishes non-persistent by default.** NestJS defaults
+  `persistent` to `false`, and RabbitMQ confirms a non-persistent
+  message without writing it to disk, so a broker restart loses it.
+  Pass `persistent: true` in your `ClientsModule.register()` options.
+- **NATS gives you no delivery signal at all.** Core NATS publish is
+  fire-and-forget by protocol. If you need a guarantee there, this
+  externalizer is not the right one; the `EVENT_EXTERNALIZER` SPI is
+  public and a JetStream-based implementation slots into the same
+  place.
+
+The outbox itself guarantees crash-consistent **enqueueing** and
+at-least-once delivery to **local** handlers regardless of transport.
+Measurements, the reading of each client's `dispatchEvent`, and what
+remains genuinely unguaranteed:
+[ADR-021](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/021-externalization-acknowledgement-per-transport.md).
 
 ## Install
 
@@ -97,34 +114,38 @@ publication, so a typo surfaces on deploy instead of in the middle of
 the night. Pass `validateOnBootstrap: false` to defer resolution if you
 register clients late.
 
-## Reducing the risk
+## Hardening the delivery
 
-Given the reliability gap above, three things help — in order of how
-much they buy you:
+The defaults are reasonable on Kafka and RabbitMQ. What is left is
+mostly about not weakening them, and about the consumer side.
 
-1. **Configure the proxy for stronger acknowledgement.** Kafka:
-   `producer.acks: 'all'` with `producer.idempotent: true`. RabbitMQ: a
-   confirm channel via `amqp-connection-manager`. NATS: JetStream with
-   explicit ack. This package reuses whatever you registered and does
-   not interfere.
-2. **Deduplicate on the consumer.** Track processed message ids on the
+1. **Do not configure the acknowledgement away.** Kafka `acks: 0`,
+   MQTT QoS 0, and RabbitMQ without `persistent: true` each give up a
+   guarantee you had for free. `producer.idempotent: true` on Kafka
+   additionally protects against duplicates from producer retries.
+   This package reuses whatever proxy you registered and does not
+   interfere with any of it.
+2. **Deduplicate on the consumer.** At-least-once means duplicates are
+   expected, not exceptional. Track processed message ids on the
    receiving side and alert on gaps. The listener id plus the event id
    is enough to identify a message.
-3. **Wait for broker-aware externalizers** if neither is workable. The
-   `EVENT_EXTERNALIZER` SPI is stable, and native producer-based
-   implementations will slot into the same place without changes on your
-   side.
+3. **Watch the `FAILED` publications.** A broker rejection now reaches
+   you as a `FAILED` row with a readable `failureReason`, which is what
+   `FailedEventPublications.resubmit` and the retry scheduler act on.
+   That path is only useful if someone is looking at it.
 
 ## Limitations
 
 - **Headers and `routingKey`** are accepted by `@Externalized` but not
   yet applied to the emitted payload.
-- **Delivery is fire-and-forget** by design — see the note at the top.
+- **gRPC cannot be used** as an externalization transport:
+  `ClientGrpcProxy.dispatchEvent` throws.
+- **NATS and TCP give no delivery signal** — see the table at the top.
 
 ## Documentation
 
 - [Getting started and full docs](https://github.com/igorgolovanov/nestjs-transactional#readme)
-- [Reliability semantics (ADR-016)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/016-externalization-reliability-semantics.md)
+- [Acknowledgement per transport (ADR-021)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/021-externalization-acknowledgement-per-transport.md)
 - [Externalization architecture (ADR-015)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/015-event-externalization-architecture.md)
 - [Architecture: event externalization](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/architecture/event-externalization.md)
 - Runnable examples:
