@@ -27,9 +27,11 @@ growing set of npm packages organised by concern.
   `TypeOrmEventPublicationRepository` with an atomic conditional-`UPDATE`
   claim (`tryClaim`), shipped migration, `OutboxTypeOrmModule` wiring.
 - **@nestjs-transactional/outbox-microservices** — event
-  externalization to brokers (Kafka, RabbitMQ, NATS, JMS, gRPC, ...) via
-  `@nestjs/microservices` `ClientProxy`. One package covers every transport
-  the upstream supports. Reliability caveat: see ADR-016.
+  externalization to brokers (Kafka, RabbitMQ, MQTT, Redis, NATS, ...) via
+  `@nestjs/microservices` `ClientProxy`. One package covers every usable
+  transport the upstream supports; gRPC is not one, its `dispatchEvent`
+  throws. What a successful publish acknowledges varies by transport: see
+  ADR-021.
 
 ### Future (not scheduled)
 
@@ -106,10 +108,11 @@ the Design Decisions list below.
 - **ADR-009**: Listener ID stability — [`docs/adr/009-listener-id-stability.md`](docs/adr/009-listener-id-stability.md)
 - **ADR-014**: Class-level handler API redesign — [`docs/adr/014-handler-api-redesign.md`](docs/adr/014-handler-api-redesign.md)
 - **ADR-015**: Event externalization architecture — [`docs/adr/015-event-externalization-architecture.md`](docs/adr/015-event-externalization-architecture.md)
-- **ADR-016**: Externalization reliability semantics — [`docs/adr/016-externalization-reliability-semantics.md`](docs/adr/016-externalization-reliability-semantics.md)
+- **ADR-016**: Externalization reliability semantics — [`docs/adr/016-externalization-reliability-semantics.md`](docs/adr/016-externalization-reliability-semantics.md) (superseded by ADR-021)
 - **ADR-018**: Multi-adapter architecture — [`docs/adr/018-multi-adapter-architecture.md`](docs/adr/018-multi-adapter-architecture.md)
 - **ADR-019**: OutboxModule multi-`forRoot` registration pattern — [`docs/adr/019-outbox-multi-forroot-pattern.md`](docs/adr/019-outbox-multi-forroot-pattern.md)
 - **ADR-020**: Prototype-level wrapping for CQRS handlers — [`docs/adr/020-prototype-level-cqrs-wrapping.md`](docs/adr/020-prototype-level-cqrs-wrapping.md)
+- **ADR-021**: What `ClientProxy.emit()` acknowledges, per transport — [`docs/adr/021-externalization-acknowledgement-per-transport.md`](docs/adr/021-externalization-acknowledgement-per-transport.md)
 
 Superseded / Skipped (number reserved, not reused):
 
@@ -299,16 +302,19 @@ up as a reviewable diff.
   per-package in npm's UI; configure each with GitHub repo +
   workflow filename. Low priority; current token works fine until
   rotation due.
-- **Real-broker integration tests for `outbox-microservices`** —
-  the unit specs use a mock `ClientProxy`; a future iteration
-  could spin up Kafka / RabbitMQ via testcontainers and exercise
-  the externalizer against a live broker. Anchor for that work
-  is `examples/externalization-with-fallback` which already runs
-  a docker-compose RabbitMQ.
-- Future phases (not scheduled): broker-aware externalizers
-  (native `kafkajs` / `amqplib` / `nats` under the same SPI from
-  DD-018 — closes the ADR-016 silent-success gap), `outbox-prisma`,
-  `outbox-mongodb`, OpenTelemetry integration, ESM dual packaging.
+- ~~**Real-broker integration tests for `outbox-microservices`**~~ —
+  *done.* `test/integration/reliability.integration.spec.ts` runs
+  against testcontainers Kafka and RabbitMQ in its own single-cell
+  `broker-integration` CI job. It exists because the claim it pins was
+  once recorded backwards: ADR-016 concluded from a failing experiment
+  that `emit()` can never report a broker failure, deleted this suite,
+  and put that in a published README. ADR-021 has the measurements.
+- Future phases (not scheduled): a NATS externalizer built on
+  JetStream's `PubAck` (core NATS `publish()` returns `void`, so it is
+  the one transport where a native adapter still buys something —
+  ADR-021 retired the Kafka and RabbitMQ half of that plan),
+  `outbox-prisma`, `outbox-mongodb`, OpenTelemetry integration, ESM
+  dual packaging.
 - **`1.0.0` stable progression**: done — the cohort has left
   pre-release mode (`pnpm changeset pre exit`) and versions to
   `1.0.0` under the `latest` dist-tag. Breaking changes from here

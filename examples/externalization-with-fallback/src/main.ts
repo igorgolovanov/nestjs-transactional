@@ -13,9 +13,12 @@ import { RefundLedgerHandler } from './refund-ledger.handler';
 import { RefundRequestedEvent } from './refund-requested.event';
 import { RefundService } from './refund.service';
 
-async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
+async function waitFor(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 10_000,
+): Promise<void> {
   const start = Date.now();
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() - start > timeoutMs) {
       throw new Error(`waitFor: timed out after ${timeoutMs} ms`);
     }
@@ -47,7 +50,7 @@ async function main(): Promise<void> {
   console.log('   The publication transitions to COMPLETED.');
   console.log('   Verify on RabbitMQ management UI: queue `refunds` should have a message.');
 
-  console.log('2) ADR-016 silent-success demo');
+  console.log('2) Broker down — the failure is surfaced, not swallowed');
   console.log('   ACTION REQUIRED — in another terminal, stop RabbitMQ:');
   console.log(
     '     docker-compose -f examples/externalization-with-fallback/docker-compose.yml stop rabbitmq',
@@ -58,15 +61,17 @@ async function main(): Promise<void> {
   await refunds.requestRefund('rf-2', 'order-2', 7_500);
   await waitFor(() => ledger.handled.some((e) => e.refundId === 'rf-2'));
   console.log('   ledger handled:', ledger.handled.map((e) => e.refundId));
+  console.log('   The local handler ran regardless of the broker (DD-019 ordering).');
 
-  // Give the externalizer a moment to "succeed" (it won't surface the
-  // unreachable broker — that's the whole point).
-  await new Promise((r) => setTimeout(r, 1_500));
-  console.log('   The publication for rf-2 ALSO transitions to COMPLETED.');
+  // RabbitMQ resolves `emit()` on a publisher confirm, so a stopped
+  // broker rejects and the publication lands in FAILED rather than
+  // being reported as delivered. ADR-021 has the measurements.
+  await waitFor(async () => (await failed.count()) > 0, 30_000);
+  const [failure] = await failed.findAll();
+  console.log(`   Publication for rf-2 is FAILED, reason: ${failure?.failureReason ?? '(none)'}`);
   console.log('   Verify on RabbitMQ management UI: queue `refunds` got NO new message.');
-  console.log('   This is the ADR-016 silent-success limitation in action.');
 
-  console.log('3) Recovery from a SURFACED failure');
+  console.log('3) Recovery — resubmit once the broker is back');
   console.log('   Restart the broker:');
   console.log(
     '     docker-compose -f examples/externalization-with-fallback/docker-compose.yml start rabbitmq',
@@ -74,14 +79,13 @@ async function main(): Promise<void> {
   console.log('   Press ENTER when ready...');
   await new Promise<void>((resolve) => process.stdin.once('data', () => resolve()));
 
-  // The visual demo can't easily simulate a thrown emit at the proxy
-  // level — the test does that via mocking. Instead just exercise
-  // the operator API to show it works.
   const failedCount = await failed.count();
   console.log(`   Currently ${failedCount} publications in FAILED state.`);
   if (failedCount > 0) {
     const resubmitted = await failed.resubmit();
     console.log(`   Resubmitted ${resubmitted} for retry.`);
+    await waitFor(async () => (await failed.count()) === 0, 30_000);
+    console.log('   The next poll delivered them; nothing left in FAILED.');
   } else {
     console.log('   Nothing to resubmit; see the integration test for the full failure flow.');
   }

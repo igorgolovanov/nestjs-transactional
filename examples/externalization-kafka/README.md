@@ -20,7 +20,7 @@ atomicity (DD-019) is preserved end-to-end.
 
 For multi-broker per-event routing see
 [`externalization-multi-broker`](../externalization-multi-broker).
-For the ADR-016 reliability limitation in action see
+For the FAILED-then-resubmit recovery path against a live broker see
 [`externalization-with-fallback`](../externalization-with-fallback).
 
 ## Prerequisites
@@ -82,17 +82,16 @@ handler succeeds and Kafka emit throws, the publication ALSO ends up
 
 ## Why the integration test mocks `ClientProxy`
 
-`@nestjs/microservices` `ClientProxy.emit()` does NOT propagate
-broker-side delivery failures (ADR-016). With an unreachable broker,
-`emit()` resolves successfully and the outbox publication finalises
-as `COMPLETED` regardless of whether the message landed. Real-broker
-integration tests therefore can't reliably distinguish "Kafka
-received the message" from "proxy queued it locally and dropped it"
-— they only verify the happy path, which mocked tests verify with
-deterministic timing and zero CI flakiness.
+Deterministic timing and no Kafka container per example run. What
+this example demonstrates is the wiring and the routing metadata,
+neither of which needs a real broker to be convincing.
 
-For end-to-end broker observation (and the documented limitation in
-action: stop the broker, observe `COMPLETED`) see
+The broker behaviour itself is measured elsewhere: the
+`outbox-microservices` package runs a testcontainers Kafka and
+RabbitMQ suite in CI, pinning that `emit()` resolves on a real
+acknowledgement and rejects when the broker is gone (ADR-021). For
+the FAILED-then-resubmit path against a live broker you can drive by
+hand, see
 [`externalization-with-fallback`](../externalization-with-fallback)
 and run its `pnpm start` demo.
 
@@ -106,10 +105,11 @@ and run its `pnpm start` demo.
 2. **Atomic rollback.** `placeOrderAndFail` does the same writes and
    throws. Neither row is persisted, the local handler never runs,
    Kafka never emits.
-3. **Externalizer failure surfacing.** When `KAFKA_CLIENT.emit` throws
-   (proxy-level rejection — distinct from ADR-016 silent broker
-   failure), the publication is marked `FAILED` with `failureReason`
-   set. The local handler still ran (DD-019 ordering).
+3. **Externalizer failure surfacing.** When `KAFKA_CLIENT.emit`
+   throws, the publication is marked `FAILED` with `failureReason`
+   set. The local handler still ran (DD-019 ordering). Against a real
+   Kafka this is what an unreachable broker produces, since
+   `producer.send()` rejects.
 4. **Per-event Kafka routing key + headers.**
    `@Externalized<OrderPlacedEvent>({ routingKey: e => e.orderId,
    headers: e => ({ ... }) })` derives partition affinity (Kafka
@@ -160,12 +160,11 @@ and run its `pnpm start` demo.
   This example uses it for one-shot demo simplicity; production
   runs the migration shipped with
   `@nestjs-transactional/outbox-typeorm`.
-- **`@nestjs/microservices` Kafka silent-success limitation
-  (ADR-016).** When the broker is unreachable, `emit()` resolves
-  successfully. The outbox cannot detect this and marks the
-  publication `COMPLETED`. See `externalization-with-fallback` for
-  mitigation patterns (consumer-side idempotency, broker-aware
-  externalizer iteration).
+- **Do not set `acks: 0` on the producer.** `kafkajs` defaults to
+  `acks: -1`, every in-sync replica, which is what makes `emit()`
+  reject when the message did not land. Setting it to 0 gives that
+  up, and the publication is then marked `COMPLETED` with no
+  guarantee behind it (ADR-021).
 - **Listener id stability.** Default `${ClassName}#${EventName}`
   rolls when you rename the handler class. This example pins
   `id: 'Shipping.createShipment'` so a future rename does not
@@ -182,12 +181,12 @@ and run its `pnpm start` demo.
 - [`externalization-multi-datasource`](../externalization-multi-datasource)
   — multi-DS + multi-broker, combined complexity.
 - [`externalization-with-fallback`](../externalization-with-fallback)
-  — ADR-016 limitation in action plus mitigation patterns
-  (`FailedEventPublications.resubmit`, consumer-side idempotency).
+  — what a `COMPLETED` publication proves, plus
+  `FailedEventPublications.resubmit` and consumer-side idempotency.
 
 ## Further reading
 
 - [ADR-015 — event externalization architecture](../../docs/adr/015-event-externalization-architecture.md)
-- [ADR-016 — externalization reliability semantics](../../docs/adr/016-externalization-reliability-semantics.md)
+- [ADR-021 — what `emit()` acknowledges, per transport](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
 - [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)
 - [Spring Modulith — event externalization reference](https://docs.spring.io/spring-modulith/reference/events.html#externalization)

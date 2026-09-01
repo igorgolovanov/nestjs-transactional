@@ -1,8 +1,8 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 /**
- * Inbox / dedup table for the consumer-side mitigation pattern from
- * ADR-016. Each row records that a publication id has been
+ * Inbox / dedup table for the consumer-side pattern. Each row
+ * records that a publication id has been
  * processed; `RefundConsumerService.process` checks this table
  * BEFORE doing the actual refund work, so a duplicate delivery
  * (broker redelivers, processor resubmits, network retry, ...) is

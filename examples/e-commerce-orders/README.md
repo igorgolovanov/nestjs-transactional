@@ -181,9 +181,9 @@ docker compose exec kafka kafka-console-consumer \
    orders marks failed AND inventory releases stock.
 4. **Externalization on terminal event only.** The internal saga
    events stay inside the system; only `OrderConfirmedEvent`
-   leaves on Kafka. ADR-016 silent-success applies — the test
-   asserts the emit happened with the right headers; whether the
-   broker acked is the broker's problem.
+   leaves on Kafka. The test mocks the proxy and asserts the emit
+   happened with the right headers; the real Kafka acknowledgement
+   path is measured in the `outbox-microservices` suite (ADR-021).
 5. **Idempotency at every cross-context handler.** Reservations
    keyed on `${orderId}:${sku}`, payments keyed on `orderId`,
    confirmations gated on `status = 'placed'`. Outbox at-least-

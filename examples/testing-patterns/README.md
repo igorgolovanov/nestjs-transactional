@@ -109,8 +109,9 @@ pnpm -C examples/testing-patterns test:integration
   pattern is documented in
   [`externalization-with-fallback`](../externalization-with-fallback)
   and the other Tier 3 externalization examples — the mock returns
-  `of(undefined)` from `emit()` so the framework's ADR-016 silent-
-  success behaviour is observable in the test.
+  `of(undefined)` from `emit()` for a delivered event and throws for
+  a failed one, which is enough to drive both publication outcomes
+  without a broker container.
 - **Multi-DataSource testing.** See
   [`multi-datasource-outbox`](../multi-datasource-outbox) for the
   testcontainers + multi-DB pattern (one container, two databases).

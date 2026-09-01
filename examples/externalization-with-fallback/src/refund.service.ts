@@ -11,9 +11,9 @@ import { RefundRequestedEvent } from './refund-requested.event';
  * Producer side. Single-unit atomicity (DD-019): refund row + event
  * publication row commit together. The worker then picks the
  * publication up and runs local handlers + externalization. Every
- * subsequent failure scenario in this example happens AFTER this
- * method returns successfully — the producer never knows whether
- * the broker actually received anything (ADR-016).
+ * failure scenario in this example happens AFTER this method
+ * returns: the broker is not contacted until the worker's next
+ * poll, so nothing about delivery can be inferred from this commit.
  */
 @Injectable()
 export class RefundService {

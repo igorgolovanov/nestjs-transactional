@@ -40,5 +40,7 @@ production use cases Spring Modulith targets.
 
 > See also: [ADR-015](../adr/015-event-externalization-architecture.md)
 > for the ADR-form record of the externalization architecture and
-> [ADR-016](../adr/016-externalization-reliability-semantics.md) for
-> the reliability caveat.
+> [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md)
+> for what a successful publish acknowledges on each transport. That
+> ADR also supersedes ADR-016, which recorded the opposite and was
+> wrong.

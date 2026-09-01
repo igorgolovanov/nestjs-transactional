@@ -7,7 +7,7 @@ import { ProcessedRefundEntity } from './processed-refunds.entity';
 import { RefundRequestedEvent } from './refund-requested.event';
 
 /**
- * Consumer-side template (ADR-016 mitigation strategy 2). In a real
+ * Consumer-side template. In a real
  * deployment this service would live in a different process and
  * receive `RefundRequestedEvent` from RabbitMQ via a
  * `@MessagePattern('refunds')` handler. Here it just exposes a

@@ -11,10 +11,13 @@ body:
         - [`docs/known-limitations.md`](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/known-limitations.md)
           — several behaviours that look like bugs are documented
           trade-offs, with the reasoning and the workaround.
-        - [ADR-016](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/016-externalization-reliability-semantics.md)
-          — if events are marked `COMPLETED` while your broker was
-          unreachable, that is the known silent-success gap, not a new
-          bug.
+        - [ADR-021](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/021-externalization-acknowledgement-per-transport.md)
+          — what a successful publish acknowledges on each transport.
+          On core NATS and TCP nothing is acknowledged, so a
+          `COMPLETED` publication proves little. On Kafka and RabbitMQ
+          it should be acknowledged, so if events are marked
+          `COMPLETED` while your broker was unreachable there, that is
+          a bug worth reporting.
 
   - type: textarea
     id: what-happened

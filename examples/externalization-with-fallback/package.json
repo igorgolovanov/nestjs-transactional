@@ -2,7 +2,7 @@
   "name": "@nestjs-transactional-examples/externalization-with-fallback",
   "version": "0.0.0",
   "private": true,
-  "description": "ADR-016 silent-success demonstration plus the three production mitigation patterns (consumer-side inbox dedup, FailedEventPublications.resubmit recovery)",
+  "description": "What a COMPLETED outbox publication does and does not prove, plus consumer-side inbox dedup and FailedEventPublications.resubmit recovery",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
