@@ -37,8 +37,9 @@ import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices
  * to add a `dataSource` option to `OutboxMicroservicesModule.forRoot`
  * for now).
  *
- * Mocked `ClientProxy` per ADR-016 — real-broker
- * integration is intentionally out of scope here.
+ * Mocked `ClientProxy`: what is under test is the dataSource-keyed
+ * wiring, not the transport. Real brokers are covered by
+ * `reliability.integration.spec.ts`.
  */
 
 // ---------------------------------------------------------------------------

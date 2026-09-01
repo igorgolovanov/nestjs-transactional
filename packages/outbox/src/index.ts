@@ -37,6 +37,9 @@ export type { ExternalizationMetadata } from './externalization/types';
 export type { EventExternalizer } from './externalization/event-externalizer';
 export { EVENT_EXTERNALIZER } from './externalization/event-externalizer';
 export { ExternalizationError } from './externalization/errors';
+// Exported because every externalizer implementation faces the same
+// problem: broker clients reject with values that are not `Error`s.
+export { describeThrown } from './externalization/describe-thrown';
 export {
   Externalized,
   getExternalizedMetadata,

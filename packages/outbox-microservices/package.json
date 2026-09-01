@@ -52,6 +52,7 @@
     "clean": "rimraf dist *.tsbuildinfo coverage",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:integration": "jest --config jest.integration.config.js",
     "test:cov": "jest --coverage",
     "type-check": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
@@ -74,11 +75,15 @@
     "@nestjs/core": "^11.2.3",
     "@nestjs/microservices": "^11.2.3",
     "@nestjs/testing": "^11.2.3",
+    "@testcontainers/kafka": "^12.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.1",
+    "amqplib": "^2.0.1",
     "jest": "^30.4.2",
+    "kafkajs": "^2.2.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "testcontainers": "^12.1.0",
     "ts-jest": "^29.4.12",
     "typescript": "^6.0.3"
   }

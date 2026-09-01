@@ -1,31 +1,24 @@
 /**
- * Documents — and pins — the reliability contract that
- * `MicroservicesEventExternalizer` actually inherits from
- * `@nestjs/microservices` `ClientProxy`. See
- * [docs/adr/016-externalization-reliability-semantics.md](../../../../docs/adr/016-externalization-reliability-semantics.md)
- * for the full discussion.
+ * Pins the one thing this externalizer decides on its own: a
+ * `ClientProxy.emit()` Observable that completes is a successful
+ * externalization, whatever it did or did not emit on the way. That is
+ * what the processor turns into a `COMPLETED` publication, so it is
+ * worth an explicit test rather than being implied by the happy path.
  *
- * **The contract**: `ClientProxy.emit()` returns an Observable that
- * completes when the proxy considers the dispatch handed off — for
- * Kafka, RabbitMQ, NATS, gRPC, ... this means *queued for transport*,
- * not necessarily *acknowledged by the broker*. With the producer in
- * a fire-and-forget configuration (the default) `emit()` can complete
- * without the message ever reaching a broker (broker unreachable,
- * cluster failover, configuration mistakes, ...).
+ * What a completion *proves* is the transport's business, not ours,
+ * and it is not uniform: Kafka settles `producer.send()` with
+ * `acks: -1`, RabbitMQ waits for a publisher confirm, NATS core
+ * resolves unconditionally because `publish()` returns `void`. The
+ * per-transport table and the live measurements are in
+ * [docs/adr/021-externalization-acknowledgement-per-transport.md](../../../../docs/adr/021-externalization-acknowledgement-per-transport.md),
+ * and the brokers that do acknowledge are covered by
+ * `test/integration/reliability.integration.spec.ts` against real
+ * containers.
  *
- * The externalizer faithfully wraps that Observable: it considers
- * the publication "delivered" the moment the Observable completes.
- * It can NOT detect a silent broker-side failure — there is no
- * signal at this layer to detect it from. Integration
- * testing surfaced this finding while attempting a "broker
- * unreachable → publication FAILED" assertion against testcontainers
- * Kafka; the publication transitioned to `COMPLETED` despite no
- * message landing on the topic.
- *
- * Tests below intentionally assert the silent-success behavior so
- * that any future change to that contract — for example a
- * broker-aware externalizer that issues a real round-trip — surfaces
- * here as an explicit behavioral diff.
+ * This file used to argue the opposite: that `emit()` can never report
+ * a broker failure, and that these mocks therefore documented a
+ * silent-success limitation. See ADR-016, superseded, for how that
+ * conclusion was reached and why it was wrong.
  */
 import { type InjectionToken, Logger } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
@@ -57,7 +50,7 @@ function metadataFor(eventType: string): ExternalizationMetadata {
   return { eventType, target: 'orders.placed' };
 }
 
-describe('MicroservicesEventExternalizer — silent-success contract (ADR-016)', () => {
+describe('MicroservicesEventExternalizer — completion contract (ADR-021)', () => {
   let emit: jest.Mock<Observable<unknown>>;
   let resolveClient: ResolveClientMock;
 
@@ -108,12 +101,12 @@ describe('MicroservicesEventExternalizer — silent-success contract (ADR-016)',
     ).resolves.toBeUndefined();
   });
 
-  it('models the silent-failure scenario: emit() completes without error even when the broker would not have received the message', async () => {
-    // What an unreachable-broker `ClientProxy.emit()` looks like to
-    // the externalizer in fire-and-forget mode: a completed Observable
-    // with no error signal. The externalizer faithfully reports
-    // success — pinning this behavior is the whole point of this
-    // file. ADR-016 lists the production mitigation strategies.
+  it('does not second-guess a completion: it reports success and subscribes exactly once', async () => {
+    // On a transport that acknowledges nothing (NATS core, TCP) this
+    // completion is all the externalizer will ever see, and it has no
+    // basis to treat it as anything but success. The assertion on the
+    // call count matters too: `emit()` returns a cold-ish Observable
+    // and a second subscription would publish the event twice.
     emit.mockReturnValue(of(undefined));
     const externalizer = buildExternalizer({ defaultClient: KAFKA_TOKEN }, resolveClient);
 

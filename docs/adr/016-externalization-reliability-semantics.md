@@ -1,14 +1,32 @@
 # ADR-016: Externalization reliability semantics with `@nestjs/microservices`
 
-- **Status**: Accepted (with documented limitation)
+- **Status**: Superseded by
+  [ADR-021](021-externalization-acknowledgement-per-transport.md)
 - **Date**: 2026-04-25
 - **Related**:
+  - ADR-021 (what `ClientProxy.emit()` actually acknowledges, per transport)
   - ADR-006 (outbox pattern rationale)
   - ADR-007 (outbox architecture: core + typeorm split)
   - DD-016 (event externalization scope and design)
   - DD-017 (reuse of `ClientsModule` for `ClientProxy` registration)
   - DD-018 (`EventExternalizer` SPI as a structural port)
   - DD-019 (single-unit atomicity and execution order)
+
+> ## Superseded: the central claim below is not true
+>
+> This ADR concluded from one failing experiment that
+> `ClientProxy.emit()` cannot report broker failures on any transport,
+> and everything it decided follows from that. The claim was
+> re-measured against live Kafka and RabbitMQ and read out of the
+> `@nestjs/microservices` source, and it does not hold: on both of
+> those transports an unreachable broker rejects, a reachable one
+> delivers, and `emit()` resolves on a real acknowledgement. What is
+> true is narrower and transport-specific.
+>
+> Read [ADR-021](021-externalization-acknowledgement-per-transport.md)
+> instead. This document is kept because how a single experiment became
+> a general claim, a README warning and a roadmap phase is worth being
+> able to read.
 
 > **Note (Phase 12 package rename, 2026-04-26):** Where this ADR refers
 > to `outbox-core`'s reliability machinery (retry, recovery, staleness

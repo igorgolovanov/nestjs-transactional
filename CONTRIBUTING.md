@@ -297,9 +297,13 @@ incompatible; pick versions that agree instead of relaxing the setting.
   the SQL and module wiring; `test/unit/` covers the Docker-free
   surface, above all the `affected`-count claim contract from
   DD-025 and the schema initializer's production-safety default.
-- **outbox-microservices** — unit tests with a mocked
-  `ClientProxy`, including the ADR-016 silent-success canary. No
-  real-broker suite exists (see ADR-016).
+- **outbox-microservices** — unit tests with a mocked `ClientProxy`
+  for the wiring and the completion contract, plus
+  `test/integration/reliability.integration.spec.ts` against
+  testcontainers Kafka and RabbitMQ. That suite owns the claim in
+  ADR-021 about what `emit()` acknowledges on each transport, and it
+  runs in its own `broker-integration` CI job rather than in the
+  TypeORM-matrixed one.
 
 ### Coverage gate
 

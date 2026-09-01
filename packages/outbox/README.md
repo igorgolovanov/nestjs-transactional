@@ -209,11 +209,14 @@ await assertable.doesNotContain(OrderCancelledEvent);
 `@Externalized` marks an event for forwarding after its local handlers
 complete. The `EVENT_EXTERNALIZER` SPI is transport-agnostic;
 `outbox-microservices` implements it over `@nestjs/microservices`.
-**Read that package's reliability note before relying on it in
-production** — `ClientProxy.emit()` cannot report broker-side failure,
-so a publication can be marked `COMPLETED` when nothing reached the
-broker
-([ADR-016](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/016-externalization-reliability-semantics.md)).
+
+A publication is marked `COMPLETED` when the externalizer resolves,
+and what that proves depends on the transport. Kafka and RabbitMQ wait
+for a broker acknowledgement, so a broker that is down produces a
+`FAILED` row the retry and resubmit machinery can act on. NATS core and
+TCP acknowledge nothing, and gRPC cannot be used for externalization at
+all. The per-transport table is in that package's README and in
+[ADR-021](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/021-externalization-acknowledgement-per-transport.md).
 
 ## Documentation
 

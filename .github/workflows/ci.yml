@@ -352,6 +352,12 @@ jobs:
     # ubuntu-latest ships with Docker — testcontainers spins up Postgres
     # per-suite. Currently `typeorm` and `outbox-typeorm` define
     # `test:integration`; pnpm filter-run skips packages without it.
+    #
+    # `outbox-microservices` also defines one, and it is excluded here on
+    # purpose: it talks to Kafka and RabbitMQ and never touches TypeORM,
+    # so running it in this matrix would start two brokers three times
+    # for one signal, under a job label naming a TypeORM version that has
+    # nothing to do with the result. It has its own job below.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -395,7 +401,46 @@ jobs:
         run: pnpm -r --filter './packages/*' build
 
       - name: Integration tests
-        run: pnpm -r --filter './packages/*' test:integration
+        run: |
+          pnpm -r \
+            --filter './packages/*' \
+            --filter '!@nestjs-transactional/outbox-microservices' \
+            test:integration
+
+  broker-integration:
+    name: Broker integration tests (Kafka, RabbitMQ)
+    runs-on: ubuntu-latest
+    # Single cell: the question this job answers is what `ClientProxy.emit()`
+    # reports back from a real broker, which does not vary by Node or
+    # TypeORM version. About 40 seconds for both brokers.
+    #
+    # This job exists because the answer was once recorded wrong. ADR-016
+    # concluded from a failing experiment that `emit()` cannot report
+    # broker failures, deleted this suite, and left a "silent success"
+    # limitation in the published README that was not true. Re-measuring
+    # it is cheap; leaving it unmeasured cost a user-facing false
+    # statement that stood for months. See ADR-021.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Integration tests
+        run: pnpm --filter @nestjs-transactional/outbox-microservices test:integration
 
   api-surface:
     name: API surface
