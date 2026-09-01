@@ -70,6 +70,10 @@ pnpm format          # rewrite
 # Relative markdown links resolve (ADR / DD / source references)
 pnpm lint:doc-links
 
+# Integration specs wait on the rows, not on a handler flag or an
+# emit mock, before asserting a publication's status
+pnpm lint:test-races
+
 # Public API surface unchanged (api-extractor, needs a build first)
 pnpm api:check       # verify — CI fails if the surface moved
 pnpm api:update      # accept an intended change, then commit the diff
@@ -348,6 +352,30 @@ testing the `outbox-typeorm` package, the TypeORM adapter's
 savepoint/isolation behaviour, and example end-to-end flows. For
 general application testing (even with the outbox enabled) the
 in-memory repository is sufficient.
+
+### Waiting in a worker-driven test
+
+When a test drives the outbox worker, wait for the **publication rows**
+before asserting anything about them. A handler's `handled` array and a
+mocked broker's `emit` are both written from inside the dispatch, while
+the worker writes the row's terminal status only after that call
+returns. Waiting on the flag and then asserting `COMPLETED` leaves that
+window open; it passes on a fast machine and fails on a loaded runner.
+
+```ts
+// Wrong: waits for the handler, asserts the database.
+await waitFor(() => handler.handled.some((e) => e.id === 'x'));
+expect(rows.every((r) => r.status === PublicationStatus.COMPLETED)).toBe(true);
+
+// Right: wait for the rows. Reaching COMPLETED already implies the
+// handler ran, so flag assertions can follow.
+await waitForPublications(ds, (rows) => rows.every((r) => r.status === COMPLETED));
+expect(handler.handled.some((e) => e.id === 'x')).toBe(true);
+```
+
+`pnpm lint:test-races` enforces this, and the `Test races` CI job runs
+it. A test that drives the worker with its own awaited call, such as
+`await processor.processBatch()`, is deterministic and is not affected.
 
 ## Architectural decisions
 

@@ -50,6 +50,21 @@ async function waitFor(
   }
 }
 
+/**
+ * Wait until this dataSource's publication rows satisfy `predicate`.
+ *
+ * The worker sets a row's terminal status after the handler has run and,
+ * here, after the broker emit has returned. Waiting on a handler flag or
+ * on an emit mock is therefore not the same as waiting on the row: the
+ * gap is invisible on a fast machine and real on a CI runner.
+ */
+async function waitForPublications(
+  ds: DataSource,
+  predicate: (rows: EventPublicationEntity[]) => boolean,
+): Promise<void> {
+  await waitFor(async () => predicate(await ds.getRepository(EventPublicationEntity).find()));
+}
+
 describe('externalization-multi-broker (Postgres real, three ClientProxy mocked)', () => {
   let container: StartedPostgreSqlContainer;
   let module: TestingModule;
@@ -233,19 +248,21 @@ describe('externalization-multi-broker (Postgres real, three ClientProxy mocked)
   it('one transaction → three brokers; all three publications COMPLETED on success', async () => {
     await orders.placeOrder('o-5', 'eve@example.com', 3_500, { refundCents: 500 });
 
-    await waitFor(
-      () =>
-        shipping.handled.some((e) => e.orderId === 'o-5') &&
-        accounting.handled.some((e) => e.orderId === 'o-5') &&
-        cache.handled.some((e) => e.key.includes('eve@example.com')),
+    // Wait on the rows, not on the handler flags or the emit mocks.
+    // Both of those are set from inside the dispatch, while the worker
+    // writes the terminal status only after the emit returns. Waiting on
+    // either and then asserting COMPLETED leaves that window open.
+    await waitForPublications(
+      dataSource,
+      (rows) =>
+        rows.length === 3 && rows.every((r) => r.status === PublicationStatus.COMPLETED),
     );
 
-    await waitFor(
-      () =>
-        kafka.emit.mock.calls.length >= 1 &&
-        rabbitmq.emit.mock.calls.length >= 1 &&
-        redis.emit.mock.calls.length >= 1,
-    );
+    // Reaching COMPLETED implies each handler ran and each broker was
+    // emitted to, so these assertions need no wait of their own.
+    expect(shipping.handled.some((e) => e.orderId === 'o-5')).toBe(true);
+    expect(accounting.handled.some((e) => e.orderId === 'o-5')).toBe(true);
+    expect(cache.handled.some((e) => e.key.includes('eve@example.com'))).toBe(true);
 
     expect(kafka.emit).toHaveBeenCalledTimes(1);
     expect(rabbitmq.emit).toHaveBeenCalledTimes(1);
@@ -253,7 +270,6 @@ describe('externalization-multi-broker (Postgres real, three ClientProxy mocked)
 
     const completedRows = await dataSource.getRepository(EventPublicationEntity).find();
     expect(completedRows).toHaveLength(3);
-    expect(completedRows.every((r) => r.status === PublicationStatus.COMPLETED)).toBe(true);
 
     const eventTypes = completedRows.map((r) => r.eventType).sort();
     expect(eventTypes).toEqual([

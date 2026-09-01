@@ -25,6 +25,7 @@
     "test:integration": "pnpm -r --filter './packages/*' test:integration",
     "lint": "eslint \"packages/*/src/**/*.ts\"",
     "lint:doc-links": "./scripts/check-doc-links.sh",
+    "lint:test-races": "node ./scripts/check-test-races.js",
     "lint:fix": "eslint \"packages/*/src/**/*.ts\" --fix",
     "format": "prettier --write \"packages/*/src/**/*.{ts,json}\" \"*.{md,json,yml,yaml,mjs}\"",
     "format:check": "prettier --check \"packages/*/src/**/*.{ts,json}\" \"*.{md,json,yml,yaml,mjs}\"",
