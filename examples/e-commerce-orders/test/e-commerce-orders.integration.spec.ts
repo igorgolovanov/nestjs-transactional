@@ -29,10 +29,9 @@ interface KafkaMock {
 }
 
 function makeKafkaMock(): KafkaMock {
-  // ADR-016: ClientProxy.emit returns Observable<void> on success;
-  // mocked emits return `of(undefined)` so the worker treats them
-  // as silent-success — same behaviour the framework gives in
-  // production when the broker accepts the message.
+  // `ClientProxy.emit` returns an Observable that completes on
+  // success, so a mocked `of(undefined)` is exactly what the worker
+  // sees when a real broker accepts the message.
   const emit = jest.fn().mockReturnValue(of(undefined));
   const proxy = { emit } as unknown as ClientProxy;
   return { proxy, emit };

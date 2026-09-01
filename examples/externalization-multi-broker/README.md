@@ -199,12 +199,13 @@ for that combination.
 - [`externalization-multi-datasource`](../externalization-multi-datasource)
   — multi-DS + multi-broker, real production scenario.
 - [`externalization-with-fallback`](../externalization-with-fallback)
-  — ADR-016 limitation in action plus mitigation patterns.
+  — what a `COMPLETED` publication proves, plus the recovery and
+  consumer-side patterns.
 
 ## Further reading
 
 - [ADR-015 — event externalization architecture](../../docs/adr/015-event-externalization-architecture.md)
-- [ADR-016 — externalization reliability semantics](../../docs/adr/016-externalization-reliability-semantics.md)
+- [ADR-021 — what `emit()` acknowledges, per transport](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
 - [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)
 - [`packages/outbox-microservices/README.md`](../../packages/outbox-microservices/README.md)
   — the multi-broker section that this example expands on.

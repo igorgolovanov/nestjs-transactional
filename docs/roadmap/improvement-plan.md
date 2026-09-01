@@ -595,24 +595,42 @@ retention of completed publications is entirely manual.
 timer pattern), disabled by default; covered by specs; documented in
 the outbox README.
 
-### C5. Silent-success gap — broker-aware externalizers (ADR-016)
+### ~~C5. Silent-success gap — broker-aware externalizers (ADR-016)~~
 
-`ClientProxy.emit()` is fire-and-forget on every transport: an
-unreachable broker still yields a completed Observable, so the
-processor marks the publication `COMPLETED` and the entire
-retry/staleness/recovery machinery (which only fires on `FAILED`)
-is bypassed. Documented in
-[ADR-016](../adr/016-externalization-reliability-semantics.md) with
-mitigations; the real fix is native broker-aware externalizers
-(`kafkajs` / `amqplib` / `nats`) under the DD-018 `EVENT_EXTERNALIZER`
-SPI, offering broker-acknowledged delivery. This is a full phase of
-its own (new packages, real-broker testcontainers suites — the
-`examples/externalization-with-fallback` docker-compose RabbitMQ is
-the anchor) and should be scheduled after C1–C4.
+*Closed, and not the way it was written.*
 
-**DoD**: phase plan drafted (package split, transport priority);
-first externalizer shipped with real-broker integration tests;
-ADR-016 amended by a superseding ADR once the gap closes.
+This item read: `ClientProxy.emit()` is fire-and-forget on every
+transport, so the processor marks publications `COMPLETED` with
+nothing delivered and the whole retry/staleness/recovery machinery is
+bypassed. The fix was a full phase of its own, three new packages of
+native `kafkajs` / `amqplib` / `nats` externalizers under the DD-018
+SPI.
+
+The premise was measured before the phase was scheduled, and it did
+not hold. On Kafka and RabbitMQ `emit()` resolves on a real broker
+acknowledgement and rejects when the broker is unreachable, so the
+publication is marked `FAILED` and the recovery machinery engages as
+designed. Two of the three packages would have bought nothing.
+
+What shipped instead:
+
+- The real-broker suite ADR-016 deleted is back, in its own
+  `broker-integration` CI job.
+- `describeThrown` on the outbox package, because RabbitMQ rejects
+  with non-`Error` values that `String(err)` rendered as
+  `[object Object]` in a `FAILED` publication's `failureReason`.
+- Per-transport documentation in place of a blanket warning, which
+  surfaced two defects the warning had hidden: gRPC was advertised
+  as a supported transport and its `dispatchEvent` throws, and
+  RabbitMQ users were told to enable confirms they already had while
+  never being told about `persistent: false`.
+- [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md),
+  superseding ADR-016.
+
+What survives as future work is one transport, not three: core NATS
+`publish()` returns `void`, and a JetStream-based externalizer is the
+only piece of the original plan the evidence supports. It is left
+unscheduled rather than assumed.
 
 ## Workstream D — Deferred backlog
 
@@ -668,7 +686,7 @@ Recorded, not scheduled. Ordered roughly by value.
   is multi-dataSource, because both change the answer — `readOnly` is
   enforced only on the Postgres family (DD-027) and multi-DS has its
   own documented limitations — and it points at
-  `known-limitations.md` and ADR-016 up front, since a fair share of
+  `known-limitations.md` and ADR-021 up front, since a fair share of
   "bugs" here are documented trade-offs. `SECURITY.md` also records
   the data-at-rest footprint (serialized payloads and listener
   exception messages persist in `event_publication` until purged),

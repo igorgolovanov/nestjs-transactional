@@ -122,18 +122,20 @@ describe('externalization-with-fallback (Postgres real, ClientProxy mocked)', ()
     broker.emit.mockReturnValue(of(undefined));
   });
 
-  describe('ADR-016 silent-success contract', () => {
-    it('emit() resolves successfully → publication COMPLETED, regardless of "real" broker state', async () => {
-      // The mocked emit returns `of(undefined)` unconditionally — same
-      // shape as a real ClientProxy succeeded against an unreachable
-      // broker. The framework cannot distinguish the two.
+  describe('completion contract', () => {
+    it('emit() resolves → publication COMPLETED with no failure reason', async () => {
+      // The mocked emit returns `of(undefined)`, which is what a
+      // successful publish looks like to the externalizer. What that
+      // completion proves about the broker is transport-specific and
+      // is measured in ADR-021; the real-broker suite lives in the
+      // outbox-microservices package.
       await refunds.requestRefund('rf-1', 'order-1', 5_000);
 
       await waitFor(() => ledger.handled.some((e) => e.refundId === 'rf-1'));
       await waitFor(() => broker.emit.mock.calls.length >= 1);
 
-      // The publication COMPLETES — not because the broker confirmed
-      // delivery, but because emit() returned without throwing.
+      // The publication COMPLETES because emit() returned without
+      // throwing. That is the whole rule the processor applies.
       await waitFor(async () => {
         const row = await dataSource
           .getRepository(EventPublicationEntity)
@@ -147,16 +149,18 @@ describe('externalization-with-fallback (Postgres real, ClientProxy mocked)', ()
       expect(row?.status).toBe(PublicationStatus.COMPLETED);
       expect(row?.failureReason).toBeNull();
 
-      // The point: we cannot assert "broker received the message" from
-      // the producer side. Mitigation lives on the consumer side
-      // (next describe block).
+      // Duplicates remain possible even on a transport that
+      // acknowledges, because delivery is at-least-once by design.
+      // The consumer-side inbox is what handles that (last describe
+      // block).
     });
   });
 
   describe('FailedEventPublications.resubmit recovery', () => {
     it('emit() throws → publication FAILED → operator resubmits → next poll COMPLETES', async () => {
-      // First emit attempt throws — surfaces the failure to the
-      // externalizer (distinct from ADR-016 silent success).
+      // First emit attempt throws. Against a real Kafka or RabbitMQ
+      // this is what a broker that is down actually produces; the
+      // mock just makes it deterministic.
       broker.emit.mockImplementationOnce(() => {
         throw new Error('simulated broker rejection');
       });
@@ -232,7 +236,7 @@ describe('externalization-with-fallback (Postgres real, ClientProxy mocked)', ()
     });
   });
 
-  describe('Consumer-side inbox dedup template (ADR-016 mitigation strategy 2)', () => {
+  describe('Consumer-side inbox dedup template', () => {
     it('first invocation processes; second invocation with same publication id is a no-op', async () => {
       const event = new RefundRequestedEvent('rf-dedup', 'order-dedup', 1_500);
       const publicationId = 'pub-id-rf-dedup';

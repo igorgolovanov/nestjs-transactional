@@ -5,13 +5,13 @@
 > bound `EventExternalizer` is invoked with resolved metadata and
 > sends the event over `@nestjs/microservices` `ClientProxy`. The
 > outbox publication transitions to `COMPLETED` only when both steps
-> resolve. Reliability is documented in
-> [ADR-016](../adr/016-externalization-reliability-semantics.md);
-> read it before shipping to production.
+> resolve. What that proves about broker delivery depends on the
+> transport, and the per-transport table is in
+> [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
 
 This document expands [ADR-015](../adr/015-event-externalization-architecture.md)
 with diagrams, concrete component descriptions, the end-to-end
-sequence, the Spring Modulith mapping, and a reliability semantics
+sequence, the Spring Modulith mapping, and a delivery guarantee
 section. It is the load-bearing reference for anyone evaluating the
 externalization story for their application.
 
@@ -204,49 +204,57 @@ behind.
 | Local listener succeeds, externalizer succeeds and broker durably acked | `COMPLETED` | Yes |
 | Local listener succeeds, externalizer succeeds but broker **silently dropped** the message | `COMPLETED` | Yes (resolved) |
 
-The last row is the case **ADR-016** documents — see *Reliability
-semantics* below.
+Whether the last row is reachable depends on the transport. On Kafka
+and RabbitMQ it takes a broker that acknowledges and then loses the
+message before durable storage, or a configuration that gave the
+acknowledgement away. On core NATS and TCP it is the normal case,
+because nothing is acknowledged at all. See below.
 
-## Reliability semantics
+## Delivery guarantee
 
-ADR-016 is the canonical reference; the summary here exists so
-readers do not have to navigate away to understand the trade-off.
+[ADR-021](../adr/021-externalization-acknowledgement-per-transport.md)
+is the canonical reference, with the measurements and the reading of
+each client's `dispatchEvent`. The summary here exists so readers do
+not have to navigate away.
 
-`@nestjs/microservices` `ClientProxy.emit()` follows the
-fire-and-forget model: the Observable it returns completes when the
-proxy considers the dispatch *handed off to the transport*, not
-necessarily when the broker has *durably acknowledged* the message.
-Different transports interpret "handed off" differently — Kafka with
-default `acks: 'leader'` gets close to broker-acknowledged, RabbitMQ
-in default mode does not — but in every case there are realistic
-failure modes (broker unreachable, network partition during ack,
-broker crash before fsync, configuration drift) where `emit()`
-reports success and the message is never delivered.
+`ClientProxy.emit()` does not mean the same thing on every transport:
 
-`MicroservicesEventExternalizer` faithfully wraps that contract: an
-Observable that completes without error becomes a resolved
-`externalize()` Promise, the processor finalises the publication as
-`COMPLETED`, and the outbox retry / staleness machinery does not
-fire because there is nothing to detect from at this layer.
+| Transport | `emit()` resolves when | Acknowledged by the broker? |
+| --- | --- | --- |
+| Kafka | `producer.send()` settles; `kafkajs` defaults to `acks: -1` | Yes |
+| RabbitMQ | the publisher confirm arrives (`amqp-connection-manager` defaults `confirm` to `true`) | Yes, but `persistent` defaults to `false` |
+| MQTT | PUBACK at QoS 1 and above, immediately at QoS 0 | Depends on QoS |
+| Redis | the `PUBLISH` command replies | Server received it; pub/sub does not persist |
+| TCP | the message is written to the socket | No |
+| NATS | immediately: core `publish()` returns `void` | No |
+| gRPC | never: `dispatchEvent` throws | Not usable for externalization |
 
-This is an architectural concern, not an implementation bug. Three
-mitigation paths exist:
+`MicroservicesEventExternalizer` wraps whichever of those it is given:
+an Observable that completes without error becomes a resolved
+`externalize()` Promise and a `COMPLETED` publication, and a rejection
+becomes `FAILED` with a readable reason. On Kafka and RabbitMQ that
+means an unreachable broker feeds straight into the retry, staleness
+and `FailedEventPublications.resubmit` machinery. On NATS it means
+nothing ever will.
 
-1. **Tighter `ClientProxy` configuration.** Kafka `producer.acks: 'all'`
-   plus `producer.idempotent: true`. RabbitMQ confirm-channel via
-   `amqp-connection-manager`. NATS JetStream with explicit ack. The
-   externalizer reuses whatever proxy the user registered (DD-017),
-   so this configuration applies transparently.
-2. **Consumer-side acknowledgment / inbox patterns.** Track
-   processed message ids on the receiving system and surface gaps
-   to operators. The outbox publication's listener id plus the
-   domain event id is enough to deduplicate.
-3. **Broker-aware native externalizers** under the same
-   `EVENT_EXTERNALIZER` SPI (DD-018). These would issue real
-   round-trip acknowledgments and propagate broker errors back
-   through the existing FAILED → `FailedEventPublications.resubmit`
-   path. They are not yet scheduled but are the long-term answer
-   for stricter delivery guarantees.
+What is worth doing about it:
+
+1. **Do not configure the acknowledgement away.** Kafka `acks: 0`,
+   MQTT QoS 0, and RabbitMQ without `persistent: true` each give up a
+   guarantee the defaults provide. `producer.idempotent: true` on
+   Kafka additionally protects against duplicates from producer
+   retries. The externalizer reuses whatever proxy the user
+   registered (DD-017), so all of this applies transparently.
+2. **Consumer-side acknowledgment / inbox patterns.** At-least-once
+   means duplicates are expected. Track processed message ids on the
+   receiving system and surface gaps to operators. The outbox
+   publication's listener id plus the domain event id is enough to
+   deduplicate.
+3. **A different externalizer where the transport cannot help.** The
+   `EVENT_EXTERNALIZER` SPI (DD-018) is public, so a NATS
+   implementation built on JetStream's `PubAck` slots into the same
+   place without client-code changes. Kafka and RabbitMQ do not need
+   one.
 
 ## Spring Modulith mapping
 
@@ -273,7 +281,13 @@ package serve every transport.
 
 ## Limitations
 
-In addition to the reliability semantics covered above:
+In addition to the per-transport delivery guarantee covered above:
+
+- **gRPC cannot be used as an externalization transport.**
+  `ClientGrpcProxy.dispatchEvent` throws
+  `Method is not supported in gRPC mode` unconditionally, so an
+  `@Externalized` event routed to a gRPC client has never been
+  publishable.
 
 - **Headers and `routingKey` are accepted on `@Externalized` but not
   yet applied to the wire payload.** `@nestjs/microservices`
@@ -300,7 +314,8 @@ In addition to the reliability semantics covered above:
 ## References
 
 - [ADR-015](../adr/015-event-externalization-architecture.md) — design rationale.
-- [ADR-016](../adr/016-externalization-reliability-semantics.md) — reliability semantics, mitigations, future work.
+- [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md) — what `emit()` acknowledges per transport, measured.
+- [ADR-016](../adr/016-externalization-reliability-semantics.md) — the superseded reliability claim, kept for the reasoning that led to it.
 - `packages/outbox/src/externalization/` — SPI, decorator, registry, errors.
 - `packages/outbox-microservices/` — `ClientProxy`-backed externalizer + module.
 - [`docs/architecture/outbox-pattern.md`](outbox-pattern.md) — outbox foundations this layer builds on.

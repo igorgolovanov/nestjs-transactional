@@ -6,7 +6,8 @@
   - ADR-006 (outbox pattern rationale)
   - ADR-007 (outbox architecture: core + typeorm split)
   - ADR-014 (class-level handler API)
-  - ADR-016 (externalization reliability semantics with `@nestjs/microservices`)
+  - ADR-021 (what `ClientProxy.emit()` acknowledges, per transport)
+  - ADR-016 (externalization reliability semantics; superseded by ADR-021)
   - DD-016 (event externalization scope and design)
   - DD-017 (reuse `ClientsModule` for `ClientProxy` registration)
   - DD-018 (`EventExternalizer` SPI as a structural port)
@@ -117,8 +118,11 @@ Rejected:
 
 The future is not closed off, however. Native broker adapters can
 ship under the same `EVENT_EXTERNALIZER` SPI (DD-018) without
-breaking existing users — see ADR-016 *Future remediation* for the
-specific reliability angle that may motivate them.
+breaking existing users. ADR-021 narrows the case for them: on Kafka
+and RabbitMQ there is no acknowledgement gap left to close, and the
+one transport where the argument survives is NATS, whose core
+`publish()` acknowledges nothing while JetStream's returns a
+`PubAck` that `@nestjs/microservices` does not use.
 
 ### Native broker library integration (`kafkajs`, `amqplib` direct)
 
@@ -127,8 +131,9 @@ Rejected as the primary approach:
 - Less idiomatic for NestJS users.
 - `ClientProxy` is the well-known pattern in the NestJS ecosystem.
 - Native libraries can be added later as separate packages for
-  fine-grained control if real users need stricter semantics — see
-  ADR-016 for the case that may already motivate this.
+  fine-grained control if real users need stricter semantics. ADR-021
+  measured which transports actually need it; Kafka and RabbitMQ do
+  not.
 
 ### Custom `ClientProxy` registration inside our module
 
@@ -186,39 +191,28 @@ Rejected:
   `OutboxMicroservicesModule` mitigates the former by failing fast
   on a missing `defaultClient` binding.
 
-### Reliability caveat (introduced by ADR-016)
+### Delivery guarantee (amended by ADR-021)
 
-The chosen `ClientProxy` abstraction comes with a fire-and-forget
-delivery semantic that this ADR cannot remove on its own.
-[ADR-016](016-externalization-reliability-semantics.md) records the
-finding from Phase 11.4: `ClientProxy.emit()` resolves successfully
-when the proxy considers the dispatch handed off to the transport,
-not when the broker has durably acknowledged the message. With an
-unreachable broker or a transport in default fire-and-forget mode,
-`emit()` reports success and the outbox publication transitions to
-`COMPLETED` even though no message landed.
+The delivery guarantee this architecture provides is the one the
+chosen `ClientProxy` provides, and that is transport-specific rather
+than uniform.
+[ADR-021](021-externalization-acknowledgement-per-transport.md)
+carries the per-transport table and the measurements. In short: Kafka
+and RabbitMQ resolve `emit()` on a real broker acknowledgement, so an
+unreachable broker produces a `FAILED` publication and the outbox
+retry, staleness and `FailedEventPublications.resubmit` machinery
+engages exactly as designed. Core NATS and TCP acknowledge nothing.
+gRPC cannot be used at all, because `ClientGrpcProxy.dispatchEvent`
+throws.
 
-The externalization layer cannot detect a silent broker-side failure
-from this signal alone — there is nothing to detect from. The
-`outbox` retry / staleness / `FailedEventPublications.resubmit`
-machinery only fires when the externalizer returns an error, which
-in this configuration it does not.
+Either way the architecture in this ADR stands: the SPI, decorator,
+registry and module wiring are what let a transport with a weaker
+guarantee be replaced without touching client code.
 
-This does not invalidate the architecture in this ADR — the SPI,
-decorator, registry, and module wiring all stand. It scopes the
-delivery guarantee that
-`@nestjs-transactional/outbox-microservices` provides out of the
-box. Users requiring stricter semantics have three paths, all
-documented in ADR-016 and in the package README:
-
-1. Configure the underlying `ClientProxy` for stronger acknowledgment
-   (Kafka `acks: 'all'` + idempotent producer, RabbitMQ
-   confirm-channel, NATS JetStream with explicit ack).
-2. Combine with consumer-side acknowledgment / inbox patterns to
-   detect gaps after the fact.
-3. Wait for a native broker adapter under the same
-   `EVENT_EXTERNALIZER` SPI — that is the future-work path the SPI
-   was designed to leave open (DD-018).
+> This section previously recorded the ADR-016 caveat, which stated
+> that `emit()` can never report a broker failure on any transport.
+> That claim was re-measured and does not hold; ADR-016 is superseded.
+> The heading is kept so links to it still land somewhere accurate.
 
 ## Spring Modulith mapping
 
@@ -249,4 +243,5 @@ from a Spring auto-configuration to the user's `ClientsModule`.
 - `packages/outbox-microservices/src/externalizer/microservices-event-externalizer.ts`
 - `packages/outbox-microservices/src/module/outbox-microservices.module.ts`
 - `docs/architecture/event-externalization.md`
-- ADR-016 — externalization reliability semantics with `@nestjs/microservices`
+- ADR-021 — what `ClientProxy.emit()` acknowledges, per transport
+- ADR-016 — externalization reliability semantics; superseded by ADR-021

@@ -215,7 +215,7 @@ go there. The two axes don't interact.
   sub-modules. Useful if you want logical-only separation rather
   than physical DB isolation.
 - [`externalization-with-fallback`](../externalization-with-fallback)
-  — ADR-016 silent-success limitation in action and the recovery
+  — what a `COMPLETED` publication proves, and the recovery
   patterns.
 
 ## Further reading
@@ -223,5 +223,5 @@ go there. The two axes don't interact.
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
 - [ADR-019 — outbox multi-`forRoot` pattern](../../docs/adr/019-outbox-multi-forroot-pattern.md)
 - [ADR-015 — event externalization architecture](../../docs/adr/015-event-externalization-architecture.md)
-- [ADR-016 — externalization reliability semantics](../../docs/adr/016-externalization-reliability-semantics.md)
+- [ADR-021 — what `emit()` acknowledges, per transport](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
 - [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)

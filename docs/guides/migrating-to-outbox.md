@@ -491,11 +491,14 @@ local listener has succeeded — single-unit atomicity (DD-019):
 if either step fails, the publication is recorded as `FAILED`
 and surfaces in `FailedEventPublications.resubmit(...)`.
 
-**Read [ADR-016](../adr/016-externalization-reliability-semantics.md)
-before going to production**: the `@nestjs/microservices` `ClientProxy.emit()`
-API does NOT propagate broker-side delivery failures. Mitigation
-strategies (idempotent producers, consumer-side inbox / dedup) are
-covered in
+How much a `COMPLETED` publication proves about broker delivery
+depends on the transport. Kafka and RabbitMQ resolve `emit()` on a
+real acknowledgement, so an unreachable broker lands in
+`FailedEventPublications` like any other failure. Core NATS and TCP
+acknowledge nothing, and gRPC cannot be used at all. The
+per-transport table is in
+[ADR-021](../adr/021-externalization-acknowledgement-per-transport.md);
+consumer-side inbox and dedup patterns are shown in
 [`examples/externalization-with-fallback`](../../examples/externalization-with-fallback/).
 
 ## Migrating from older snapshots
@@ -595,14 +598,18 @@ Outbox-routed handlers (`@OutboxEventsHandler`,
 `@IntegrationEventsHandler`) auto-route via the per-DS event-type
 registry and need no explicit `dataSource` option (Category A).
 
-**"Kafka externalizer reports success but no message arrives."**
-ADR-016 silent-success limitation. The `@nestjs/microservices`
-`ClientProxy.emit()` API completes when the dispatch is handed
-off to the transport, not when the broker durably acknowledges.
-Mitigation: configure the proxy for stronger acknowledgment
-(Kafka `producer.acks: 'all'` + `idempotent: true`, RabbitMQ
-confirm channels, NATS JetStream), or add a consumer-side
-inbox / dedup check. See
+**"The externalizer reports success but no message arrives."**
+On Kafka and RabbitMQ this should not happen with the defaults:
+`emit()` resolves on a broker acknowledgement, so a broker that
+never got the message produces a `FAILED` publication instead.
+Check the three things that give that guarantee away. Kafka
+`acks: 0` in your `ClientsModule.register()` options; MQTT QoS 0;
+and RabbitMQ without `persistent: true`, where the broker confirms
+without writing to disk and a restart loses the message. On core
+NATS and TCP there is no acknowledgement to begin with, which is
+the transport, not a bug. Details in
+[ADR-021](../adr/021-externalization-acknowledgement-per-transport.md);
+consumer-side dedup in
 [`examples/externalization-with-fallback`](../../examples/externalization-with-fallback/).
 
 ## See also
@@ -614,7 +621,7 @@ inbox / dedup check. See
 - [ADR-007 — outbox architecture](../adr/007-outbox-architecture.md)
 - [ADR-014 — class-level handler API](../adr/014-handler-api-redesign.md)
 - [ADR-015 — event externalization architecture](../adr/015-event-externalization-architecture.md)
-- [ADR-016 — externalization reliability semantics](../adr/016-externalization-reliability-semantics.md)
+- [ADR-021 — what `emit()` acknowledges, per transport](../adr/021-externalization-acknowledgement-per-transport.md)
 - [ADR-018 — multi-adapter architecture](../adr/018-multi-adapter-architecture.md)
 - [ADR-019 — `OutboxModule` multi-`forRoot` pattern](../adr/019-outbox-multi-forroot-pattern.md)
 - [`examples/basic-typeorm-outbox`](../../examples/basic-typeorm-outbox/) — single-DS production-shape baseline.

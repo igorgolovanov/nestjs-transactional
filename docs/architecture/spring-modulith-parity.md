@@ -21,13 +21,14 @@ for NestJS applications, not just Spring Framework core.
 - `PublishedEvents` test utility — outbox `/testing`
 - Event externalization to brokers — SPI,
   `@Externalized`, `outbox-microservices` package,
-  [ADR-015](../adr/015-event-externalization-architecture.md),
-  reliability caveat in [ADR-016](../adr/016-externalization-reliability-semantics.md).
-  One package covers all `@nestjs/microservices` transports
-  ([DD-016](../dd/016-event-externalization.md)). Reliability
-  semantics are weaker than Spring Modulith's broker-acked story —
-  see ADR-016 for the trade-off and three production mitigation
-  strategies.
+  [ADR-015](../adr/015-event-externalization-architecture.md).
+  One package covers every usable `@nestjs/microservices` transport
+  ([DD-016](../dd/016-event-externalization.md)). What a successful
+  publish acknowledges varies by transport: Kafka and RabbitMQ match
+  Spring Modulith's broker-acked story, core NATS and TCP do not
+  acknowledge at all, and gRPC cannot be used. Per-transport table and
+  measurements in
+  [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
 
 **Explicitly out of scope:**
 - Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)

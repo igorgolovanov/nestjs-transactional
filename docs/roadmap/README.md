@@ -209,9 +209,9 @@ Spring Modulith `@Externalized` parity — durable, retryable
 delivery of outbox events to external message brokers via
 `@nestjs/microservices` `ClientProxy` (DD-016, DD-017, DD-018,
 DD-019). Full design rationale in
-[ADR-015](../adr/015-event-externalization-architecture.md);
-reliability caveat in
-[ADR-016](../adr/016-externalization-reliability-semantics.md).
+[ADR-015](../adr/015-event-externalization-architecture.md); what a
+successful publish acknowledges on each transport in
+[ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
 
 ### Phase 11.1: `EventExternalizer` SPI in outbox
 
@@ -240,7 +240,17 @@ reliability caveat in
 - Bootstrap validation: every event with an `@Externalized`
   mapping has a resolvable client token.
 
-### Phase 11.4: ADR-016 reliability finding
+### Phase 11.4: ADR-016 reliability finding (later retracted)
+
+> **The finding recorded below is not true, and everything this phase
+> shipped followed from it.** Re-measured against live Kafka and
+> RabbitMQ, `emit()` rejects on an unreachable broker and resolves on a
+> real acknowledgement. The suite this phase deleted is back, the
+> published README warning is gone, and ADR-016 is superseded by
+> [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
+> The account is kept as written because how one failing experiment
+> became a general claim, a README warning and a scheduled phase is the
+> part worth remembering.
 
 The original Phase 11.4 plan was testcontainers-driven E2E
 integration tests against real Kafka and RabbitMQ. The
@@ -281,6 +291,13 @@ proxy does not surface. Future broker-aware externalizers
 (Phase 12+, unscheduled) plugging into the same
 `EVENT_EXTERNALIZER` SPI from DD-018 can offer stricter
 guarantees without breaking existing users.
+
+*Retraction:* on Kafka and RabbitMQ the externalizer does report
+those failures, so the machinery engages and the "unreachable
+broker" test the phase called unreachable now runs in CI. The
+broker-aware externalizers that were scheduled to close the gap
+are retired for those two transports, since there is no gap.
+Core NATS remains genuinely unacknowledged. See ADR-021.
 
 ### Phase 11.5: Documentation pass
 
@@ -561,9 +578,11 @@ Four examples covering the externalization axes:
   pub/sub routed per event via `@Externalized({ client })`.
 - `externalization-multi-datasource` — two physical Postgres
   × two `ClientProxy` registrations on a single broker.
-- `externalization-with-fallback` — ADR-016 silent-success
-  demo + the three production mitigation patterns +
-  `FailedEventPublications.resubmit` recovery flow.
+- `externalization-with-fallback` — what a `COMPLETED`
+  publication does and does not prove, consumer-side inbox
+  dedup, and the `FailedEventPublications.resubmit` recovery
+  flow. Built as an ADR-016 silent-success demo; reframed after
+  ADR-021.
 
 #### Phase 14.8d — Tier 4: Advanced patterns
 
@@ -774,10 +793,15 @@ Both routes converge on the same EM.
 
 ## Future phases (not scheduled)
 
-- **Broker-aware externalizers** — native `kafkajs` /
-  `amqplib` / `nats` adapters under the same
-  `EVENT_EXTERNALIZER` SPI from DD-018, offering at-least-once
-  broker-side delivery (closes the ADR-016 silent-success gap).
+- **A NATS externalizer on JetStream** — under the same
+  `EVENT_EXTERNALIZER` SPI from DD-018. Core NATS `publish()`
+  returns `void`, so `ClientProxy` can offer no delivery signal
+  there at all, while JetStream's returns a `PubAck` that
+  `@nestjs/microservices` does not use. This is what remains of
+  the planned `kafkajs` / `amqplib` / `nats` adapter phase:
+  ADR-021 measured Kafka and RabbitMQ as already
+  broker-acknowledged, so native adapters for those two would
+  buy nothing.
 - **`@nestjs-transactional/outbox-prisma`** — Prisma persistence
   backend. Slots into the Phase 14 multi-adapter contract.
 - **`@nestjs-transactional/outbox-mongodb`** — MongoDB

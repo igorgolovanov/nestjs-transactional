@@ -67,13 +67,12 @@ describe('externalization-kafka (Postgres real, ClientProxy mocked)', () => {
 
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
 
-    // Mock the Kafka ClientProxy. `emit` returns `of(undefined)` —
-    // the silent-success contract pinned by ADR-016. The
-    // externalizer waits on `firstValueFrom(emit(...))`, so the
-    // mocked Observable resolves immediately. This deliberately
-    // does NOT verify "real broker received the message" — see
-    // ADR-016 for the rationale and `externalization-with-fallback`
-    // for the production mitigation patterns.
+    // Mock the Kafka ClientProxy. `emit` returns `of(undefined)`,
+    // which is what a successful publish looks like to the
+    // externalizer; it waits on `firstValueFrom(emit(...))`, so the
+    // mocked Observable resolves immediately. Deliberately not a
+    // broker test: the real Kafka acknowledgement path is measured
+    // in the `outbox-microservices` suite (ADR-021).
     kafkaEmit = jest.fn().mockReturnValue(of(undefined));
     const kafkaProxyMock = { emit: kafkaEmit } as unknown as ClientProxy;
 
@@ -198,13 +197,12 @@ describe('externalization-kafka (Postgres real, ClientProxy mocked)', () => {
   });
 
   it('externalizer error marks the publication FAILED — local handler still ran (DD-019 ordering)', async () => {
-    // Make every emit throw — simulates a broker-side failure the
-    // proxy DOES surface (proxy refused to enqueue, network
-    // partition raised an error). Distinct from the ADR-016 silent
-    // success path: here the externalizer DOES detect the failure
-    // and the publication transitions to FAILED. Recovery via
-    // `FailedEventPublications.resubmit` is shown in
-    // `externalization-with-fallback`.
+    // Make every emit throw. Against a real Kafka this is what an
+    // unreachable broker produces, since `producer.send()` rejects
+    // and the default `acks: -1` waits for every in-sync replica.
+    // The externalizer surfaces it and the publication transitions
+    // to FAILED. Recovery via `FailedEventPublications.resubmit` is
+    // shown in `externalization-with-fallback`.
     kafkaEmit.mockImplementation(() => {
       throw new Error('simulated broker rejection');
     });

@@ -56,12 +56,13 @@ matching your need; the four cover the canonical entry points.
   two routing axes (per-DS publication, per-event broker) are
   orthogonal — DD-023 cross-DS isolation extended end-to-end.
 - [`externalization-with-fallback`](externalization-with-fallback) —
-  ADR-016 silent-success demonstration plus the three
-  production mitigation patterns. Mocked-emit silent-success contract
-  pinned; consumer-side inbox / dedup template (real code, two tests);
-  `FailedEventPublications.resubmit` recovery flow (single + batch).
-  Visual demo includes manual `docker-compose stop rabbitmq` so the
-  ADR-016 limitation is observable on a real broker.
+  what a `COMPLETED` publication does and does not prove, plus the
+  consumer-side patterns that hold regardless. Completion contract
+  pinned; consumer-side inbox / dedup template (real code, two
+  tests); `FailedEventPublications.resubmit` recovery flow (single +
+  batch). The visual demo includes a manual
+  `docker-compose stop rabbitmq` so the FAILED-then-resubmit path is
+  observable against a real broker.
 
 ## Tier 4 — Advanced patterns
 
