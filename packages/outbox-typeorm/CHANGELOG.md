@@ -1,5 +1,18 @@
 # @nestjs-transactional/outbox-typeorm
 
+## 1.1.0
+
+### Minor Changes
+
+- [#57](https://github.com/igorgolovanov/nestjs-transactional/pull/57) [`8f57523`](https://github.com/igorgolovanov/nestjs-transactional/commit/8f57523271654691de9e635b2e854c56e7319495) Thanks [@igorgolovanov](https://github.com/igorgolovanov)! - Scheduled retention for completed publications. `OutboxModule.forRoot({ cleanup: { interval, retention, batchSize } })` starts a per-dataSource job that deletes publications whose `completionDate` is older than the retention window. Off by default; `interval: 0` keeps it off, and `CompletedEventPublications.purge(...)` stays available for a one-shot purge.
+  
+  `EventPublicationRepository.findCompleted` now documents and guarantees oldest-first ordering, and both repositories were aligned to it. The order was previously unspecified: the TypeORM repository returned newest-first, the in-memory one returned insertion order, and no test pinned either. It becomes a contract because `limit` makes it one — a bounded retention pass reading newest-first would delete only recent rows and never reach the old ones. If you relied on `CompletedEventPublications.findAll(...)` returning newest-first, sort at the call site.
+
+### Patch Changes
+
+- Updated dependencies [[`8f57523`](https://github.com/igorgolovanov/nestjs-transactional/commit/8f57523271654691de9e635b2e854c56e7319495), [`4ab3916`](https://github.com/igorgolovanov/nestjs-transactional/commit/4ab3916aa0ae503e42da1849745c6231162ff4fb)]:
+  - @nestjs-transactional/outbox@1.1.0
+
 ## 1.0.0
 
 ### Minor Changes
