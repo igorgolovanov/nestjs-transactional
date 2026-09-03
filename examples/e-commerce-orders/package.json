@@ -22,7 +22,7 @@
     "@nestjs/cqrs": "^11.0.0",
     "@nestjs/microservices": "^11.2.3",
     "@nestjs/platform-express": "^11.2.3",
-    "@nestjs/typeorm": "^11.0.3",
+    "@nestjs/typeorm": "^12.0.1",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
