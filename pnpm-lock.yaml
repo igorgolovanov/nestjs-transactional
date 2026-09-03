@@ -93,14 +93,14 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config':
-        specifier: ^4.0.0
-        version: 4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
+        specifier: ^12.0.0
+        version: 12.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       '@nestjs/core':
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       joi:
         specifier: ^18.2.5
         version: 18.2.5
@@ -175,8 +175,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -325,8 +325,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -386,8 +386,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -468,8 +468,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4
@@ -550,8 +550,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@grpc/grpc-js@1.14.4)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(amqp-connection-manager@5.0.0(amqplib@2.0.1))(amqplib@2.0.1)(ioredis@5.11.1)(kafkajs@2.2.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4
@@ -626,8 +626,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@grpc/grpc-js@1.14.4)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(amqp-connection-manager@5.0.0(amqplib@2.0.1))(amqplib@2.0.1)(ioredis@5.11.1)(kafkajs@2.2.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       amqp-connection-manager:
         specifier: ^5.0.0
         version: 5.0.0(amqplib@2.0.1)
@@ -711,8 +711,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@grpc/grpc-js@1.14.4)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(amqp-connection-manager@5.0.0(amqplib@2.0.1))(amqplib@2.0.1)(ioredis@5.11.1)(kafkajs@2.2.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       amqp-connection-manager:
         specifier: ^5.0.0
         version: 5.0.0(amqplib@2.0.1)
@@ -790,8 +790,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@grpc/grpc-js@1.14.4)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(amqp-connection-manager@5.0.0(amqplib@2.0.1))(amqplib@2.0.1)(ioredis@5.11.1)(kafkajs@2.2.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       amqp-connection-manager:
         specifier: ^5.0.0
         version: 5.0.0(amqplib@2.0.1)
@@ -863,8 +863,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -924,8 +924,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -985,8 +985,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -1046,8 +1046,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1107,8 +1107,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1180,8 +1180,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1247,8 +1247,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1320,8 +1320,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1423,8 +1423,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
@@ -1558,8 +1558,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       '@testcontainers/postgresql':
         specifier: ^12.1.0
         version: 12.1.0
@@ -1606,8 +1606,8 @@ importers:
         specifier: ^11.2.3
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)
       '@nestjs/typeorm':
-        specifier: ^11.0.3
-        version: 11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))
       '@testcontainers/postgresql':
         specifier: ^12.1.0
         version: 12.1.0
@@ -2265,10 +2265,10 @@ packages:
       class-validator:
         optional: true
 
-  '@nestjs/config@4.0.4':
-    resolution: {integrity: sha512-CJPjNitr0bAufSEnRe2N+JbnVmMmDoo6hvKCPzXgZoGwJSmp/dZPk9f/RMbuD/+Q1ZJPjwsRpq0vxna++Knwow==}
+  '@nestjs/config@12.0.0':
+    resolution: {integrity: sha512-pG5+fFfCo3cdgVkLJLvvhUGfxEjwzv9hIAQ1aJVHvHlHVniDWfwX5pR/utgoAkJzSikv2oTR1BmIF03FXdi42Q==}
     peerDependencies:
-      '@nestjs/common': ^10.0.0 || ^11.0.0
+      '@nestjs/common': ^11.0.0 || ^12.0.0
       rxjs: ^7.1.0
 
   '@nestjs/core@11.2.3':
@@ -2352,11 +2352,12 @@ packages:
       '@nestjs/platform-express':
         optional: true
 
-  '@nestjs/typeorm@11.0.3':
-    resolution: {integrity: sha512-zJ+E5l7auVVA7c0PsvcMdyvRPKTUqU5s2ToYmOA2QEsXQ42qbUGtK4+1HlRfpHqBkCSXP+phiH4luvf9DyJNog==}
+  '@nestjs/typeorm@12.0.1':
+    resolution: {integrity: sha512-7dsdaD/PSiwCAAhv78+ScS3e6lW41BOMZ8LB7/v5p/hovSUc1wUH1DBXhLgqYx0ChXYLzDybBIADN6lvBhiM6w==}
+    engines: {node: '>=20.19.0'}
     peerDependencies:
-      '@nestjs/common': ^10.0.0 || ^11.0.0
-      '@nestjs/core': ^10.0.0 || ^11.0.0
+      '@nestjs/common': ^10.0.0 || ^11.0.0 || ^12.0.0
+      '@nestjs/core': ^10.0.0 || ^11.0.0 || ^12.0.0
       reflect-metadata: ^0.1.13 || ^0.2.0
       rxjs: ^7.2.0
       typeorm: ^0.3.0 || ^1.0.0-dev
@@ -3292,16 +3293,12 @@ packages:
     resolution: {integrity: sha512-avsq/xk4YPIrn0CgleX5bjT9Y8IT1p9PxrNQ++RBQ2WEyFfHCTDsT9kmyxz+H/axnjAwg8wJWEIuPGOUuNupiA==}
     engines: {node: '>= 14.17'}
 
-  dotenv-expand@12.0.3:
-    resolution: {integrity: sha512-uc47g4b+4k/M/SeaW1y4OApx+mtLWl92l5LMPP0GNXctZqELk+YGgOPIIC5elYmUH4OuoK3JLhuRUYegeySiFA==}
+  dotenv-expand@13.0.0:
+    resolution: {integrity: sha512-aBfBS8eYIeXmpHI9ThIlA7/WLq+SLt18iXUZhb52rW89QLKQFoIpPG1bPeewoPZsTyjSSO3T7234FBVUM1V2rA==}
     engines: {node: '>=12'}
 
-  dotenv@16.6.1:
-    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
-    engines: {node: '>=12'}
-
-  dotenv@17.4.1:
-    resolution: {integrity: sha512-k8DaKGP6r1G30Lx8V4+pCsLzKr8vLmV2paqEj1Y55GdAgJuIqpRp5FfajGF8KtwMxCz9qJc6wUIJnm053d/WCw==}
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -3369,6 +3366,9 @@ packages:
 
   es-toolkit@1.51.0:
     resolution: {integrity: sha512-zC2lQGkM7QX+Gm6iM3+WIdZJzthsEd14LvRNJneSO2hzyz/zNBENR8+YXWo1cKxgPBtV6ksPYHELbcwBRzmdCw==}
+
+  es-toolkit@1.52.0:
+    resolution: {integrity: sha512-XTNEJQh1tY1ZJVcf6ayP/2n4ZPyaHlW2FWs7xvw5ddPuhUVjLD3olQVQS7kf58JbAB48iL0uL/jerTrjtV3lDA==}
 
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
@@ -5484,7 +5484,7 @@ snapshots:
   '@commitlint/ensure@21.2.0':
     dependencies:
       '@commitlint/types': 21.2.0
-      es-toolkit: 1.51.0
+      es-toolkit: 1.52.0
 
   '@commitlint/execute-rule@21.0.1': {}
 
@@ -5513,7 +5513,7 @@ snapshots:
       '@commitlint/types': 21.2.0
       cosmiconfig: 9.0.2(typescript@6.0.3)
       cosmiconfig-typescript-loader: 6.3.0(@types/node@22.20.1)(cosmiconfig@9.0.2(typescript@6.0.3))(typescript@6.0.3)
-      es-toolkit: 1.51.0
+      es-toolkit: 1.52.0
       is-plain-obj: 4.1.0
       picocolors: 1.1.1
     transitivePeerDependencies:
@@ -5542,7 +5542,7 @@ snapshots:
     dependencies:
       '@commitlint/config-validator': 21.2.0
       '@commitlint/types': 21.2.0
-      es-toolkit: 1.51.0
+      es-toolkit: 1.52.0
       global-directory: 5.0.0
       resolve-from: 5.0.0
 
@@ -5976,12 +5976,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nestjs/config@4.0.4(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)':
+  '@nestjs/config@12.0.0(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)':
     dependencies:
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      dotenv: 17.4.1
-      dotenv-expand: 12.0.3
-      lodash: 4.18.1
+      '@standard-schema/spec': 1.1.0
+      dotenv: 17.4.2
+      dotenv-expand: 13.0.0
+      es-toolkit: 1.51.0
       rxjs: 7.8.2
 
   '@nestjs/core@11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
@@ -6041,7 +6042,7 @@ snapshots:
       '@nestjs/microservices': 11.2.3(@grpc/grpc-js@1.14.4)(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(amqp-connection-manager@5.0.0(amqplib@2.0.1))(amqplib@2.0.1)(ioredis@5.11.1)(kafkajs@2.2.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express': 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)
 
-  '@nestjs/typeorm@11.0.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))':
+  '@nestjs/typeorm@12.0.1(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2))':
     dependencies:
       '@nestjs/common': 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.2.3)(@nestjs/platform-express@11.2.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -6990,13 +6991,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dotenv-expand@12.0.3:
+  dotenv-expand@13.0.0:
     dependencies:
-      dotenv: 16.6.1
+      dotenv: 17.4.2
 
-  dotenv@16.6.1: {}
-
-  dotenv@17.4.1: {}
+  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:
@@ -7050,6 +7049,8 @@ snapshots:
       hasown: 2.0.3
 
   es-toolkit@1.51.0: {}
+
+  es-toolkit@1.52.0: {}
 
   escalade@3.2.0: {}
 
