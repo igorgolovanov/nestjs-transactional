@@ -79,7 +79,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.1",
     "amqplib": "^2.0.1",
-    "jest": "^30.4.2",
+    "jest": "^30.5.0",
     "kafkajs": "^2.2.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
