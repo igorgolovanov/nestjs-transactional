@@ -10,6 +10,11 @@ module.exports = {
   // ratchet upward. Lowering one is a reviewable change, not a quiet
   // side effect of a merge.
   //
+  // Ratcheted once, on branches only: `describeThrown` and its spec
+  // moved the real figure from 66.7 to 77.41, leaving the 65 floor with
+  // more slack than any other package in the repo. Measured
+  // 97.91 / 77.41 / 100 / 97.82.
+  //
   // Unlike `typeorm` and `outbox-typeorm`, this package has no
   // `jest.coverage.config.js` folding its integration suite into the
   // measurement, and that is deliberate rather than an omission. Those
@@ -21,7 +26,7 @@ module.exports = {
   coverageThreshold: {
     global: {
       statements: 97,
-      branches: 65,
+      branches: 77,
       functions: 100,
       lines: 97,
     },
