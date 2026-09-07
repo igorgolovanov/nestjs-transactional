@@ -5,8 +5,7 @@
     { "repo": "igorgolovanov/nestjs-transactional" }
   ],
   "commit": false,
-  "fixed": [],
-  "linked": [
+  "fixed": [
     [
       "@nestjs-transactional/core",
       "@nestjs-transactional/typeorm",
@@ -16,6 +15,7 @@
       "@nestjs-transactional/outbox-microservices"
     ]
   ],
+  "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
