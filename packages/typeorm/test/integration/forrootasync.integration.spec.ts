@@ -5,8 +5,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
-import { TestUser } from '../shared/test-user.entity';
+import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
+import { TestUser } from '../shared/test-user.entity.js';
 
 /**
  * Pin the `TypeOrmTransactionalModule.forRootAsync` contract: it

@@ -11,8 +11,8 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { CompensationHandler } from './compensation.handler';
-import { OrderRow, PaymentRow, ReservationRow, StockItemRow } from './entities';
+import { CompensationHandler } from './compensation.handler.js';
+import { OrderRow, PaymentRow, ReservationRow, StockItemRow } from './entities.js';
 import {
   InventoryReservationFailedEvent,
   InventoryReservedEvent,
@@ -20,11 +20,11 @@ import {
   OrderShippedEvent,
   PaymentChargedEvent,
   PaymentFailedEvent,
-} from './events';
-import { OrderService } from './order.service';
-import { PaymentHandler } from './payment.handler';
-import { ReservationHandler } from './reservation.handler';
-import { ShipmentHandler } from './shipment.handler';
+} from './events.js';
+import { OrderService } from './order.service.js';
+import { PaymentHandler } from './payment.handler.js';
+import { ReservationHandler } from './reservation.handler.js';
+import { ShipmentHandler } from './shipment.handler.js';
 
 export interface PostgresConfig {
   readonly host: string;

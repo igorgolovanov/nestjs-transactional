@@ -3,10 +3,10 @@ import 'reflect-metadata';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
-import { AppModule } from '../src/app.module';
-import { GetNotifiedOrdersQuery } from '../src/get-notified-orders.query';
-import { NotificationHandler } from '../src/notification.handler';
-import { PlaceOrderCommand } from '../src/place-order.handler';
+import { AppModule } from '../src/app.module.js';
+import { GetNotifiedOrdersQuery } from '../src/get-notified-orders.query.js';
+import { NotificationHandler } from '../src/notification.handler.js';
+import { PlaceOrderCommand } from '../src/place-order.handler.js';
 
 describe('basic-cqrs', () => {
   let module: TestingModule;

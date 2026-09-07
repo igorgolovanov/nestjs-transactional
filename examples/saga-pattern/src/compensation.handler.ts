@@ -7,8 +7,8 @@ import {
 } from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
-import { OrderRow, StockItemRow } from './entities';
-import { InventoryReservationFailedEvent, PaymentFailedEvent } from './events';
+import { OrderRow, StockItemRow } from './entities.js';
+import { InventoryReservationFailedEvent, PaymentFailedEvent } from './events.js';
 
 /**
  * Compensation step. Subscribes to **both** failure events and runs

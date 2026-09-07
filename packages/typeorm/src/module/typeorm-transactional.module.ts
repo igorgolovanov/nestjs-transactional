@@ -19,13 +19,13 @@ import {
 } from '@nestjs-transactional/core';
 import type { DataSource } from 'typeorm';
 
-import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter';
+import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter.js';
 import {
   applyAllPatches,
   markAsManaged,
   patchDataSourceInstance,
   resetPatchingForTesting,
-} from '../patching';
+} from '../patching/index.js';
 
 // ---------------------------------------------------------------
 // Apply Repository / EntityManager prototype patches at MODULE-LOAD

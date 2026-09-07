@@ -117,6 +117,14 @@ That is the entire setup for the first half of this page. Add
 `outbox-microservices` to reach a broker — each is additive, and none of
 them changes code you have already written.
 
+**These packages are ESM only**, from `2.0.0`, matching NestJS 12. A
+CommonJS application still consumes them: Node loads ESM from
+`require()` as of 22.12.0, which is what the `>=22.13.0` floor covers.
+What does not follow Node is tooling with its own module loader — Jest
+needs `--experimental-vm-modules` and a few settings, shown in all 19
+example applications. The reasoning, and why one build rather than two,
+is in [ADR-022](docs/adr/022-esm-only-packaging.md).
+
 ## Packages
 
 | Package | npm | What it adds |

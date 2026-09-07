@@ -1,8 +1,11 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 
-import { EVENT_PUBLICATION_TABLE, applyEventPublicationSchema } from './event-publication-schema';
-import type { SchemaInitializationOptions } from './schema-initialization-options';
+import {
+  EVENT_PUBLICATION_TABLE,
+  applyEventPublicationSchema,
+} from './event-publication-schema.js';
+import type { SchemaInitializationOptions } from './schema-initialization-options.js';
 
 interface ExistsRow {
   readonly exists: string | null;

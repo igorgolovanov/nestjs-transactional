@@ -4,10 +4,10 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { CacheInvalidationEvent } from './cache-invalidation.event';
-import { OrderEntity } from './order.entity';
-import { OrderPlacedEvent } from './order-placed.event';
-import { RefundRequestedEvent } from './refund-requested.event';
+import { CacheInvalidationEvent } from './cache-invalidation.event.js';
+import { OrderEntity } from './order.entity.js';
+import { OrderPlacedEvent } from './order-placed.event.js';
+import { RefundRequestedEvent } from './refund-requested.event.js';
 
 /**
  * Demonstrates that a single `@Transactional` method can publish

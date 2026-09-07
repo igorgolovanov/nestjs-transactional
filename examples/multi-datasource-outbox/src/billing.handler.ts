@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { InvoiceCreatedEvent } from './events';
+import { InvoiceCreatedEvent } from './events.js';
 
 /**
  * Category A — `OutboxListenerScanner` walks every

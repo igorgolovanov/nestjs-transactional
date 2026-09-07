@@ -1,11 +1,11 @@
 import { Inject } from '@nestjs/common';
 
-import { DEFAULT_DATA_SOURCE_NAME } from '../tokens/constants';
+import { DEFAULT_DATA_SOURCE_NAME } from '../tokens/constants.js';
 import {
   getTransactionContextToken,
   getTransactionManagerToken,
   getTransactionalAdapterToken,
-} from '../tokens/token-utils';
+} from '../tokens/token-utils.js';
 
 /**
  * Inject the per-dataSource `TransactionManager`. Sugar over

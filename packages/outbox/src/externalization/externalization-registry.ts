@@ -1,9 +1,9 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 
-import { EventTypeRegistry } from '../serialization/event-type-registry';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
 
-import { type ExternalizedMetadata, getExternalizedMetadata } from './externalized.decorator';
-import type { ExternalizationMetadata } from './types';
+import { type ExternalizedMetadata, getExternalizedMetadata } from './externalized.decorator.js';
+import type { ExternalizationMetadata } from './types.js';
 
 /**
  * Registry mapping event type names to their {@link ExternalizedMetadata}.

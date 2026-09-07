@@ -1,10 +1,10 @@
-import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter';
+import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
-import { TestUser } from '../shared/test-user.entity';
+} from '../setup-testcontainers.js';
+import { TestUser } from '../shared/test-user.entity.js';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 

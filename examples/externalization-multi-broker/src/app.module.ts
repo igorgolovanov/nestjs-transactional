@@ -12,15 +12,15 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { AccountingHandler } from './accounting.handler';
-import { CacheInvalidationEvent } from './cache-invalidation.event';
-import { KAFKA_CLIENT, RABBITMQ_CLIENT, REDIS_CLIENT } from './clients';
-import { LocalCacheInvalidator } from './local-cache.handler';
-import { OrderEntity } from './order.entity';
-import { OrderPlacedEvent } from './order-placed.event';
-import { OrderService } from './order.service';
-import { RefundRequestedEvent } from './refund-requested.event';
-import { ShippingHandler } from './shipping.handler';
+import { AccountingHandler } from './accounting.handler.js';
+import { CacheInvalidationEvent } from './cache-invalidation.event.js';
+import { KAFKA_CLIENT, RABBITMQ_CLIENT, REDIS_CLIENT } from './clients.js';
+import { LocalCacheInvalidator } from './local-cache.handler.js';
+import { OrderEntity } from './order.entity.js';
+import { OrderPlacedEvent } from './order-placed.event.js';
+import { OrderService } from './order.service.js';
+import { RefundRequestedEvent } from './refund-requested.event.js';
+import { ShippingHandler } from './shipping.handler.js';
 
 export interface PostgresConfig {
   readonly host: string;

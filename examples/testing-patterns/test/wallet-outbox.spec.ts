@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Injectable } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionalModule } from '@nestjs-transactional/core';
@@ -14,9 +15,9 @@ import {
   PublishedEvents,
 } from '@nestjs-transactional/outbox/testing';
 
-import { WalletOperationEvent } from '../src/events';
-import { WalletService } from '../src/wallet.service';
-import { WALLET_REPOSITORY, type WalletRepository } from '../src/wallet.repository';
+import { WalletOperationEvent } from '../src/events.js';
+import { WalletService } from '../src/wallet.service.js';
+import { WALLET_REPOSITORY, type WalletRepository } from '../src/wallet.repository.js';
 
 /**
  * A no-op outbox listener so the publisher has somewhere to write

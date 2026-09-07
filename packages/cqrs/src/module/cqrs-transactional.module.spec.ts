@@ -12,10 +12,10 @@ import { TransactionalModule, Transactional } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule, getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
 
-import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
-import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator.js';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface.js';
 
-import { CqrsTransactionalModule } from './cqrs-transactional.module';
+import { CqrsTransactionalModule } from './cqrs-transactional.module.js';
 
 // --- Schema ---
 

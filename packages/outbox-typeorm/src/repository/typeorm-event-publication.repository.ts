@@ -22,8 +22,8 @@ import {
   type FindOptionsWhere,
 } from 'typeorm';
 
-import { EventPublicationArchiveEntity } from '../entity/event-publication-archive.entity';
-import { EventPublicationEntity } from '../entity/event-publication.entity';
+import { EventPublicationArchiveEntity } from '../entity/event-publication-archive.entity.js';
+import { EventPublicationEntity } from '../entity/event-publication.entity.js';
 
 /**
  * TypeORM-backed implementation of

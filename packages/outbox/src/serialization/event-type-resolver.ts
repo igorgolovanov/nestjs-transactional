@@ -1,6 +1,6 @@
-import { OutboxError } from '../types/errors';
+import { OutboxError } from '../types/errors.js';
 
-import type { EventTypeRegistry } from './event-type-registry';
+import type { EventTypeRegistry } from './event-type-registry.js';
 
 /**
  * Resolve the dataSource that owns a given event-type name by walking

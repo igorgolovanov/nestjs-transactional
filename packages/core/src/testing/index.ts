@@ -1,1 +1,1 @@
-export * from './in-memory.adapter';
+export * from './in-memory.adapter.js';

@@ -3,10 +3,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
-} from '../repository/event-publication-repository';
-import { drainWithTimeout } from '../shutdown/drain';
-import { PublicationStatus } from '../types/publication-status';
-import type { StalenessConfig } from '../types/staleness-config';
+} from '../repository/event-publication-repository.js';
+import { drainWithTimeout } from '../shutdown/drain.js';
+import { PublicationStatus } from '../types/publication-status.js';
+import type { StalenessConfig } from '../types/staleness-config.js';
 
 /**
  * Periodic watchdog that flips publications stuck in non-terminal

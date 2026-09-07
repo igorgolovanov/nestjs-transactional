@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { ArticleRow } from './article.entity';
+import { ArticleRow } from './article.entity.js';
 
 /**
  * Read side. `@InjectRepository(ArticleRow, 'replica')` resolves

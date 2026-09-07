@@ -1,12 +1,12 @@
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
 
 import {
   AssertablePublishedEvents,
   PublishedEventsAssertionError,
-} from './assertable-published-events';
-import { InMemoryEventPublicationRepository } from './in-memory-repository';
-import { PublishedEvents } from './published-events';
+} from './assertable-published-events.js';
+import { InMemoryEventPublicationRepository } from './in-memory-repository.js';
+import { PublishedEvents } from './published-events.js';
 
 class OrderPlacedEvent {
   constructor(

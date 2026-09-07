@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { FailedEventPublications } from '../api/failed-event-publications';
-import { drainWithTimeout } from '../shutdown/drain';
-import type { EventPublication } from '../types/event-publication';
-import { ResubmissionOptions } from '../types/resubmission-options';
-import type { OutboxRetryConfig } from '../types/retry-config';
+import { FailedEventPublications } from '../api/failed-event-publications.js';
+import { drainWithTimeout } from '../shutdown/drain.js';
+import type { EventPublication } from '../types/event-publication.js';
+import { ResubmissionOptions } from '../types/resubmission-options.js';
+import type { OutboxRetryConfig } from '../types/retry-config.js';
 
 /**
  * Periodically resubmits `FAILED` publications whose backoff window has

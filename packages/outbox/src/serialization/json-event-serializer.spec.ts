@@ -1,7 +1,7 @@
-import { DeserializationError, SerializationError } from '../types/errors';
+import { DeserializationError, SerializationError } from '../types/errors.js';
 
-import { EventTypeRegistry } from './event-type-registry';
-import { JsonEventSerializer } from './json-event-serializer';
+import { EventTypeRegistry } from './event-type-registry.js';
+import { JsonEventSerializer } from './json-event-serializer.js';
 
 class OrderPlacedEvent {
   constructor(

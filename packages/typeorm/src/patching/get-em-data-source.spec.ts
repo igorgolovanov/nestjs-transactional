@@ -1,6 +1,6 @@
 import type { DataSource, EntityManager } from 'typeorm';
 
-import { getEmDataSource } from './get-em-data-source';
+import { getEmDataSource } from './get-em-data-source.js';
 
 describe('getEmDataSource', () => {
   const sentinel = { name: 'ds' } as unknown as DataSource;

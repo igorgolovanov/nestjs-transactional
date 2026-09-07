@@ -1,7 +1,7 @@
-import { OutboxError } from '../types/errors';
+import { OutboxError } from '../types/errors.js';
 
-import { EventTypeRegistry } from './event-type-registry';
-import { resolveDataSourceByEventTypeName } from './event-type-resolver';
+import { EventTypeRegistry } from './event-type-registry.js';
+import { resolveDataSourceByEventTypeName } from './event-type-resolver.js';
 
 class FooEvent {}
 class BarEvent {}

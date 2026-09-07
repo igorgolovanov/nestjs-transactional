@@ -2,17 +2,20 @@ import { Inject, Injectable, Logger, type OnModuleInit, type Type } from '@nestj
 import { DiscoveryService, ModuleRef } from '@nestjs/core';
 import { PropagationMode, TransactionManager } from '@nestjs-transactional/core';
 
-import { getOutboxEventsHandlerMetadata } from '../decorators/outbox-events-handler.decorator';
+import { getOutboxEventsHandlerMetadata } from '../decorators/outbox-events-handler.decorator.js';
 import {
   OUTBOX_DATA_SOURCE_NAMES,
   type OutboxDataSourceNames,
-} from '../dispatcher/outbox-event-publisher';
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import { getEventTypeRegistryToken, getOutboxListenerRegistryToken } from '../tokens/token-utils';
-import { OutboxError } from '../types/errors';
+} from '../dispatcher/outbox-event-publisher.js';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver.js';
+import {
+  getEventTypeRegistryToken,
+  getOutboxListenerRegistryToken,
+} from '../tokens/token-utils.js';
+import { OutboxError } from '../types/errors.js';
 
-import { OutboxListenerRegistry } from './listener-registry';
+import { OutboxListenerRegistry } from './listener-registry.js';
 
 type OutboxListenerMethod = (event: unknown) => Promise<void>;
 

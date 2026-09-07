@@ -3,9 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { BillingService } from './billing.service';
-import { InventoryService } from './inventory.service';
-import { InvoiceEntity, StockItemEntity } from './entities';
+import { BillingService } from './billing.service.js';
+import { InventoryService } from './inventory.service.js';
+import { InvoiceEntity, StockItemEntity } from './entities.js';
 
 /**
  * Multi-DataSource example using two SQLite in-memory databases via

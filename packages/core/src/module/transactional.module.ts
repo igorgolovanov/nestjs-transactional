@@ -8,25 +8,25 @@ import {
 } from '@nestjs/common';
 import { APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
 
-import { TransactionalMethodsBootstrap } from '../bootstrap/transactional-methods.bootstrap';
-import { TransactionContextView } from '../context/transaction-context-view';
-import { TransactionalInterceptor } from '../interceptor/transactional.interceptor';
+import { TransactionalMethodsBootstrap } from '../bootstrap/transactional-methods.bootstrap.js';
+import { TransactionContextView } from '../context/transaction-context-view.js';
+import { TransactionalInterceptor } from '../interceptor/transactional.interceptor.js';
 import {
   ADAPTER_REGISTRY,
   type AdapterRegistration,
   AdapterRegistry,
-} from '../manager/adapter.registry';
-import { TransactionManager } from '../manager/transaction.manager';
+} from '../manager/adapter.registry.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
 import {
   TRANSACTION_OBSERVERS,
   type TransactionObserver,
-} from '../observability/transaction-observer';
+} from '../observability/transaction-observer.js';
 import {
   getTransactionContextToken,
   getTransactionManagerToken,
   getTransactionalAdapterToken,
-} from '../tokens/token-utils';
-import type { TransactionAdapter } from '../types/transaction-adapter';
+} from '../tokens/token-utils.js';
+import type { TransactionAdapter } from '../types/transaction-adapter.js';
 
 /**
  * Synchronous options for {@link TransactionalModule.forRoot}.

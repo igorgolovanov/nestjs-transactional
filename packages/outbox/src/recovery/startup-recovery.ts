@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 
-import { IncompleteEventPublications } from '../api/incomplete-event-publications';
-import { ResubmissionOptions } from '../types/resubmission-options';
+import { IncompleteEventPublications } from '../api/incomplete-event-publications.js';
+import { ResubmissionOptions } from '../types/resubmission-options.js';
 
 /** DI token for {@link OutboxRecoveryOptions}. */
 export const OUTBOX_RECOVERY_OPTIONS = Symbol('OUTBOX_RECOVERY_OPTIONS');

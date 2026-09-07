@@ -9,9 +9,9 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { EventTypeRegistry } from '../serialization/event-type-registry';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
 
-import { OutboxModule } from './outbox.module';
+import { OutboxModule } from './outbox.module.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;

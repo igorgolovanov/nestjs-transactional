@@ -3,7 +3,7 @@ import {
   getTransactionContextToken,
   getTransactionManagerToken,
   getTransactionalAdapterToken,
-} from './token-utils';
+} from './token-utils.js';
 
 describe('Token utilities (core)', () => {
   describe('getTransactionManagerToken', () => {

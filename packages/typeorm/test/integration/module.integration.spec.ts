@@ -9,15 +9,15 @@ import {
 } from '@nestjs-transactional/core';
 import type { DataSource } from 'typeorm';
 
-import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager';
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
+import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager.js';
+import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
 import {
   createAdditionalDatabase,
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
-import { TestUser } from '../shared/test-user.entity';
+} from '../setup-testcontainers.js';
+import { TestUser } from '../shared/test-user.entity.js';
 
 /**
  * Stand-in for `TypeOrmModule.forRoot(...)` — registers the

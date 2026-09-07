@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { EventPublicationRepository } from '../repository/event-publication-repository';
-import { drainWithTimeout } from '../shutdown/drain';
-import type { OutboxCleanupConfig } from '../types/cleanup-config';
+import type { EventPublicationRepository } from '../repository/event-publication-repository.js';
+import { drainWithTimeout } from '../shutdown/drain.js';
+import type { OutboxCleanupConfig } from '../types/cleanup-config.js';
 
 /**
  * Periodically removes publications that have been `COMPLETED` longer

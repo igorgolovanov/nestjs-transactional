@@ -1,14 +1,19 @@
-import { TransactionAdapterNotFoundError } from '../types/errors';
-import type { TransactionAdapter } from '../types/transaction-adapter';
+import { jest } from '@jest/globals';
 
-import { AdapterRegistry, type AdapterRegistration } from './adapter.registry';
+import { TransactionAdapterNotFoundError } from '../types/errors.js';
+import type { TransactionAdapter } from '../types/transaction-adapter.js';
+
+import { AdapterRegistry, type AdapterRegistration } from './adapter.registry.js';
 
 function makeAdapter(name = 'mock', dataSourceName = 'default'): TransactionAdapter {
   return {
     name,
     dataSourceName,
-    runInTransaction: jest.fn(),
-    runInSavepoint: jest.fn(),
+    // Placeholders: these specs exercise registry lookup, never the
+    // adapter itself. Cast because the real signatures are generic in
+    // the return type and `jest.Mock` cannot carry a type parameter.
+    runInTransaction: jest.fn() as unknown as TransactionAdapter['runInTransaction'],
+    runInSavepoint: jest.fn() as unknown as TransactionAdapter['runInSavepoint'],
   };
 }
 

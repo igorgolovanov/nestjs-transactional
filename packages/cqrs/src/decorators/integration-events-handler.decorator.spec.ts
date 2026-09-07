@@ -1,10 +1,10 @@
-import type { IIntegrationEventHandler } from '../interfaces/integration-event-handler.interface';
+import type { IIntegrationEventHandler } from '../interfaces/integration-event-handler.interface.js';
 
 import {
   INTEGRATION_EVENTS_HANDLER_METADATA,
   IntegrationEventsHandler,
   getIntegrationEventsHandlerMetadata,
-} from './integration-events-handler.decorator';
+} from './integration-events-handler.decorator.js';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}

@@ -1,6 +1,6 @@
 import { TransactionError } from '@nestjs-transactional/core';
 
-import type { PublicationStatus } from './publication-status';
+import type { PublicationStatus } from './publication-status.js';
 
 /**
  * Base class for errors raised by `@nestjs-transactional/outbox`.

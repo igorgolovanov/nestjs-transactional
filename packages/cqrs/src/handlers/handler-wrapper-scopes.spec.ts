@@ -11,15 +11,15 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
-import { CqrsTransactionalBootstrap } from './bootstrap';
+import { CqrsTransactionalBootstrap } from './bootstrap.js';
 import {
   CQRS_HANDLER_WRAPPER_OPTIONS,
   CqrsHandlerWrapper,
   type HandlerWrapperOptions,
-} from './handler-wrapper';
-import { TransactionalListenerScanner } from './listener-scanner';
+} from './handler-wrapper.js';
+import { TransactionalListenerScanner } from './listener-scanner.js';
 
 /**
  * Scope-aware wrapping behaviour for `CqrsHandlerWrapper` per ADR-020.

@@ -10,8 +10,8 @@ import { type Observable, defer, firstValueFrom } from 'rxjs';
 import {
   TRANSACTIONAL_METADATA,
   type TransactionalMetadata,
-} from '../decorators/transactional.decorator';
-import { TransactionManager } from '../manager/transaction.manager';
+} from '../decorators/transactional.decorator.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
 
 /**
  * NestJS interceptor that wraps a request-boundary handler in a transaction

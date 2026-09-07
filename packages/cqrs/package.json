@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "@nestjs/cqrs integration for @nestjs-transactional/core — transactional event listeners with phases, handler wrapping, AggregateRoot integration",
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "sideEffects": false,
   "author": "Igor Golovanov",
   "repository": {
@@ -26,7 +26,7 @@
     "after-commit"
   ],
   "engines": {
-    "node": ">=22.11.0"
+    "node": ">=22.13.0"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -49,24 +49,25 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "clean": "rimraf dist *.tsbuildinfo coverage",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
+    "test:cov": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",
     "api:check": "api-extractor run",
     "api:update": "api-extractor run --local",
-    "publish:check": "publint && attw --pack ."
+    "publish:check": "publint && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",
-    "@nestjs/common": "^10.0.0 || ^11.0.0",
-    "@nestjs/core": "^10.0.0 || ^11.0.0",
-    "@nestjs/cqrs": "^11.0.0",
+    "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@nestjs/cqrs": "^11.0.0 || ^12.0.0",
     "reflect-metadata": "^0.1.13 || ^0.2.0",
     "rxjs": "^7.0.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.4.2",
     "@nestjs-transactional/core": "workspace:*",
     "@nestjs-transactional/outbox": "workspace:*",
     "@nestjs-transactional/typeorm": "workspace:*",

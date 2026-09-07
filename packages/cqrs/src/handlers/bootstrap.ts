@@ -1,6 +1,6 @@
 import { Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 
-import { CqrsHandlerWrapper } from './handler-wrapper';
+import { CqrsHandlerWrapper } from './handler-wrapper.js';
 
 /**
  * Fires `CqrsHandlerWrapper.wrapAll` at application bootstrap, after all

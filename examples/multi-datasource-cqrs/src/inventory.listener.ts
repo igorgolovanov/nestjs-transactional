@@ -4,7 +4,7 @@ import {
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
 
-import { ReservationPlacedEvent } from './reservation.aggregate';
+import { ReservationPlacedEvent } from './reservation.aggregate.js';
 
 /**
  * Category B in action. The `dataSource: 'inventory'`

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { WalletRow } from './wallet.entity';
+import { WalletRow } from './wallet.entity.js';
 
 /**
  * Domain-owned repository contract. Tests substitute a Jest mock or

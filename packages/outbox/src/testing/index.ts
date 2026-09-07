@@ -1,3 +1,3 @@
-export * from './in-memory-repository';
-export * from './published-events';
-export * from './assertable-published-events';
+export * from './in-memory-repository.js';
+export * from './published-events.js';
+export * from './assertable-published-events.js';

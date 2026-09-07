@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Injectable, Logger } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -11,19 +12,19 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { IntegrationEventsHandler } from '../decorators/integration-events-handler.decorator';
+import { IntegrationEventsHandler } from '../decorators/integration-events-handler.decorator.js';
 import {
   type DispatcherListenerMetadata,
   TransactionalEventDispatcher,
-} from '../event-dispatcher/event-dispatcher';
-import type { IIntegrationEventHandler } from '../interfaces/integration-event-handler.interface';
-import { TransactionPhase } from '../types/transactional-listener.types';
+} from '../event-dispatcher/event-dispatcher.js';
+import type { IIntegrationEventHandler } from '../interfaces/integration-event-handler.interface.js';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
-import { IntegrationEventsHandlerScanner } from './integration-events-handler-scanner';
+import { IntegrationEventsHandlerScanner } from './integration-events-handler-scanner.js';
 import {
   OUTBOX_LISTENER_REGISTRAR,
   type OutboxListenerRegistrar,
-} from './outbox-listener-registrar';
+} from './outbox-listener-registrar.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -142,7 +143,9 @@ describe('IntegrationEventsHandlerScanner', () => {
   });
 
   describe('with outbox registrar bound', () => {
-    let registrar: OutboxListenerRegistrar & { register: jest.Mock };
+    let registrar: OutboxListenerRegistrar & {
+      register: jest.Mock<OutboxListenerRegistrar['register']>;
+    };
 
     beforeEach(() => {
       registrar = { register: jest.fn() };

@@ -1,19 +1,20 @@
+import { jest } from '@jest/globals';
 import { Inject, Injectable } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { TransactionContextView } from '../context/transaction-context-view';
-import { TransactionContext } from '../context/transaction.context';
-import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
-import { TransactionManager } from '../manager/transaction.manager';
-import type { TransactionObserver } from '../observability/transaction-observer';
-import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
+import { TransactionContextView } from '../context/transaction-context-view.js';
+import { TransactionContext } from '../context/transaction.context.js';
+import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
+import type { TransactionObserver } from '../observability/transaction-observer.js';
+import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter.js';
 import {
   getTransactionContextToken,
   getTransactionManagerToken,
   getTransactionalAdapterToken,
-} from '../tokens/token-utils';
+} from '../tokens/token-utils.js';
 
-import { TransactionalModule } from './transactional.module';
+import { TransactionalModule } from './transactional.module.js';
 
 /**
  * Multi-`forRoot` coordination behaviour. Static class

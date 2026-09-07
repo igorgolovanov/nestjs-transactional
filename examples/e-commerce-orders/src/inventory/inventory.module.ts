@@ -5,11 +5,11 @@ import { OutboxModule } from '@nestjs-transactional/outbox';
 import {
   StockReservationFailedEvent,
   StockReservedEvent,
-} from '../shared/events';
-import { ProductRow } from './product.entity';
-import { ReleaseStockHandler } from './release-stock.handler';
-import { ReservationRow } from './reservation.entity';
-import { ReserveStockHandler } from './reserve-stock.handler';
+} from '../shared/events.js';
+import { ProductRow } from './product.entity.js';
+import { ReleaseStockHandler } from './release-stock.handler.js';
+import { ReservationRow } from './reservation.entity.js';
+import { ReserveStockHandler } from './reserve-stock.handler.js';
 
 /**
  * Inventory bounded context. Owns the inventory DataSource entities

@@ -2,11 +2,11 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule, readMultiDsConfigFromEnv } from './app.module';
-import { BillingService } from './billing.service';
-import { BillingProjectionsHandler } from './billing.handler';
-import { InventoryService } from './inventory.service';
-import { InventoryProjectionsHandler } from './inventory.handler';
+import { AppModule, readMultiDsConfigFromEnv } from './app.module.js';
+import { BillingService } from './billing.service.js';
+import { BillingProjectionsHandler } from './billing.handler.js';
+import { InventoryService } from './inventory.service.js';
+import { InventoryProjectionsHandler } from './inventory.handler.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now();

@@ -15,7 +15,7 @@ import {
 } from '@nestjs-transactional/outbox';
 import { firstValueFrom } from 'rxjs';
 
-import { OUTBOX_MICROSERVICES_OPTIONS, type OutboxMicroservicesOptions } from '../types/options';
+import { OUTBOX_MICROSERVICES_OPTIONS, type OutboxMicroservicesOptions } from '../types/options.js';
 
 /**
  * {@link EventExternalizer} implementation backed by `@nestjs/microservices`

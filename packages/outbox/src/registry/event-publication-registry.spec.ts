@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import {
   AdapterRegistry,
   TransactionManager,
@@ -8,13 +9,13 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { CompletionMode } from '../types/completion-mode';
-import { PublicationStatus } from '../types/publication-status';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { CompletionMode } from '../types/completion-mode.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { EventPublicationRegistry } from './event-publication-registry';
+import { EventPublicationRegistry } from './event-publication-registry.js';
 
 // Inline fake adapter — cqrs specs use the same pattern, because the
 // `@nestjs-transactional/core/testing` subpath cannot be resolved under

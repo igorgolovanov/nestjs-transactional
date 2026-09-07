@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Injectable, Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -10,12 +11,12 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
-import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface';
-import { OutboxModule } from '../module/outbox.module';
-import { getOutboxListenerRegistryToken } from '../tokens/token-utils';
+import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator.js';
+import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface.js';
+import { OutboxModule } from '../module/outbox.module.js';
+import { getOutboxListenerRegistryToken } from '../tokens/token-utils.js';
 
-import { OutboxListenerRegistry } from './listener-registry';
+import { OutboxListenerRegistry } from './listener-registry.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;

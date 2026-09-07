@@ -1,9 +1,10 @@
+import { jest } from '@jest/globals';
 import { IllegalTransactionStateError } from '@nestjs-transactional/core';
 import { DataSource, type EntityManager } from 'typeorm';
 
-import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter';
-import type { TypeOrmTransactionHandle } from '../../src/types/typeorm-transaction-handle';
-import { TestUser } from '../shared/test-user.entity';
+import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter.js';
+import type { TypeOrmTransactionHandle } from '../../src/types/typeorm-transaction-handle.js';
+import { TestUser } from '../shared/test-user.entity.js';
 
 async function createSqlJsDataSource(): Promise<DataSource> {
   const ds = new DataSource({
@@ -314,7 +315,7 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
         async (support) => {
           const parent = await parentHandle();
           const restricted = withTransactionSupport(support);
-          const inner = jest.fn();
+          const inner = jest.fn<() => Promise<unknown>>();
 
           await expect(restricted.runInSavepoint(parent, inner)).rejects.toBeInstanceOf(
             IllegalTransactionStateError,

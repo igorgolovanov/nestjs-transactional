@@ -1,14 +1,17 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
-import { ExternalizationError } from '../externalization/errors';
-import { EVENT_EXTERNALIZER, type EventExternalizer } from '../externalization/event-externalizer';
-import { ExternalizationRegistry } from '../externalization/externalization-registry';
-import { EventPublicationRegistry } from '../registry/event-publication-registry';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
-import { drainWithTimeout } from '../shutdown/drain';
-import type { EventPublication } from '../types/event-publication';
+import { ExternalizationError } from '../externalization/errors.js';
+import {
+  EVENT_EXTERNALIZER,
+  type EventExternalizer,
+} from '../externalization/event-externalizer.js';
+import { ExternalizationRegistry } from '../externalization/externalization-registry.js';
+import { EventPublicationRegistry } from '../registry/event-publication-registry.js';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
+import { drainWithTimeout } from '../shutdown/drain.js';
+import type { EventPublication } from '../types/event-publication.js';
 
-import type { EventPublicationProcessorOptions } from './processor-options';
+import type { EventPublicationProcessorOptions } from './processor-options.js';
 
 /**
  * Async worker that drains the event publication queue:

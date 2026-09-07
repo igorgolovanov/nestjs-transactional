@@ -1,4 +1,4 @@
-import type { ExtendedTransactionOptions } from '../types/transaction-options';
+import type { ExtendedTransactionOptions } from '../types/transaction-options.js';
 
 /**
  * Context passed to {@link TransactionObserver.onTransactionStart}. Built

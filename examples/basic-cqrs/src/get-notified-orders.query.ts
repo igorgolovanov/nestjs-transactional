@@ -1,6 +1,6 @@
 import { type IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 
-import { NotificationHandler } from './notification.handler';
+import { NotificationHandler } from './notification.handler.js';
 
 /**
  * Returns the list of order ids the in-memory `NotificationHandler`

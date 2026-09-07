@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { ProcessedRefundEntity } from './processed-refunds.entity';
-import { RefundRequestedEvent } from './refund-requested.event';
+import { ProcessedRefundEntity } from './processed-refunds.entity.js';
+import { RefundRequestedEvent } from './refund-requested.event.js';
 
 /**
  * Consumer-side template. In a real

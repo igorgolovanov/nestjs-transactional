@@ -6,7 +6,7 @@ import {
   TransactionManager,
 } from '@nestjs-transactional/core';
 
-import { TransactionPhase } from '../types/transactional-listener.types';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
 /**
  * Resolved per-event-type listener configuration used by

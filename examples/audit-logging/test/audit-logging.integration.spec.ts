@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -13,11 +14,11 @@ import {
 } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
-import { AccountService } from '../src/account.service';
-import { AuditHandler } from '../src/audit.handler';
-import { AuditLoggingModule } from '../src/app.module';
-import { AccountOperationRow, AccountRow, AuditLogRow } from '../src/entities';
-import { AccountOperationEvent } from '../src/events';
+import { AccountService } from '../src/account.service.js';
+import { AuditHandler } from '../src/audit.handler.js';
+import { AuditLoggingModule } from '../src/app.module.js';
+import { AccountOperationRow, AccountRow, AuditLogRow } from '../src/entities.js';
+import { AccountOperationEvent } from '../src/events.js';
 
 async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
   const start = Date.now();

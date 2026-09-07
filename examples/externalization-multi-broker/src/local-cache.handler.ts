@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { CacheInvalidationEvent } from './cache-invalidation.event';
+import { CacheInvalidationEvent } from './cache-invalidation.event.js';
 
 /**
  * Local listener for `CacheInvalidationEvent`. Drops the affected key

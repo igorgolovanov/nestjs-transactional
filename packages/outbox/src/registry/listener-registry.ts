@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DuplicateListenerIdError } from '../types/errors';
+import { DuplicateListenerIdError } from '../types/errors.js';
 
 /**
  * A listener registered with the {@link OutboxListenerRegistry}.

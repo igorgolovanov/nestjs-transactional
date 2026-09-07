@@ -4,7 +4,7 @@ import {
   InjectTransactionContext,
   InjectTransactionManager,
   InjectTransactionalAdapter,
-} from './inject-decorators';
+} from './inject-decorators.js';
 
 /**
  * `@Inject(token)` writes its token under the

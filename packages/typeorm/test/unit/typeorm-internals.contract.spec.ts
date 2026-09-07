@@ -1,6 +1,6 @@
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
-import { TestUser } from '../shared/test-user.entity';
+import { TestUser } from '../shared/test-user.entity.js';
 
 /**
  * Contract tests for the TypeORM internals the patching layer depends on.

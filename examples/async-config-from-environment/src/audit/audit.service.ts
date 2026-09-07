@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { InjectOutboxPublisher, OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { AuditEventRecordedEvent } from './audit-event-recorded.event';
-import { AuditLogEntry } from './audit-log.entity';
+import { AuditEventRecordedEvent } from './audit-event-recorded.event.js';
+import { AuditLogEntry } from './audit-log.entity.js';
 
 /**
  * Single-method service that demonstrates the framework still

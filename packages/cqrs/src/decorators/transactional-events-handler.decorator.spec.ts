@@ -1,11 +1,11 @@
-import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
-import { TransactionPhase } from '../types/transactional-listener.types';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface.js';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
 import {
   TRANSACTIONAL_EVENTS_HANDLER_METADATA,
   TransactionalEventsHandler,
   getTransactionalEventsHandlerMetadata,
-} from './transactional-events-handler.decorator';
+} from './transactional-events-handler.decorator.js';
 
 class OrderPlaced {
   constructor(readonly orderId: string) {}

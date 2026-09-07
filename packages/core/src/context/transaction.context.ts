@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { IllegalTransactionStateError } from '../types/errors';
-import type { TransactionHandle } from '../types/transaction-handle';
-import type { TransactionOptions } from '../types/transaction-options';
+import { IllegalTransactionStateError } from '../types/errors.js';
+import type { TransactionHandle } from '../types/transaction-handle.js';
+import type { TransactionOptions } from '../types/transaction-options.js';
 
 /**
  * A single transaction currently live on the async context. Adapters register

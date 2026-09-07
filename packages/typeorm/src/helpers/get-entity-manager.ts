@@ -1,7 +1,7 @@
 import { IllegalTransactionStateError, TransactionContext } from '@nestjs-transactional/core';
 import type { DataSource, EntityManager } from 'typeorm';
 
-import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle';
+import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle.js';
 
 /**
  * Compose the `TransactionContext` lookup key for the TypeORM adapter.

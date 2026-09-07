@@ -1,4 +1,4 @@
-import { describeThrown } from './describe-thrown';
+import { describeThrown } from './describe-thrown.js';
 
 describe('describeThrown', () => {
   it('uses an Error message', () => {

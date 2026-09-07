@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { OrderEntity } from './order.entity';
-import { OrderPlacedEvent } from './order-placed.event';
+import { OrderEntity } from './order.entity.js';
+import { OrderPlacedEvent } from './order-placed.event.js';
 
 /**
  * Single-unit atomicity (DD-019) extended to externalization:

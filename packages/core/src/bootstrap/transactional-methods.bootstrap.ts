@@ -7,9 +7,9 @@ import {
   TRANSACTIONAL_METADATA,
   type TransactionalMetadata,
   getTransactionalMetadata,
-} from '../decorators/transactional.decorator';
-import { WRAPPED_MARKER } from '../internal/markers';
-import { TransactionManager } from '../manager/transaction.manager';
+} from '../decorators/transactional.decorator.js';
+import { WRAPPED_MARKER } from '../internal/markers.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
 
 /**
  * Metadata keys set by `@nestjs/cqrs`'s handler decorators. Mirrored here
@@ -34,7 +34,7 @@ type MethodFn = (...args: unknown[]) => unknown;
  * This is the second of the three coordinated wrapping mechanisms
  * described in ADR-005:
  *
- * 1. {@link import('../interceptor/transactional.interceptor').TransactionalInterceptor}
+ * 1. {@link import('../interceptor/transactional.interceptor.js').TransactionalInterceptor}
  *    — for controller / resolver / gateway request-boundary handlers.
  * 2. This class — for regular `@Injectable` services.
  * 3. `CqrsHandlerWrapper` (in `@nestjs-transactional/cqrs`) — for CQRS

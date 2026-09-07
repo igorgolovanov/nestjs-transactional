@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { ReservationEntity } from './entities';
-import { ReservationPlacedEvent } from './events';
+import { ReservationEntity } from './entities.js';
+import { ReservationPlacedEvent } from './events.js';
 
 /**
  * Bound to the **inventory** DataSource via

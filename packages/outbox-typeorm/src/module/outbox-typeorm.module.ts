@@ -10,12 +10,12 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { EVENT_PUBLICATION_REPOSITORY } from '@nestjs-transactional/outbox';
 import type { DataSource } from 'typeorm';
 
-import { TypeOrmEventPublicationRepository } from '../repository/typeorm-event-publication.repository';
+import { TypeOrmEventPublicationRepository } from '../repository/typeorm-event-publication.repository.js';
 import {
   DEFAULT_SCHEMA_INITIALIZATION_OPTIONS,
   type SchemaInitializationOptions,
-} from '../schema/schema-initialization-options';
-import { SchemaInitializer } from '../schema/schema-initializer';
+} from '../schema/schema-initialization-options.js';
+import { SchemaInitializer } from '../schema/schema-initializer.js';
 
 /**
  * Options accepted by {@link OutboxTypeOrmModule.forRoot}.

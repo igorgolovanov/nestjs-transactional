@@ -3,8 +3,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
-} from '../repository/event-publication-repository';
-import type { EventPublication } from '../types/event-publication';
+} from '../repository/event-publication-repository.js';
+import type { EventPublication } from '../types/event-publication.js';
 
 /**
  * Operator-facing query + purge API for publications that have

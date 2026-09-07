@@ -1,6 +1,8 @@
-import type { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { jest } from '@jest/globals';
 
-import { HybridEventPublisher, type OutboxPublicationScheduler } from './hybrid-event-publisher';
+import type { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
+
+import { HybridEventPublisher, type OutboxPublicationScheduler } from './hybrid-event-publisher.js';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}

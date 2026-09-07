@@ -10,11 +10,11 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { AuditEventRecordedEvent } from './audit/audit-event-recorded.event';
-import { AuditLogEntry } from './audit/audit-log.entity';
-import { AuditService } from './audit/audit.service';
-import { SlowArchivalHandler } from './audit/slow-archival.handler';
-import { ExampleCleanupService } from './shutdown/example-cleanup.service';
+import { AuditEventRecordedEvent } from './audit/audit-event-recorded.event.js';
+import { AuditLogEntry } from './audit/audit-log.entity.js';
+import { AuditService } from './audit/audit.service.js';
+import { SlowArchivalHandler } from './audit/slow-archival.handler.js';
+import { ExampleCleanupService } from './shutdown/example-cleanup.service.js';
 
 export interface PostgresConfig {
   readonly host: string;

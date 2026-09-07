@@ -1,7 +1,7 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { IEvent, IEventPublisher } from '@nestjs/cqrs';
 
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
 /**
  * Minimal structural contract for the outbox-side publisher. Declared

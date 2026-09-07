@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import {
   AdapterRegistry,
@@ -9,20 +10,20 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { EventPublicationRegistry } from '../registry/event-publication-registry';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { CompletionMode } from '../types/completion-mode';
-import { PublicationStatus } from '../types/publication-status';
+import { EventPublicationRegistry } from '../registry/event-publication-registry.js';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { CompletionMode } from '../types/completion-mode.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
-import { EventPublicationProcessor } from './event-publication-processor';
+import { DataSourceOutboxPublisher } from './data-source-outbox-publisher.js';
+import { EventPublicationProcessor } from './event-publication-processor.js';
 import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
-} from './processor-options';
+} from './processor-options.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;

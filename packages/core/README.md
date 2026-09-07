@@ -28,6 +28,20 @@ pnpm add @nestjs-transactional/core @nestjs-transactional/typeorm reflect-metada
 Load `reflect-metadata` once at your entry point, as NestJS itself
 requires.
 
+## Module format
+
+This package ships **ESM only**, matching NestJS 12, which is ESM-only
+across its own packages. There is no CommonJS build.
+
+A CommonJS application still works: Node loads ESM from `require()`
+since 22.12.0, which is why `engines.node` is `>=22.13.0`. What does not
+follow Node here is tooling with its own module loader — Jest above all,
+which needs `NODE_OPTIONS=--experimental-vm-modules` and a few config
+settings. The 19 example applications in the repository all run their
+suites that way and can be copied from.
+
+Reasoning and measurements: [ADR-022](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/022-esm-only-packaging.md).
+
 ## Quick start
 
 ```ts

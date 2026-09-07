@@ -1,4 +1,4 @@
-import { EventTypeRegistry } from './event-type-registry';
+import { EventTypeRegistry } from './event-type-registry.js';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}

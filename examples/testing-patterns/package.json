@@ -1,13 +1,14 @@
 {
   "name": "@nestjs-transactional-examples/testing-patterns",
   "version": "0.0.0",
+  "type": "module",
   "private": true,
   "description": "Three test tiers for nestjs-transactional code: unit with InMemoryTransactionAdapter, outbox unit with InMemoryEventPublicationRepository + AssertablePublishedEvents, integration with testcontainers Postgres",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
-    "test": "jest",
-    "test:integration": "jest --config jest.integration.config.js"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs"
   },
   "dependencies": {
     "@nestjs-transactional/core": "workspace:*",
@@ -25,6 +26,7 @@
     "typeorm": "^1.1.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.4.2",
     "@nestjs/testing": "^11.2.3",
     "@testcontainers/postgresql": "^12.1.0",
     "@types/jest": "^30.0.0",

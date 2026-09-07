@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { ReservationPlacedEvent } from './reservation-placed.event';
-import { ReservationRow } from './reservation.entity';
+import { ReservationPlacedEvent } from './reservation-placed.event.js';
+import { ReservationRow } from './reservation.entity.js';
 
 /**
  * Operates exclusively on the `inventory` schema. Same atomicity

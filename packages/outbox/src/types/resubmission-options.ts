@@ -1,4 +1,4 @@
-import type { EventPublication } from './event-publication';
+import type { EventPublication } from './event-publication.js';
 
 /**
  * Predicate that decides whether a given publication should be included

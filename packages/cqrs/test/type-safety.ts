@@ -25,7 +25,7 @@ import {
   type ITransactionalEventHandler,
   TransactionPhase,
   TransactionalEventsHandler,
-} from '../src';
+} from '../src/index.js';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}

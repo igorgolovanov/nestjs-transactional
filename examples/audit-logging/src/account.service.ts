@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { AccountOperationRow, AccountRow } from './entities';
-import { AccountOperationEvent } from './events';
+import { AccountOperationRow, AccountRow } from './entities.js';
+import { AccountOperationEvent } from './events.js';
 
 /**
  * Business service. Default `@Transactional()` opens the transaction

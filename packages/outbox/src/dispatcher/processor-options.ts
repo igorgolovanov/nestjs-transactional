@@ -1,5 +1,5 @@
-import { DEFAULT_DRAIN_TIMEOUT_MS } from '../shutdown/drain';
-import { CompletionMode } from '../types/completion-mode';
+import { DEFAULT_DRAIN_TIMEOUT_MS } from '../shutdown/drain.js';
+import { CompletionMode } from '../types/completion-mode.js';
 
 /**
  * Tunables for the {@link EventPublicationProcessor} polling loop.

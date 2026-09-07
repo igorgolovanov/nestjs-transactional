@@ -1,12 +1,13 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 
-import { FailedEventPublications } from '../api/failed-event-publications';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import type { NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
-import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config';
+import { FailedEventPublications } from '../api/failed-event-publications.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import type { NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
+import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config.js';
 
-import { OutboxRetryScheduler } from './outbox-retry-scheduler';
+import { OutboxRetryScheduler } from './outbox-retry-scheduler.js';
 
 /** Deterministic config: no jitter, so eligibility is exactly reproducible. */
 const config: OutboxRetryConfig = {

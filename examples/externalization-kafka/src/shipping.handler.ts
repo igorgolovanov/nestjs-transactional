@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { OrderPlacedEvent } from './order-placed.event';
+import { OrderPlacedEvent } from './order-placed.event.js';
 
 /**
  * Local outbox listener. Runs on the same node as the publisher; the

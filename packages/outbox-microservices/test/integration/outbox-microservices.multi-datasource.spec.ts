@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Injectable, Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -24,7 +25,7 @@ import {
 } from '@nestjs-transactional/outbox';
 import { of } from 'rxjs';
 
-import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices.module';
+import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices.module.js';
 
 /**
  * Verification test.

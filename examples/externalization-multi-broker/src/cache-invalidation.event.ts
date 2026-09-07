@@ -1,6 +1,6 @@
 import { Externalized } from '@nestjs-transactional/outbox';
 
-import { REDIS_CLIENT } from './clients';
+import { REDIS_CLIENT } from './clients.js';
 
 /**
  * Domain event routed to **Redis pub/sub** — ephemeral, fan-out, no

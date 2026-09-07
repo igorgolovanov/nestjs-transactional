@@ -7,9 +7,9 @@ import {
 } from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
-import { PaymentFailedEvent } from '../shared/events';
-import { ProductRow } from './product.entity';
-import { ReservationRow } from './reservation.entity';
+import { PaymentFailedEvent } from '../shared/events.js';
+import { ProductRow } from './product.entity.js';
+import { ReservationRow } from './reservation.entity.js';
 
 /**
  * Compensation step in the inventory context. On `PaymentFailedEvent`

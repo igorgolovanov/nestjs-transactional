@@ -3,8 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { UserEntity } from './user.entity';
-import { UserService } from './user.service';
+import { UserEntity } from './user.entity.js';
+import { UserService } from './user.service.js';
 
 @Module({
   imports: [

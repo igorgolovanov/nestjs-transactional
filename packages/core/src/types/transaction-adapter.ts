@@ -1,5 +1,5 @@
-import type { TransactionHandle } from './transaction-handle';
-import type { TransactionOptions } from './transaction-options';
+import type { TransactionHandle } from './transaction-handle.js';
+import type { TransactionOptions } from './transaction-options.js';
 
 /**
  * Port for ORM-specific transaction execution. Core defines this interface;

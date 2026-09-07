@@ -1,14 +1,15 @@
+import { jest } from '@jest/globals';
 import type { DataSource, QueryRunner } from 'typeorm';
 
 import {
   EVENT_PUBLICATION_ARCHIVE_TABLE,
   EVENT_PUBLICATION_TABLE,
-} from '../../src/schema/event-publication-schema';
+} from '../../src/schema/event-publication-schema.js';
 import {
   DEFAULT_SCHEMA_INITIALIZATION_OPTIONS,
   type SchemaInitializationOptions,
-} from '../../src/schema/schema-initialization-options';
-import { SchemaInitializer } from '../../src/schema/schema-initializer';
+} from '../../src/schema/schema-initialization-options.js';
+import { SchemaInitializer } from '../../src/schema/schema-initializer.js';
 
 /**
  * Docker-free companion to
@@ -20,13 +21,25 @@ import { SchemaInitializer } from '../../src/schema/schema-initializer';
  * switched on, since applying schema at process startup is exactly what
  * production deployments must not do.
  */
+// `@jest/globals` types a bare `jest.fn()` as `UnknownFunction`, and
+// `mockResolvedValue` / `mockReturnValue` then reject their argument.
+// These stand in for TypeORM methods that are cast to the real interface
+// anyway, so a permissive signature carrying the resolved type is enough
+// to keep the assertions checked.
+function asyncMock<T>(value: T) {
+  return jest.fn<(...args: unknown[]) => Promise<T>>().mockResolvedValue(value);
+}
+function syncMock<T>(value: T) {
+  return jest.fn<(...args: unknown[]) => T>().mockReturnValue(value);
+}
+
 describe('SchemaInitializer (unit)', () => {
   function queryRunner(overrides: Partial<QueryRunner> = {}) {
     return {
-      connect: jest.fn().mockResolvedValue(undefined),
-      release: jest.fn().mockResolvedValue(undefined),
-      createTable: jest.fn().mockResolvedValue(undefined),
-      createIndex: jest.fn().mockResolvedValue(undefined),
+      connect: asyncMock(undefined),
+      release: asyncMock(undefined),
+      createTable: asyncMock(undefined),
+      createIndex: asyncMock(undefined),
       ...overrides,
     } as unknown as QueryRunner & {
       connect: jest.Mock;
@@ -37,10 +50,8 @@ describe('SchemaInitializer (unit)', () => {
   }
 
   function dataSource(args: { tableExists: boolean; runner?: QueryRunner }) {
-    const query = jest
-      .fn()
-      .mockResolvedValue([{ exists: args.tableExists ? EVENT_PUBLICATION_TABLE : null }]);
-    const createQueryRunner = jest.fn().mockReturnValue(args.runner ?? queryRunner());
+    const query = asyncMock([{ exists: args.tableExists ? EVENT_PUBLICATION_TABLE : null }]);
+    const createQueryRunner = syncMock(args.runner ?? queryRunner());
     return {
       ds: { query, createQueryRunner } as unknown as DataSource,
       query,
@@ -81,8 +92,8 @@ describe('SchemaInitializer (unit)', () => {
     await initializer(ds, { enabled: true }).onApplicationBootstrap();
 
     expect(runner.connect).toHaveBeenCalledTimes(1);
-    const createdTables = runner.createTable.mock.calls.map(
-      ([table]: [{ name: string }]) => table.name,
+    const createdTables = (runner.createTable.mock.calls as [{ name: string }][]).map(
+      ([table]) => table.name,
     );
     expect(createdTables).toEqual([EVENT_PUBLICATION_TABLE, EVENT_PUBLICATION_ARCHIVE_TABLE]);
     expect(runner.createIndex).toHaveBeenCalled();
@@ -93,7 +104,9 @@ describe('SchemaInitializer (unit)', () => {
     // A leaked query runner exhausts the pool, turning a one-off DDL
     // error into an app that cannot serve traffic.
     const runner = queryRunner({
-      createTable: jest.fn().mockRejectedValue(new Error('permission denied')),
+      createTable: jest
+        .fn<(...args: unknown[]) => Promise<never>>()
+        .mockRejectedValue(new Error('permission denied')),
     });
     const { ds } = dataSource({ tableExists: false, runner });
 
@@ -109,8 +122,8 @@ describe('SchemaInitializer (unit)', () => {
     // probe reads the column, not the row count.
     const runner = queryRunner();
     const ds = {
-      query: jest.fn().mockResolvedValue([{ exists: null }]),
-      createQueryRunner: jest.fn().mockReturnValue(runner),
+      query: asyncMock([{ exists: null }]),
+      createQueryRunner: syncMock(runner),
     } as unknown as DataSource;
 
     await initializer(ds, { enabled: true }).onApplicationBootstrap();
@@ -121,8 +134,8 @@ describe('SchemaInitializer (unit)', () => {
   it('treats an empty probe result as "table missing" rather than crashing', async () => {
     const runner = queryRunner();
     const ds = {
-      query: jest.fn().mockResolvedValue([]),
-      createQueryRunner: jest.fn().mockReturnValue(runner),
+      query: asyncMock([]),
+      createQueryRunner: syncMock(runner),
     } as unknown as DataSource;
 
     await initializer(ds, { enabled: true }).onApplicationBootstrap();

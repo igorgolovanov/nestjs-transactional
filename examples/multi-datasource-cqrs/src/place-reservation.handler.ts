@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { ReservationRow } from './entities';
-import { Reservation } from './reservation.aggregate';
+import { ReservationRow } from './entities.js';
+import { Reservation } from './reservation.aggregate.js';
 
 export class PlaceReservationCommand {
   constructor(

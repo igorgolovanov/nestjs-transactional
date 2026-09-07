@@ -4,9 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 
-import { AccountService } from './account.service';
-import { AuditLoggingModule, readConfigFromEnv } from './app.module';
-import { AccountRow, AuditLogRow } from './entities';
+import { AccountService } from './account.service.js';
+import { AuditLoggingModule, readConfigFromEnv } from './app.module.js';
+import { AccountRow, AuditLogRow } from './entities.js';
 
 async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
   const start = Date.now();

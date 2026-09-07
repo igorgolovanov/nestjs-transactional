@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { Transactional } from '../decorators/transactional.decorator';
-import { WRAPPED_MARKER } from '../internal/markers';
-import { TransactionManager } from '../manager/transaction.manager';
-import { TransactionalModule } from '../module/transactional.module';
-import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
+import { Transactional } from '../decorators/transactional.decorator.js';
+import { WRAPPED_MARKER } from '../internal/markers.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
+import { TransactionalModule } from '../module/transactional.module.js';
+import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter.js';
 
 @Injectable()
 class UserService {

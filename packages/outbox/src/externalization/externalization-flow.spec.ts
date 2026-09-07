@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { type DynamicModule, Injectable, Logger, Module } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -10,19 +11,19 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { FailedEventPublications } from '../api/failed-event-publications';
-import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
-import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
-import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
-import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface';
-import { OutboxModule } from '../module/outbox.module';
-import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { PublicationStatus } from '../types/publication-status';
+import { FailedEventPublications } from '../api/failed-event-publications.js';
+import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator.js';
+import { EventPublicationProcessor } from '../dispatcher/event-publication-processor.js';
+import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher.js';
+import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface.js';
+import { OutboxModule } from '../module/outbox.module.js';
+import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { EVENT_EXTERNALIZER, type EventExternalizer } from './event-externalizer';
-import { ExternalizationRegistry } from './externalization-registry';
-import { Externalized } from './externalized.decorator';
+import { EVENT_EXTERNALIZER, type EventExternalizer } from './event-externalizer.js';
+import { ExternalizationRegistry } from './externalization-registry.js';
+import { Externalized } from './externalized.decorator.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -105,7 +106,9 @@ describe('Externalization end-to-end (OutboxModule + mock externalizer)', () => 
   let externalizer: jest.Mocked<EventExternalizer>;
 
   async function buildModule(): Promise<void> {
-    externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
+    externalizer = {
+      externalize: jest.fn<EventExternalizer['externalize']>().mockResolvedValue(undefined),
+    };
     const adapter = new FakeAdapter();
     module = await Test.createTestingModule({
       imports: [

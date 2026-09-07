@@ -1,7 +1,7 @@
 import { TransactionContext } from '@nestjs-transactional/core';
 import { DataSource, EntityManager } from 'typeorm';
 
-import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle';
+import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle.js';
 
 import {
   getActiveEntityManager,
@@ -9,8 +9,8 @@ import {
   isManaged,
   markAsManaged,
   resetManagedRegistry,
-} from './managed-registry';
-import { TYPEORM_DATA_SOURCE_NAME } from './symbols';
+} from './managed-registry.js';
+import { TYPEORM_DATA_SOURCE_NAME } from './symbols.js';
 
 async function createSqlJsDataSource(): Promise<DataSource> {
   const ds = new DataSource({ type: 'sqljs', synchronize: false, entities: [] });

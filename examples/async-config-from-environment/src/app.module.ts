@@ -11,15 +11,15 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { AuditArchivalHandler } from './audit/audit-archival.handler';
-import { AuditEventRecordedEvent } from './audit/audit-event-recorded.event';
-import { AuditLogEntry } from './audit/audit-log.entity';
-import { AuditService } from './audit/audit.service';
+import { AuditArchivalHandler } from './audit/audit-archival.handler.js';
+import { AuditEventRecordedEvent } from './audit/audit-event-recorded.event.js';
+import { AuditLogEntry } from './audit/audit-log.entity.js';
+import { AuditService } from './audit/audit.service.js';
 import {
   type DatabaseConfig,
   envValidationSchema,
   type ValidatedEnv,
-} from './config/config.schema';
+} from './config/config.schema.js';
 
 /**
  * Optional connection-level override applied AFTER env-driven

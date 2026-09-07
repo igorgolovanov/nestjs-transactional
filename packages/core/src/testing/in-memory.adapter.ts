@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
-import type { TransactionAdapter } from '../types/transaction-adapter';
-import type { TransactionHandle } from '../types/transaction-handle';
-import type { TransactionOptions } from '../types/transaction-options';
+import type { TransactionAdapter } from '../types/transaction-adapter.js';
+import type { TransactionHandle } from '../types/transaction-handle.js';
+import type { TransactionOptions } from '../types/transaction-options.js';
 
 /**
  * Handle emitted by {@link InMemoryTransactionAdapter}. Extends

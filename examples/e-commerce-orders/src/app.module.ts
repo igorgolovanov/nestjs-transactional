@@ -20,23 +20,23 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { BillingModule } from './billing/billing.module';
-import { PaymentRow } from './billing/payment.entity';
-import { KAFKA_CLIENT } from './clients';
-import { InventoryModule } from './inventory/inventory.module';
-import { ProductRow } from './inventory/product.entity';
-import { ReservationRow } from './inventory/reservation.entity';
-import { OrdersCompensationHandler } from './orders/compensation.handler';
-import { ConfirmShipmentHandler } from './orders/confirm-shipment.handler';
-import { OrderConfirmedExternalizationStub } from './orders/externalized-event-stub';
-import { GetOrderHandler } from './orders/get-order.handler';
-import { OrderRow } from './orders/order.entity';
-import { OrdersController } from './orders/orders.controller';
+import { BillingModule } from './billing/billing.module.js';
+import { PaymentRow } from './billing/payment.entity.js';
+import { KAFKA_CLIENT } from './clients.js';
+import { InventoryModule } from './inventory/inventory.module.js';
+import { ProductRow } from './inventory/product.entity.js';
+import { ReservationRow } from './inventory/reservation.entity.js';
+import { OrdersCompensationHandler } from './orders/compensation.handler.js';
+import { ConfirmShipmentHandler } from './orders/confirm-shipment.handler.js';
+import { OrderConfirmedExternalizationStub } from './orders/externalized-event-stub.js';
+import { GetOrderHandler } from './orders/get-order.handler.js';
+import { OrderRow } from './orders/order.entity.js';
+import { OrdersController } from './orders/orders.controller.js';
 import {
   OrderConfirmedEvent,
   OrderPlacedEvent,
-} from './shared/events';
-import { PlaceOrderHandler } from './orders/place-order.handler';
+} from './shared/events.js';
+import { PlaceOrderHandler } from './orders/place-order.handler.js';
 
 export interface PostgresConnection {
   readonly host: string;

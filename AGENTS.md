@@ -51,18 +51,27 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
 
 ## Technology Stack
 
-- **Runtime**: Node.js 22 LTS (minimum); 22 / 24 / 26 verified in CI
-- **Language**: TypeScript 5.5+ in strict mode
-- **Core peer deps**: `@nestjs/common ^10.0.0 || ^11.0.0`,
-  `@nestjs/core ^10.0.0 || ^11.0.0`, `reflect-metadata`, `rxjs ^7.0.0`
+- **Runtime**: Node.js `>=22.13.0`; 22 / 24 / 26 verified in CI
+- **Module format**: **ESM only** — every package is `"type": "module"`
+  and there is no CommonJS build (ADR-022). CommonJS applications still
+  consume them, through Node's `require(esm)`; tooling with its own
+  loader does not, which is why the suites run under
+  `--experimental-vm-modules`
+- **Language**: TypeScript 5.5+ in strict mode, `module` /
+  `moduleResolution` set to `NodeNext` (not `Node16`, which models the
+  semantics that predate `require(esm)`)
+- **Core peer deps**: `@nestjs/common ^10.0.0 || ^11.0.0 || ^12.0.0`,
+  `@nestjs/core ^10.0.0 || ^11.0.0 || ^12.0.0`, `reflect-metadata`,
+  `rxjs ^7.0.0`
 - **TypeORM peer**: `typeorm ^0.3.0 || ^1.0.0`,
-  `@nestjs/typeorm ^10.0.0 || ^11.0.0`. Development happens against
-  `1.1.0` (what the lockfile pins); CI additionally forces `0.3.31`
-  and `1.0.0` via `pnpm.overrides`
-- **CQRS peer**: `@nestjs/cqrs ^11.0.0`
+  `@nestjs/typeorm ^10.0.0 || ^11.0.0 || ^12.0.0`. Development happens
+  against `1.1.0` (what the lockfile pins); CI additionally forces
+  `0.3.31` and `1.0.0` via `pnpm.overrides`
+- **CQRS peer**: `@nestjs/cqrs ^11.0.0 || ^12.0.0`
 - **Package manager**: pnpm workspaces
 - **Build**: tsc with project references (no bundler — pure TypeScript)
-- **Test runner**: Jest + ts-jest
+- **Test runner**: Jest + ts-jest, in ESM mode — see CONTRIBUTING,
+  "The suites run as ESM", before writing a spec
 - **Integration tests**: testcontainers-node for a real Postgres
 - **Versioning**: Changesets
 - **License**: MIT
@@ -113,6 +122,7 @@ the Design Decisions list below.
 - **ADR-019**: OutboxModule multi-`forRoot` registration pattern — [`docs/adr/019-outbox-multi-forroot-pattern.md`](docs/adr/019-outbox-multi-forroot-pattern.md)
 - **ADR-020**: Prototype-level wrapping for CQRS handlers — [`docs/adr/020-prototype-level-cqrs-wrapping.md`](docs/adr/020-prototype-level-cqrs-wrapping.md)
 - **ADR-021**: What `ClientProxy.emit()` acknowledges, per transport — [`docs/adr/021-externalization-acknowledgement-per-transport.md`](docs/adr/021-externalization-acknowledgement-per-transport.md)
+- **ADR-022**: ESM-only packaging, and the 2.0.0 that comes with it — [`docs/adr/022-esm-only-packaging.md`](docs/adr/022-esm-only-packaging.md)
 
 Superseded / Skipped (number reserved, not reused):
 

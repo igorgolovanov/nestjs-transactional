@@ -11,10 +11,10 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { AccountService } from './account.service';
-import { AuditHandler } from './audit.handler';
-import { AccountOperationRow, AccountRow, AuditLogRow } from './entities';
-import { AccountOperationEvent } from './events';
+import { AccountService } from './account.service.js';
+import { AuditHandler } from './audit.handler.js';
+import { AccountOperationRow, AccountRow, AuditLogRow } from './entities.js';
+import { AccountOperationEvent } from './events.js';
 
 export interface PostgresConnection {
   readonly host: string;

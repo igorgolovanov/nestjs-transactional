@@ -4,9 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 
-import { AppModule, readPostgresConfigFromEnv } from './app.module';
-import { OrderRow, PaymentRow, StockItemRow } from './entities';
-import { OrderService } from './order.service';
+import { AppModule, readPostgresConfigFromEnv } from './app.module.js';
+import { OrderRow, PaymentRow, StockItemRow } from './entities.js';
+import { OrderService } from './order.service.js';
 
 async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 10_000): Promise<void> {
   const start = Date.now();

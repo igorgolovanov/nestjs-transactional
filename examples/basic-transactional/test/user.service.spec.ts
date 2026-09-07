@@ -2,8 +2,8 @@ import 'reflect-metadata';
 
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { AppModule } from '../src/app.module';
-import { UserService } from '../src/user.service';
+import { AppModule } from '../src/app.module.js';
+import { UserService } from '../src/user.service.js';
 
 describe('basic-transactional', () => {
   let module: TestingModule;

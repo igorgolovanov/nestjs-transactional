@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { RefundRequestedEvent } from './refund-requested.event';
+import { RefundRequestedEvent } from './refund-requested.event.js';
 
 /**
  * Local listener for `RefundRequestedEvent`. Runs BEFORE the

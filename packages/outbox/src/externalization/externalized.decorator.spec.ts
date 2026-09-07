@@ -1,8 +1,10 @@
+import { jest } from '@jest/globals';
+
 import {
   EXTERNALIZED_METADATA,
   Externalized,
   getExternalizedMetadata,
-} from './externalized.decorator';
+} from './externalized.decorator.js';
 
 describe('@Externalized', () => {
   it('attaches metadata to the decorated class', () => {
@@ -46,7 +48,7 @@ describe('@Externalized', () => {
   });
 
   it('preserves a routingKey callback verbatim — no resolution at decoration time', () => {
-    const routingKey = jest.fn().mockReturnValue('tenant-A');
+    const routingKey = jest.fn<(tenantId: string) => string>().mockReturnValue('tenant-A');
 
     @Externalized<{ tenantId: string }>({
       target: 'orders',
@@ -77,7 +79,9 @@ describe('@Externalized', () => {
   });
 
   it('preserves a headers callback verbatim — does not invoke it at decoration time', () => {
-    const headers = jest.fn().mockReturnValue({ 'x-tenant': 'A' });
+    const headers = jest
+      .fn<(tenantId: string) => Record<string, string>>()
+      .mockReturnValue({ 'x-tenant': 'A' });
 
     @Externalized<{ tenantId: string }>({
       target: 'orders',

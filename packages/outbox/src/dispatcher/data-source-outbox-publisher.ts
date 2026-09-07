@@ -5,8 +5,8 @@ import {
   TransactionContext,
 } from '@nestjs-transactional/core';
 
-import type { EventPublicationRegistry } from '../registry/event-publication-registry';
-import type { OutboxListenerRegistry } from '../registry/listener-registry';
+import type { EventPublicationRegistry } from '../registry/event-publication-registry.js';
+import type { OutboxListenerRegistry } from '../registry/listener-registry.js';
 
 /**
  * Per-dataSource publisher. Owns the per-transaction

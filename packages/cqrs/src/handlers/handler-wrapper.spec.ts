@@ -24,15 +24,15 @@ import {
   Transactional,
 } from '@nestjs-transactional/core';
 
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
-import { CqrsTransactionalBootstrap } from './bootstrap';
+import { CqrsTransactionalBootstrap } from './bootstrap.js';
 import {
   CQRS_HANDLER_WRAPPER_OPTIONS,
   CqrsHandlerWrapper,
   type HandlerWrapperOptions,
-} from './handler-wrapper';
-import { TransactionalListenerScanner } from './listener-scanner';
+} from './handler-wrapper.js';
+import { TransactionalListenerScanner } from './listener-scanner.js';
 
 // Inline fake adapter — `@nestjs-transactional/core/testing` subpath is
 // not resolvable under the monorepo's `moduleResolution: "node"` setting.

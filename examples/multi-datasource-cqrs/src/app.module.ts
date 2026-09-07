@@ -4,11 +4,11 @@ import { TransactionalModule } from '@nestjs-transactional/core';
 import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { BillingNotificationListener } from './billing.listener';
-import { InventoryNotificationListener } from './inventory.listener';
-import { InvoiceRow, ReservationRow } from './entities';
-import { IssueInvoiceHandler } from './issue-invoice.handler';
-import { PlaceReservationHandler } from './place-reservation.handler';
+import { BillingNotificationListener } from './billing.listener.js';
+import { InventoryNotificationListener } from './inventory.listener.js';
+import { InvoiceRow, ReservationRow } from './entities.js';
+import { IssueInvoiceHandler } from './issue-invoice.handler.js';
+import { PlaceReservationHandler } from './place-reservation.handler.js';
 
 /**
  * Multi-DS CQRS demo. Two SQLite in-memory DataSources via `sql.js`,

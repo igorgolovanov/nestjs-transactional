@@ -11,7 +11,7 @@ import {
   getOutboxEventSerializerToken,
   getOutboxListenerRegistryToken,
   getOutboxPublisherToken,
-} from '../tokens/token-utils';
+} from '../tokens/token-utils.js';
 
 /**
  * Inject decorators for the outbox-side per-dataSource components

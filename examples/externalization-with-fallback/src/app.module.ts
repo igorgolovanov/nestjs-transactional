@@ -12,13 +12,13 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { REFUNDS_BROKER } from './clients';
-import { ProcessedRefundEntity } from './processed-refunds.entity';
-import { RefundConsumerService } from './refund-consumer.service';
-import { RefundEntity } from './refund.entity';
-import { RefundLedgerHandler } from './refund-ledger.handler';
-import { RefundRequestedEvent } from './refund-requested.event';
-import { RefundService } from './refund.service';
+import { REFUNDS_BROKER } from './clients.js';
+import { ProcessedRefundEntity } from './processed-refunds.entity.js';
+import { RefundConsumerService } from './refund-consumer.service.js';
+import { RefundEntity } from './refund.entity.js';
+import { RefundLedgerHandler } from './refund-ledger.handler.js';
+import { RefundRequestedEvent } from './refund-requested.event.js';
+import { RefundService } from './refund.service.js';
 
 export interface PostgresConfig {
   readonly host: string;

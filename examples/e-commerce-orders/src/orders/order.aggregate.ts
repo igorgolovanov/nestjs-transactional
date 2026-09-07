@@ -3,7 +3,7 @@ import { AggregateRoot } from '@nestjs/cqrs';
 import {
   OrderConfirmedEvent,
   OrderPlacedEvent,
-} from '../shared/events';
+} from '../shared/events.js';
 
 /**
  * Order aggregate. CQRS-style — `apply()` stages events on the

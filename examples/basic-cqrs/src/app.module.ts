@@ -3,9 +3,9 @@ import { TransactionalModule } from '@nestjs-transactional/core';
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
 import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
 
-import { GetNotifiedOrdersHandler } from './get-notified-orders.query';
-import { NotificationHandler } from './notification.handler';
-import { PlaceOrderHandler } from './place-order.handler';
+import { GetNotifiedOrdersHandler } from './get-notified-orders.query.js';
+import { NotificationHandler } from './notification.handler.js';
+import { PlaceOrderHandler } from './place-order.handler.js';
 
 /**
  * Foundational CQRS example. Uses `InMemoryTransactionAdapter` so the

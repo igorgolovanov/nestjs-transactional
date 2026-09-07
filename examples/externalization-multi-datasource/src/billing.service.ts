@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { InvoiceEntity } from './entities';
-import { InvoicePaidEvent } from './events';
+import { InvoiceEntity } from './entities.js';
+import { InvoicePaidEvent } from './events.js';
 
 /**
  * Bound to the **default** DataSource (the billing DB). The `@Transactional`

@@ -4,9 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from './app.module';
-import { BillingService } from './billing.service';
-import { InventoryService } from './inventory.service';
+import { AppModule } from './app.module.js';
+import { BillingService } from './billing.service.js';
+import { InventoryService } from './inventory.service.js';
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule, {

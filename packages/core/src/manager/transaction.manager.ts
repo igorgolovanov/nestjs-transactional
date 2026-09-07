@@ -2,20 +2,20 @@ import { randomUUID } from 'node:crypto';
 
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
-import { TransactionContext, type ActiveTransaction } from '../context/transaction.context';
+import { TransactionContext, type ActiveTransaction } from '../context/transaction.context.js';
 import {
   TRANSACTION_OBSERVERS,
   type TransactionCommitContext,
   type TransactionObserver,
   type TransactionRollbackContext,
   type TransactionStartContext,
-} from '../observability/transaction-observer';
-import { IllegalTransactionStateError } from '../types/errors';
-import { PropagationMode } from '../types/propagation';
-import type { TransactionAdapter } from '../types/transaction-adapter';
-import type { ExtendedTransactionOptions } from '../types/transaction-options';
+} from '../observability/transaction-observer.js';
+import { IllegalTransactionStateError } from '../types/errors.js';
+import { PropagationMode } from '../types/propagation.js';
+import type { TransactionAdapter } from '../types/transaction-adapter.js';
+import type { ExtendedTransactionOptions } from '../types/transaction-options.js';
 
-import { ADAPTER_REGISTRY, AdapterRegistry } from './adapter.registry';
+import { ADAPTER_REGISTRY, AdapterRegistry } from './adapter.registry.js';
 
 /**
  * Unified lifecycle hook shape used internally by {@link TransactionManager.runHooks}.

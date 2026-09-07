@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { AuditEventRecordedEvent } from './audit-event-recorded.event';
+import { AuditEventRecordedEvent } from './audit-event-recorded.event.js';
 
 /**
  * Outbox handler that artificially takes ~`HANDLER_LATENCY_MS` to

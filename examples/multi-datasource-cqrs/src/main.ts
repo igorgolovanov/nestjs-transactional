@@ -3,11 +3,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { CommandBus } from '@nestjs/cqrs';
 
-import { AppModule } from './app.module';
-import { BillingNotificationListener } from './billing.listener';
-import { InventoryNotificationListener } from './inventory.listener';
-import { IssueInvoiceCommand } from './issue-invoice.handler';
-import { PlaceReservationCommand } from './place-reservation.handler';
+import { AppModule } from './app.module.js';
+import { BillingNotificationListener } from './billing.listener.js';
+import { InventoryNotificationListener } from './inventory.listener.js';
+import { IssueInvoiceCommand } from './issue-invoice.handler.js';
+import { PlaceReservationCommand } from './place-reservation.handler.js';
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule, {

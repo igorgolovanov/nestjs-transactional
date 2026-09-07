@@ -4,7 +4,7 @@ import {
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
 
-import { InvoiceIssuedEvent } from './invoice.aggregate';
+import { InvoiceIssuedEvent } from './invoice.aggregate.js';
 
 /**
  * Listens to `InvoiceIssuedEvent` on the **default** dataSource. No

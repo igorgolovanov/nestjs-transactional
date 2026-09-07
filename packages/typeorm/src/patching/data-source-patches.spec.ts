@@ -1,10 +1,10 @@
 import { TransactionContext } from '@nestjs-transactional/core';
 import { Column, DataSource, Entity, EntityManager, PrimaryGeneratedColumn } from 'typeorm';
 
-import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle';
+import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle.js';
 
-import { patchDataSourceInstance } from './data-source-patches';
-import { markAsManaged, resetManagedRegistry } from './managed-registry';
+import { patchDataSourceInstance } from './data-source-patches.js';
+import { markAsManaged, resetManagedRegistry } from './managed-registry.js';
 
 @Entity({ name: 'ds_patch_test_users' })
 class DsPatchTestUser {

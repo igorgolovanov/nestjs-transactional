@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import { getEventTypeRegistryToken, getOutboxPublisherToken } from '../tokens/token-utils';
-import { OutboxError } from '../types/errors';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver.js';
+import { getEventTypeRegistryToken, getOutboxPublisherToken } from '../tokens/token-utils.js';
+import { OutboxError } from '../types/errors.js';
 
-import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
+import { DataSourceOutboxPublisher } from './data-source-outbox-publisher.js';
 
 /**
  * Optional override accepted by the facade `OutboxEventPublisher`'s

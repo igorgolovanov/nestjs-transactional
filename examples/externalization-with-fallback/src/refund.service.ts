@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { RefundEntity } from './refund.entity';
-import { RefundRequestedEvent } from './refund-requested.event';
+import { RefundEntity } from './refund.entity.js';
+import { RefundRequestedEvent } from './refund-requested.event.js';
 
 /**
  * Producer side. Single-unit atomicity (DD-019): refund row + event

@@ -8,13 +8,13 @@ import {
   Repository,
 } from 'typeorm';
 
-import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle';
+import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle.js';
 
-import { patchDataSourceInstance } from './data-source-patches';
-import { applyEntityManagerPatches } from './entity-manager-patches';
-import { markAsManaged, resetManagedRegistry } from './managed-registry';
-import { applyRepositoryPatches, areRepositoryPatchesApplied } from './repository-patches';
-import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols';
+import { patchDataSourceInstance } from './data-source-patches.js';
+import { applyEntityManagerPatches } from './entity-manager-patches.js';
+import { markAsManaged, resetManagedRegistry } from './managed-registry.js';
+import { applyRepositoryPatches, areRepositoryPatchesApplied } from './repository-patches.js';
+import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols.js';
 
 @Entity({ name: 'patch_test_users' })
 class PatchTestUser {

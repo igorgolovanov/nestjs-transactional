@@ -10,10 +10,10 @@ import {
 } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { ArticleQueryService } from '../src/article.query-service';
-import { ArticleRow } from '../src/article.entity';
-import { ArticleService } from '../src/article.service';
+import { AppModule } from '../src/app.module.js';
+import { ArticleQueryService } from '../src/article.query-service.js';
+import { ArticleRow } from '../src/article.entity.js';
+import { ArticleService } from '../src/article.service.js';
 
 describe('read-write-separation (Postgres via testcontainers)', () => {
   let container: StartedPostgreSqlContainer;

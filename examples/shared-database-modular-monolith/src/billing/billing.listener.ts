@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { InvoicePaidEvent } from './invoice-paid.event';
+import { InvoicePaidEvent } from './invoice-paid.event.js';
 
 /**
  * Module-internal listener — observes the `InvoicePaidEvent` after

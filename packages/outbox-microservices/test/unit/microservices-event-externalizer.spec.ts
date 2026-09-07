@@ -1,11 +1,12 @@
+import { jest } from '@jest/globals';
 import { type InjectionToken, Logger } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 import { type ClientProxy } from '@nestjs/microservices';
 import { ExternalizationError, type ExternalizationMetadata } from '@nestjs-transactional/outbox';
 import { Observable, of, throwError } from 'rxjs';
 
-import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';
-import { type OutboxMicroservicesOptions } from '../../src/types/options';
+import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer.js';
+import { type OutboxMicroservicesOptions } from '../../src/types/options.js';
 
 const DEFAULT_TOKEN = 'KAFKA_CLIENT';
 const OVERRIDE_TOKEN = 'AMQP_CLIENT';
@@ -15,8 +16,10 @@ class OrderPlacedEvent {
   constructor(readonly orderId: string) {}
 }
 
-type ResolveClientArgs = [InjectionToken, { strict: boolean }];
-type ResolveClientMock = jest.Mock<ClientProxy | null, ResolveClientArgs>;
+// `@jest/globals` types `Mock` by the function signature, not by the
+// (return, args) pair `@types/jest` used.
+type ResolveClientFn = (token: InjectionToken, options: { strict: boolean }) => ClientProxy | null;
+type ResolveClientMock = jest.Mock<ResolveClientFn>;
 
 function buildExternalizer(
   options: OutboxMicroservicesOptions,
@@ -68,7 +71,7 @@ describe('MicroservicesEventExternalizer', () => {
 
     emit = jest.fn().mockReturnValue(of(undefined));
     client = { emit } as unknown as ClientProxy;
-    resolveClient = jest.fn<ClientProxy | null, ResolveClientArgs>().mockReturnValue(client);
+    resolveClient = jest.fn<ResolveClientFn>().mockReturnValue(client);
   });
 
   describe('externalize()', () => {

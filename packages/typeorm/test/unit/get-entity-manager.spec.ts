@@ -6,9 +6,9 @@ import {
 } from '@nestjs-transactional/core';
 import { DataSource } from 'typeorm';
 
-import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter';
-import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager';
-import { TestUser } from '../shared/test-user.entity';
+import { TypeOrmTransactionAdapter } from '../../src/adapter/typeorm.adapter.js';
+import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager.js';
+import { TestUser } from '../shared/test-user.entity.js';
 
 async function createSqlJsDataSource(): Promise<DataSource> {
   const ds = new DataSource({

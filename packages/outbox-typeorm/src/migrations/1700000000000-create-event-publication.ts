@@ -3,7 +3,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 import {
   applyEventPublicationSchema,
   revertEventPublicationSchema,
-} from '../schema/event-publication-schema';
+} from '../schema/event-publication-schema.js';
 
 /**
  * Initial schema for the Event Publication Registry. Creates both the
