@@ -22,12 +22,17 @@ module.exports = {
   testTimeout: 60_000,
   // Floors, not targets, set just under the measured combined coverage
   // and meant to ratchet up. See CONTRIBUTING, "Coverage gate".
+  //
+  // Ratcheted from 88 / 66 / 80 / 88, which had drifted far enough below
+  // the real numbers to stop meaning anything: branches had 9.9 points
+  // of slack, so a change could have deleted a tenth of the branch
+  // coverage and still passed. Measured 91.08 / 75.92 / 85 / 91.44.
   coverageThreshold: {
     global: {
-      statements: 88,
-      branches: 66,
-      functions: 80,
-      lines: 88,
+      statements: 91,
+      branches: 75,
+      functions: 85,
+      lines: 91,
     },
   },
 };
