@@ -29,13 +29,17 @@ needs longer than that.
 
 | Version | Supported |
 | --- | --- |
-| `1.0.x` | ✅ |
+| `2.0.x` | ✅ |
+| `1.x` | ❌ |
 | `1.0.0-alpha.x` and earlier prereleases | ❌ |
 
-Fixes land on the latest minor of the current major; there are no
-backports to earlier minors, so upgrading within `1.x` is the supported
-path. The alpha series is not maintained — `1.0.0` is the first release
-under this policy.
+Fixes land on the latest minor of the current major. There are no
+backports to earlier minors, and none to earlier majors either, so
+upgrading to `2.x` is the supported path. `2.0.0` is an ESM-only
+release that raises the Node floor to `22.13.0`; what that costs a
+CommonJS application is covered in
+[ADR-022](docs/adr/022-esm-only-packaging.md). The alpha series was
+never maintained, and `1.0.0` is where this policy started.
 
 ## Scope
 

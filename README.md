@@ -223,14 +223,17 @@ picking a starting point.
 
 ## Status
 
-`1.0.0`. The public API is under a
+`2.0.0`, ESM only. The public API is under a
 [stability policy](docs/adr/004-public-api-stability.md): breaking
 changes cost a major version and an ADR explaining why.
 
-Next up: a scheduled cleanup job for completed publications, and
-broker-aware externalizers that close the delivery gap above. Prisma and
-MongoDB storage backends are unblocked by the adapter contract but
-unscheduled — the
+Nothing is scheduled next. The retention job for completed publications
+shipped, and the broker-aware externalizers that were meant to close a
+silent-success gap were retired once the gap failed to reproduce
+against Kafka or RabbitMQ
+([ADR-021](docs/adr/021-externalization-acknowledgement-per-transport.md)).
+Unscheduled but unblocked: a NATS externalizer built on JetStream's
+`PubAck`, Prisma and MongoDB storage backends, and OpenTelemetry. The
 [improvement plan](docs/roadmap/improvement-plan.md) tracks all of it.
 
 ## Contributing
