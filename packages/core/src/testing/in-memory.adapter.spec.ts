@@ -1,6 +1,6 @@
-import type { TransactionOptions } from '../types/transaction-options';
+import type { TransactionOptions } from '../types/transaction-options.js';
 
-import { InMemoryTransactionAdapter, type InMemoryTransactionHandle } from './in-memory.adapter';
+import { InMemoryTransactionAdapter, type InMemoryTransactionHandle } from './in-memory.adapter.js';
 
 describe('InMemoryTransactionAdapter', () => {
   let adapter: InMemoryTransactionAdapter;

@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { StockItemEntity } from './entities';
-import { StockAdjustedEvent } from './events';
+import { StockItemEntity } from './entities.js';
+import { StockAdjustedEvent } from './events.js';
 
 /**
  * Operates on the `inventory` DataSource. The smart

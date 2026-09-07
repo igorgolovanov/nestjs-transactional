@@ -8,28 +8,28 @@
  * @internal
  */
 
-import { applyEntityManagerPatches } from './entity-manager-patches';
-import { resetManagedRegistry } from './managed-registry';
-import { applyRepositoryPatches } from './repository-patches';
+import { applyEntityManagerPatches } from './entity-manager-patches.js';
+import { resetManagedRegistry } from './managed-registry.js';
+import { applyRepositoryPatches } from './repository-patches.js';
 
-export { applyRepositoryPatches, areRepositoryPatchesApplied } from './repository-patches';
+export { applyRepositoryPatches, areRepositoryPatchesApplied } from './repository-patches.js';
 export {
   applyEntityManagerPatches,
   areEntityManagerPatchesApplied,
-} from './entity-manager-patches';
-export { patchDataSourceInstance } from './data-source-patches';
+} from './entity-manager-patches.js';
+export { patchDataSourceInstance } from './data-source-patches.js';
 export {
   getActiveEntityManager,
   getManagedDataSourceName,
   isManaged,
   markAsManaged,
   resetManagedRegistry,
-} from './managed-registry';
+} from './managed-registry.js';
 export {
   TYPEORM_DATA_SOURCE_NAME,
   TYPEORM_DATA_SOURCE_PATCHED,
   TYPEORM_ENTITY_MANAGER_NAME,
-} from './symbols';
+} from './symbols.js';
 
 /**
  * Apply both prototype-level patch families in one call. Used by

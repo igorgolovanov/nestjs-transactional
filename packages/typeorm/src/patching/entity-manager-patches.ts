@@ -9,7 +9,7 @@
 
 import { EntityManager } from 'typeorm';
 
-import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols';
+import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols.js';
 
 /**
  * Tracks whether `EntityManager.prototype.getRepository` has been

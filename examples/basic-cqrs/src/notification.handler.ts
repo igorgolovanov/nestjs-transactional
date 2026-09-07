@@ -4,7 +4,7 @@ import {
   TransactionalEventsHandler,
 } from '@nestjs-transactional/cqrs';
 
-import { OrderPlacedEvent } from './order.aggregate';
+import { OrderPlacedEvent } from './order.aggregate.js';
 
 /**
  * In-memory phase-aware listener. Default phase is `AFTER_COMMIT` —

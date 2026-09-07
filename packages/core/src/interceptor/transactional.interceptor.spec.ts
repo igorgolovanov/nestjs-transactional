@@ -9,13 +9,13 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { defer, firstValueFrom, from, of, throwError } from 'rxjs';
 
-import { Transactional } from '../decorators/transactional.decorator';
-import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
-import { TransactionManager } from '../manager/transaction.manager';
-import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
-import { PropagationMode } from '../types/propagation';
+import { Transactional } from '../decorators/transactional.decorator.js';
+import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
+import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter.js';
+import { PropagationMode } from '../types/propagation.js';
 
-import { TransactionalInterceptor } from './transactional.interceptor';
+import { TransactionalInterceptor } from './transactional.interceptor.js';
 
 @Injectable()
 class TestService {

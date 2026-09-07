@@ -1,23 +1,23 @@
-export * from './types/propagation';
-export * from './types/isolation';
-export * from './types/transaction-handle';
-export * from './types/transaction-options';
-export * from './types/transaction-adapter';
-export * from './types/domain-event';
-export * from './types/errors';
+export * from './types/propagation.js';
+export * from './types/isolation.js';
+export * from './types/transaction-handle.js';
+export * from './types/transaction-options.js';
+export * from './types/transaction-adapter.js';
+export * from './types/domain-event.js';
+export * from './types/errors.js';
 
-export * from './context/transaction.context';
-export * from './context/transaction-context-view';
-export * from './manager/adapter.registry';
-export * from './manager/transaction.manager';
+export * from './context/transaction.context.js';
+export * from './context/transaction-context-view.js';
+export * from './manager/adapter.registry.js';
+export * from './manager/transaction.manager.js';
 
-export * from './decorators/transactional.decorator';
-export * from './decorators/inject-decorators';
+export * from './decorators/transactional.decorator.js';
+export * from './decorators/inject-decorators.js';
 
-export * from './tokens';
+export * from './tokens/index.js';
 
-export * from './interceptor/transactional.interceptor';
-export * from './bootstrap/transactional-methods.bootstrap';
-export * from './module/transactional.module';
+export * from './interceptor/transactional.interceptor.js';
+export * from './bootstrap/transactional-methods.bootstrap.js';
+export * from './module/transactional.module.js';
 
-export * from './observability/transaction-observer';
+export * from './observability/transaction-observer.js';

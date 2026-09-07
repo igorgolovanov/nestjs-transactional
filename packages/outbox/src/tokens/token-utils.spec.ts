@@ -8,7 +8,7 @@ import {
   getOutboxEventSerializerToken,
   getOutboxListenerRegistryToken,
   getOutboxPublisherToken,
-} from './token-utils';
+} from './token-utils.js';
 
 describe('Token utilities (outbox)', () => {
   const allUtilities = [

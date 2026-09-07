@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -12,11 +13,11 @@ import {
 } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { OrderRow, PaymentRow, ReservationRow, StockItemRow } from '../src/entities';
-import { OrderPlacedEvent } from '../src/events';
-import { OrderService } from '../src/order.service';
-import { ReservationHandler } from '../src/reservation.handler';
+import { AppModule } from '../src/app.module.js';
+import { OrderRow, PaymentRow, ReservationRow, StockItemRow } from '../src/entities.js';
+import { OrderPlacedEvent } from '../src/events.js';
+import { OrderService } from '../src/order.service.js';
+import { ReservationHandler } from '../src/reservation.handler.js';
 
 async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
   const start = Date.now();

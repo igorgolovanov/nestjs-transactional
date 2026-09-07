@@ -1,6 +1,6 @@
 import { Externalized } from '@nestjs-transactional/outbox';
 
-import { REFUNDS_BROKER } from './clients';
+import { REFUNDS_BROKER } from './clients.js';
 
 /**
  * Domain event published from `RefundService.requestRefund`. Two

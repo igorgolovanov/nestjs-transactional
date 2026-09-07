@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { ReservationPlacedEvent } from './reservation-placed.event';
+import { ReservationPlacedEvent } from './reservation-placed.event.js';
 
 @Injectable()
 @OutboxEventsHandler({

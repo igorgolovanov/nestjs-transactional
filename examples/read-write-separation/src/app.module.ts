@@ -3,9 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { ArticleQueryService } from './article.query-service';
-import { ArticleRow } from './article.entity';
-import { ArticleService } from './article.service';
+import { ArticleQueryService } from './article.query-service.js';
+import { ArticleRow } from './article.entity.js';
+import { ArticleService } from './article.service.js';
 
 export interface PostgresConnection {
   readonly host: string;

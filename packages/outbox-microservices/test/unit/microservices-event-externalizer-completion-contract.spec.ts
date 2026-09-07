@@ -20,14 +20,15 @@
  * silent-success limitation. See ADR-016, superseded, for how that
  * conclusion was reached and why it was wrong.
  */
+import { jest } from '@jest/globals';
 import { type InjectionToken, Logger } from '@nestjs/common';
 import { type ModuleRef } from '@nestjs/core';
 import { type ClientProxy } from '@nestjs/microservices';
 import { type ExternalizationMetadata } from '@nestjs-transactional/outbox';
 import { Observable, of } from 'rxjs';
 
-import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';
-import { type OutboxMicroservicesOptions } from '../../src/types/options';
+import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer.js';
+import { type OutboxMicroservicesOptions } from '../../src/types/options.js';
 
 const KAFKA_TOKEN = 'KAFKA_CLIENT';
 
@@ -35,8 +36,10 @@ class OrderPlacedEvent {
   constructor(readonly orderId: string) {}
 }
 
-type ResolveClientArgs = [InjectionToken, { strict: boolean }];
-type ResolveClientMock = jest.Mock<ClientProxy | null, ResolveClientArgs>;
+// `@jest/globals` types `Mock` by the function signature, not by the
+// (return, args) pair `@types/jest` used.
+type ResolveClientFn = (token: InjectionToken, options: { strict: boolean }) => ClientProxy | null;
+type ResolveClientMock = jest.Mock<ResolveClientFn>;
 
 function buildExternalizer(
   options: OutboxMicroservicesOptions,
@@ -51,7 +54,7 @@ function metadataFor(eventType: string): ExternalizationMetadata {
 }
 
 describe('MicroservicesEventExternalizer — completion contract (ADR-021)', () => {
-  let emit: jest.Mock<Observable<unknown>>;
+  let emit: jest.Mock<() => Observable<unknown>>;
   let resolveClient: ResolveClientMock;
 
   beforeEach(() => {
@@ -62,7 +65,7 @@ describe('MicroservicesEventExternalizer — completion contract (ADR-021)', () 
 
     emit = jest.fn();
     const proxy = { emit } as unknown as ClientProxy;
-    resolveClient = jest.fn<ClientProxy | null, ResolveClientArgs>().mockReturnValue(proxy);
+    resolveClient = jest.fn<ResolveClientFn>().mockReturnValue(proxy);
   });
 
   it('considers a synchronous `of(undefined)` completion a successful externalization', async () => {

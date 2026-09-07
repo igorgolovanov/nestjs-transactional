@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { InvoiceRow } from './entities';
-import { Invoice } from './invoice.aggregate';
+import { InvoiceRow } from './entities.js';
+import { Invoice } from './invoice.aggregate.js';
 
 export class IssueInvoiceCommand {
   constructor(

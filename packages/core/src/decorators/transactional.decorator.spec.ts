@@ -1,11 +1,11 @@
-import { PropagationMode } from '../types/propagation';
+import { PropagationMode } from '../types/propagation.js';
 
 import {
   ReadOnly,
   Transactional,
   TransactionalOn,
   getTransactionalMetadata,
-} from './transactional.decorator';
+} from './transactional.decorator.js';
 
 describe('@Transactional', () => {
   describe('as method decorator', () => {

@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 
-import { WalletOperationEvent } from './events';
-import { WALLET_REPOSITORY, type WalletRepository } from './wallet.repository';
+import { WalletOperationEvent } from './events.js';
+import { WALLET_REPOSITORY, type WalletRepository } from './wallet.repository.js';
 
 /**
  * Domain service under test. `@Transactional()` opens the ambient

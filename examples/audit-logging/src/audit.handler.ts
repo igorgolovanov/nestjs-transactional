@@ -7,8 +7,8 @@ import {
 } from '@nestjs-transactional/cqrs';
 import { QueryFailedError, Repository } from 'typeorm';
 
-import { AuditLogRow } from './entities';
-import { AccountOperationEvent } from './events';
+import { AuditLogRow } from './entities.js';
+import { AccountOperationEvent } from './events.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 

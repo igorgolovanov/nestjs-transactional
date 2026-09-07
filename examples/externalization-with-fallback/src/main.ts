@@ -7,11 +7,11 @@ import {
   AppModule,
   readPostgresConfigFromEnv,
   readRabbitMqConfigFromEnv,
-} from './app.module';
-import { RefundConsumerService } from './refund-consumer.service';
-import { RefundLedgerHandler } from './refund-ledger.handler';
-import { RefundRequestedEvent } from './refund-requested.event';
-import { RefundService } from './refund.service';
+} from './app.module.js';
+import { RefundConsumerService } from './refund-consumer.service.js';
+import { RefundLedgerHandler } from './refund-ledger.handler.js';
+import { RefundRequestedEvent } from './refund-requested.event.js';
+import { RefundService } from './refund.service.js';
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,

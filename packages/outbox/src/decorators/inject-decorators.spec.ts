@@ -10,7 +10,7 @@ import {
   InjectOutboxEventSerializer,
   InjectOutboxListenerRegistry,
   InjectOutboxPublisher,
-} from './inject-decorators';
+} from './inject-decorators.js';
 
 function readSelfParamTypes(target: unknown): { index: number; param: unknown }[] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

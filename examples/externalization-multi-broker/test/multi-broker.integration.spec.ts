@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -18,13 +19,13 @@ import {
 import { of } from 'rxjs';
 import type { DataSource } from 'typeorm';
 
-import { AccountingHandler } from '../src/accounting.handler';
-import { AppModule } from '../src/app.module';
-import { KAFKA_CLIENT, RABBITMQ_CLIENT, REDIS_CLIENT } from '../src/clients';
-import { LocalCacheInvalidator } from '../src/local-cache.handler';
-import { OrderEntity } from '../src/order.entity';
-import { OrderService } from '../src/order.service';
-import { ShippingHandler } from '../src/shipping.handler';
+import { AccountingHandler } from '../src/accounting.handler.js';
+import { AppModule } from '../src/app.module.js';
+import { KAFKA_CLIENT, RABBITMQ_CLIENT, REDIS_CLIENT } from '../src/clients.js';
+import { LocalCacheInvalidator } from '../src/local-cache.handler.js';
+import { OrderEntity } from '../src/order.entity.js';
+import { OrderService } from '../src/order.service.js';
+import { ShippingHandler } from '../src/shipping.handler.js';
 
 interface ProxyMock {
   proxy: ClientProxy;

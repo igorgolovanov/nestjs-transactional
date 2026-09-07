@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -22,14 +23,14 @@ import {
 import { of } from 'rxjs';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { REFUNDS_BROKER } from '../src/clients';
-import { ProcessedRefundEntity } from '../src/processed-refunds.entity';
-import { RefundConsumerService } from '../src/refund-consumer.service';
-import { RefundEntity } from '../src/refund.entity';
-import { RefundLedgerHandler } from '../src/refund-ledger.handler';
-import { RefundRequestedEvent } from '../src/refund-requested.event';
-import { RefundService } from '../src/refund.service';
+import { AppModule } from '../src/app.module.js';
+import { REFUNDS_BROKER } from '../src/clients.js';
+import { ProcessedRefundEntity } from '../src/processed-refunds.entity.js';
+import { RefundConsumerService } from '../src/refund-consumer.service.js';
+import { RefundEntity } from '../src/refund.entity.js';
+import { RefundLedgerHandler } from '../src/refund-ledger.handler.js';
+import { RefundRequestedEvent } from '../src/refund-requested.event.js';
+import { RefundService } from '../src/refund.service.js';
 
 interface ProxyMock {
   proxy: ClientProxy;

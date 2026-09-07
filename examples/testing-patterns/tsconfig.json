@@ -8,8 +8,8 @@
     "composite": false,
     "declaration": false,
     "declarationMap": false,
-    "module": "Node16",
-    "moduleResolution": "Node16",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "isolatedModules": true
   },
   "include": ["src/**/*"],

@@ -1,16 +1,17 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 
-import { CreateEventPublication1700000000000 } from '../../src/migrations/1700000000000-create-event-publication';
+import { CreateEventPublication1700000000000 } from '../../src/migrations/1700000000000-create-event-publication.js';
 import {
   EVENT_PUBLICATION_ARCHIVE_TABLE,
   EVENT_PUBLICATION_TABLE,
-} from '../../src/schema/event-publication-schema';
-import { SchemaInitializer } from '../../src/schema/schema-initializer';
+} from '../../src/schema/event-publication-schema.js';
+import { SchemaInitializer } from '../../src/schema/schema-initializer.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
+} from '../setup-testcontainers.js';
 
 async function tableExists(ctx: PostgresTestContext, table: string): Promise<boolean> {
   const rows = await ctx.dataSource.query<{ exists: string | null }[]>(

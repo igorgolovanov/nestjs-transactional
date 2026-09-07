@@ -8,4 +8,4 @@ export {
   getOutboxEventSerializerToken,
   getOutboxListenerRegistryToken,
   getOutboxPublisherToken,
-} from './token-utils';
+} from './token-utils.js';

@@ -8,8 +8,8 @@ import {
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { OrderRow } from './entities';
-import { OrderShippedEvent, PaymentChargedEvent } from './events';
+import { OrderRow } from './entities.js';
+import { OrderShippedEvent, PaymentChargedEvent } from './events.js';
 
 /**
  * Terminal saga step. Subscribes to `PaymentChargedEvent`. The

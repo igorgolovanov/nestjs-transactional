@@ -1,4 +1,4 @@
-import { DEFAULT_DRAIN_TIMEOUT_MS } from '../shutdown/drain';
+import { DEFAULT_DRAIN_TIMEOUT_MS } from '../shutdown/drain.js';
 
 /**
  * Policy for automatically resubmitting `FAILED` publications

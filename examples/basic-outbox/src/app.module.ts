@@ -3,9 +3,9 @@ import { TransactionalModule } from '@nestjs-transactional/core';
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
 import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
 
-import { OrderPlacedEvent } from './order-placed.event';
-import { OrderService } from './order.service';
-import { ShippingHandler } from './shipping.handler';
+import { OrderPlacedEvent } from './order-placed.event.js';
+import { OrderService } from './order.service.js';
+import { ShippingHandler } from './shipping.handler.js';
 
 /**
  * Foundational outbox example. Uses `InMemoryTransactionAdapter` (test

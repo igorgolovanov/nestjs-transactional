@@ -2,8 +2,8 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule, readPostgresConfigFromEnv } from './app.module';
-import { AuditService } from './audit/audit.service';
+import { AppModule, readPostgresConfigFromEnv } from './app.module.js';
+import { AuditService } from './audit/audit.service.js';
 
 /**
  * Visual demo. Records an audit event every two seconds in a loop.

@@ -1,6 +1,6 @@
 import { Externalized } from '@nestjs-transactional/outbox';
 
-import { RABBITMQ_CLIENT } from './clients';
+import { RABBITMQ_CLIENT } from './clients.js';
 
 /**
  * Domain event routed to **RabbitMQ** — work-queue semantics with

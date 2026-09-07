@@ -1,7 +1,7 @@
 import type { Type } from '@nestjs/common';
 
-import type { IsolationLevel } from './isolation';
-import type { PropagationMode } from './propagation';
+import type { IsolationLevel } from './isolation.js';
+import type { PropagationMode } from './propagation.js';
 
 /**
  * Options passed by the core runtime down into an adapter's

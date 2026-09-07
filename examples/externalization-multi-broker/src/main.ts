@@ -6,11 +6,11 @@ import {
   AppModule,
   readBrokerConfigFromEnv,
   readPostgresConfigFromEnv,
-} from './app.module';
-import { AccountingHandler } from './accounting.handler';
-import { LocalCacheInvalidator } from './local-cache.handler';
-import { OrderService } from './order.service';
-import { ShippingHandler } from './shipping.handler';
+} from './app.module.js';
+import { AccountingHandler } from './accounting.handler.js';
+import { LocalCacheInvalidator } from './local-cache.handler.js';
+import { OrderService } from './order.service.js';
+import { ShippingHandler } from './shipping.handler.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const start = Date.now();

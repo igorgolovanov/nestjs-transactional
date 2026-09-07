@@ -1,8 +1,8 @@
-import { PublicationNotFoundError } from '../types/errors';
-import type { NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
+import { PublicationNotFoundError } from '../types/errors.js';
+import type { NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { InMemoryEventPublicationRepository } from './in-memory-repository';
+import { InMemoryEventPublicationRepository } from './in-memory-repository.js';
 
 function sampleInput(overrides: Partial<NewEventPublication> = {}): NewEventPublication {
   return {

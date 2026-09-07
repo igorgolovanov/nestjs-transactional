@@ -11,11 +11,11 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { WalletOperationEvent } from './events';
-import { WalletProjection } from './wallet.listener';
-import { WALLET_REPOSITORY, TypeOrmWalletRepository } from './wallet.repository';
-import { WalletRow } from './wallet.entity';
-import { WalletService } from './wallet.service';
+import { WalletOperationEvent } from './events.js';
+import { WalletProjection } from './wallet.listener.js';
+import { WALLET_REPOSITORY, TypeOrmWalletRepository } from './wallet.repository.js';
+import { WalletRow } from './wallet.entity.js';
+import { WalletService } from './wallet.service.js';
 
 export interface PostgresConfig {
   readonly host: string;

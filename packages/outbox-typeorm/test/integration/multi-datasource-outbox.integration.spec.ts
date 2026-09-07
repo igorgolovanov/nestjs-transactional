@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -16,19 +17,19 @@ import {
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
-import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
-import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
+import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity.js';
+import { EventPublicationEntity } from '../../src/entity/event-publication.entity.js';
 import {
   OutboxTypeOrmModule,
   typeOrmEventPublicationRepositoryProvider,
-} from '../../src/module/outbox-typeorm.module';
-import { TypeOrmEventPublicationRepository } from '../../src/repository/typeorm-event-publication.repository';
+} from '../../src/module/outbox-typeorm.module.js';
+import { TypeOrmEventPublicationRepository } from '../../src/repository/typeorm-event-publication.repository.js';
 import {
   type PostgresTestContext,
   createAdditionalDatabase,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
+} from '../setup-testcontainers.js';
 
 /**
  * Stand-in for `TypeOrmModule.forRoot(...)` registers

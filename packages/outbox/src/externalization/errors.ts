@@ -1,4 +1,4 @@
-import { OutboxError } from '../types/errors';
+import { OutboxError } from '../types/errors.js';
 
 /**
  * Raised when an {@link EventExternalizer} fails to deliver a

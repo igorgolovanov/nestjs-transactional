@@ -1,10 +1,10 @@
-import { OutboxListenerRegistry } from '../registry/listener-registry';
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
-import { PublicationStatus } from '../types/publication-status';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { InMemoryEventPublicationRepository } from './in-memory-repository';
-import { PublishedEvents } from './published-events';
+import { InMemoryEventPublicationRepository } from './in-memory-repository.js';
+import { PublishedEvents } from './published-events.js';
 
 class OrderPlacedEvent {
   constructor(

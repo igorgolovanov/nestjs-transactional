@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { UserEntity } from './user.entity';
+import { UserEntity } from './user.entity.js';
 
 /**
  * Transparent transactional repositories — `@InjectRepository(UserEntity)`

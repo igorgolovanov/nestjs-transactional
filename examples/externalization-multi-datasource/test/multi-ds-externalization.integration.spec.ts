@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -18,13 +19,13 @@ import {
 import { of } from 'rxjs';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { BillingPaymentHandler } from '../src/billing.handler';
-import { BillingService } from '../src/billing.service';
-import { BILLING_BROKER, INVENTORY_BROKER } from '../src/clients';
-import { InvoiceEntity, ReservationEntity } from '../src/entities';
-import { InventoryAllocationHandler } from '../src/inventory.handler';
-import { InventoryService } from '../src/inventory.service';
+import { AppModule } from '../src/app.module.js';
+import { BillingPaymentHandler } from '../src/billing.handler.js';
+import { BillingService } from '../src/billing.service.js';
+import { BILLING_BROKER, INVENTORY_BROKER } from '../src/clients.js';
+import { InvoiceEntity, ReservationEntity } from '../src/entities.js';
+import { InventoryAllocationHandler } from '../src/inventory.handler.js';
+import { InventoryService } from '../src/inventory.service.js';
 
 interface ProxyMock {
   proxy: ClientProxy;

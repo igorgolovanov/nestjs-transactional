@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { OrderRow } from './entities';
-import { OrderPlacedEvent } from './events';
+import { OrderRow } from './entities.js';
+import { OrderPlacedEvent } from './events.js';
 
 /**
  * Saga entry point. `placeOrder` opens a transaction, persists the

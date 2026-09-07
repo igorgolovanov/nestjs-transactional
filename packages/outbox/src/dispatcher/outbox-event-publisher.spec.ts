@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import {
   AdapterRegistry,
@@ -12,14 +13,14 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { EventPublicationRegistry } from '../registry/event-publication-registry';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { PublicationStatus } from '../types/publication-status';
+import { EventPublicationRegistry } from '../registry/event-publication-registry.js';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { DataSourceOutboxPublisher } from './data-source-outbox-publisher';
+import { DataSourceOutboxPublisher } from './data-source-outbox-publisher.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;

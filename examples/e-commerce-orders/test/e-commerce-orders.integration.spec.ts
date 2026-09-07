@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { type INestApplication, Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -16,12 +17,12 @@ import { of } from 'rxjs';
 import request from 'supertest';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { KAFKA_CLIENT } from '../src/clients';
-import { PaymentRow } from '../src/billing/payment.entity';
-import { OrderRow } from '../src/orders/order.entity';
-import { ProductRow } from '../src/inventory/product.entity';
-import { ReservationRow } from '../src/inventory/reservation.entity';
+import { AppModule } from '../src/app.module.js';
+import { KAFKA_CLIENT } from '../src/clients.js';
+import { PaymentRow } from '../src/billing/payment.entity.js';
+import { OrderRow } from '../src/orders/order.entity.js';
+import { ProductRow } from '../src/inventory/product.entity.js';
+import { ReservationRow } from '../src/inventory/reservation.entity.js';
 
 interface KafkaMock {
   proxy: ClientProxy;

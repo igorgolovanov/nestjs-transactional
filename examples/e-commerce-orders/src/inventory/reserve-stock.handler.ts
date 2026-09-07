@@ -12,9 +12,9 @@ import {
   OrderPlacedEvent,
   StockReservationFailedEvent,
   StockReservedEvent,
-} from '../shared/events';
-import { ProductRow } from './product.entity';
-import { ReservationRow } from './reservation.entity';
+} from '../shared/events.js';
+import { ProductRow } from './product.entity.js';
+import { ReservationRow } from './reservation.entity.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 

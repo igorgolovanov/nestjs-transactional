@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-transactional/core';
 import { InjectOutboxPublisher, OutboxEventPublisher } from '@nestjs-transactional/outbox';
 
-import { OrderPlacedEvent } from './order-placed.event';
+import { OrderPlacedEvent } from './order-placed.event.js';
 
 @Injectable()
 export class OrderService {

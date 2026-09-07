@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { type DynamicModule, Injectable, Logger, Module, type Provider } from '@nestjs/common';
 import { EventPublisher } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -10,11 +11,14 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher';
-import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
+import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher.js';
+import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper.js';
 
-import { CQRS_TRANSACTIONAL_OPTIONS, CqrsTransactionalModule } from './cqrs-transactional.module';
+import {
+  CQRS_TRANSACTIONAL_OPTIONS,
+  CqrsTransactionalModule,
+} from './cqrs-transactional.module.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;

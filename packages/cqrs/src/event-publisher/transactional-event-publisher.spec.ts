@@ -20,16 +20,16 @@ import {
   Transactional,
 } from '@nestjs-transactional/core';
 
-import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
-import { CQRS_HANDLER_WRAPPER_OPTIONS, CqrsHandlerWrapper } from '../handlers/handler-wrapper';
-import { TransactionalListenerScanner } from '../handlers/listener-scanner';
-import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
-import { TransactionPhase } from '../types/transactional-listener.types';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator.js';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
+import { CqrsTransactionalBootstrap } from '../handlers/bootstrap.js';
+import { CQRS_HANDLER_WRAPPER_OPTIONS, CqrsHandlerWrapper } from '../handlers/handler-wrapper.js';
+import { TransactionalListenerScanner } from '../handlers/listener-scanner.js';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface.js';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
-import { TransactionalEventPublisher } from './transactional-event-publisher';
-import { TransactionalEventPublisherAdapter } from './transactional-event-publisher-adapter';
+import { TransactionalEventPublisherAdapter } from './transactional-event-publisher-adapter.js';
+import { TransactionalEventPublisher } from './transactional-event-publisher.js';
 
 // Inline fake adapter — `@nestjs-transactional/core/testing` subpath is
 // not resolvable under the monorepo's `moduleResolution: "node"` setting.

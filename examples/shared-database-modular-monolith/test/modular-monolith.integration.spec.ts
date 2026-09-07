@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -17,13 +18,13 @@ import {
 import { Client } from 'pg';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { BillingPaymentProjectionListener } from '../src/billing/billing.listener';
-import { BillingService } from '../src/billing/billing.service';
-import { InvoiceRow } from '../src/billing/invoice.entity';
-import { InventoryShipmentProjectionListener } from '../src/inventory/inventory.listener';
-import { InventoryService } from '../src/inventory/inventory.service';
-import { ReservationRow } from '../src/inventory/reservation.entity';
+import { AppModule } from '../src/app.module.js';
+import { BillingPaymentProjectionListener } from '../src/billing/billing.listener.js';
+import { BillingService } from '../src/billing/billing.service.js';
+import { InvoiceRow } from '../src/billing/invoice.entity.js';
+import { InventoryShipmentProjectionListener } from '../src/inventory/inventory.listener.js';
+import { InventoryService } from '../src/inventory/inventory.service.js';
+import { ReservationRow } from '../src/inventory/reservation.entity.js';
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,

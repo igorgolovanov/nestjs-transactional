@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { InvoicePaidEvent } from './events';
+import { InvoicePaidEvent } from './events.js';
 
 /**
  * Local listener for the billing DS. The Category A

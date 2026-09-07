@@ -7,9 +7,9 @@ import {
   AppModule,
   readKafkaConfigFromEnv,
   readPostgresConfigFromEnv,
-} from './app.module';
-import { OrderService } from './order.service';
-import { ShippingHandler } from './shipping.handler';
+} from './app.module.js';
+import { OrderService } from './order.service.js';
+import { ShippingHandler } from './shipping.handler.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const start = Date.now();

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { InvoiceEntity } from './entities';
+import { InvoiceEntity } from './entities.js';
 
 /**
  * Operates on the `billing` DataSource — registered as the default

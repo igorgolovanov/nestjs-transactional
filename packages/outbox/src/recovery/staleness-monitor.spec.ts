@@ -1,11 +1,12 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import type { NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
-import type { StalenessConfig } from '../types/staleness-config';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import type { NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
+import type { StalenessConfig } from '../types/staleness-config.js';
 
-import { StalenessMonitor } from './staleness-monitor';
+import { StalenessMonitor } from './staleness-monitor.js';
 
 function sampleInput(publicationDate: Date): NewEventPublication {
   return {

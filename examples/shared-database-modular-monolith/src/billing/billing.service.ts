@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { InvoicePaidEvent } from './invoice-paid.event';
-import { InvoiceRow } from './invoice.entity';
+import { InvoicePaidEvent } from './invoice-paid.event.js';
+import { InvoiceRow } from './invoice.entity.js';
 
 /**
  * Operates exclusively on the `billing` Postgres schema. The

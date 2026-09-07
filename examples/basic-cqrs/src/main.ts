@@ -3,10 +3,10 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
-import { AppModule } from './app.module';
-import { GetNotifiedOrdersQuery } from './get-notified-orders.query';
-import { NotificationHandler } from './notification.handler';
-import { PlaceOrderCommand } from './place-order.handler';
+import { AppModule } from './app.module.js';
+import { GetNotifiedOrdersQuery } from './get-notified-orders.query.js';
+import { NotificationHandler } from './notification.handler.js';
+import { PlaceOrderCommand } from './place-order.handler.js';
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule, {

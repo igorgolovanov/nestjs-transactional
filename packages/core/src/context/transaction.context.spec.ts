@@ -1,11 +1,11 @@
-import { IllegalTransactionStateError } from '../types/errors';
-import type { TransactionHandle } from '../types/transaction-handle';
+import { IllegalTransactionStateError } from '../types/errors.js';
+import type { TransactionHandle } from '../types/transaction-handle.js';
 
 import {
   TransactionContext,
   type ActiveTransaction,
   type TransactionContextStore,
-} from './transaction.context';
+} from './transaction.context.js';
 
 function makeActiveTx(
   adapterInstanceName: string,

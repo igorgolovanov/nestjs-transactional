@@ -1,12 +1,13 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 
-import type { EventPublicationRepository } from '../repository/event-publication-repository';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { DEFAULT_CLEANUP_CONFIG, type OutboxCleanupConfig } from '../types/cleanup-config';
-import type { NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
+import type { EventPublicationRepository } from '../repository/event-publication-repository.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { DEFAULT_CLEANUP_CONFIG, type OutboxCleanupConfig } from '../types/cleanup-config.js';
+import type { NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { OutboxCleanupScheduler } from './outbox-cleanup-scheduler';
+import { OutboxCleanupScheduler } from './outbox-cleanup-scheduler.js';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -185,7 +186,9 @@ describe('OutboxCleanupScheduler', () => {
     it('reports 0 and keeps going when the repository throws', async () => {
       const failing: EventPublicationRepository = {
         ...repo,
-        findCompleted: jest.fn().mockRejectedValue(new Error('database unreachable')),
+        findCompleted: jest
+          .fn<EventPublicationRepository['findCompleted']>()
+          .mockRejectedValue(new Error('database unreachable')),
       } as unknown as EventPublicationRepository;
       scheduler = new OutboxCleanupScheduler(failing, config);
 

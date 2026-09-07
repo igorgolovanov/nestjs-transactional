@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule, readConfigFromEnv } from './app.module';
+import { AppModule, readConfigFromEnv } from './app.module.js';
 
 /**
  * HTTP-server bootstrap. Tier 5 introduces the REST surface — the

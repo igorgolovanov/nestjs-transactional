@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { StockAdjustedEvent } from './events';
+import { StockAdjustedEvent } from './events.js';
 
 /**
  * Category A auto-routing — same as

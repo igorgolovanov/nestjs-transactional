@@ -6,11 +6,11 @@ import {
   AppModule,
   readMultiDsConfigFromEnv,
   readRabbitMqConfigFromEnv,
-} from './app.module';
-import { BillingPaymentHandler } from './billing.handler';
-import { BillingService } from './billing.service';
-import { InventoryAllocationHandler } from './inventory.handler';
-import { InventoryService } from './inventory.service';
+} from './app.module.js';
+import { BillingPaymentHandler } from './billing.handler.js';
+import { BillingService } from './billing.service.js';
+import { InventoryAllocationHandler } from './inventory.handler.js';
+import { InventoryService } from './inventory.service.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const start = Date.now();

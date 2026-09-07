@@ -1,6 +1,6 @@
 import { Injectable, type Type } from '@nestjs/common';
 
-import { PublishedEvents, type PublishedEventsView } from './published-events';
+import { PublishedEvents, type PublishedEventsView } from './published-events.js';
 
 /**
  * Thrown when an assertion made against the published-events view does

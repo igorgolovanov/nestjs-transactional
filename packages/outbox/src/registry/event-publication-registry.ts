@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository';
-import type { EventPublicationRepository } from '../repository/event-publication-repository';
-import { EVENT_SERIALIZER } from '../serialization/event-serializer';
-import type { EventSerializer } from '../serialization/event-serializer';
-import { CompletionMode } from '../types/completion-mode';
-import type { EventPublication, NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
+import { EVENT_PUBLICATION_REPOSITORY } from '../repository/event-publication-repository.js';
+import type { EventPublicationRepository } from '../repository/event-publication-repository.js';
+import { EVENT_SERIALIZER } from '../serialization/event-serializer.js';
+import type { EventSerializer } from '../serialization/event-serializer.js';
+import { CompletionMode } from '../types/completion-mode.js';
+import type { EventPublication, NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
 /**
  * Central service that coordinates the event publication lifecycle.

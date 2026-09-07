@@ -1,13 +1,14 @@
 {
   "name": "@nestjs-transactional-examples/basic-cqrs",
   "version": "0.0.0",
+  "type": "module",
   "private": true,
   "description": "Foundational CQRS example: @CommandHandler with @Transactional + AFTER_COMMIT phase listener",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
     "start": "tsc && node dist/main.js",
-    "test": "jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "dependencies": {
     "@nestjs-transactional/core": "workspace:*",
@@ -19,6 +20,7 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@jest/globals": "^30.4.2",
     "@nestjs/testing": "^11.2.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.1",

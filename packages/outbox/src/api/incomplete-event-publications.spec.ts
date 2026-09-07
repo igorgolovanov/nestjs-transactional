@@ -1,9 +1,9 @@
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import type { NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
-import { ResubmissionOptions } from '../types/resubmission-options';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import type { NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
+import { ResubmissionOptions } from '../types/resubmission-options.js';
 
-import { IncompleteEventPublications } from './incomplete-event-publications';
+import { IncompleteEventPublications } from './incomplete-event-publications.js';
 
 function newInput(overrides: Partial<NewEventPublication> = {}): NewEventPublication {
   return {

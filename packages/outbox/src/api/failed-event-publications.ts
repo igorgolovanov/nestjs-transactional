@@ -3,10 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
-} from '../repository/event-publication-repository';
-import type { EventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
-import { ResubmissionOptions } from '../types/resubmission-options';
+} from '../repository/event-publication-repository.js';
+import type { EventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
+import { ResubmissionOptions } from '../types/resubmission-options.js';
 
 /**
  * Operator-facing query + resubmit API for publications currently in

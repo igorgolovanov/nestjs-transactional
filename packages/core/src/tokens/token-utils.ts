@@ -1,4 +1,4 @@
-import { DEFAULT_DATA_SOURCE_NAME } from './constants';
+import { DEFAULT_DATA_SOURCE_NAME } from './constants.js';
 
 /**
  * Token utilities derive deterministic DI token strings from a

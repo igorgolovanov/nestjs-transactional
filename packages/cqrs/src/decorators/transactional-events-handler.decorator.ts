@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { type Type } from '@nestjs/common';
 import { DEFAULT_DATA_SOURCE_NAME } from '@nestjs-transactional/core';
 
-import { TransactionPhase } from '../types/transactional-listener.types';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
 /**
  * Metadata key under which {@link TransactionalEventsHandlerMetadata} is

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { StockItemEntity } from './entities';
+import { StockItemEntity } from './entities.js';
 
 /**
  * Operates on the `inventory` DataSource — registered under that

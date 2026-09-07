@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Injectable, Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -10,22 +11,22 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { FailedEventPublications } from '../api/failed-event-publications';
-import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator';
-import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
-import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
-import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface';
-import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
-import { StalenessMonitor } from '../recovery/staleness-monitor';
+import { FailedEventPublications } from '../api/failed-event-publications.js';
+import { OutboxEventsHandler } from '../decorators/outbox-events-handler.decorator.js';
+import { EventPublicationProcessor } from '../dispatcher/event-publication-processor.js';
+import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher.js';
+import type { IOutboxEventHandler } from '../interfaces/outbox-event-handler.interface.js';
+import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler.js';
+import { StalenessMonitor } from '../recovery/staleness-monitor.js';
 import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
-} from '../repository/event-publication-repository';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { PublicationStatus } from '../types/publication-status';
-import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config';
+} from '../repository/event-publication-repository.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { PublicationStatus } from '../types/publication-status.js';
+import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config.js';
 
-import { OUTBOX_RETRY_CONFIG, OutboxModule } from './outbox.module';
+import { OUTBOX_RETRY_CONFIG, OutboxModule } from './outbox.module.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;

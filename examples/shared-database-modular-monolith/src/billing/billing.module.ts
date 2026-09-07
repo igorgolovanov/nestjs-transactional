@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule } from '@nestjs-transactional/outbox';
 
-import { BillingPaymentProjectionListener } from './billing.listener';
-import { BillingService } from './billing.service';
-import { InvoicePaidEvent } from './invoice-paid.event';
-import { InvoiceRow } from './invoice.entity';
+import { BillingPaymentProjectionListener } from './billing.listener.js';
+import { BillingService } from './billing.service.js';
+import { InvoicePaidEvent } from './invoice-paid.event.js';
+import { InvoiceRow } from './invoice.entity.js';
 
 /**
  * `BillingModule` encapsulates the billing bounded-context — its

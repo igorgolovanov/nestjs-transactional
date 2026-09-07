@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { jest } from '@jest/globals';
 import { Global, Injectable, Logger, Module } from '@nestjs/common';
 import {
   AggregateRoot,
@@ -31,12 +32,12 @@ import {
   getOutboxListenerRegistryToken,
 } from '@nestjs-transactional/outbox';
 
-import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
-import { OUTBOX_PUBLICATION_SCHEDULER } from '../event-publisher/hybrid-event-publisher';
-import { OUTBOX_LISTENER_REGISTRAR } from '../handlers/outbox-listener-registrar';
-import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator.js';
+import { OUTBOX_PUBLICATION_SCHEDULER } from '../event-publisher/hybrid-event-publisher.js';
+import { OUTBOX_LISTENER_REGISTRAR } from '../handlers/outbox-listener-registrar.js';
+import type { ITransactionalEventHandler } from '../interfaces/transactional-event-handler.interface.js';
 
-import { CqrsTransactionalModule } from './cqrs-transactional.module';
+import { CqrsTransactionalModule } from './cqrs-transactional.module.js';
 
 /**
  * Verification that cqrs is dataSource-agnostic by design and
@@ -219,7 +220,10 @@ describe('CqrsTransactionalModule + multi-dataSource outbox (decoupling)', () =>
     // sufficient — TypeScript imports are textual, and the
     // `from '@nestjs-transactional/outbox'` form catches every
     // shape (named, namespace, default).
-    const cqrsSrcFiles = collectTsFiles(join(__dirname, '..', '..', 'src'));
+    // `import.meta.dirname` rather than `__dirname`: the package is ESM
+    // and `__dirname` does not exist there. Available since Node 20.11,
+    // well under the `>=22.12.0` floor these packages declare.
+    const cqrsSrcFiles = collectTsFiles(join(import.meta.dirname, '..', '..', 'src'));
     const offenders: string[] = [];
     for (const file of cqrsSrcFiles) {
       const text = readFileSync(file, 'utf8');

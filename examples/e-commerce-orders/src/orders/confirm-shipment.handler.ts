@@ -8,9 +8,9 @@ import {
 } from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
-import { PaymentChargedEvent } from '../shared/events';
-import { Order } from './order.aggregate';
-import { OrderRow } from './order.entity';
+import { PaymentChargedEvent } from '../shared/events.js';
+import { Order } from './order.aggregate.js';
+import { OrderRow } from './order.entity.js';
 
 /**
  * Final happy-path step. `PaymentChargedEvent` was published by the

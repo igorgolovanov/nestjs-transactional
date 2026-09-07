@@ -9,9 +9,9 @@
 import { Repository } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
-import { getEmDataSource } from './get-em-data-source';
-import { getActiveEntityManager, getManagedDataSourceName, isManaged } from './managed-registry';
-import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols';
+import { getEmDataSource } from './get-em-data-source.js';
+import { getActiveEntityManager, getManagedDataSourceName, isManaged } from './managed-registry.js';
+import { TYPEORM_ENTITY_MANAGER_NAME } from './symbols.js';
 
 /**
  * Tracks whether the prototype patch has been installed on

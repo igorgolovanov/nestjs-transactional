@@ -1,13 +1,14 @@
 {
   "name": "@nestjs-transactional-examples/multi-datasource-basic",
   "version": "0.0.0",
+  "type": "module",
   "private": true,
   "description": "Two DataSources (billing + inventory) with @Transactional({ dataSource }) routing — foundational multi-DataSource example",
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
     "start": "tsc && node dist/main.js",
-    "test": "jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "dependencies": {
     "@nestjs-transactional/core": "workspace:*",
@@ -21,6 +22,7 @@
     "typeorm": "^1.1.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.4.2",
     "@nestjs/testing": "^11.2.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.1",

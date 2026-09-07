@@ -1,4 +1,4 @@
-import type { PublicationStatus } from './publication-status';
+import type { PublicationStatus } from './publication-status.js';
 
 /**
  * Persistent record of an event that was published and needs to be

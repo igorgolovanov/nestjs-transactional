@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -16,12 +17,12 @@ import {
 } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { BillingProjectionsHandler } from '../src/billing.handler';
-import { BillingService } from '../src/billing.service';
-import { InvoiceEntity, StockItemEntity } from '../src/entities';
-import { InventoryProjectionsHandler } from '../src/inventory.handler';
-import { InventoryService } from '../src/inventory.service';
+import { AppModule } from '../src/app.module.js';
+import { BillingProjectionsHandler } from '../src/billing.handler.js';
+import { BillingService } from '../src/billing.service.js';
+import { InvoiceEntity, StockItemEntity } from '../src/entities.js';
+import { InventoryProjectionsHandler } from '../src/inventory.handler.js';
+import { InventoryService } from '../src/inventory.service.js';
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,

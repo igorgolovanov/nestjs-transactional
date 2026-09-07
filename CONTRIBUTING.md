@@ -9,9 +9,12 @@ or a PR — stale instructions are worse than none.
 Requirements:
 
 - **Node.js 22.13+**, which is what `.nvmrc` selects (`nvm use`). CI
-  verifies the matrix [22, 24, 26]. The floor is 22.13 rather than
-  22.11 because TypeORM 1.x requires `^22.13.0` on the 22 line, and
-  developing here means installing it.
+  verifies the matrix [22, 24, 26]. Every published package declares
+  the same floor, for two independent reasons: TypeORM 1.x requires
+  `^22.13.0` on the 22 line, and the packages ship ESM, which a
+  CommonJS consumer loads through `require(esm)` — added in 22.12.0 on
+  that line. The stricter of the two wins, and it happens to be the one
+  that was already there.
 - **pnpm 9+**. Any pnpm 9 release works; the repo pins
   `packageManager` in `package.json`.
 - **Docker** — only for running TypeORM integration tests against a
@@ -282,6 +285,45 @@ than printing a warning. When `pnpm install` reports
 incompatible; pick versions that agree instead of relaxing the setting.
 
 ## Testing strategy
+
+### The suites run as ESM
+
+The packages ship ESM (ADR-022), and Jest does not follow Node here: it
+keeps its own module registry and never calls Node's `require(esm)`, so
+a suite that imports these packages has to run as ESM itself. Four
+settings carry that, and every one of them is load bearing:
+
+- `NODE_OPTIONS=--experimental-vm-modules`, set in each package's
+  `test` scripts. Running `npx jest` by hand without it fails on the
+  first import.
+- `extensionsToTreatAsEsm: ['.ts']`, or Jest hands `.ts` to the
+  CommonJS registry and no `import` parses.
+- `moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' }`. ESM requires the
+  explicit `.js` in relative specifiers; on disk those files are `.ts`.
+- `useESM: true` on the ts-jest transform, or it emits CommonJS into an
+  ESM module scope.
+
+Two consequences worth knowing before writing a spec:
+
+- **`jest` is not a global.** `describe` / `it` / `expect` still are,
+  but the `jest` object has to be imported: `import { jest } from
+  '@jest/globals'`. It is a declared devDependency for that reason.
+- **`jest.mock` does not work.** It relies on being hoisted above the
+  imports, and ESM resolves imports before any module code runs. Use
+  `jest.unstable_mockModule` and pull the module under test in with a
+  dynamic `import()` afterwards. One spec in the repository does this
+  (`packages/outbox-typeorm/test/unit/typeorm-event-publication.repository.spec.ts`);
+  copy its shape.
+
+`@jest/globals` also types mocks more strictly than the ambient
+`@types/jest` did. `jest.fn()` is `Mock<UnknownFunction>` until given a
+signature, so prefer `jest.fn<Thing['method']>()` over a bare
+`jest.fn()` — the assertions on `mock.calls` stay type-checked that way
+instead of degrading to `unknown`.
+
+The jest config files are `.cjs`, not `.js`: the packages are
+`"type": "module"`, so a `.js` config using `module.exports` would
+itself be parsed as ESM.
 
 ### Per-package shape
 

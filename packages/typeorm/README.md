@@ -35,6 +35,20 @@ through service layers, no separate "transactional" repository type.
 pnpm add @nestjs-transactional/typeorm @nestjs-transactional/core typeorm @nestjs/typeorm reflect-metadata
 ```
 
+## Module format
+
+This package ships **ESM only**, matching NestJS 12, which is ESM-only
+across its own packages. There is no CommonJS build.
+
+A CommonJS application still works: Node loads ESM from `require()`
+since 22.12.0, which is why `engines.node` is `>=22.13.0`. What does not
+follow Node here is tooling with its own module loader — Jest above all,
+which needs `NODE_OPTIONS=--experimental-vm-modules` and a few config
+settings. The 19 example applications in the repository all run their
+suites that way and can be copied from.
+
+Reasoning and measurements: [ADR-022](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/022-esm-only-packaging.md).
+
 ## Quick start
 
 ```ts
@@ -164,8 +178,8 @@ if you inject adapters by token.
 | --- | --- |
 | Node.js | `>=22.13.0` |
 | `typeorm` | `^0.3.0 \|\| ^1.0.0` |
-| `@nestjs/typeorm` | `^10.0.0 \|\| ^11.0.0` |
-| `@nestjs/common` / `@nestjs/core` | `^10.0.0 \|\| ^11.0.0` |
+| `@nestjs/typeorm` | `^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0` |
+| `@nestjs/common` / `@nestjs/core` | `^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0` |
 | `reflect-metadata` | `^0.1.13 \|\| ^0.2.0` |
 | `rxjs` | `^7.0.0` |
 

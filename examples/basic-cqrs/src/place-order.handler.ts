@@ -1,7 +1,7 @@
 import { CommandHandler, EventPublisher, type ICommandHandler } from '@nestjs/cqrs';
 import { Transactional } from '@nestjs-transactional/core';
 
-import { Order } from './order.aggregate';
+import { Order } from './order.aggregate.js';
 
 export class PlaceOrderCommand {
   constructor(

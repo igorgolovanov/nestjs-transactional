@@ -4,7 +4,7 @@ import {
   IntegrationEventsHandler,
 } from '@nestjs-transactional/cqrs';
 
-import { WalletOperationEvent } from './events';
+import { WalletOperationEvent } from './events.js';
 
 /**
  * Outbox-routed listener. `@IntegrationEventsHandler` switches

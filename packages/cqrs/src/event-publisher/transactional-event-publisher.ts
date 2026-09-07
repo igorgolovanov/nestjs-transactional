@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { IEvent, IEventPublisher } from '@nestjs/cqrs';
 
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
 /**
  * `IEventPublisher` implementation that routes aggregate-emitted events

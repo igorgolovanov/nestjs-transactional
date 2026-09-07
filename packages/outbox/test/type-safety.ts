@@ -11,7 +11,7 @@
  * decorator honest across refactors.
  */
 
-import { type IOutboxEventHandler, OutboxEventsHandler } from '../src';
+import { type IOutboxEventHandler, OutboxEventsHandler } from '../src/index.js';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}

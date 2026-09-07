@@ -10,8 +10,8 @@ import { Repository } from 'typeorm';
 import {
   PaymentFailedEvent,
   StockReservationFailedEvent,
-} from '../shared/events';
-import { OrderRow } from './order.entity';
+} from '../shared/events.js';
+import { OrderRow } from './order.entity.js';
 
 /**
  * Saga compensation. Subscribes to BOTH failure events and walks

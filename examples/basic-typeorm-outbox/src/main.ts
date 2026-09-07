@@ -2,9 +2,9 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule, readPostgresConfigFromEnv } from './app.module';
-import { OrderService } from './order.service';
-import { ShippingHandler } from './shipping.handler';
+import { AppModule, readPostgresConfigFromEnv } from './app.module.js';
+import { OrderService } from './order.service.js';
+import { ShippingHandler } from './shipping.handler.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now();

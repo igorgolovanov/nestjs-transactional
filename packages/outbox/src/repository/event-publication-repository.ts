@@ -1,5 +1,5 @@
-import type { EventPublication, NewEventPublication } from '../types/event-publication';
-import type { PublicationStatus } from '../types/publication-status';
+import type { EventPublication, NewEventPublication } from '../types/event-publication.js';
+import type { PublicationStatus } from '../types/publication-status.js';
 
 /**
  * Options accepted by {@link EventPublicationRepository.updateStatus}.

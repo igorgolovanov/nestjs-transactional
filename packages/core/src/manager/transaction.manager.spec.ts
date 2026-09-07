@@ -1,11 +1,13 @@
-import { TransactionContext } from '../context/transaction.context';
-import type { TransactionObserver } from '../observability/transaction-observer';
-import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
-import { IllegalTransactionStateError } from '../types/errors';
-import { PropagationMode } from '../types/propagation';
+import { jest } from '@jest/globals';
 
-import { AdapterRegistry } from './adapter.registry';
-import { TransactionManager } from './transaction.manager';
+import { TransactionContext } from '../context/transaction.context.js';
+import type { TransactionObserver } from '../observability/transaction-observer.js';
+import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter.js';
+import { IllegalTransactionStateError } from '../types/errors.js';
+import { PropagationMode } from '../types/propagation.js';
+
+import { AdapterRegistry } from './adapter.registry.js';
+import { TransactionManager } from './transaction.manager.js';
 
 describe('TransactionManager (propagation REQUIRED)', () => {
   let adapter: InMemoryTransactionAdapter;
@@ -575,10 +577,15 @@ describe('TransactionManager (propagation REQUIRED)', () => {
   });
 
   describe('observability', () => {
+    // Typed against the real hooks rather than a bare `jest.Mock`.
+    // `@jest/globals` types `jest.fn()` as `Mock<UnknownFunction>`, so an
+    // untyped mock hands back `unknown` from `mock.calls`, and every
+    // assertion on the context below would need a cast. Naming the
+    // signature keeps those assertions checked.
     interface MockObserver {
-      onTransactionStart: jest.Mock;
-      onTransactionCommit: jest.Mock;
-      onTransactionRollback: jest.Mock;
+      onTransactionStart: jest.Mock<NonNullable<TransactionObserver['onTransactionStart']>>;
+      onTransactionCommit: jest.Mock<NonNullable<TransactionObserver['onTransactionCommit']>>;
+      onTransactionRollback: jest.Mock<NonNullable<TransactionObserver['onTransactionRollback']>>;
     }
 
     function makeObserver(): MockObserver {
@@ -587,6 +594,20 @@ describe('TransactionManager (propagation REQUIRED)', () => {
         onTransactionCommit: jest.fn(),
         onTransactionRollback: jest.fn(),
       };
+    }
+
+    /**
+     * First argument of the first recorded call, or a failure if the hook
+     * was never invoked. Indexing `mock.calls[0]?.[0]` types the result as
+     * possibly-undefined and every assertion below would have to cope
+     * with that; throwing here says what actually went wrong instead.
+     */
+    function firstCallArg<A extends unknown[], R>(mock: jest.Mock<(...args: A) => R>): A[0] {
+      const call = mock.mock.calls[0];
+      if (call === undefined) {
+        throw new Error('expected the observer hook to have been called at least once');
+      }
+      return call[0];
     }
 
     it('fires onTransactionStart before the body runs, with the full context', async () => {
@@ -603,7 +624,7 @@ describe('TransactionManager (propagation REQUIRED)', () => {
       });
 
       expect(observer.onTransactionStart).toHaveBeenCalledTimes(1);
-      const ctx = observer.onTransactionStart.mock.calls[0]?.[0];
+      const ctx = firstCallArg(observer.onTransactionStart);
       expect(ctx.transactionId).toBeDefined();
       expect(ctx.transactionId).toMatch(/^[0-9a-f-]{36}$/);
       expect(ctx.adapterName).toBe('in-memory');
@@ -623,7 +644,7 @@ describe('TransactionManager (propagation REQUIRED)', () => {
 
       expect(observer.onTransactionCommit).toHaveBeenCalledTimes(1);
       expect(observer.onTransactionRollback).not.toHaveBeenCalled();
-      const ctx = observer.onTransactionCommit.mock.calls[0]?.[0];
+      const ctx = firstCallArg(observer.onTransactionCommit);
       expect(ctx.commitCount).toBe(2);
       expect(ctx.durationMs).toBeGreaterThanOrEqual(0);
       expect(ctx.transactionId).toBeDefined();
@@ -643,7 +664,7 @@ describe('TransactionManager (propagation REQUIRED)', () => {
 
       expect(observer.onTransactionRollback).toHaveBeenCalledTimes(1);
       expect(observer.onTransactionCommit).not.toHaveBeenCalled();
-      const ctx = observer.onTransactionRollback.mock.calls[0]?.[0];
+      const ctx = firstCallArg(observer.onTransactionRollback);
       expect(ctx.error).toBe(boom);
       expect(ctx.rollbackCount).toBe(1);
       expect(ctx.durationMs).toBeGreaterThanOrEqual(0);

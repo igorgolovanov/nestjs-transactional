@@ -5,8 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { Order } from './order.aggregate';
-import { OrderRow } from './order.entity';
+import { Order } from './order.aggregate.js';
+import { OrderRow } from './order.entity.js';
 
 export class PlaceOrderCommand {
   constructor(

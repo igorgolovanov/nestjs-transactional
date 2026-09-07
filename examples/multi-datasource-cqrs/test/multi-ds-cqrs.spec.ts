@@ -5,11 +5,11 @@ import { CommandBus } from '@nestjs/cqrs';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { AppModule } from '../src/app.module';
-import { BillingNotificationListener } from '../src/billing.listener';
-import { InventoryNotificationListener } from '../src/inventory.listener';
-import { IssueInvoiceCommand } from '../src/issue-invoice.handler';
-import { PlaceReservationCommand } from '../src/place-reservation.handler';
+import { AppModule } from '../src/app.module.js';
+import { BillingNotificationListener } from '../src/billing.listener.js';
+import { InventoryNotificationListener } from '../src/inventory.listener.js';
+import { IssueInvoiceCommand } from '../src/issue-invoice.handler.js';
+import { PlaceReservationCommand } from '../src/place-reservation.handler.js';
 
 describe('multi-datasource-cqrs (Category B)', () => {
   let module: TestingModule;

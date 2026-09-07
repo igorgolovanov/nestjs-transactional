@@ -5,9 +5,9 @@ import { OutboxModule } from '@nestjs-transactional/outbox';
 import {
   PaymentChargedEvent,
   PaymentFailedEvent,
-} from '../shared/events';
-import { ChargePaymentHandler } from './charge-payment.handler';
-import { PaymentRow } from './payment.entity';
+} from '../shared/events.js';
+import { ChargePaymentHandler } from './charge-payment.handler.js';
+import { PaymentRow } from './payment.entity.js';
 
 /**
  * Billing bounded context. Owns the billing DataSource entities

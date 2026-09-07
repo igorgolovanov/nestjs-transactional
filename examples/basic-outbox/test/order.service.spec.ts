@@ -2,9 +2,9 @@ import 'reflect-metadata';
 
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { AppModule } from '../src/app.module';
-import { OrderService } from '../src/order.service';
-import { ShippingHandler } from '../src/shipping.handler';
+import { AppModule } from '../src/app.module.js';
+import { OrderService } from '../src/order.service.js';
+import { ShippingHandler } from '../src/shipping.handler.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
   const start = Date.now();

@@ -1,9 +1,10 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 
-import { EventTypeRegistry } from '../serialization/event-type-registry';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
 
-import { ExternalizationRegistry } from './externalization-registry';
-import { Externalized } from './externalized.decorator';
+import { ExternalizationRegistry } from './externalization-registry.js';
+import { Externalized } from './externalized.decorator.js';
 
 @Externalized<{ tenantId: string }>({
   target: 'orders',

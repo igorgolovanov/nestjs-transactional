@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -9,12 +10,12 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
-import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
-import { StalenessMonitor } from '../recovery/staleness-monitor';
+import { EventPublicationProcessor } from '../dispatcher/event-publication-processor.js';
+import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler.js';
+import { StalenessMonitor } from '../recovery/staleness-monitor.js';
 
-import { OutboxProcessingModule } from './outbox-processing.module';
-import { OutboxModule } from './outbox.module';
+import { OutboxProcessingModule } from './outbox-processing.module.js';
+import { OutboxModule } from './outbox.module.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -40,12 +41,16 @@ class FakeAdapter implements TransactionAdapter<FakeHandle> {
 
 describe('OutboxProcessingModule', () => {
   let module: TestingModule;
-  let processorStart: jest.SpyInstance;
-  let processorStop: jest.SpyInstance;
-  let monitorStart: jest.SpyInstance;
-  let monitorStop: jest.SpyInstance;
-  let retryStart: jest.SpyInstance;
-  let retryStop: jest.SpyInstance;
+  // Typed against the real methods: `stop()` returns a promise, and a
+  // `() => void` spy would let an async `mockImplementation` through as
+  // a floating promise — which is exactly what this suite exists to
+  // catch.
+  let processorStart: jest.Spied<EventPublicationProcessor['start']>;
+  let processorStop: jest.Spied<EventPublicationProcessor['stop']>;
+  let monitorStart: jest.Spied<StalenessMonitor['start']>;
+  let monitorStop: jest.Spied<StalenessMonitor['stop']>;
+  let retryStart: jest.Spied<OutboxRetryScheduler['start']>;
+  let retryStop: jest.Spied<OutboxRetryScheduler['stop']>;
 
   beforeEach(async () => {
     OutboxModule.resetForTesting();

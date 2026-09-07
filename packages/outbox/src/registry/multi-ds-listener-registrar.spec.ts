@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -9,14 +10,14 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { OutboxModule } from '../module/outbox.module';
-import { getOutboxListenerRegistryToken } from '../tokens/token-utils';
+import { OutboxModule } from '../module/outbox.module.js';
+import { getOutboxListenerRegistryToken } from '../tokens/token-utils.js';
 
-import type { OutboxListenerRegistry } from './listener-registry';
+import type { OutboxListenerRegistry } from './listener-registry.js';
 import {
   MultiDsOutboxListenerRegistrar,
   OUTBOX_LISTENER_REGISTRAR_TOKEN,
-} from './multi-ds-listener-registrar';
+} from './multi-ds-listener-registrar.js';
 
 class NamedFakeAdapter implements TransactionAdapter<
   TransactionHandle & { id: string; adapterName: string }

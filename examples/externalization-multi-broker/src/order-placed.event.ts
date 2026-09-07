@@ -1,6 +1,6 @@
 import { Externalized } from '@nestjs-transactional/outbox';
 
-import { KAFKA_CLIENT } from './clients';
+import { KAFKA_CLIENT } from './clients.js';
 
 /**
  * Domain event routed to **Kafka** — partitioned, durable, ordered.

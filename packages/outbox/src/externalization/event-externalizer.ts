@@ -1,4 +1,4 @@
-import type { ExternalizationMetadata } from './types';
+import type { ExternalizationMetadata } from './types.js';
 
 /**
  * SPI for routing events that have an `@Externalized` mapping to an

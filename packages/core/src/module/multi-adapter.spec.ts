@@ -1,19 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
-import { TransactionContextView } from '../context/transaction-context-view';
-import { TransactionContext } from '../context/transaction.context';
-import { Transactional, getTransactionalMetadata } from '../decorators/transactional.decorator';
-import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
-import { TransactionManager } from '../manager/transaction.manager';
-import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
+import { TransactionContextView } from '../context/transaction-context-view.js';
+import { TransactionContext } from '../context/transaction.context.js';
+import { Transactional, getTransactionalMetadata } from '../decorators/transactional.decorator.js';
+import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
+import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter.js';
 import {
   getTransactionContextToken,
   getTransactionManagerToken,
   getTransactionalAdapterToken,
-} from '../tokens/token-utils';
+} from '../tokens/token-utils.js';
 
-import { TransactionalModule } from './transactional.module';
+import { TransactionalModule } from './transactional.module.js';
 
 /**
  * Multi-adapter behaviour: token-based DI registration,

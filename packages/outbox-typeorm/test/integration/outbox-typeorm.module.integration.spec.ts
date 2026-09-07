@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -30,17 +31,17 @@ function buildFakeTypeOrmModule(providers: Provider[]): unknown {
   return FakeTypeOrmModule;
 }
 
-import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
-import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
+import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity.js';
+import { EventPublicationEntity } from '../../src/entity/event-publication.entity.js';
 import {
   OutboxTypeOrmModule,
   typeOrmEventPublicationRepositoryProvider,
-} from '../../src/module/outbox-typeorm.module';
+} from '../../src/module/outbox-typeorm.module.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
+} from '../setup-testcontainers.js';
 
 class OrderPlacedEvent {
   constructor(readonly orderId: string) {}

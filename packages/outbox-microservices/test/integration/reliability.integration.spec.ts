@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { ClientKafka, ClientRMQ } from '@nestjs/microservices';
 import { ExternalizationError } from '@nestjs-transactional/outbox';
@@ -8,7 +9,7 @@ import * as amqplib from 'amqplib';
 import { Kafka } from 'kafkajs';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 
-import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';
+import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer.js';
 
 /**
  * What `ClientProxy.emit()` actually guarantees, measured against real

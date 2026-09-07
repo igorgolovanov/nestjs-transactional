@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OutboxModule } from '@nestjs-transactional/outbox';
 
-import { InventoryShipmentProjectionListener } from './inventory.listener';
-import { InventoryService } from './inventory.service';
-import { ReservationPlacedEvent } from './reservation-placed.event';
-import { ReservationRow } from './reservation.entity';
+import { InventoryShipmentProjectionListener } from './inventory.listener.js';
+import { InventoryService } from './inventory.service.js';
+import { ReservationPlacedEvent } from './reservation-placed.event.js';
+import { ReservationRow } from './reservation.entity.js';
 
 /**
  * `InventoryModule` mirrors `BillingModule` — entity feature, event

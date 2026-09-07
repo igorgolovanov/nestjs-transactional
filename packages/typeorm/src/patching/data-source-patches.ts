@@ -9,8 +9,8 @@
 
 import type { DataSource, EntityManager, QueryRunner } from 'typeorm';
 
-import { getActiveEntityManager, getManagedDataSourceName } from './managed-registry';
-import { TYPEORM_DATA_SOURCE_PATCHED } from './symbols';
+import { getActiveEntityManager, getManagedDataSourceName } from './managed-registry.js';
+import { TYPEORM_DATA_SOURCE_PATCHED } from './symbols.js';
 
 /**
  * Apply per-instance patches to a single `DataSource` at the time

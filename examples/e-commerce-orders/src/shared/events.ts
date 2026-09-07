@@ -1,6 +1,6 @@
 import { Externalized } from '@nestjs-transactional/outbox';
 
-import { KAFKA_CLIENT } from '../clients';
+import { KAFKA_CLIENT } from '../clients.js';
 
 /**
  * Cross-context events. Each event is **owned** by the bounded

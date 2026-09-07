@@ -1,18 +1,33 @@
+import { jest } from '@jest/globals';
 import { PublicationNotFoundError, PublicationStatus } from '@nestjs-transactional/outbox';
-import { getCurrentEntityManager } from '@nestjs-transactional/typeorm';
+import type { getCurrentEntityManager } from '@nestjs-transactional/typeorm';
 import type { DataSource, EntityManager } from 'typeorm';
 
-import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
-import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
-import { TypeOrmEventPublicationRepository } from '../../src/repository/typeorm-event-publication.repository';
+import type { EventPublicationArchiveEntity as ArchiveEntityType } from '../../src/entity/event-publication-archive.entity.js';
+import type { EventPublicationEntity as EntityType } from '../../src/entity/event-publication.entity.js';
+import type { TypeOrmEventPublicationRepository as RepositoryType } from '../../src/repository/typeorm-event-publication.repository.js';
 
-jest.mock('@nestjs-transactional/typeorm', () => ({
+// `jest.mock` does not work under ESM: it relies on being hoisted above
+// the imports, and ESM imports are resolved before any module code runs.
+// `unstable_mockModule` is the supported replacement, and it requires the
+// mocked module's consumers to be pulled in with dynamic `import()`
+// afterwards — hence the top-level awaits below. The name is Jest's, not
+// a comment on its reliability; it is the only module-mocking API ESM
+// has.
+jest.unstable_mockModule('@nestjs-transactional/typeorm', () => ({
   getCurrentEntityManager: jest.fn(),
 }));
 
-const getEntityManagerMock = getCurrentEntityManager as jest.MockedFunction<
-  typeof getCurrentEntityManager
->;
+const { getCurrentEntityManager: getEntityManagerMock } =
+  (await import('@nestjs-transactional/typeorm')) as unknown as {
+    getCurrentEntityManager: jest.MockedFunction<typeof getCurrentEntityManager>;
+  };
+
+const { EventPublicationArchiveEntity } =
+  await import('../../src/entity/event-publication-archive.entity.js');
+const { EventPublicationEntity } = await import('../../src/entity/event-publication.entity.js');
+const { TypeOrmEventPublicationRepository } =
+  await import('../../src/repository/typeorm-event-publication.repository.js');
 
 /**
  * Docker-free companion to
@@ -24,6 +39,15 @@ const getEntityManagerMock = getCurrentEntityManager as jest.MockedFunction<
  * on, the guard branches that skip the database entirely, and the
  * entity → domain mapping — none of which need a database to pin.
  */
+// `@jest/globals` types a bare `jest.fn()` as `UnknownFunction`, and
+// `mockResolvedValue` / `mockReturnValue` then reject their argument.
+// These stand in for TypeORM methods that are cast to the real interface
+// anyway, so a permissive signature carrying the resolved type is enough
+// to keep the assertions checked.
+function asyncMock<T>(value: T) {
+  return jest.fn<(...args: unknown[]) => Promise<T>>().mockResolvedValue(value);
+}
+
 describe('TypeOrmEventPublicationRepository (unit)', () => {
   /** Chainable stand-in for TypeORM's `UpdateQueryBuilder`. */
   function updateQueryBuilder(result: { affected?: number | null }) {
@@ -31,7 +55,7 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      execute: jest.fn().mockResolvedValue(result),
+      execute: asyncMock(result),
     };
   }
 
@@ -41,11 +65,11 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
     return em;
   }
 
-  function repository(): TypeOrmEventPublicationRepository {
+  function repository(): RepositoryType {
     return new TypeOrmEventPublicationRepository({} as DataSource, 'default');
   }
 
-  function entity(overrides: Partial<EventPublicationEntity> = {}): EventPublicationEntity {
+  function entity(overrides: Partial<EntityType> = {}): EntityType {
     const e = new EventPublicationEntity();
     e.id = 'pub-1';
     e.listenerId = 'OrderPlacedHandler';
@@ -111,13 +135,13 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
 
   describe('deleteCompleted', () => {
     it('returns the number of purged rows', async () => {
-      entityManager({ delete: jest.fn().mockResolvedValue({ affected: 7 }) });
+      entityManager({ delete: asyncMock({ affected: 7 }) });
 
       await expect(repository().deleteCompleted()).resolves.toBe(7);
     });
 
     it('reports zero when the driver omits the affected count', async () => {
-      entityManager({ delete: jest.fn().mockResolvedValue({ affected: null }) });
+      entityManager({ delete: asyncMock({ affected: null }) });
 
       await expect(repository().deleteCompleted()).resolves.toBe(0);
     });
@@ -133,7 +157,7 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
     });
 
     it('queries when at least one status is requested', async () => {
-      const find = jest.fn().mockResolvedValue([entity()]);
+      const find = asyncMock([entity()]);
       entityManager({ find });
 
       const result = await repository().findStale(new Date(), [PublicationStatus.PROCESSING]);
@@ -143,9 +167,74 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
     });
   });
 
+  describe('findCompleted', () => {
+    // The retention scheduler reads through this method with a `limit`,
+    // which is what turns the ordering into a correctness property: a
+    // bounded pass reading newest-first would delete only recent rows
+    // and never reach the old ones. Nothing pinned any of it before.
+
+    it('orders oldest-first, which the SPI documents as the contract', async () => {
+      const find = asyncMock([entity()]);
+      entityManager({ find });
+
+      await repository().findCompleted();
+
+      expect(find).toHaveBeenCalledWith(
+        EventPublicationEntity,
+        expect.objectContaining({ order: { completionDate: 'ASC' } }),
+      );
+    });
+
+    it('filters on COMPLETED and adds no date predicate when olderThan is omitted', async () => {
+      const find = asyncMock([]);
+      entityManager({ find });
+
+      await repository().findCompleted();
+
+      const [, options] = find.mock.calls[0] as [unknown, { where: Record<string, unknown> }];
+      expect(options.where).toEqual({ status: PublicationStatus.COMPLETED });
+    });
+
+    it('constrains completionDate when olderThan is given', async () => {
+      const find = asyncMock([]);
+      entityManager({ find });
+      const cutoff = new Date('2020-03-03T00:00:00.000Z');
+
+      await repository().findCompleted({ olderThan: cutoff });
+
+      const [, options] = find.mock.calls[0] as [unknown, { where: Record<string, unknown> }];
+      expect(options.where.completionDate).toBeDefined();
+      expect(options.where.status).toBe(PublicationStatus.COMPLETED);
+    });
+
+    it('passes limit through as take, and omits take entirely without one', async () => {
+      const withLimit = asyncMock([]);
+      entityManager({ find: withLimit });
+      await repository().findCompleted({ limit: 25 });
+      const [, limited] = withLimit.mock.calls[0] as [unknown, { take?: number }];
+      expect(limited.take).toBe(25);
+
+      const withoutLimit = asyncMock([]);
+      entityManager({ find: withoutLimit });
+      await repository().findCompleted();
+      const [, unlimited] = withoutLimit.mock.calls[0] as [unknown, { take?: number }];
+      expect(unlimited.take).toBeUndefined();
+    });
+
+    it('maps entities to the domain shape', async () => {
+      entityManager({ find: asyncMock([entity({ status: PublicationStatus.COMPLETED })]) });
+
+      const result = await repository().findCompleted();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.id).toBe('pub-1');
+      expect(result[0]?.status).toBe(PublicationStatus.COMPLETED);
+    });
+  });
+
   describe('archiveCompleted', () => {
     it('rejects with PublicationNotFoundError when the row is gone', async () => {
-      entityManager({ findOne: jest.fn().mockResolvedValue(null) });
+      entityManager({ findOne: asyncMock(null) });
 
       await expect(repository().archiveCompleted('missing')).rejects.toThrow(
         PublicationNotFoundError,
@@ -153,13 +242,11 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
     });
 
     it('copies the row into the archive and then removes it from the hot queue', async () => {
-      const save = jest.fn().mockResolvedValue(undefined);
-      const del = jest.fn().mockResolvedValue({ affected: 1 });
+      const save = asyncMock(undefined);
+      const del = asyncMock({ affected: 1 });
       const completionDate = new Date('2020-02-02T00:00:00.000Z');
       entityManager({
-        findOne: jest
-          .fn()
-          .mockResolvedValue(entity({ status: PublicationStatus.COMPLETED, completionDate })),
+        findOne: asyncMock(entity({ status: PublicationStatus.COMPLETED, completionDate })),
         save,
         delete: del,
       });
@@ -183,16 +270,16 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
       // The archive table's `completionDate` is non-nullable, so a row
       // archived without one (an operator archiving a non-completed
       // publication) has to be given a value at archive time.
-      const save = jest.fn().mockResolvedValue(undefined);
+      const save = asyncMock(undefined);
       entityManager({
-        findOne: jest.fn().mockResolvedValue(entity({ completionDate: null })),
+        findOne: asyncMock(entity({ completionDate: null })),
         save,
-        delete: jest.fn().mockResolvedValue({ affected: 1 }),
+        delete: asyncMock({ affected: 1 }),
       });
 
       await repository().archiveCompleted('pub-1');
 
-      const archived = save.mock.calls[0]![1] as EventPublicationArchiveEntity;
+      const archived = save.mock.calls[0]![1] as ArchiveEntityType;
       expect(archived.completionDate).toBeInstanceOf(Date);
     });
   });
@@ -200,7 +287,7 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
   describe('entity → domain mapping', () => {
     it('preserves nullable lifecycle fields as null rather than dropping them', async () => {
       entityManager({
-        find: jest.fn().mockResolvedValue([
+        find: asyncMock([
           entity({
             status: PublicationStatus.FAILED,
             failureReason: 'boom',
@@ -229,7 +316,7 @@ describe('TypeOrmEventPublicationRepository (unit)', () => {
   describe('dataSource resolution', () => {
     it('resolves the entity manager for its own dataSource, falling back to the injected one', async () => {
       const dataSource = {} as DataSource;
-      entityManager({ delete: jest.fn().mockResolvedValue({ affected: 0 }) });
+      entityManager({ delete: asyncMock({ affected: 0 }) });
 
       await new TypeOrmEventPublicationRepository(dataSource, 'billing').delete('pub-1');
 

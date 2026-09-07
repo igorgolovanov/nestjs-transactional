@@ -4,9 +4,9 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { AppModule } from '../src/app.module';
-import { BillingService } from '../src/billing.service';
-import { InventoryService } from '../src/inventory.service';
+import { AppModule } from '../src/app.module.js';
+import { BillingService } from '../src/billing.service.js';
+import { InventoryService } from '../src/inventory.service.js';
 
 describe('multi-datasource-basic', () => {
   let module: TestingModule;

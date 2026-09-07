@@ -8,9 +8,9 @@ import {
   Post,
 } from '@nestjs/common';
 
-import type { OrderResponseDto, PlaceOrderRequestDto } from '../shared/dtos';
-import { GetOrderHandler, GetOrderQuery } from './get-order.handler';
-import { PlaceOrderCommand, PlaceOrderHandler } from './place-order.handler';
+import type { OrderResponseDto, PlaceOrderRequestDto } from '../shared/dtos.js';
+import { GetOrderHandler, GetOrderQuery } from './get-order.handler.js';
+import { PlaceOrderCommand, PlaceOrderHandler } from './place-order.handler.js';
 
 /**
  * REST surface — the production-realism bit Tier 5 introduces over

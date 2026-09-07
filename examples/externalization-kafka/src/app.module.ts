@@ -12,10 +12,10 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { OrderEntity } from './order.entity';
-import { OrderPlacedEvent } from './order-placed.event';
-import { OrderService } from './order.service';
-import { ShippingHandler } from './shipping.handler';
+import { OrderEntity } from './order.entity.js';
+import { OrderPlacedEvent } from './order-placed.event.js';
+import { OrderService } from './order.service.js';
+import { ShippingHandler } from './shipping.handler.js';
 
 export interface PostgresConfig {
   readonly host: string;

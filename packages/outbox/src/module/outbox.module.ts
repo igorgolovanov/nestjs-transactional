@@ -10,44 +10,47 @@ import {
 import { DiscoveryModule, ModuleRef } from '@nestjs/core';
 import { TransactionManager } from '@nestjs-transactional/core';
 
-import { CompletedEventPublications } from '../api/completed-event-publications';
-import { FailedEventPublications } from '../api/failed-event-publications';
-import { IncompleteEventPublications } from '../api/incomplete-event-publications';
-import { DataSourceOutboxPublisher } from '../dispatcher/data-source-outbox-publisher';
-import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
+import { CompletedEventPublications } from '../api/completed-event-publications.js';
+import { FailedEventPublications } from '../api/failed-event-publications.js';
+import { IncompleteEventPublications } from '../api/incomplete-event-publications.js';
+import { DataSourceOutboxPublisher } from '../dispatcher/data-source-outbox-publisher.js';
+import { EventPublicationProcessor } from '../dispatcher/event-publication-processor.js';
 import {
   OUTBOX_DATA_SOURCE_NAMES,
   OutboxEventPublisher,
-} from '../dispatcher/outbox-event-publisher';
+} from '../dispatcher/outbox-event-publisher.js';
 import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
-} from '../dispatcher/processor-options';
-import { EVENT_EXTERNALIZER, type EventExternalizer } from '../externalization/event-externalizer';
-import { ExternalizationRegistry } from '../externalization/externalization-registry';
-import { OutboxCleanupScheduler } from '../recovery/outbox-cleanup-scheduler';
-import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler';
-import { StalenessMonitor } from '../recovery/staleness-monitor';
+} from '../dispatcher/processor-options.js';
+import {
+  EVENT_EXTERNALIZER,
+  type EventExternalizer,
+} from '../externalization/event-externalizer.js';
+import { ExternalizationRegistry } from '../externalization/externalization-registry.js';
+import { OutboxCleanupScheduler } from '../recovery/outbox-cleanup-scheduler.js';
+import { OutboxRetryScheduler } from '../recovery/outbox-retry-scheduler.js';
+import { StalenessMonitor } from '../recovery/staleness-monitor.js';
 import {
   OUTBOX_RECOVERY_OPTIONS,
   type OutboxRecoveryOptions,
   StartupRecoveryService,
-} from '../recovery/startup-recovery';
-import { EventPublicationRegistry } from '../registry/event-publication-registry';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
+} from '../recovery/startup-recovery.js';
+import { EventPublicationRegistry } from '../registry/event-publication-registry.js';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
 import {
   MultiDsOutboxListenerRegistrar,
   OUTBOX_LISTENER_REGISTRAR_TOKEN,
-} from '../registry/multi-ds-listener-registrar';
-import { OutboxListenerScanner } from '../registry/outbox-listener-scanner';
+} from '../registry/multi-ds-listener-registrar.js';
+import { OutboxListenerScanner } from '../registry/outbox-listener-scanner.js';
 import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
-} from '../repository/event-publication-repository';
-import { EVENT_SERIALIZER, type EventSerializer } from '../serialization/event-serializer';
-import { EVENT_TYPE_REGISTRY, EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
+} from '../repository/event-publication-repository.js';
+import { EVENT_SERIALIZER, type EventSerializer } from '../serialization/event-serializer.js';
+import { EVENT_TYPE_REGISTRY, EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
 import {
   getEventPublicationProcessorToken,
   getEventPublicationRegistryToken,
@@ -57,11 +60,11 @@ import {
   getOutboxEventSerializerToken,
   getOutboxListenerRegistryToken,
   getOutboxPublisherToken,
-} from '../tokens/token-utils';
-import { DEFAULT_CLEANUP_CONFIG, type OutboxCleanupConfig } from '../types/cleanup-config';
-import { CompletionMode } from '../types/completion-mode';
-import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config';
-import { DEFAULT_STALENESS_CONFIG, type StalenessConfig } from '../types/staleness-config';
+} from '../tokens/token-utils.js';
+import { DEFAULT_CLEANUP_CONFIG, type OutboxCleanupConfig } from '../types/cleanup-config.js';
+import { CompletionMode } from '../types/completion-mode.js';
+import { DEFAULT_RETRY_CONFIG, type OutboxRetryConfig } from '../types/retry-config.js';
+import { DEFAULT_STALENESS_CONFIG, type StalenessConfig } from '../types/staleness-config.js';
 
 const DEFAULT_DATA_SOURCE = 'default';
 

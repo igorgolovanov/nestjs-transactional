@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
-import { ArticleRow } from './article.entity';
+import { ArticleRow } from './article.entity.js';
 
 /**
  * Write side. `@InjectRepository(ArticleRow)` (no second argument)

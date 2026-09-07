@@ -3,9 +3,9 @@ import { Inject, Injectable, type Type } from '@nestjs/common';
 import {
   EVENT_PUBLICATION_REPOSITORY,
   type EventPublicationRepository,
-} from '../repository/event-publication-repository';
-import { EVENT_SERIALIZER, type EventSerializer } from '../serialization/event-serializer';
-import type { EventPublication } from '../types/event-publication';
+} from '../repository/event-publication-repository.js';
+import { EVENT_SERIALIZER, type EventSerializer } from '../serialization/event-serializer.js';
+import type { EventPublication } from '../types/event-publication.js';
 
 /**
  * Test utility for inspecting events that were published through the

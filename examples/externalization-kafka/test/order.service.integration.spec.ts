@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -18,10 +19,10 @@ import {
 import { of } from 'rxjs';
 import type { DataSource } from 'typeorm';
 
-import { AppModule, KAFKA_CLIENT } from '../src/app.module';
-import { OrderEntity } from '../src/order.entity';
-import { OrderService } from '../src/order.service';
-import { ShippingHandler } from '../src/shipping.handler';
+import { AppModule, KAFKA_CLIENT } from '../src/app.module.js';
+import { OrderEntity } from '../src/order.entity.js';
+import { OrderService } from '../src/order.service.js';
+import { ShippingHandler } from '../src/shipping.handler.js';
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,

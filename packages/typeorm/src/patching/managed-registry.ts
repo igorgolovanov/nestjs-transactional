@@ -9,9 +9,9 @@
 import { TransactionContext } from '@nestjs-transactional/core';
 import type { DataSource, EntityManager } from 'typeorm';
 
-import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle';
+import type { TypeOrmTransactionHandle } from '../types/typeorm-transaction-handle.js';
 
-import { TYPEORM_DATA_SOURCE_NAME } from './symbols';
+import { TYPEORM_DATA_SOURCE_NAME } from './symbols.js';
 
 /**
  * Process-wide set of `DataSource` instances we have registered as

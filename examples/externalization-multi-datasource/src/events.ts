@@ -1,6 +1,6 @@
 import { Externalized } from '@nestjs-transactional/outbox';
 
-import { BILLING_BROKER, INVENTORY_BROKER } from './clients';
+import { BILLING_BROKER, INVENTORY_BROKER } from './clients.js';
 
 /**
  * Published from `BillingService.payInvoice`. Persisted to the

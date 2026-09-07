@@ -3,9 +3,9 @@ import 'reflect-metadata';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule } from './app.module';
-import { AuditArchivalHandler } from './audit/audit-archival.handler';
-import { AuditService } from './audit/audit.service';
+import { AppModule } from './app.module.js';
+import { AuditArchivalHandler } from './audit/audit-archival.handler.js';
+import { AuditService } from './audit/audit.service.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now();

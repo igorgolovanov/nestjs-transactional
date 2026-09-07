@@ -1,13 +1,14 @@
+import { jest } from '@jest/globals';
 import { Injectable, Logger } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionManager } from '@nestjs-transactional/core';
 
-import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator';
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import { TransactionPhase } from '../types/transactional-listener.types';
+import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator.js';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
-import { TransactionalListenerScanner } from './listener-scanner';
+import { TransactionalListenerScanner } from './listener-scanner.js';
 
 class OrderPlaced {
   constructor(readonly orderId = 'order-1') {}
@@ -70,7 +71,7 @@ const fakeManagerProvider = {
 describe('TransactionalListenerScanner', () => {
   let module: TestingModule;
   let dispatcher: TransactionalEventDispatcher;
-  let registerSpy: jest.SpyInstance;
+  let registerSpy: jest.Spied<TransactionalEventDispatcher['registerListener']>;
 
   const buildModule = async (extraProviders: unknown[]): Promise<void> => {
     module = await Test.createTestingModule({

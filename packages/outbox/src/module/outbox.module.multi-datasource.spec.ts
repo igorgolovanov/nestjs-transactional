@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Injectable, Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
@@ -11,20 +12,20 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
-import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
-import { composeListenerId } from '../registry/outbox-listener-scanner';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
+import { EventPublicationProcessor } from '../dispatcher/event-publication-processor.js';
+import { OutboxEventPublisher } from '../dispatcher/outbox-event-publisher.js';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
+import { composeListenerId } from '../registry/outbox-listener-scanner.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
 import {
   getEventPublicationProcessorToken,
   getEventPublicationRepositoryToken,
   getEventTypeRegistryToken,
   getOutboxListenerRegistryToken,
   getOutboxPublisherToken,
-} from '../tokens/token-utils';
+} from '../tokens/token-utils.js';
 
-import { OutboxModule } from './outbox.module';
+import { OutboxModule } from './outbox.module.js';
 
 /**
  * Per-dataSource fake adapter — `dataSourceName` is set per instance

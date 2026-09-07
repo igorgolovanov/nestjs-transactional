@@ -10,12 +10,12 @@ import {
 } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { BillingService } from './billing.service';
-import { BillingProjectionsHandler } from './billing.handler';
-import { InventoryService } from './inventory.service';
-import { InventoryProjectionsHandler } from './inventory.handler';
-import { InvoiceEntity, StockItemEntity } from './entities';
-import { InvoiceCreatedEvent, StockAdjustedEvent } from './events';
+import { BillingService } from './billing.service.js';
+import { BillingProjectionsHandler } from './billing.handler.js';
+import { InventoryService } from './inventory.service.js';
+import { InventoryProjectionsHandler } from './inventory.handler.js';
+import { InvoiceEntity, StockItemEntity } from './entities.js';
+import { InvoiceCreatedEvent, StockAdjustedEvent } from './events.js';
 
 export interface PostgresConnection {
   readonly host: string;

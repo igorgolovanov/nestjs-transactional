@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { IllegalTransactionStateError, TransactionAdapterNotFoundError } from '../types/errors';
-import type { TransactionAdapter } from '../types/transaction-adapter';
+import { IllegalTransactionStateError, TransactionAdapterNotFoundError } from '../types/errors.js';
+import type { TransactionAdapter } from '../types/transaction-adapter.js';
 
 /**
  * A single entry in the {@link AdapterRegistry}: an adapter instance bound to

@@ -7,14 +7,14 @@ import { TransactionManager, TransactionalModule } from '@nestjs-transactional/c
 import { PublicationStatus } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
-import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
-import { TypeOrmEventPublicationRepository } from '../../src/repository/typeorm-event-publication.repository';
+import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity.js';
+import { EventPublicationEntity } from '../../src/entity/event-publication.entity.js';
+import { TypeOrmEventPublicationRepository } from '../../src/repository/typeorm-event-publication.repository.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
+} from '../setup-testcontainers.js';
 
 /**
  * `TypeOrmTransactionalModule.forRoot` resolves the

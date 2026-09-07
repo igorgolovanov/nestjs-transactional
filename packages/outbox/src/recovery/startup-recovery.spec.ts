@@ -1,11 +1,12 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 
-import { IncompleteEventPublications } from '../api/incomplete-event-publications';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import type { NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
+import { IncompleteEventPublications } from '../api/incomplete-event-publications.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import type { NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import { type OutboxRecoveryOptions, StartupRecoveryService } from './startup-recovery';
+import { type OutboxRecoveryOptions, StartupRecoveryService } from './startup-recovery.js';
 
 function newInput(overrides: Partial<NewEventPublication> = {}): NewEventPublication {
   return {

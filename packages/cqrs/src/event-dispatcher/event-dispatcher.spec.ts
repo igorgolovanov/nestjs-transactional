@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import {
   AdapterRegistry,
@@ -9,9 +10,12 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { TransactionPhase } from '../types/transactional-listener.types';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
-import { type DispatcherListenerMetadata, TransactionalEventDispatcher } from './event-dispatcher';
+import {
+  type DispatcherListenerMetadata,
+  TransactionalEventDispatcher,
+} from './event-dispatcher.js';
 
 // Inline fake adapter — standing in for `InMemoryTransactionAdapter` from
 // `@nestjs-transactional/core/testing`. The subpath export can't be resolved
@@ -207,7 +211,7 @@ describe('TransactionalEventDispatcher', () => {
   });
 
   describe('listener failures', () => {
-    let errorSpy: jest.SpyInstance;
+    let errorSpy: jest.Spied<typeof Logger.prototype.error>;
 
     beforeEach(() => {
       errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);

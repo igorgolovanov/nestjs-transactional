@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
 
-import { ReservationPlacedEvent } from './events';
+import { ReservationPlacedEvent } from './events.js';
 
 /**
  * Local listener for the inventory DS. `ReservationPlacedEvent` is

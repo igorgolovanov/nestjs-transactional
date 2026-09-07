@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -13,10 +14,10 @@ import {
 } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
-import { WalletProjection } from '../src/wallet.listener';
-import { WalletModule } from '../src/wallet.module';
-import { WalletRow } from '../src/wallet.entity';
-import { WalletService } from '../src/wallet.service';
+import { WalletProjection } from '../src/wallet.listener.js';
+import { WalletModule } from '../src/wallet.module.js';
+import { WalletRow } from '../src/wallet.entity.js';
+import { WalletService } from '../src/wallet.service.js';
 
 async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
   const start = Date.now();

@@ -9,9 +9,9 @@ import {
 } from '@nestjs-transactional/core';
 import { DataSource } from 'typeorm';
 
-import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter';
+import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter.js';
 
-import { TypeOrmTransactionalModule } from './typeorm-transactional.module';
+import { TypeOrmTransactionalModule } from './typeorm-transactional.module.js';
 
 async function createSqlJsDataSource(): Promise<DataSource> {
   const ds = new DataSource({

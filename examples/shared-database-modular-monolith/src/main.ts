@@ -3,11 +3,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Client } from 'pg';
 
-import { AppModule, readPostgresConfigFromEnv } from './app.module';
-import { BillingService } from './billing/billing.service';
-import { BillingPaymentProjectionListener } from './billing/billing.listener';
-import { InventoryService } from './inventory/inventory.service';
-import { InventoryShipmentProjectionListener } from './inventory/inventory.listener';
+import { AppModule, readPostgresConfigFromEnv } from './app.module.js';
+import { BillingService } from './billing/billing.service.js';
+import { BillingPaymentProjectionListener } from './billing/billing.listener.js';
+import { InventoryService } from './inventory/inventory.service.js';
+import { InventoryShipmentProjectionListener } from './inventory/inventory.listener.js';
 
 async function ensureSchemas(config: ReturnType<typeof readPostgresConfigFromEnv>): Promise<void> {
   const admin = new Client(config);

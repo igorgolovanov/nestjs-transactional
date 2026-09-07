@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -8,8 +9,8 @@ import {
 } from '@nestjs-transactional/outbox';
 import { of } from 'rxjs';
 
-import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer';
-import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices.module';
+import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer.js';
+import { OutboxMicroservicesModule } from '../../src/module/outbox-microservices.module.js';
 
 const KAFKA_TOKEN = 'KAFKA_CLIENT';
 

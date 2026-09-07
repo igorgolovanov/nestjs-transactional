@@ -14,10 +14,10 @@ import type {
   FindCompletedOptions,
   FindFailedOptions,
   UpdateStatusOptions,
-} from '../repository/event-publication-repository';
-import { PublicationNotFoundError } from '../types/errors';
-import type { EventPublication, NewEventPublication } from '../types/event-publication';
-import { PublicationStatus } from '../types/publication-status';
+} from '../repository/event-publication-repository.js';
+import { PublicationNotFoundError } from '../types/errors.js';
+import type { EventPublication, NewEventPublication } from '../types/event-publication.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
 /**
  * In-memory reference implementation of {@link EventPublicationRepository}.

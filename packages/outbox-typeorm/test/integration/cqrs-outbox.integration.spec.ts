@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Global, Injectable, Logger, Module, type Provider } from '@nestjs/common';
 import {
   AggregateRoot,
@@ -27,17 +28,17 @@ import {
 } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
 
-import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity';
-import { EventPublicationEntity } from '../../src/entity/event-publication.entity';
+import { EventPublicationArchiveEntity } from '../../src/entity/event-publication-archive.entity.js';
+import { EventPublicationEntity } from '../../src/entity/event-publication.entity.js';
 import {
   OutboxTypeOrmModule,
   typeOrmEventPublicationRepositoryProvider,
-} from '../../src/module/outbox-typeorm.module';
+} from '../../src/module/outbox-typeorm.module.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
+} from '../setup-testcontainers.js';
 
 /**
  * Stand-in for `TypeOrmModule.forRoot(...)` registers

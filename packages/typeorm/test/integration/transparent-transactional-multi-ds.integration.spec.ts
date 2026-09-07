@@ -9,13 +9,13 @@ import {
 } from '@nestjs-transactional/core';
 import { Column, DataSource, Entity, PrimaryGeneratedColumn, Repository } from 'typeorm';
 
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
+import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
 import {
   createAdditionalDatabase,
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
+} from '../setup-testcontainers.js';
 
 /**
  * Multi-DS scope — the entities are duplicated per dataSource so

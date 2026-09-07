@@ -4,7 +4,7 @@
 
 ```ts
 
-import { AggregateRoot } from '@nestjs/cqrs';
+import { AsyncContext } from '@nestjs/cqrs';
 import { DiscoveryService } from '@nestjs/core';
 import { DynamicModule } from '@nestjs/common';
 import { EventBus } from '@nestjs/cqrs';
@@ -21,7 +21,7 @@ import { TransactionManager } from '@nestjs-transactional/core';
 import { Type } from '@nestjs/common';
 
 // @public (undocumented)
-export type AggregateConstructor<T extends AggregateRoot> = new (...args: never[]) => T;
+export type AggregateConstructor<T extends object = object> = new (...args: never[]) => T;
 
 // @public
 export const CQRS_HANDLER_WRAPPER_OPTIONS: unique symbol;
@@ -194,9 +194,9 @@ export class TransactionalEventPublisher implements IEventPublisher {
 export class TransactionalEventPublisherAdapter extends EventPublisher {
     constructor(strategy: IEventPublisher, eventBus: EventBus);
     // (undocumented)
-    mergeClassContext<T extends AggregateConstructor<AggregateRoot>>(metatype: T): T;
+    mergeClassContext<T extends AggregateConstructor>(metatype: T, _asyncContext?: AsyncContext): T;
     // (undocumented)
-    mergeObjectContext<T extends AggregateRoot>(object: T): T;
+    mergeObjectContext<T extends object>(object: T, _asyncContext?: AsyncContext): T;
 }
 
 // @public

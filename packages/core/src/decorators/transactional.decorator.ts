@@ -1,5 +1,5 @@
-import { PropagationMode } from '../types/propagation';
-import type { ExtendedTransactionOptions } from '../types/transaction-options';
+import { PropagationMode } from '../types/propagation.js';
+import type { ExtendedTransactionOptions } from '../types/transaction-options.js';
 
 /**
  * Metadata key under which {@link Transactional} stores its options on a

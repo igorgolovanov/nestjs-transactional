@@ -1,6 +1,6 @@
-import { DuplicateListenerIdError } from '../types/errors';
+import { DuplicateListenerIdError } from '../types/errors.js';
 
-import { OutboxListenerRegistry, type RegisteredOutboxListener } from './listener-registry';
+import { OutboxListenerRegistry, type RegisteredOutboxListener } from './listener-registry.js';
 
 function listener(
   id: string,

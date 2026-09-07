@@ -2,9 +2,9 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule, readConfigFromEnv } from './app.module';
-import { ArticleQueryService } from './article.query-service';
-import { ArticleService } from './article.service';
+import { AppModule, readConfigFromEnv } from './app.module.js';
+import { ArticleQueryService } from './article.query-service.js';
+import { ArticleService } from './article.service.js';
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(

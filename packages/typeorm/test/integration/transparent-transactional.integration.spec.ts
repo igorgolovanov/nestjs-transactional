@@ -14,13 +14,13 @@ import {
 } from '@nestjs-transactional/core';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module';
+import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
   stopPostgresContainer,
-} from '../setup-testcontainers';
-import { TestUser } from '../shared/test-user.entity';
+} from '../setup-testcontainers.js';
+import { TestUser } from '../shared/test-user.entity.js';
 
 /**
  * In production the `getDataSourceToken(name)` and per-entity

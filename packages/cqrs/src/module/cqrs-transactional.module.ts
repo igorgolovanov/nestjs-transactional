@@ -10,14 +10,14 @@ import { DiscoveryModule, DiscoveryService } from '@nestjs/core';
 import { CqrsModule, EventBus, EventPublisher } from '@nestjs/cqrs';
 import { TransactionManager } from '@nestjs-transactional/core';
 
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher';
-import { TransactionalEventPublisher } from '../event-publisher/transactional-event-publisher';
-import { TransactionalEventPublisherAdapter } from '../event-publisher/transactional-event-publisher-adapter';
-import { CqrsTransactionalBootstrap } from '../handlers/bootstrap';
-import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper';
-import { IntegrationEventsHandlerScanner } from '../handlers/integration-events-handler-scanner';
-import { TransactionalListenerScanner } from '../handlers/listener-scanner';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
+import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher.js';
+import { TransactionalEventPublisherAdapter } from '../event-publisher/transactional-event-publisher-adapter.js';
+import { TransactionalEventPublisher } from '../event-publisher/transactional-event-publisher.js';
+import { CqrsTransactionalBootstrap } from '../handlers/bootstrap.js';
+import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper.js';
+import { IntegrationEventsHandlerScanner } from '../handlers/integration-events-handler-scanner.js';
+import { TransactionalListenerScanner } from '../handlers/listener-scanner.js';
 
 /**
  * DI token for the resolved {@link CqrsTransactionalOptions} object.

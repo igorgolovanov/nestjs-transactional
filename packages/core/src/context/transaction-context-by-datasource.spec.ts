@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { type ActiveTransaction, TransactionContext } from './transaction.context';
+import { type ActiveTransaction, TransactionContext } from './transaction.context.js';
 
 function makeActiveTx(adapterInstanceName: string): ActiveTransaction {
   return {

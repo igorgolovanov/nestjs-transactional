@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { InjectOutboxPublisher, OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { OrderEntity } from './order.entity';
-import { OrderPlacedEvent } from './order-placed.event';
+import { OrderEntity } from './order.entity.js';
+import { OrderPlacedEvent } from './order-placed.event.js';
 
 /**
  * The single-unit atomicity demo (DD-019). Inside `@Transactional()`

@@ -1,4 +1,4 @@
-import { type ActiveTransaction, TransactionContext } from './transaction.context';
+import { type ActiveTransaction, TransactionContext } from './transaction.context.js';
 
 /**
  * Per-dataSource read-only view over {@link TransactionContext}'s active

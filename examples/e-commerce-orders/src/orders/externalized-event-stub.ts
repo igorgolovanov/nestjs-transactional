@@ -4,7 +4,7 @@ import {
   OutboxEventsHandler,
 } from '@nestjs-transactional/outbox';
 
-import { OrderConfirmedEvent } from '../shared/events';
+import { OrderConfirmedEvent } from '../shared/events.js';
 
 /**
  * Stub local listener for `OrderConfirmedEvent`. Registered solely

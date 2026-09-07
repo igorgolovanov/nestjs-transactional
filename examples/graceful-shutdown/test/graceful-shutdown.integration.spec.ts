@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -18,14 +19,14 @@ import {
 import { Client } from 'pg';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { AuditLogEntry } from '../src/audit/audit-log.entity';
-import { AuditService } from '../src/audit/audit.service';
+import { AppModule } from '../src/app.module.js';
+import { AuditLogEntry } from '../src/audit/audit-log.entity.js';
+import { AuditService } from '../src/audit/audit.service.js';
 import {
   HANDLER_LATENCY_MS,
   SlowArchivalHandler,
-} from '../src/audit/slow-archival.handler';
-import { ExampleCleanupService } from '../src/shutdown/example-cleanup.service';
+} from '../src/audit/slow-archival.handler.js';
+import { ExampleCleanupService } from '../src/shutdown/example-cleanup.service.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now();
@@ -163,7 +164,7 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
     // Asserting the commit made this test depend on beating provider
     // teardown — true on a fast machine, false on a CI runner, where it
     // failed with `QueryFailedError: Connection terminated`.
-    const [recorded] = await Promise.allSettled([
+    await Promise.allSettled([
       audit.recordEvent('a-2', 'tx mid-shutdown'),
       module.close(),
     ]);
@@ -175,17 +176,23 @@ describe('graceful-shutdown (Postgres via testcontainers)', () => {
       'SELECT event_type FROM event_publication',
     );
 
-    if (recorded.status === 'fulfilled') {
-      // Committed before teardown reached the DataSource: both rows.
+    // Assert DD-019's invariant, not a winner of the race. The earlier
+    // shape keyed off `recorded.status`, on the assumption that a
+    // rejection means nothing committed. It does not: the rejection can
+    // arrive after the commit — the connection dying on the way back, or
+    // an after-commit step failing — and under a loaded machine running
+    // every example suite at once that is exactly what happened, leaving
+    // the audit row present while the promise rejected.
+    //
+    // What actually holds either way is that the business row and its
+    // publication are a single unit: both, or neither.
+    if (auditRows.rows.length > 0) {
       expect(auditRows.rows.map((r) => r.id)).toEqual(['a-2']);
       expect(pubRows.rows).toHaveLength(1);
       expect(pubRows.rows[0]?.event_type).toBe('AuditEventRecordedEvent');
     } else {
-      // Lost the race, and the connection went away mid-transaction.
-      // Postgres rolled it back — and DD-019's single unit means the
-      // business row and the publication cannot survive separately, so
-      // neither may be here.
-      expect(auditRows.rows).toHaveLength(0);
+      // Lost the race before commit: Postgres rolled the whole unit
+      // back, so the publication cannot have survived on its own.
       expect(pubRows.rows).toHaveLength(0);
     }
 

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { jest } from '@jest/globals';
 import { join } from 'node:path';
 
 import { Logger } from '@nestjs/common';
@@ -23,16 +24,17 @@ import {
 } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { AuditArchivalHandler } from '../src/audit/audit-archival.handler';
-import { AuditLogEntry } from '../src/audit/audit-log.entity';
-import { AuditService } from '../src/audit/audit.service';
+import { AppModule } from '../src/app.module.js';
+import { AuditArchivalHandler } from '../src/audit/audit-archival.handler.js';
+import { AuditLogEntry } from '../src/audit/audit-log.entity.js';
+import { AuditService } from '../src/audit/audit.service.js';
 
-const repoRoot = join(__dirname, '..');
+// `import.meta.dirname` rather than `__dirname`: the example is ESM.
+const repoRoot = join(import.meta.dirname, '..');
 const envDevelopment = join(repoRoot, '.env.development');
 const envProduction = join(repoRoot, '.env.production');
-const envMissingRequired = join(__dirname, 'fixtures', '.env.missing-required');
-const envBadPolling = join(__dirname, 'fixtures', '.env.bad-polling');
+const envMissingRequired = join(import.meta.dirname, 'fixtures', '.env.missing-required');
+const envBadPolling = join(import.meta.dirname, 'fixtures', '.env.bad-polling');
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,

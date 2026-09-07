@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
-import { DeserializationError, SerializationError } from '../types/errors';
+import { DeserializationError, SerializationError } from '../types/errors.js';
 
-import type { EventSerializer } from './event-serializer';
-import { EventTypeRegistry } from './event-type-registry';
+import type { EventSerializer } from './event-serializer.js';
+import { EventTypeRegistry } from './event-type-registry.js';
 
 /**
  * Default JSON-based {@link EventSerializer}. Uses `JSON.stringify` for

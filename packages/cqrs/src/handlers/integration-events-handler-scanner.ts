@@ -5,14 +5,14 @@ import { PropagationMode, TransactionManager } from '@nestjs-transactional/core'
 import {
   type IntegrationEventsHandlerMetadata,
   getIntegrationEventsHandlerMetadata,
-} from '../decorators/integration-events-handler.decorator';
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
-import { TransactionPhase } from '../types/transactional-listener.types';
+} from '../decorators/integration-events-handler.decorator.js';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
+import { TransactionPhase } from '../types/transactional-listener.types.js';
 
 import {
   OUTBOX_LISTENER_REGISTRAR,
   type OutboxListenerRegistrar,
-} from './outbox-listener-registrar';
+} from './outbox-listener-registrar.js';
 
 type HandlerMethod = (event: unknown) => unknown;
 

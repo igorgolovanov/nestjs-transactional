@@ -2,8 +2,8 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule } from './app.module';
-import { UserService } from './user.service';
+import { AppModule } from './app.module.js';
+import { UserService } from './user.service.js';
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule, {

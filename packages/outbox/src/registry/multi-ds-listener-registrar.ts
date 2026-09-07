@@ -4,12 +4,15 @@ import { ModuleRef } from '@nestjs/core';
 import {
   OUTBOX_DATA_SOURCE_NAMES,
   type OutboxDataSourceNames,
-} from '../dispatcher/outbox-event-publisher';
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver';
-import { getEventTypeRegistryToken, getOutboxListenerRegistryToken } from '../tokens/token-utils';
+} from '../dispatcher/outbox-event-publisher.js';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { resolveDataSourceByEventTypeName } from '../serialization/event-type-resolver.js';
+import {
+  getEventTypeRegistryToken,
+  getOutboxListenerRegistryToken,
+} from '../tokens/token-utils.js';
 
-import { OutboxListenerRegistry } from './listener-registry';
+import { OutboxListenerRegistry } from './listener-registry.js';
 
 /**
  * Cross-package shared DI token for the outbox listener registrar

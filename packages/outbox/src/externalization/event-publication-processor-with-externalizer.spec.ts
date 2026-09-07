@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import {
   AdapterRegistry,
@@ -9,23 +10,23 @@ import {
   type TransactionOptions,
 } from '@nestjs-transactional/core';
 
-import { DataSourceOutboxPublisher } from '../dispatcher/data-source-outbox-publisher';
-import { EventPublicationProcessor } from '../dispatcher/event-publication-processor';
+import { DataSourceOutboxPublisher } from '../dispatcher/data-source-outbox-publisher.js';
+import { EventPublicationProcessor } from '../dispatcher/event-publication-processor.js';
 import {
   DEFAULT_PROCESSOR_OPTIONS,
   type EventPublicationProcessorOptions,
-} from '../dispatcher/processor-options';
-import { EventPublicationRegistry } from '../registry/event-publication-registry';
-import { OutboxListenerRegistry } from '../registry/listener-registry';
-import { EventTypeRegistry } from '../serialization/event-type-registry';
-import { JsonEventSerializer } from '../serialization/json-event-serializer';
-import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository';
-import { CompletionMode } from '../types/completion-mode';
-import { PublicationStatus } from '../types/publication-status';
+} from '../dispatcher/processor-options.js';
+import { EventPublicationRegistry } from '../registry/event-publication-registry.js';
+import { OutboxListenerRegistry } from '../registry/listener-registry.js';
+import { EventTypeRegistry } from '../serialization/event-type-registry.js';
+import { JsonEventSerializer } from '../serialization/json-event-serializer.js';
+import { InMemoryEventPublicationRepository } from '../testing/in-memory-repository.js';
+import { CompletionMode } from '../types/completion-mode.js';
+import { PublicationStatus } from '../types/publication-status.js';
 
-import type { EventExternalizer } from './event-externalizer';
-import { ExternalizationRegistry } from './externalization-registry';
-import { Externalized } from './externalized.decorator';
+import type { EventExternalizer } from './event-externalizer.js';
+import { ExternalizationRegistry } from './externalization-registry.js';
+import { Externalized } from './externalized.decorator.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -110,7 +111,9 @@ describe('EventPublicationProcessor (externalizer wired, no ExternalizationRegis
     );
     listenerRegistry = new OutboxListenerRegistry();
     publisher = new DataSourceOutboxPublisher('default', publicationRegistry, listenerRegistry);
-    externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
+    externalizer = {
+      externalize: jest.fn<EventExternalizer['externalize']>().mockResolvedValue(undefined),
+    };
     processor = new EventPublicationProcessor(
       publicationRegistry,
       listenerRegistry,
@@ -216,7 +219,9 @@ describe('EventPublicationProcessor (externalizer + ExternalizationRegistry wire
     );
     listenerRegistry = new OutboxListenerRegistry();
     publisher = new DataSourceOutboxPublisher('default', publicationRegistry, listenerRegistry);
-    externalizer = { externalize: jest.fn().mockResolvedValue(undefined) };
+    externalizer = {
+      externalize: jest.fn<EventExternalizer['externalize']>().mockResolvedValue(undefined),
+    };
     processor = new EventPublicationProcessor(
       publicationRegistry,
       listenerRegistry,

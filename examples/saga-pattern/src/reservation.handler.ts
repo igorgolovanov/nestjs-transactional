@@ -8,12 +8,12 @@ import {
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { QueryFailedError, Repository } from 'typeorm';
 
-import { OrderRow, ReservationRow, StockItemRow } from './entities';
+import { OrderRow, ReservationRow, StockItemRow } from './entities.js';
 import {
   InventoryReservationFailedEvent,
   InventoryReservedEvent,
   OrderPlacedEvent,
-} from './events';
+} from './events.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 

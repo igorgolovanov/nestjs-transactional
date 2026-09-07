@@ -1,4 +1,7 @@
-import { ResubmissionOptions } from './resubmission-options';
+import { jest } from '@jest/globals';
+
+import type { EventPublication } from './event-publication.js';
+import { ResubmissionOptions } from './resubmission-options.js';
 
 describe('ResubmissionOptions', () => {
   describe('defaults()', () => {
@@ -47,7 +50,7 @@ describe('ResubmissionOptions', () => {
 
     it('withFilter returns the same instance and stores the predicate', () => {
       const opts = ResubmissionOptions.defaults();
-      const filter = jest.fn().mockReturnValue(true);
+      const filter = jest.fn<(publication: EventPublication) => boolean>().mockReturnValue(true);
       const returned = opts.withFilter(filter);
 
       expect(returned).toBe(opts);
@@ -55,7 +58,7 @@ describe('ResubmissionOptions', () => {
     });
 
     it('supports fluent chaining of all builder methods', () => {
-      const filter = jest.fn().mockReturnValue(true);
+      const filter = jest.fn<(publication: EventPublication) => boolean>().mockReturnValue(true);
       const opts = ResubmissionOptions.defaults()
         .withBatchSize(25)
         .withMinAge(1_000)

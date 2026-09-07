@@ -1,15 +1,16 @@
+import { jest } from '@jest/globals';
 import { Controller, Get, type INestApplication, Injectable, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
-import { Transactional } from '../decorators/transactional.decorator';
-import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry';
-import { TransactionManager } from '../manager/transaction.manager';
-import type { TransactionObserver } from '../observability/transaction-observer';
-import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter';
-import { PropagationMode } from '../types/propagation';
+import { Transactional } from '../decorators/transactional.decorator.js';
+import { ADAPTER_REGISTRY, AdapterRegistry } from '../manager/adapter.registry.js';
+import { TransactionManager } from '../manager/transaction.manager.js';
+import type { TransactionObserver } from '../observability/transaction-observer.js';
+import { InMemoryTransactionAdapter } from '../testing/in-memory.adapter.js';
+import { PropagationMode } from '../types/propagation.js';
 
-import { TransactionalModule } from './transactional.module';
+import { TransactionalModule } from './transactional.module.js';
 
 @Injectable()
 class UserService {

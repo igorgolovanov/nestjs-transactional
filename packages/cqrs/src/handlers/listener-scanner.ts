@@ -1,8 +1,8 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
 
-import { getTransactionalEventsHandlerMetadata } from '../decorators/transactional-events-handler.decorator';
-import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher';
+import { getTransactionalEventsHandlerMetadata } from '../decorators/transactional-events-handler.decorator.js';
+import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
 /**
  * Bootstrap-time scanner that walks every provider in the running
