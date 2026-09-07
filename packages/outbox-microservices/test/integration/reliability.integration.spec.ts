@@ -6,7 +6,7 @@ import { ClientKafka, ClientRMQ } from '@nestjs/microservices';
 import { ExternalizationError } from '@nestjs-transactional/outbox';
 import { KafkaContainer, type StartedKafkaContainer } from '@testcontainers/kafka';
 import * as amqplib from 'amqplib';
-import { Kafka } from 'kafkajs';
+import { type Admin, Kafka } from 'kafkajs';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 
 import { MicroservicesEventExternalizer } from '../../src/externalizer/microservices-event-externalizer.js';
@@ -49,6 +49,37 @@ function externalizerFor(token: string, client: unknown): MicroservicesEventExte
     defaultClient: token,
     validateOnBootstrap: false,
   });
+}
+
+/**
+ * Creates the topic, retrying until the broker can name its controller.
+ *
+ * A single-node Kafka accepts connections before the controller has
+ * registered itself, and metadata then carries `controllerId: -1`, which
+ * `admin.createTopics()` surfaces as
+ * `KafkaJSBrokerNotFound: Broker -1 not found in the cached metadata`.
+ * kafkajs will not ride that out on its own: its `createTopics` retrier
+ * calls `bail()` for every error except `NOT_CONTROLLER`, so the first
+ * attempt is the only attempt. Each attempt does start with
+ * `cluster.refreshMetadata()`, so retrying from the outside is what picks
+ * up the controller once it appears.
+ */
+async function createTopic(admin: Admin, topic: string, timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      await admin.createTopics({
+        topics: [{ topic, numPartitions: 1 }],
+        waitForLeaders: true,
+      });
+      return;
+    } catch (err) {
+      if (Date.now() >= deadline) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
 }
 
 beforeAll(() => {
@@ -146,10 +177,7 @@ describe('externalization reliability (Kafka via testcontainers)', () => {
     // auto-creation timing.
     const admin = new Kafka({ clientId: 'probe-admin', brokers: [broker], logLevel: 0 }).admin();
     await admin.connect();
-    await admin.createTopics({
-      topics: [{ topic: TOPIC, numPartitions: 1 }],
-      waitForLeaders: true,
-    });
+    await createTopic(admin, TOPIC);
     await admin.disconnect();
 
     client = new ClientKafka({ client: { clientId: 'probe', brokers: [broker], logLevel: 0 } });
