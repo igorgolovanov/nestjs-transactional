@@ -10,9 +10,9 @@ discoveries during implementation live in
 
 ## Current status
 
-Releasing `1.0.0`. The core transactional contract, multi-adapter
+Releasing `2.0.0`. The core transactional contract, multi-adapter
 architecture, outbox pattern, CQRS integration, externalization SPI and
-the Tier 1–5 example library have all shipped, and the public API is now
+the Tier 1–5 example library have all shipped, and the public API is
 under the stability policy in
 [ADR-004](../adr/004-public-api-stability.md): breaking changes need a
 major bump and an ADR.
@@ -23,12 +23,23 @@ change to it into a reviewable diff, and `publint` plus
 `@arethetypeswrong/cli` verify that what consumers resolve from the
 published tarball matches.
 
-Scheduled after `1.0.0`: the scheduled cleanup job (C4) and
-broker-aware externalizers (C5). An observability SPI for the outbox
-(C3) is deferred, since applications wire telemetry to their own stack
-and `TransactionObserver` already gives an exporter a binding point.
+`2.0.0` is what the ESM-only move cost: the packages ship a single ESM
+build and support NestJS 12, whose whole line is ESM-only
+([ADR-022](../adr/022-esm-only-packaging.md)). CommonJS applications
+still consume them through `require(esm)`, which the `>=22.13.0` engine
+floor covers.
+
+The three items scheduled after `1.0.0` are all closed, and only one of
+them the way it was written. The scheduled cleanup job (C4) shipped as
+specified. The observability SPI (C3) is deferred, since applications
+wire telemetry to their own stack and `TransactionObserver` already
+gives an exporter a binding point. Broker-aware externalizers (C5) were
+**retired on evidence**: the silent-success gap they were meant to close
+did not reproduce on Kafka or RabbitMQ, and what survives is a single
+unscheduled NATS adapter
+([ADR-021](../adr/021-externalization-acknowledgement-per-transport.md)).
 See [`improvement-plan.md`](improvement-plan.md), which also records
-the post-alpha assessment this release came out of.
+the post-alpha assessment this line of work came out of.
 
 ## Era 1 — Foundation (Phases 0–9)
 
@@ -808,4 +819,9 @@ Both routes converge on the same EM.
   persistence backend.
 - **OpenTelemetry integration** — tracing across transaction
   and event boundaries.
-- **ESM dual packaging** — ESM export support alongside CJS.
+- ~~**ESM dual packaging**~~ — *shipped in 2.0.0, and not as dual.*
+  The whole NestJS 12 line went ESM-only, so the packages followed with
+  a single ESM build rather than two. Dual was rejected on the dual
+  package hazard: DI here keys on class identity, and two copies of the
+  same class in one process is the failure it produces. See
+  [ADR-022](../adr/022-esm-only-packaging.md).
