@@ -272,9 +272,13 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 **Last update**: releasing `2.0.0`. The cohort of six —
 `@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`
-— ships under the `latest` dist-tag and moves as one version again;
-`1.1.0` had split it, since `linked` only aligns the packages that a
-release actually bumps.
+— ships under the `latest` dist-tag and moves as one version again.
+`1.1.0` had split it three-and-three, because `linked` only aligns the
+packages a release actually bumps. From `2.0.0` the cohort is `fixed`:
+every release publishes all six at the same version, since none of
+these packages is independently usable and a per-package number is
+therefore information nobody reads. See CONTRIBUTING, "One version for
+all six".
 
 `2.0.0` is the ESM-only move (ADR-022) plus NestJS 12 support. Every
 package is `"type": "module"` with no CommonJS build, matching the
@@ -368,7 +372,8 @@ up as a reviewable diff.
   option, item A5) removed.
 - First public alpha shipped — six packages at `1.0.0-alpha.0` on
   npm with `alpha` dist-tag. Linked-cohort versioning via
-  changesets keeps the six packages in lockstep. Final blocker
+  changesets — which aligns the packages a release bumps, not all
+  six, as `1.1.0` later showed; `fixed` replaced it at `2.0.0`. Final blocker
   was a CI plumbing issue: `actions/setup-node@v4` with
   `registry-url:` generates an `.npmrc` referencing
   `${NODE_AUTH_TOKEN}`, but the publish step only set `NPM_TOKEN`

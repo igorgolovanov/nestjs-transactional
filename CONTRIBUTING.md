@@ -467,6 +467,38 @@ Releases are fully automated by the `release` workflow:
 
 Maintainers do not run `changeset publish` manually.
 
+### One version for all six
+
+The cohort is `fixed` in `.changeset/config.json`, not `linked`: every
+release publishes all six packages at the same version, including the
+ones with no changes.
+
+That follows from how the packages are actually consumed. None of them
+is independently usable — `core` ships no production adapter at all,
+only the in-memory one under `core/testing`, so the smallest real
+deployment is `core` plus an adapter, and every other package peers on
+`core`. Nobody installs one of these and nothing else, which means a
+per-package version number carries no information anybody reads. What
+people do instead is upgrade the set, and `fixed` turns that into "set
+everything to the same number" rather than a compatibility puzzle
+across six changelogs. It is what NestJS does with its own monorepo:
+`common`, `core`, `microservices`, `testing` and `platform-express`
+publish in lockstep.
+
+The cost is real and accepted. A release republishes packages that did
+not change, and their internal peer ranges tighten to the new version
+even when the older one would have worked — under `linked`,
+`outbox-typeorm@1.1.0` peered on `core@^1.0.0` and said something true
+that `fixed` would have overstated. For a set that moves together that
+overstatement is harmless, since the consumer has the new `core`
+anyway.
+
+This was `linked` until `2.0.0`. Switching was only clean at that point:
+`fixed` aligns a group to the highest version in it, and `1.1.0` had
+left the cohort split three-and-three, so flipping earlier would have
+jumped three packages a version for nothing. `2.0.0` brought all six
+back to one number, which is the moment the change costs nothing.
+
 ## Publishing and npm provenance
 
 Every published tarball carries an
