@@ -711,9 +711,11 @@ Recorded, not scheduled. Ordered roughly by value.
   `OutboxTypeOrmModule reshape ...`), and the body/footer line-length
   caps disabled (bodies carry URLs). No `scope-enum`: the history uses
   19 distinct scopes, including combined ones like `cqrs,outbox`.
-- **ESM dual packaging** — all packages are CJS-only (single
-  `exports` condition set); already a
-  [future phase](README.md#future-phases-not-scheduled).
+- ~~**ESM dual packaging**~~ — *shipped in 2.0.0, as ESM-only.* The
+  packages are no longer CommonJS at all. CommonJS applications still
+  consume them through Node`s `require(esm)`, which is what the
+  `>=22.13.0` floor covers. [ADR-022](../adr/022-esm-only-packaging.md)
+  records why one build beat two here.
 
   `sideEffects` is now declared, and not uniformly, because the
   uniform answer would have been false. `core`, `cqrs`, `outbox` and

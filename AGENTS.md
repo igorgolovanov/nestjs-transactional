@@ -270,14 +270,19 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last update**: releasing stable `1.0.0`. The cohort of six —
+**Last update**: releasing `2.0.0`. The cohort of six —
 `@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`
-— has left changesets pre-release mode and ships under the `latest`
-dist-tag rather than `alpha`. The release-readiness workstreams from
-the improvement plan are complete: API consistency, coverage
-governance, graceful shutdown and automatic retry in the outbox, plus
-the packaging guards (api-extractor surface reports, `publint`,
-`@arethetypeswrong/cli`).
+— ships under the `latest` dist-tag and moves as one version again;
+`1.1.0` had split it, since `linked` only aligns the packages that a
+release actually bumps.
+
+`2.0.0` is the ESM-only move (ADR-022) plus NestJS 12 support. Every
+package is `"type": "module"` with no CommonJS build, matching the
+NestJS 12 line, and `engines.node` is `>=22.13.0` on all six.
+CommonJS applications still consume them through Node's
+`require(esm)`. Jest does not follow Node there, so the suites run
+under `--experimental-vm-modules` — see CONTRIBUTING, "The suites run
+as ESM", before writing a spec.
 
 From here the public API is under ADR-004's stability policy: a
 breaking change needs a major bump *and* an ADR, and the committed
@@ -286,13 +291,9 @@ up as a reviewable diff.
 
 ### Blocked / Awaiting
 
-- **The `1.0.0` release itself.** Pre-release mode is exited and the
-  manifests no longer pin the `alpha` dist-tag, so the next
-  `changeset version` produces `1.0.0` for all six (verified locally:
-  every pending changeset resolves to `1.0.0`, since semver treats any
-  increment of `1.0.0-alpha.5` as `1.0.0`). What remains is the normal
-  flow — merge the "Version Packages" PR, `release.yml` publishes
-  under `latest`.
+- **The `2.0.0` release itself.** The major changeset is on `main`;
+  what remains is the normal flow — merge the "Version Packages" PR and
+  `release.yml` publishes under `latest`.
 
 ### Next
 
@@ -300,11 +301,13 @@ up as a reviewable diff.
   workstreams for the stable-`1.0.0` push (API consistency, coverage
   governance, outbox production readiness) live in
   [`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md).
-  Architectural items there (A1 `readOnly`/`timeout`, C2 retry
-  policy, C5 broker-aware externalizers) start as DD/ADR discussions.
-  C3, an observability SPI for the outbox, is deferred: applications
-  wire telemetry to their own stack, and `TransactionObserver` already
-  gives an exporter a binding point.
+  Every workstream there is now closed. A1 `readOnly`/`timeout` and
+  C2 retry policy shipped; C4 scheduled cleanup shipped; C3, an
+  observability SPI, is deferred, since applications wire telemetry to
+  their own stack and `TransactionObserver` already gives an exporter a
+  binding point. C5, broker-aware externalizers, was **retired on
+  evidence** rather than built: the gap it was scoped to close did not
+  reproduce against live Kafka or RabbitMQ (ADR-021).
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
   the six published packages to Trusted Publishing would let the
@@ -323,8 +326,7 @@ up as a reviewable diff.
   JetStream's `PubAck` (core NATS `publish()` returns `void`, so it is
   the one transport where a native adapter still buys something —
   ADR-021 retired the Kafka and RabbitMQ half of that plan),
-  `outbox-prisma`, `outbox-mongodb`, OpenTelemetry integration, ESM
-  dual packaging.
+  `outbox-prisma`, `outbox-mongodb`, OpenTelemetry integration.
 - **`1.0.0` stable progression**: done — the cohort has left
   pre-release mode (`pnpm changeset pre exit`) and versions to
   `1.0.0` under the `latest` dist-tag. Breaking changes from here
