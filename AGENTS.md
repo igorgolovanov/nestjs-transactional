@@ -331,10 +331,10 @@ up as a reviewable diff.
   the one transport where a native adapter still buys something —
   ADR-021 retired the Kafka and RabbitMQ half of that plan),
   `outbox-prisma`, `outbox-mongodb`, OpenTelemetry integration.
-- **`1.0.0` stable progression**: done — the cohort has left
-  pre-release mode (`pnpm changeset pre exit`) and versions to
-  `1.0.0` under the `latest` dist-tag. Breaking changes from here
-  need a major bump plus an ADR (ADR-004).
+- **Stable progression**: done. The cohort left pre-release mode
+  (`pnpm changeset pre exit`) at `1.0.0` and now versions to `2.0.0`
+  under the `latest` dist-tag. Breaking changes need a major bump plus
+  an ADR (ADR-004).
 
 ### Five most recent decisions
 
