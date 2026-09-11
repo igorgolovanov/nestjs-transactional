@@ -35,6 +35,7 @@ const envDevelopment = join(repoRoot, '.env.development');
 const envProduction = join(repoRoot, '.env.production');
 const envMissingRequired = join(import.meta.dirname, 'fixtures', '.env.missing-required');
 const envBadPolling = join(import.meta.dirname, 'fixtures', '.env.bad-polling');
+const envTwoViolations = join(import.meta.dirname, 'fixtures', '.env.two-violations');
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,
@@ -267,6 +268,27 @@ describe('async-config-from-environment (Postgres via testcontainers)', () => {
           imports: [AppModule.forEnv({ envFilePath: envBadPolling })],
         }).compile(),
       ).rejects.toThrow(/OUTBOX_POLLING_INTERVAL_MS/);
+    });
+
+    // The two cases above pass whether validation stops at the first
+    // failure or not, so neither one guards the `abortEarly: false`
+    // that `forEnv` sets. This one does: with early abort, only
+    // whichever rule Joi reaches first would be named, and half the
+    // misconfiguration would stay hidden until the next boot.
+    it('reports every broken rule in one error, not just the first', async () => {
+      let thrown: unknown;
+      try {
+        await Test.createTestingModule({
+          imports: [AppModule.forEnv({ envFilePath: envTwoViolations })],
+        }).compile();
+      } catch (err) {
+        thrown = err;
+      }
+
+      expect(thrown).toBeInstanceOf(Error);
+      const { message } = thrown as Error;
+      expect(message).toMatch(/PG_HOST/);
+      expect(message).toMatch(/OUTBOX_POLLING_INTERVAL_MS/);
     });
   });
 });
