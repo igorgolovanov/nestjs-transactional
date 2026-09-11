@@ -76,9 +76,19 @@ export class AppModule {
           isGlobal: true,
           envFilePath: options.envFilePath,
           validationSchema: envValidationSchema,
-          // Surface every misconfiguration in one pass — easier to
+          // Surface every misconfiguration in one pass, easier to
           // diagnose than fixing them one error at a time.
-          validationOptions: { abortEarly: false },
+          //
+          // `@nestjs/config` 12 validates through Standard Schema
+          // rather than Joi directly, so `validationOptions` carries
+          // only the spec's own fields and anything Joi understands
+          // moves under `libraryOptions`. Version 12 also restores
+          // `abortEarly: false` for Joi schemas by default, so this
+          // is belt and braces; it stays because it is the intent
+          // this example is here to show, and because a default that
+          // exists for backwards compatibility is a thin thing to
+          // rely on.
+          validationOptions: { libraryOptions: { abortEarly: false } },
         }),
 
         TypeOrmModule.forRootAsync({
