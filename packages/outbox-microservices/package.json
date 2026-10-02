@@ -79,7 +79,7 @@
     "@testcontainers/kafka": "^12.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.2",
-    "amqplib": "^2.0.1",
+    "amqplib": "^2.2.0",
     "jest": "^30.5.1",
     "kafkajs": "^2.2.4",
     "reflect-metadata": "^0.2.2",
