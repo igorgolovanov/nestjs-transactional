@@ -1,5 +1,13 @@
 # Migration to multi-adapter
 
+> **The outbox sections describe 2.x.** From 3.0.0 the outbox delivers
+> through `@nestjs/outbox` and lives in one DataSource
+> ([ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md));
+> `packages/outbox-typeorm` and `packages/outbox-microservices` no longer
+> exist. The multi-adapter transaction support this guide describes in
+> `core`, `typeorm` and `cqrs` is unchanged. To upgrade, see
+> [Migrating from 2.x to 3.0](../guides/migrating-to-3.md).
+
 This guide enumerates the file-level impact and the breaking
 changes the multi-adapter architecture introduces.
 

@@ -322,9 +322,9 @@ realism by
 [`examples/e-commerce-orders`](../../examples/e-commerce-orders/)
 (three Postgres DataSources, per-DS outbox stacks); smaller axis
 demonstrations in
-[`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/)
+[`examples/multi-datasource-outbox`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox%402.0.0/examples/multi-datasource-outbox)
 and
-[`examples/shared-database-modular-monolith`](../../examples/shared-database-modular-monolith/).
+[`examples/shared-database-modular-monolith`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox%402.0.0/examples/shared-database-modular-monolith).
 
 ## Revision history
 

@@ -1,18 +1,20 @@
 # Outbox Pattern
 
-`@nestjs-transactional/outbox` (and its TypeORM backend
-`@nestjs-transactional/outbox-typeorm`) implements the
-**Transactional Outbox** pattern: event publications are persisted
-atomically with the business data inside the same database
-transaction, then delivered asynchronously by a worker process.
-The pattern is the foundation for reliable event-driven integration
-between modules in a monolith and between services in a distributed
-system.
+From 3.0.0 the transactional outbox in this repository is two things
+working together:
+
+- [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox), the
+  first-party NestJS outbox, which stores messages and delivers them;
+- `@nestjs-transactional/outbox`, a small bridge that adds a message to
+  `@nestjs/outbox` inside the transaction `@Transactional` opened.
+
+Why the delivery engine moved, and what was weighed:
+[ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md). The bridge's
+exact rules: [DD-028](../dd/028-outbox-bridge-contract.md). How 2.x
+worked, with its own Event Publication Registry, is recorded in ADR-006,
+ADR-007 and ADR-019.
 
 ## The problem
-
-Consider a command handler that writes to a database and then
-publishes a domain event to trigger downstream work:
 
 ```ts
 @Transactional()
@@ -23,238 +25,101 @@ async placeOrder(cmd: PlaceOrder): Promise<void> {
 }
 ```
 
-Three failure modes break the "either everything happens or nothing
-does" contract users expect from `@Transactional`:
+1. The `save` commits and the process crashes before (1): the order
+   exists, the email never goes out.
+2. Both succeed and the process crashes before (2): downstream services
+   never hear about the order.
+3. (2) runs and the transaction then rolls back: downstream services
+   react to an order that does not exist.
 
-1. The `save` commits, the process crashes before line (1) runs. The
-   order exists but the email never goes out.
-2. The `save` and `sendConfirmation` both succeed; the process
-   crashes before (2) runs. Downstream services never hear about the
-   order.
-3. (2) runs successfully but the transaction rolls back afterwards
-   (unlikely with `AFTER_COMMIT` semantics, trivially common with
-   naïve in-memory event buses). Downstream services react to an
-   order that never got saved.
-
-The in-memory phase-aware `@TransactionalEventsHandler`
-(`packages/cqrs`) already solves (3). It still cannot solve (1) or
-(2) — nothing in-memory survives a crash.
+The in-memory `@TransactionalEventsHandler` (`packages/cqrs`) solves (3)
+by running after the commit. Nothing in memory survives a crash, so it
+cannot solve (1) or (2).
 
 ## The pattern
 
-The outbox pattern decouples "the event exists" from "the event has
-been delivered":
-
-1. **Write phase** — the publishing transaction writes both the
-   business row(s) AND one row per listener into an
-   `event_publication` table. Both writes commit together (or not
-   at all). The event is now durable.
-
-2. **Dispatch phase** — an asynchronous worker polls the
-   `event_publication` table, claims rows atomically (one
-   conditional `UPDATE` per row), invokes the corresponding listener,
-   and marks the row `COMPLETED` on success or `FAILED` on error.
-   A failed row can be retried; a lost worker leaves the row in
-   `PROCESSING`, which the staleness monitor flips back so another
-   worker picks it up.
-
-The result is **at-least-once delivery with transactional
-atomicity**: every committed publication is delivered eventually,
-and no listener runs for a publication whose transaction rolled
-back.
+1. **Write.** The business transaction writes the business rows and a
+   message into the outbox table. Both commit, or neither does.
+2. **Deliver.** A relay claims committed messages and hands each to a
+   transport: in-process handlers, or a broker. Delivery is at least
+   once: a message is retried until it succeeds or is dead-lettered.
 
 ## Architecture
 
 ```
- ┌─────────────────────────────────────┐
- │            Nest application         │
- │                                     │
- │  ┌─────────────────────────┐        │
- │  │  @Transactional method  │        │
- │  │  writes business row    │        │
- │  │  + outbox.publish(evt)  │        │
- │  └────────────┬────────────┘        │
- │               │                     │
- │               ▼                     │
- │  ┌─────────────────────────┐        │     Postgres
- │  │ EventPublicationRegistry│ ──────────▶ ┌──────────────────┐
- │  │   .publish()            │        │   │ event_publication│
- │  │                         │        │   │ (row per listener)│
- │  └─────────────────────────┘        │   └──────────────────┘
- │                                     │        ▲
- │  Worker process                     │        │
- │  ┌─────────────────────────┐        │        │
- │  │EventPublicationProcessor│        │        │ poll, then
- │  │  - polls `PUBLISHED`    │  ◀─────┼────────┘  claim by UPDATE
- │  │  - tryClaim()           │        │
- │  │  - invokes listener     │        │
- │  │  - marks COMPLETED      │        │
- │  └─────────────────────────┘        │
- │                                     │
- │  ┌─────────────────────────┐        │
- │  │     StalenessMonitor    │   ◀────┤  non-terminal rows
- │  │  flips stuck PROCESSING │        │  older than threshold
- │  │  back to FAILED         │        │
- │  └─────────────────────────┘        │
- │                                     │
- │  ┌─────────────────────────┐        │
- │  │  StartupRecoveryService │   ◀────┤  every incomplete row
- │  │  on bootstrap, moves    │        │  → RESUBMITTED on
- │  │  incompletes →          │        │  startup
- │  │    RESUBMITTED          │        │
- │  └─────────────────────────┘        │
- └─────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────┐
+ │  @Transactional method                                    │
+ │    repository.save(...)              ──┐                  │
+ │    OutboxEventPublisher.publish(evt) ──┤ one transaction  │
+ │      └─ outbox.add(<that transaction>, message)           │
+ └────────────────────────────────────────┼──────────────────┘
+                                          ▼
+                            nest_outbox.messages   (Postgres)
+                                          │
+                    @nestjs/outbox relay: SKIP LOCKED claim,
+                    lease + fencing token, retry with backoff
+                                          │
+                     route(message) ──────┴───────┐
+                          │                       │
+                          ▼                       ▼
+              `local` transport            ClientProxyTransport
+              @OnOutboxMessage handlers    Kafka / RabbitMQ / ...
+              (inbox per consumer)         (envelope with stable id)
 ```
 
-The publishing application and the worker can run in the same
-process (monolith) or in separate ones (API host + background
-worker). The only shared contract is the database table.
+The bridge's part is the top box and nothing else. It reads the active
+transaction from `@Transactional`'s `AsyncLocalStorage` context, turns
+it into what `outbox.add()` takes (the TypeORM `EntityManager`), and
+derives the message from the event:
 
-## Lifecycle states
-
-Every `event_publication` row moves through a finite state machine:
-
-```
-                   ┌────────────┐
-                   │  PUBLISHED │  initial state after publish
-                   └─────┬──────┘
-                         │  tryClaim (worker picks up)
-                         ▼
-                   ┌────────────┐                  ┌────────────┐
-                   │ PROCESSING │◀─────tryClaim────│RESUBMITTED │
-                   └──┬─────────┘                  └──────┬─────┘
-     listener success │      │ listener throws           ▲
-                      ▼      ▼                           │ operator
-                 ┌─────────┐ ┌────────┐   operator resubmit
-                 │COMPLETED│ │ FAILED │───────────────────┘
-                 └─────────┘ └────────┘
-```
-
-- **PUBLISHED** — row committed by the publishing transaction.
-  Visible to the worker's next `findReadyForProcessing` poll.
-- **PROCESSING** — the worker has atomically claimed the row
-  (via `tryClaim`) and is invoking the listener.
-- **COMPLETED** — listener returned successfully. Row is either
-  kept (`UPDATE` completion mode), deleted (`DELETE`), or moved to
-  an archive table (`ARCHIVE`).
-- **FAILED** — listener threw; `failure_reason` holds the message.
-  Candidate for operator-driven resubmission.
-- **RESUBMITTED** — operator or startup recovery has moved a
-  non-terminal row back into the queue for another attempt.
-
-Transition rules are enforced by `EventPublicationRegistry`:
-`tryClaim` only transitions `PUBLISHED`/`RESUBMITTED` →
-`PROCESSING`; `markCompleted` only from `PROCESSING`; and so on.
-
-## Comparison with Spring Modulith
-
-Spring Modulith's Event Publication Registry is the direct
-inspiration for this package. The feature set maps one-to-one:
-
-| Spring Modulith | `@nestjs-transactional/outbox-*` |
+| Message field | From |
 | --- | --- |
-| `EventPublicationRegistry` | `EventPublicationRegistry` |
-| `@ApplicationModuleListener` | `@IntegrationEventsHandler` (cqrs, class-level — see ADR-014) |
-| `EventPublicationRepository` SPI | `EventPublicationRepository` SPI |
-| JDBC persistence module | `outbox-typeorm` |
-| `CompletedEventPublications` | `CompletedEventPublications` |
-| `FailedEventPublications` (+ resubmit) | `FailedEventPublications` |
-| `IncompleteEventPublications` (+ resubmit) | `IncompleteEventPublications` |
-| Staleness detection (`processing` threshold) | `StalenessMonitor` |
-| Republish on restart | `StartupRecoveryService` |
-| Completion modes: UPDATE / DELETE / ARCHIVE | same three modes |
-| `PublishedEvents` + `AssertablePublishedEvents` | same utilities, same API shape |
-| `schema-initialization.enabled` | `SchemaInitializer` + `schemaInitialization: { enabled }` |
+| `topic` | `@Externalized({ target })`, otherwise the event's class name |
+| `payload` | the event, serialised to JSON by `@nestjs/outbox` |
+| `key` | `routingKey(event)`, when declared |
+| `headers` | the decorator's headers, plus `x-event-type` |
+| `id` | generated by `@nestjs/outbox` (UUIDv7) |
 
-The deliberate deviations are Node-ecosystem fits rather than
-semantic changes:
+Everything below the top box belongs to `@nestjs/outbox`: storage,
+claiming, retries, dead letters, inboxes, ordering, observability,
+migrations. Its documentation is the reference for those.
 
-- `AsyncLocalStorage` instead of `ThreadLocal` for the
-  transaction context (Node has no threads).
-- Async workers with `setTimeout` polling instead of a thread
-  pool (Node's event loop handles concurrency differently).
-- NestJS DI conventions — `@Injectable()`, `useFactory`,
-  `@Module({})` — instead of Spring's component-scan annotations.
-- `Symbol` DI tokens for injection points.
+## Guarantees
 
-## Performance considerations
+- **Atomicity with the business write.** Verified against PostgreSQL for
+  a plain commit and rollback, `REQUIRES_NEW` inside an outer rollback,
+  a `NESTED` savepoint that rolls back, and `SERIALIZABLE` isolation.
+  The message follows the business rows in every case.
+- **At-least-once delivery.** A committed message is delivered, or
+  dead-lettered with its error history. A rolled-back one never existed.
+- **No write outside the transaction.** `publish()` outside a
+  transaction, or inside one on a DataSource other than the outbox's,
+  throws.
+- **Ordering per key**, in commit order, when the message has a key.
 
-**Write phase.** The business transaction now includes N extra
-`INSERT`s into `event_publication` (N = number of listeners for the
-event). Postgres handles this cheaply — a few dozen additional
-inserts per tx is negligible. The index on `(status,
-publication_date)` is the hot-path index for the worker, so its
-maintenance cost is the one to watch. For append-heavy workloads
-the cost is typically sub-millisecond per publication.
+## When to use it, and when not
 
-**Dispatch phase.** The worker polls at a configurable interval
-(`processor.pollingInterval`, default 1 second) and reads up to
-`batchSize` rows (default 100) without row locks. Each claim is one
-`UPDATE` with a conditional `WHERE`; the listener invocation is what
-dominates wall-clock. Up to `maxConcurrent` invocations run in
-parallel per batch (default 10) via `Promise.all`. Scaling up
-horizontally means running more worker processes — they may fetch
-overlapping row sets, but only one wins each `tryClaim`, so the
-duplicate work is a wasted `SELECT`, never a duplicate dispatch.
-That trade-off is sized for typical worker counts (1–3).
+Reach for the outbox when the handler talks to the outside world, must
+survive a crash or a deploy, or is slow enough that the request should
+not wait for it.
 
-**Cleanup.** `CompletedEventPublications.purge(olderThan)` deletes
-rows in bulk with a single `DELETE ... WHERE completion_date < ?`
-against the `(completion_date)` index. Archive mode (`ARCHIVE`)
-moves completed rows to `event_publication_archive` so the hot
-table stays small; the archive table is audit-only and does not
-back worker polls.
+Keep `@TransactionalEventsHandler` when the work is cheap, in-process and
+fine to lose, or must run before the commit or on rollback; the outbox
+only ever delivers after a commit.
 
-**Latency.** End-to-end latency (from `publish()` to listener
-invocation) is dominated by the polling interval. Tune down for
-interactivity (100 ms), up for throughput (5 s). A future iteration
-may support `LISTEN/NOTIFY`-based push delivery to eliminate the
-poll entirely.
+## Limits
 
-## When to use, when not to
-
-### Reach for the outbox when…
-
-- …the listener integrates with **external systems**: email, SMS,
-  webhooks, third-party APIs, message brokers. At-least-once
-  delivery is the minimum bar and the outbox provides it for free.
-- …you need **delivery across a deploy or a crash**. In-memory
-  dispatchers lose events on process restart; the outbox survives.
-- …the listener runs in a **separate worker process** from the
-  publisher. The outbox is the transport.
-- …the listener's work is **expensive or slow** and you do not want
-  to block the publishing request. The outbox decouples.
-- …you want **operator-level replay and recovery tools** out of the
-  box — `FailedEventPublications.resubmit()`,
-  `IncompleteEventPublications`, etc.
-
-### Keep `@TransactionalEventsHandler` instead when…
-
-- …the handler is **in-process, cheap, idempotent on re-runs**,
-  and the side effect is **safe to lose** on a crash between
-  commit and invocation. Examples: cache invalidation, metrics
-  increment, logging.
-- …the handler must run **inside or right before the same
-  transaction** (`BEFORE_COMMIT` phase). The outbox always runs
-  after the transaction commits.
-- …you are writing a **library or internal plugin** where installing
-  a Postgres table would be surprising to the user.
-
-### Use `@IntegrationEventsHandler` as the default…
-
-- …for most **cross-module cross-boundary** integration handlers
-  in a NestJS application. The decorator picks the right path
-  automatically: durable via outbox when the `OUTBOX_LISTENER_REGISTRAR`
-  structural port is bound, in-memory fallback otherwise. Upgrading
-  from "no outbox" to "outbox" requires a module-wiring change,
-  not a decorator change.
+- **One outbox DataSource.** `@nestjs/outbox` takes one store per
+  application.
+- **PostgreSQL through TypeORM is what this repository tests.** The
+  bridge's default resolver reads TypeORM's handle; other adapters pass
+  a `transactionResolver`.
+- **`@nestjs/outbox` is pre-1.0**, so the bridge pins `~0.1.0`.
 
 ## See also
 
-- [ADR-006 — Outbox pattern rationale](../adr/006-outbox-pattern.md)
-- [ADR-007 — Outbox architecture (core + typeorm split)](../adr/007-outbox-architecture.md)
-- [Outbox integration with CQRS](outbox-integration-with-cqrs.md)
-- [Migration guide](../guides/migrating-to-outbox.md)
+- [Outbox × CQRS](outbox-integration-with-cqrs.md)
+- [Event externalization](event-externalization.md)
+- [Moving from `@TransactionalEventsHandler` to the outbox](../guides/migrating-to-outbox.md)
+- [Migrating from 2.x to 3.0](../guides/migrating-to-3.md)
 - [`@nestjs-transactional/outbox` README](../../packages/outbox/README.md)
-- [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)
-- [Spring Modulith — Event Publication Registry](https://docs.spring.io/spring-modulith/reference/events.html)

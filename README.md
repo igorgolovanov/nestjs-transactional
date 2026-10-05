@@ -65,20 +65,26 @@ export class NotifyCustomer implements ITransactionalEventHandler<OrderPlacedEve
 That single guarantee removes the oldest bug in event-driven services:
 the email that went out for an order the rollback erased.
 
-**Delivery that survives the process dying.** Switch one decorator and
-the same handler is backed by a transactional outbox — the handler's
-invocation is written to the database *in the same transaction* as the
-order, then delivered by a worker that retries, recovers after a
-restart, and can push to Kafka or RabbitMQ:
+**Delivery that survives the process dying.** Publish through the
+outbox and the event is written to the database *in the same
+transaction* as the order, with no transaction passed by hand. The
+first-party [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox)
+then delivers it: it retries with backoff, recovers after a crash on any
+instance, deduplicates per handler, and can push to Kafka or RabbitMQ:
 
 ```ts
-@IntegrationEventsHandler(OrderPlacedEvent) // durable when the outbox is wired
+@Transactional()
+async placeOrder(dto: PlaceOrderDto) {
+  const order = await this.orders.save(dto);
+  await this.publisher.publish(new OrderPlacedEvent(order.id)); // commits with the order
+  return order;
+}
 ```
 
 Either the order and the intent to notify both land, or neither does.
-This is Spring Modulith's Event Publication Registry, and the mapping is
-one-to-one — including the operator APIs, the completion modes and the
-staleness monitor.
+`@nestjs/outbox` on its own asks you to pass the transaction to
+`outbox.add(tx, ...)` through every layer; `@Transactional` is what
+removes that parameter.
 
 **All seven propagation modes**, not the two that are easy.
 `REQUIRES_NEW` gives you the audit row that survives the caller's
@@ -113,15 +119,15 @@ export class AppModule {}
 
 That is the entire setup for the first half of this page. Add
 `@nestjs-transactional/cqrs` for the event phases,
-`@nestjs-transactional/outbox` plus `outbox-typeorm` for durability, and
-`outbox-microservices` to reach a broker — each is additive, and none of
-them changes code you have already written.
+`@nestjs-transactional/outbox` with `@nestjs/outbox` for durable delivery
+and brokers — each is additive, and none of them changes code you have
+already written.
 
 **These packages are ESM only**, from `2.0.0`, matching NestJS 12. A
 CommonJS application still consumes them: Node loads ESM from
 `require()` as of 22.12.0, which is what the `>=22.13.0` floor covers.
 What does not follow Node is tooling with its own module loader — Jest
-needs `--experimental-vm-modules` and a few settings, shown in all 19
+needs `--experimental-vm-modules` and a few settings, shown in all 14
 example applications. The reasoning, and why one build rather than two,
 is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 
@@ -132,9 +138,7 @@ is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 | [`core`](packages/core) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core) | `@Transactional`, the propagation modes, the adapter SPI. ORM-agnostic |
 | [`typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | The TypeORM adapter and transparent transactional repositories |
 | [`cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | Transactions for `@nestjs/cqrs` handlers, phase-aware event handlers, `AggregateRoot` integration |
-| [`outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | The Event Publication Registry: worker, retry, recovery, operator APIs |
-| [`outbox-typeorm`](packages/outbox-typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-typeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-typeorm) | Storage for the outbox — the `event_publication` tables, a repository, and a migration |
-| [`outbox-microservices`](packages/outbox-microservices) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox-microservices?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox-microservices) | Forwarding events to Kafka, RabbitMQ, MQTT, Redis, NATS via `ClientProxy` |
+| [`outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | `@Transactional` for [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox): publish inside the transaction, `@Externalized` routing to brokers |
 
 ## Where the sharp edges are
 
@@ -153,10 +157,16 @@ These are documented, tested, and worth knowing before you adopt:
   what it says.
 - **Broker acknowledgement depends on the transport.** Kafka and
   RabbitMQ wait for a real acknowledgement, so a broker that is down
-  marks the publication failed and the retry machinery engages. NATS
-  core and TCP acknowledge nothing, and gRPC cannot be used for
-  externalization at all. Per-transport table and measurements:
+  keeps the message in the outbox and the relay retries it. NATS core
+  and TCP acknowledge nothing, and gRPC cannot be used at all.
+  Per-transport table and measurements:
   ([ADR-021](docs/adr/021-externalization-acknowledgement-per-transport.md))
+- **The outbox lives in one DataSource.** `@nestjs/outbox` takes one
+  store per application, so publishing from a transaction on another
+  DataSource throws rather than writing outside it.
+  ([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md))
+- **`@nestjs/outbox` is pre-1.0.** The bridge pins `~0.1.0` and widens
+  only after each release passes its integration suite.
 - **No distributed transactions across dataSources.** That is a design
   decision, not a gap — cross-dataSource atomicity goes through the
   outbox.
@@ -180,7 +190,7 @@ The interesting guarantees are the ones a test can fail on:
 - The matrix covers **three TypeORM versions** (`0.3.31`, `1.0.0`,
   `1.1.0`) across **Node 22, 24 and 26**, so the declared peer range is
   a tested claim rather than an optimistic one.
-- All **19 example applications** are built and run in CI, so a library
+- All **14 example applications** are built and run in CI, so a library
   change that breaks the documented usage fails the build.
 - The **public API surface is committed** as api-extractor reports; any
   change to it shows up as a reviewable diff.
@@ -189,16 +199,16 @@ The interesting guarantees are the ones a test can fail on:
 
 ## Examples
 
-Nineteen runnable applications under [`examples/`](examples/), in five
-tiers from a single decorator to a three-dataSource e-commerce service
-with CQRS, an outbox per dataSource and Kafka externalization:
+Fourteen runnable applications under [`examples/`](examples/), in five
+tiers from a single decorator to an e-commerce service with three
+bounded contexts, CQRS, a saga over the outbox and Kafka:
 
 ```bash
 pnpm -C examples/basic-transactional start
 ```
 
 Start with [`basic-transactional`](examples/basic-transactional) for
-transactions, [`basic-outbox`](examples/basic-outbox) for durability, or
+transactions, [`basic-typeorm-outbox`](examples/basic-typeorm-outbox) for durability, or
 [`e-commerce-orders`](examples/e-commerce-orders) to see everything at
 once. The [catalogue](examples/README.md) has a decision guide for
 picking a starting point.
@@ -207,15 +217,14 @@ picking a starting point.
 
 - **Per-package guides** — [core](packages/core/README.md),
   [typeorm](packages/typeorm/README.md), [cqrs](packages/cqrs/README.md),
-  [outbox](packages/outbox/README.md),
-  [outbox-typeorm](packages/outbox-typeorm/README.md),
-  [outbox-microservices](packages/outbox-microservices/README.md)
+  [outbox](packages/outbox/README.md)
 - **Architecture** — [core design](docs/architecture/core-design.md),
   [the outbox pattern](docs/architecture/outbox-pattern.md),
   [outbox × CQRS](docs/architecture/outbox-integration-with-cqrs.md),
   [event externalization](docs/architecture/event-externalization.md),
   [Spring Modulith parity](docs/architecture/spring-modulith-parity.md)
-- **Migrating** — [from in-memory handlers to the outbox](docs/guides/migrating-to-outbox.md)
+- **Migrating** — [from 2.x to 3.0](docs/guides/migrating-to-3.md),
+  [from in-memory handlers to the outbox](docs/guides/migrating-to-outbox.md)
 - **Why things are the way they are** — [ADRs](docs/adr/) and
   [design decisions](docs/dd/). Every non-obvious trade-off in this
   library has a written record, including the ones that turned out to be
@@ -227,14 +236,13 @@ picking a starting point.
 [stability policy](docs/adr/004-public-api-stability.md): breaking
 changes cost a major version and an ADR explaining why.
 
-Nothing is scheduled next. The retention job for completed publications
-shipped, and the broker-aware externalizers that were meant to close a
-silent-success gap were retired once the gap failed to reproduce
-against Kafka or RabbitMQ
-([ADR-021](docs/adr/021-externalization-acknowledgement-per-transport.md)).
-Unscheduled but unblocked: a NATS externalizer built on JetStream's
-`PubAck`, Prisma and MongoDB storage backends, and OpenTelemetry. The
-[improvement plan](docs/roadmap/improvement-plan.md) tracks all of it.
+Outbox delivery moves to `@nestjs/outbox` in 3.0.0
+([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md)): storage,
+retries, dead letters, ordering, inboxes and observability are
+maintained there, and this repository keeps the transactional
+programming model on top. Nothing else is scheduled. The
+[improvement plan](docs/roadmap/improvement-plan.md) records the earlier
+work.
 
 ## Contributing
 

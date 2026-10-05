@@ -191,4 +191,4 @@ and the rest of the library runs unchanged.
 - [DD-025 — Claim atomicity obligation](../dd/025-claim-atomicity-obligation.md)
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
 - [`@nestjs-transactional/outbox` README](../../packages/outbox/README.md)
-- [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)
+- [`@nestjs-transactional/outbox-typeorm` README](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox-typeorm/README.md)

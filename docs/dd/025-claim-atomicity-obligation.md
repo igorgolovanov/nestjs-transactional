@@ -89,4 +89,4 @@ not acceptable.
 
 - [ADR-007 — Outbox architecture](../adr/007-outbox-architecture.md)
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
-- [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)
+- [`@nestjs-transactional/outbox-typeorm` README](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox-typeorm/README.md)

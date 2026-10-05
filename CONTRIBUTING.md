@@ -311,9 +311,9 @@ Two consequences worth knowing before writing a spec:
 - **`jest.mock` does not work.** It relies on being hoisted above the
   imports, and ESM resolves imports before any module code runs. Use
   `jest.unstable_mockModule` and pull the module under test in with a
-  dynamic `import()` afterwards. One spec in the repository does this
-  (`packages/outbox-typeorm/test/unit/typeorm-event-publication.repository.spec.ts`);
-  copy its shape.
+  dynamic `import()` afterwards. No spec in the repository needs it
+  today; prefer injecting a fake through Nest's DI, which is what the
+  outbox bridge's specs do with a recording `Outbox`.
 
 `@jest/globals` also types mocks more strictly than the ambient
 `@types/jest` did. `jest.fn()` is `Mock<UnknownFunction>` until given a
@@ -337,19 +337,16 @@ itself be parsed as ESM.
 - **cqrs** — unit tests for decorators, scanner, wrapper with a
   mocked TransactionManager, plus full NestJS testing modules
   (real `CqrsModule` + `InMemoryTransactionAdapter`).
-- **outbox** — unit tests throughout, against
-  `InMemoryEventPublicationRepository`.
-- **outbox-typeorm** — integration tests (testcontainers) carry
-  the SQL and module wiring; `test/unit/` covers the Docker-free
-  surface, above all the `affected`-count claim contract from
-  DD-025 and the schema initializer's production-safety default.
-- **outbox-microservices** — unit tests with a mocked `ClientProxy`
-  for the wiring and the completion contract, plus
-  `test/integration/reliability.integration.spec.ts` against
-  testcontainers Kafka and RabbitMQ. That suite owns the claim in
-  ADR-021 about what `emit()` acknowledges on each transport, and it
-  runs in its own `broker-integration` CI job rather than in the
-  TypeORM-matrixed one.
+- **outbox** — unit tests for the bridge against a recording
+  `Outbox` and the in-memory adapter; `test:integration` against
+  testcontainers PostgreSQL proves the message follows the business
+  transaction (commit, rollback, `REQUIRES_NEW`, `NESTED`,
+  `SERIALIZABLE`) and runs in the TypeORM matrix, since what it
+  exercises is `@nestjs/outbox`'s TypeORM executor. `test:brokers`
+  runs against testcontainers Kafka and RabbitMQ. That suite owns the
+  claim in ADR-021 about what a broker's acknowledgement means for an
+  outbox message, and it runs in its own `broker-integration` CI job
+  rather than in the TypeORM-matrixed one.
 
 ### Coverage gate
 
@@ -359,14 +356,13 @@ Coverage is enforced, not aspirational. Each package declares a
 below its floor fails the build. Run it locally the same way before
 opening a PR.
 
-`typeorm` and `outbox-typeorm` keep their floors in
-`jest.coverage.config.js` rather than `jest.config.js`, because their
-coverage run includes the testcontainers suites. Both therefore need
-Docker for `test:cov`, though `pnpm test` stays Docker-free. Measuring
-without those suites was misleading: `outbox-typeorm` reported 62%
-statements and 31% branches where the real figures are 90% and 69%,
-because `src/module/` is exercised almost entirely from integration
-tests. The floors are set so that the gate cannot be satisfied by the
+`typeorm` keeps its floors in `jest.coverage.config.cjs` rather than
+`jest.config.cjs`, because its coverage run includes the testcontainers
+suites. It therefore needs Docker for `test:cov`, though `pnpm test`
+stays Docker-free. Measuring without those suites was misleading: the
+discontinued `outbox-typeorm` once reported 62% statements and 31%
+branches where the real figures were 90% and 69%, because its module
+wiring was exercised almost entirely from integration tests. The floors are set so that the gate cannot be satisfied by the
 unit suite alone; if the integration tests stop running, coverage
 fails rather than quietly passing.
 
@@ -390,18 +386,19 @@ The core package exports utilities via the `/testing` subpath:
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
 ```
 
-The outbox package exports `PublishedEvents`,
-`AssertablePublishedEvents`, and `InMemoryEventPublicationRepository`
-via its `/testing` subpath. The cqrs package may expose
+The outbox package has no `/testing` subpath since 3.0.0. Test outbox
+code with `@nestjs/outbox`'s own tools: turn the relay off and call
+`OutboxRelay.runOnce()` in integration tests, and provide a recording
+`Outbox` in unit tests. The cqrs package may expose
 `TransactionalTestingModule` similarly.
 
 ### When to use testcontainers
 
 Use `testcontainers-node` for a real Postgres specifically when
-testing the `outbox-typeorm` package, the TypeORM adapter's
-savepoint/isolation behaviour, and example end-to-end flows. For
-general application testing (even with the outbox enabled) the
-in-memory repository is sufficient.
+testing the outbox's atomicity with the business write, the TypeORM
+adapter's savepoint/isolation behaviour, and example end-to-end flows.
+Atomicity cannot be shown without a database: a stand-in `Outbox` can
+only pretend to roll back.
 
 ### Waiting in a worker-driven test
 

@@ -18,25 +18,21 @@ growing set of npm packages organised by concern.
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
   `@TransactionalEventsHandler` with Spring-like phases, `HybridEventPublisher`
   + `@IntegrationEventsHandler`, EventPublisher override for AggregateRoot.
-- **@nestjs-transactional/outbox** — persistent Event Publication
-  Registry: lifecycle states, repository SPI, async worker, staleness
-  monitor, startup recovery, operator APIs (Failed/Incomplete/Completed),
-  testing utilities. ORM-agnostic.
-- **@nestjs-transactional/outbox-typeorm** — TypeORM persistence
-  backend for the outbox: `event_publication` + archive entities,
-  `TypeOrmEventPublicationRepository` with an atomic conditional-`UPDATE`
-  claim (`tryClaim`), shipped migration, `OutboxTypeOrmModule` wiring.
-- **@nestjs-transactional/outbox-microservices** — event
-  externalization to brokers (Kafka, RabbitMQ, MQTT, Redis, NATS, ...) via
-  `@nestjs/microservices` `ClientProxy`. One package covers every usable
-  transport the upstream supports; gRPC is not one, its `dispatchEvent`
-  throws. What a successful publish acknowledges varies by transport: see
-  ADR-021.
+- **@nestjs-transactional/outbox** — bridge onto the first-party
+  `@nestjs/outbox` (ADR-023, DD-028): `OutboxEventPublisher` adds a
+  message inside the transaction `@Transactional` opened,
+  `@Externalized` declares broker routing, `externalizedRoute()` and
+  `toKafkaPacket()` plug that into `@nestjs/outbox`'s `OutboxModule`.
+  Storage, the relay, retries, dead letters, inboxes and broker
+  transports are `@nestjs/outbox`'s. One outbox DataSource. What a
+  successful publish acknowledges varies by transport: see ADR-021.
+
+Until 2.x the repository shipped its own outbox engine across `outbox`,
+`outbox-typeorm` and `outbox-microservices`; those two packages are
+discontinued at 3.0.0.
 
 ### Future (not scheduled)
 
-- **@nestjs-transactional/outbox-prisma** — Prisma persistence backend
-- **@nestjs-transactional/outbox-mongodb** — MongoDB persistence backend
 - **@nestjs-transactional/testing** — integration testing utilities
   cross-cutting over core / typeorm / cqrs / outbox
 
@@ -68,6 +64,8 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
   against `1.1.0` (what the lockfile pins); CI additionally forces
   `0.3.31` and `1.0.0` via `pnpm.overrides`
 - **CQRS peer**: `@nestjs/cqrs ^11.0.0 || ^12.0.0`
+- **Outbox peer**: `@nestjs/outbox ~0.1.0` (pre-1.0, pinned), with
+  `@nestjs/common` / `@nestjs/core` `^11.0.0 || ^12.0.0` for that package
 - **Package manager**: pnpm workspaces
 - **Build**: tsc with project references (no bundler — pure TypeScript)
 - **Test runner**: Jest + ts-jest, in ESM mode — see CONTRIBUTING,
@@ -96,7 +94,8 @@ the linked docs for depth.
 | Empirically-discovered conventions | [docs/status/conventions.md](docs/status/conventions.md) |
 | Coding conventions, testing strategy, dev workflow | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Multi-adapter migration guide | [docs/migration/multi-adapter.md](docs/migration/multi-adapter.md) |
-| Migrating to outbox (user-facing) | [docs/guides/migrating-to-outbox.md](docs/guides/migrating-to-outbox.md) |
+| Migrating from 2.x to 3.0 (user-facing) | [docs/guides/migrating-to-3.md](docs/guides/migrating-to-3.md) |
+| Moving handlers to the outbox (user-facing) | [docs/guides/migrating-to-outbox.md](docs/guides/migrating-to-outbox.md) |
 | Known limitations | [docs/known-limitations.md](docs/known-limitations.md) |
 | Per-package public API + usage | each package's `README.md` |
 | Example library | [examples/README.md](examples/README.md) |
@@ -190,18 +189,16 @@ The most-violated rules. Full coding conventions in
 - **DO NOT use TC39 stage-3 decorator syntax** — the whole ecosystem
   is on legacy + reflect-metadata (see DD-007).
 - **DO NOT publish events outside a transaction via
-  `OutboxEventPublisher`** — that breaks single-unit atomicity
-  (DD-019). Publish inside a `@Transactional` method.
-- **DO NOT rename handler classes carelessly once the outbox is in
-  use** — the class name is part of the listener id. Pin a stable
-  id via `@OutboxEventsHandler({ events: [...], id: '...' })` (see
-  ADR-009).
-- **DO NOT write separate classes for `@TransactionalEventsHandler`
-  and `@OutboxEventsHandler` on the same event** — use
-  `@IntegrationEventsHandler` (the smart default) or commit to one.
-- **DO NOT apply the `event_publication` schema in production
-  without a migration** — auto schema initialization is
-  development-only.
+  `OutboxEventPublisher`** — it throws, by design (DD-028). Publish
+  inside a `@Transactional` method on the outbox's DataSource.
+- **DO NOT rename an `@OnOutboxMessage` `consumer`** once the outbox is
+  in use — it keys the handler's inbox, and a renamed consumer sees
+  every past message as new.
+- **DO NOT rebuild what `@nestjs/outbox` provides** (claiming, retries,
+  dead letters, inboxes, transports) in the bridge. ADR-023 moved
+  delivery there on purpose; the bridge stays the transactional layer.
+- **DO NOT rely on the outbox store migrating at startup in
+  production** — run `npx nest-outbox migrate` before deploying.
 - **DO NOT use dynamic `require()` for optional cross-package
   dependencies** — use a DI token (structural port) with
   `@Optional()`. Bundlers (webpack, esbuild, Vite) break on dynamic
@@ -213,10 +210,6 @@ The most-violated rules. Full coding conventions in
   `CqrsTransactionalModule.forRoot()`** — the override of
   `EventPublisher` gets shadowed; aggregate events bypass the
   dispatcher. See `docs/status/conventions.md` Convention #6.
-- **DO NOT use `@InjectOutboxPublisher` in multi-DS services** —
-  that decorator binds the per-DS publisher and bypasses smart-
-  facade routing (DD-024). Use class-token DI
-  (`private readonly outbox: OutboxEventPublisher`).
 
 ## Quality Gates
 
@@ -272,23 +265,24 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last update**: releasing `2.0.0`. The cohort of six —
-`@nestjs-transactional/{core,typeorm,cqrs,outbox,outbox-typeorm,outbox-microservices}`
-— ships under the `latest` dist-tag and moves as one version again.
-`1.1.0` had split it three-and-three, because `linked` only aligns the
-packages a release actually bumps. From `2.0.0` the cohort is `fixed`:
-every release publishes all six at the same version, since none of
-these packages is independently usable and a per-package number is
-therefore information nobody reads. See CONTRIBUTING, "One version for
-all six".
+**Last update**: preparing `3.0.0`. Outbox delivery moves to the
+first-party `@nestjs/outbox` (ADR-023): `@nestjs-transactional/outbox`
+becomes a bridge that adds messages inside the transaction
+`@Transactional` opened (DD-028), `outbox-typeorm` and
+`outbox-microservices` are discontinued, local durable handlers move to
+`@OnOutboxMessage`, the wire format becomes `@nestjs/outbox`'s
+envelope, and the outbox lives in one DataSource. The cohort is four
+packages —
+`@nestjs-transactional/{core,typeorm,cqrs,outbox}` — versioned as one
+(`fixed`): see CONTRIBUTING, "One version for all four". Upgrading is in
+`docs/guides/migrating-to-3.md`.
 
-`2.0.0` is the ESM-only move (ADR-022) plus NestJS 12 support. Every
-package is `"type": "module"` with no CommonJS build, matching the
-NestJS 12 line, and `engines.node` is `>=22.13.0` on all six.
-CommonJS applications still consume them through Node's
-`require(esm)`. Jest does not follow Node there, so the suites run
-under `--experimental-vm-modules` — see CONTRIBUTING, "The suites run
-as ESM", before writing a spec.
+`2.0.0` was the ESM-only move (ADR-022) plus NestJS 12 support. Every
+package is `"type": "module"` with no CommonJS build, and
+`engines.node` is `>=22.13.0` on all of them. CommonJS applications
+still consume them through Node's `require(esm)`. Jest does not follow
+Node there, so the suites run under `--experimental-vm-modules` — see
+CONTRIBUTING, "The suites run as ESM", before writing a spec.
 
 From here the public API is under ADR-004's stability policy: a
 breaking change needs a major bump *and* an ADR, and the committed
@@ -297,9 +291,13 @@ up as a reviewable diff.
 
 ### Blocked / Awaiting
 
-- **The `2.0.0` release itself.** The major changeset is on `main`;
-  what remains is the normal flow — merge the "Version Packages" PR and
-  `release.yml` publishes under `latest`.
+- **The `3.0.0` release itself.** The major changeset is on
+  `feat/delegate-outbox`; after it merges, what remains is the normal
+  flow — merge the "Version Packages" PR and `release.yml` publishes
+  under `latest`. Then, by hand: `npm deprecate` the two discontinued
+  packages with a pointer to `docs/guides/migrating-to-3.md`, and move
+  SECURITY.md's supported-versions table and the README status line to
+  3.0.
 
 ### Next
 
@@ -316,7 +314,7 @@ up as a reviewable diff.
   reproduce against live Kafka or RabbitMQ (ADR-021).
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
-  the six published packages to Trusted Publishing would let the
+  the four published packages to Trusted Publishing would let the
   long-lived Granular `NPM_TOKEN` secret be revoked. Setup is
   per-package in npm's UI; configure each with GitHub repo +
   workflow filename. Low priority; current token works fine until
@@ -340,6 +338,20 @@ up as a reviewable diff.
 
 ### Five most recent decisions
 
+- Outbox delivery delegated to `@nestjs/outbox`
+  ([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md),
+  [DD-028](docs/dd/028-outbox-bridge-contract.md)) after a side-by-side
+  comparison showed the first-party engine ahead on every delivery axis
+  and several of ours to be defects (unfenced post-claim writes,
+  dropped routing keys, per-listener emits). A spike against real
+  PostgreSQL proved the bridge before anything was deleted: messages
+  follow `REQUIRES_NEW`, `NESTED` savepoints and `SERIALIZABLE` exactly
+  as the business rows do. Aggregate events reach the outbox only with
+  `@Externalized`, since `@nestjs/outbox` dead-letters a topic nobody
+  handles; `client: 'local'` routes one to in-process handlers. Five
+  examples were dropped and nine rewritten; `e-commerce-orders` moved to
+  one DataSource with three schemas so each saga step publishes
+  atomically.
 - Improvement-plan items shipped — post-alpha assessment
   ([`docs/roadmap/improvement-plan.md`](docs/roadmap/improvement-plan.md))
   and its first three iterations. **Docs accuracy**: `readOnly` /
