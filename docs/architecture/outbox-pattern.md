@@ -112,7 +112,8 @@ only ever delivers after a commit.
 - **One outbox DataSource.** `@nestjs/outbox` takes one store per
   application.
 - **PostgreSQL through TypeORM is what this repository tests.** The
-  bridge's default resolver reads TypeORM's handle; other adapters pass
+  bridge asks the adapter for its native transaction
+  (`TransactionAdapter.nativeTransaction`); an adapter without it passes
   a `transactionResolver`.
 - **`@nestjs/outbox` is pre-1.0**, so the bridge pins `~0.1.0`.
 

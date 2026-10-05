@@ -17,10 +17,14 @@ and therefore public API under ADR-004.
      names both. A write that silently escaped the business transaction
      is the one outcome an outbox must never produce.
 2. **How the handle becomes `outbox.add()`'s `tx`.** A
-   `transactionResolver(active)` option. The default reads
-   `handle.entityManager`, which is TypeORM's handle shape, duck-typed so
-   the package still peers only on `core`. Another adapter supplies its
-   own resolver.
+   `transactionResolver(active)` option. The default asks the adapter,
+   through `TransactionManager.nativeTransactionOf(active)` and the
+   optional `TransactionAdapter.nativeTransaction` SPI method, for its
+   ORM's transaction object; the TypeORM adapter returns the transactional
+   `EntityManager`. The package therefore still peers only on `core`. An
+   adapter without the method gets a clear error, and a resolver can
+   always be passed instead. Every bridge in this repository resolves
+   the transaction the same way.
 3. **The message.**
    - `topic` is `@Externalized({ target })` when present, otherwise the
      event's class name. An event without `@Externalized` is therefore

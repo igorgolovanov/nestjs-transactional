@@ -26,13 +26,17 @@ export interface ActiveTransaction {
   /** Wall-clock moment the transaction began, for observability. */
   readonly startedAt: Date;
 
-  /** Hooks executed just before the adapter issues COMMIT. A throwing hook rolls the transaction back. */
+  /** Hooks executed after a successful COMMIT. */
   readonly afterCommitHooks: (() => Promise<void>)[];
 
-  /** Hooks executed after a successful COMMIT. */
+  /** Hooks executed after a ROLLBACK; receive the error that caused the rollback. */
   readonly afterRollbackHooks: ((error: unknown) => Promise<void>)[];
 
-  /** Hooks executed after a ROLLBACK; receive the error that caused the rollback. */
+  /**
+   * Hooks executed just before the adapter issues COMMIT. A throwing hook
+   * rolls the transaction back. The array is read live, so a hook may push
+   * further hooks and they run in the same pass.
+   */
   readonly beforeCommitHooks: (() => Promise<void>)[];
 
   /** Correlation id inherited from the enclosing {@link TransactionContext} scope. */

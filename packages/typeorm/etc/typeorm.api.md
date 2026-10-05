@@ -24,9 +24,11 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
     constructor(dataSource: DataSource,
     instanceName: string);
     get dataSourceName(): string;
+    get dialect(): string;
     readonly instanceName: string;
     // (undocumented)
     readonly name = "typeorm";
+    nativeTransaction(handle: TypeOrmTransactionHandle): EntityManager;
     // (undocumented)
     runInSavepoint<T>(parent: TypeOrmTransactionHandle, fn: (handle: TypeOrmTransactionHandle) => Promise<T>): Promise<T>;
     // (undocumented)

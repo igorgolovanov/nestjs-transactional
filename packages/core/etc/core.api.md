@@ -128,7 +128,9 @@ export const TRANSACTION_OBSERVERS: unique symbol;
 // @public
 export interface TransactionAdapter<THandle extends TransactionHandle = TransactionHandle> {
     readonly dataSourceName: string;
+    readonly dialect?: string;
     readonly name: string;
+    nativeTransaction?(handle: THandle): unknown;
     runInSavepoint<T>(parent: THandle, fn: (handle: THandle) => Promise<T>): Promise<T>;
     runInTransaction<T>(options: TransactionOptions, fn: (handle: THandle) => Promise<T>): Promise<T>;
 }
@@ -256,10 +258,12 @@ export interface TransactionHandle {
 // @public
 export class TransactionManager {
     constructor(registry: AdapterRegistry, observers?: readonly TransactionObserver[]);
+    nativeTransactionOf(active: ActiveTransaction): unknown;
     registerAfterCommit(hook: () => Promise<void>): void;
     registerAfterRollback(hook: (error: unknown) => Promise<void>): void;
     registerBeforeCommit(hook: () => Promise<void>): void;
     run<T>(options: ExtendedTransactionOptions, fn: () => Promise<T>): Promise<T>;
+    trackPending(active: ActiveTransaction, pending: Promise<unknown>): void;
 }
 
 // @public

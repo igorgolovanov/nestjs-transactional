@@ -4,6 +4,7 @@ import type { NewOutboxMessage, Outbox } from '@nestjs/outbox';
 import {
   AdapterRegistry,
   IllegalTransactionStateError,
+  TransactionContext,
   TransactionManager,
 } from '@nestjs-transactional/core';
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
@@ -73,7 +74,7 @@ describe('OutboxEventPublisher', () => {
     const fake = fakeOutbox();
     calls = fake.calls;
     notify = fake.notify;
-    publisher = new OutboxEventPublisher(fake.outbox, {
+    publisher = new OutboxEventPublisher(fake.outbox, manager, {
       dataSource: 'default',
       // The in-memory handle has no `entityManager`; hand the handle itself
       // to `add()` so the spec can check which transaction was used.
@@ -200,13 +201,38 @@ describe('OutboxEventPublisher', () => {
   });
 
   describe('default transactionResolver', () => {
-    it('refuses a handle without an entityManager, naming the adapter', async () => {
+    it("hands outbox.add() the adapter's native transaction", async () => {
+      class NativeAdapter extends InMemoryTransactionAdapter {
+        nativeTransaction(handle: { id: string }): unknown {
+          return { native: handle.id };
+        }
+      }
+      const registry = new AdapterRegistry();
+      registry.register({
+        adapterName: 'in-memory',
+        instanceName: 'default',
+        adapter: new NativeAdapter('default'),
+      });
+      const nativeManager = new TransactionManager(registry);
       const fake = fakeOutbox();
-      const typeOrmDefault = new OutboxEventPublisher(fake.outbox, { dataSource: 'default' });
+      const byDefault = new OutboxEventPublisher(fake.outbox, nativeManager, {});
+
+      let id: string | undefined;
+      await nativeManager.run({}, async () => {
+        await byDefault.publish(new OrderPlaced('o-1'));
+        id = TransactionContext.getActiveTransactionByDataSource('default')?.handle.id;
+      });
+
+      expect(fake.calls[0]?.tx).toEqual({ native: id });
+    });
+
+    it('refuses an adapter without a native transaction, naming the adapter', async () => {
+      const fake = fakeOutbox();
+      const byDefault = new OutboxEventPublisher(fake.outbox, manager, { dataSource: 'default' });
 
       await expect(
-        manager.run({}, () => typeOrmDefault.publish(new OrderPlaced('o-1'))),
-      ).rejects.toThrow(/in-memory.*transactionResolver/s);
+        manager.run({}, () => byDefault.publish(new OrderPlaced('o-1'))),
+      ).rejects.toThrow(/in-memory.*nativeTransaction/s);
     });
   });
 });

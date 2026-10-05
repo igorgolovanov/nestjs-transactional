@@ -4,6 +4,7 @@ import {
   type ActiveTransaction,
   IllegalTransactionStateError,
   TransactionContext,
+  TransactionManager,
 } from '@nestjs-transactional/core';
 
 import { getExternalizedMetadata } from '../externalization/externalized.decorator.js';
@@ -11,7 +12,9 @@ import { TRANSACTIONAL_OUTBOX_OPTIONS } from '../module/tokens.js';
 
 /**
  * Turns the active transaction into what `outbox.add()` takes as `tx`.
- * The default handles TypeORM's handle, `{ entityManager }`.
+ * The default is the adapter's native transaction
+ * (`TransactionManager.nativeTransactionOf`), for TypeORM the
+ * transactional `EntityManager`.
  */
 export type OutboxTransactionResolver = (active: ActiveTransaction) => unknown;
 
@@ -43,10 +46,12 @@ export class OutboxEventPublisher {
 
   constructor(
     private readonly outbox: Outbox,
+    manager: TransactionManager,
     @Inject(TRANSACTIONAL_OUTBOX_OPTIONS) options: TransactionalOutboxOptions = {},
   ) {
     this.dataSource = options.dataSource ?? 'default';
-    this.resolveTransaction = options.transactionResolver ?? entityManagerOf;
+    this.resolveTransaction =
+      options.transactionResolver ?? ((active) => manager.nativeTransactionOf(active));
   }
 
   /**
@@ -69,8 +74,9 @@ export class OutboxEventPublisher {
   }
 
   /**
-   * The synchronous path, for `AggregateRoot.commit()` through the cqrs
-   * `HybridEventPublisher`. `@Externalized` events are buffered and added
+   * The synchronous path, for events published on the cqrs `EventBus`
+   * (`AggregateRoot.commit()` included) through
+   * `TransactionalEventBusPublisher`. `@Externalized` events are buffered and added
    * by one before-commit hook, so they still commit with the transaction.
    * Other events are left to the in-memory dispatcher. With no
    * transaction, the event is dropped and logged, because a synchronous
@@ -146,17 +152,4 @@ function toMessage(event: object): NewOutboxMessage {
     ...(meta?.routingKey === undefined ? {} : { key: meta.routingKey(event) }),
     headers: { ...headers, [EVENT_TYPE_HEADER]: eventType },
   };
-}
-
-function entityManagerOf(active: ActiveTransaction): unknown {
-  const entityManager = (active.handle as { entityManager?: unknown }).entityManager;
-  if (entityManager === undefined) {
-    throw new IllegalTransactionStateError(
-      `The '${active.adapterName}' transaction handle has no entityManager, which the ` +
-        `default transactionResolver expects (TypeORM). Pass a transactionResolver to ` +
-        `TransactionalOutboxModule.forRoot() that returns what @nestjs/outbox's store ` +
-        `takes as a transaction for this adapter.`,
-    );
-  }
-  return entityManager;
 }

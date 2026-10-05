@@ -29,6 +29,18 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
     await ds.destroy();
   });
 
+  describe('nativeTransaction and dialect', () => {
+    it("returns the handle's transactional EntityManager as the native transaction", async () => {
+      await adapter.runInTransaction({}, async (handle) => {
+        expect(adapter.nativeTransaction(handle)).toBe(handle.entityManager);
+      });
+    });
+
+    it("reports the DataSource's driver type as the dialect", () => {
+      expect(adapter.dialect).toBe('sqljs');
+    });
+  });
+
   describe('runInTransaction', () => {
     it('commits saved entities on success — readable through the DataSource', async () => {
       await adapter.runInTransaction({}, async (handle) => {

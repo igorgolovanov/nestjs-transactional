@@ -135,9 +135,10 @@ serialises the payload when the message is added.
   `@nestjs-transactional/cqrs`: `@Externalized` events are added just
   before the commit. Other aggregate events stay with the in-memory
   dispatcher.
-- **TypeORM by default.** The transaction handed to `outbox.add()` is
-  the `EntityManager` `@Transactional` opened. Another adapter passes a
-  `transactionResolver`.
+- **Any adapter with a native transaction.** The transaction handed to
+  `outbox.add()` is what the adapter's `nativeTransaction` returns, for
+  TypeORM the `EntityManager` `@Transactional` opened. An adapter without
+  it passes a `transactionResolver`.
 
 Everything about delivery belongs to `@nestjs/outbox`, so its
 documentation is the reference: retries, dead letters, ordering, the
