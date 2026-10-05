@@ -1,8 +1,7 @@
 /**
- * Domain event published from `OrderService.placeOrder`. The class is
- * registered with `OutboxModule.forFeature([OrderPlacedEvent])` so the
- * outbox can serialize it to the `event_publication` table and
- * deserialize on the worker side.
+ * Domain event published from `OrderService.placeOrder`. Without
+ * `@Externalized` it is delivered in-process: the outbox topic is the
+ * class name, `OrderPlacedEvent`, which `ShippingHandler` subscribes to.
  */
 export class OrderPlacedEvent {
   constructor(

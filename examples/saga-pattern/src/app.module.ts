@@ -1,26 +1,14 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
+import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import type { DataSource } from 'typeorm';
 
 import { CompensationHandler } from './compensation.handler.js';
 import { OrderRow, PaymentRow, ReservationRow, StockItemRow } from './entities.js';
-import {
-  InventoryReservationFailedEvent,
-  InventoryReservedEvent,
-  OrderPlacedEvent,
-  OrderShippedEvent,
-  PaymentChargedEvent,
-  PaymentFailedEvent,
-} from './events.js';
 import { OrderService } from './order.service.js';
 import { PaymentHandler } from './payment.handler.js';
 import { ReservationHandler } from './reservation.handler.js';
@@ -53,31 +41,26 @@ export function readPostgresConfigFromEnv(): PostgresConfig {
  * only complexity in the room. Tier 5's `e-commerce-orders` covers
  * a saga split across DataSources.
  *
- * Why `CqrsTransactionalModule` is needed even though no aggregate
- * roots are involved: `@IntegrationEventsHandler` is exported from
- * the cqrs package and its scanner runs as part of
- * `CqrsTransactionalModule`. Without that module, the decorators
- * are inert. (`CqrsModule` from `@nestjs/cqrs` is imported
- * internally — do NOT import it directly here, see
- * `docs/status/conventions.md` #6.)
+ * Every step is an `@OnOutboxMessage` handler of `@nestjs/outbox`,
+ * subscribed to the topic the bridge gives an event without
+ * `@Externalized`: its class name. Each runs in its own
+ * `@Transactional()`, and the events it publishes there commit with its
+ * own writes, so the next step only ever sees an outcome that happened.
  */
 @Module({})
 export class AppModule {
-  static forConfig(config: PostgresConfig): DynamicModule {
+  /** `relay: false` lets tests drive the saga step by step with `runOnce()`. */
+  static forConfig(
+    config: PostgresConfig,
+    options: { readonly relay?: boolean } = {},
+  ): DynamicModule {
     return {
       module: AppModule,
       imports: [
         TypeOrmModule.forRoot({
           type: 'postgres',
           ...config,
-          entities: [
-            OrderRow,
-            ReservationRow,
-            PaymentRow,
-            StockItemRow,
-            EventPublicationEntity,
-            EventPublicationArchiveEntity,
-          ],
+          entities: [OrderRow, ReservationRow, PaymentRow, StockItemRow],
           synchronize: true, // example-only — production runs migrations
           logging: false,
         }),
@@ -87,30 +70,20 @@ export class AppModule {
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
 
-        // ----- Outbox stack -----
-        OutboxTypeOrmModule.forRoot({ schemaInitialization: { enabled: false } }),
-        OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider(),
-          // Aggressive polling so the visual demo finishes in a
-          // couple of seconds. Production tunes this per workload.
-          processor: { pollingInterval: 100, batchSize: 50 },
-        }),
-        OutboxModule.forFeature([
-          OrderPlacedEvent,
-          InventoryReservedEvent,
-          InventoryReservationFailedEvent,
-          PaymentChargedEvent,
-          PaymentFailedEvent,
-          OrderShippedEvent,
-        ]),
-
-        // The same process runs the worker — fine for an example,
-        // but production splits the worker into its own deployment.
-        OutboxProcessingModule,
-
-        CqrsTransactionalModule.forRoot(),
+        // ----- Outbox -----
+        // Aggressive polling so the visual demo finishes in a couple of
+        // seconds. Production tunes this per workload, and may run the
+        // relay in its own deployment.
+        OutboxModule.forRoot({ relay: { enabled: options.relay ?? true, pollInterval: 100 } }),
+        TransactionalOutboxModule.forRoot(),
       ],
       providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
         OrderService,
         ReservationHandler,
         PaymentHandler,

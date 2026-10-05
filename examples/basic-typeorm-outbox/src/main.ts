@@ -29,10 +29,16 @@ async function main(): Promise<void> {
 
   console.log('1) placeOrder("o-1") — INSERT + outbox.publish in one tx');
   await orders.placeOrder('o-1', 'alice@example.com', 5_000);
-  console.log('   orders in DB:', (await orders.listAll()).map((o) => o.id));
+  console.log(
+    '   orders in DB:',
+    (await orders.listAll()).map((o) => o.id),
+  );
 
   await waitFor(() => shipping.handled.some((e) => e.orderId === 'o-1'));
-  console.log('   shipping handled:', shipping.handled.map((e) => e.orderId));
+  console.log(
+    '   shipping handled:',
+    shipping.handled.map((e) => e.orderId),
+  );
 
   console.log('2) placeOrderAndFail("o-2") — INSERT + publish, then throw');
   try {
@@ -41,8 +47,14 @@ async function main(): Promise<void> {
     console.log('   caught:', (err as Error).message);
   }
   await new Promise((r) => setTimeout(r, 500));
-  console.log('   orders in DB (still):', (await orders.listAll()).map((o) => o.id));
-  console.log('   shipping handled (still):', shipping.handled.map((e) => e.orderId));
+  console.log(
+    '   orders in DB (still):',
+    (await orders.listAll()).map((o) => o.id),
+  );
+  console.log(
+    '   shipping handled (still):',
+    shipping.handled.map((e) => e.orderId),
+  );
   console.log('   expected: o-2 is in NEITHER list — both rows rolled back together');
 
   await app.close();

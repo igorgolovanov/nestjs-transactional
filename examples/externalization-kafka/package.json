@@ -14,12 +14,11 @@
   "dependencies": {
     "@nestjs-transactional/core": "workspace:*",
     "@nestjs-transactional/outbox": "workspace:*",
-    "@nestjs-transactional/outbox-microservices": "workspace:*",
-    "@nestjs-transactional/outbox-typeorm": "workspace:*",
     "@nestjs-transactional/typeorm": "workspace:*",
     "@nestjs/common": "^11.2.6",
     "@nestjs/core": "^11.2.6",
     "@nestjs/microservices": "^11.2.3",
+    "@nestjs/outbox": "~0.1.0",
     "@nestjs/typeorm": "^12.0.2",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.0",

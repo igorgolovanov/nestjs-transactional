@@ -15,6 +15,11 @@ export interface ExternalizedOptions<TEvent = unknown> {
    * `OutboxModule`'s `transports`, conventionally the `ClientsModule`
    * token it wraps. Omit it to use `externalizedRoute`'s
    * `defaultTransport`.
+   *
+   * `'local'` is `@nestjs/outbox`'s in-process transport. It is how an
+   * event applied by an aggregate gets durable delivery to
+   * `@OnOutboxMessage` handlers, since `AggregateRoot.commit()` takes
+   * only `@Externalized` events into the outbox (DD-028).
    */
   readonly client?: string;
   /**

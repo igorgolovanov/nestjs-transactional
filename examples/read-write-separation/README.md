@@ -26,9 +26,7 @@ to silently fall back to autocommit.
 - You want to see the asymmetric `forRoot` shape — master gets the
   full transactional adapter, replica gets only `TypeOrmModule.forRoot`.
 
-For multiple DataSources both **producing AND consuming** events
-see [`multi-datasource-outbox`](../multi-datasource-outbox). For a
-business + audit split with cross-DS event delivery see
+For a business + audit split with cross-DS event delivery see
 [`audit-logging`](../audit-logging).
 
 ## Replication is out of scope

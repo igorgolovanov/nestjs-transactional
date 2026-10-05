@@ -17,7 +17,6 @@ import { RABBITMQ_CLIENT } from './clients.js';
   target: 'refunds',
   client: RABBITMQ_CLIENT,
   headers: (event) => ({
-    'x-event-type': 'RefundRequestedEvent',
     'x-correlation-id': event.refundId,
   }),
 })

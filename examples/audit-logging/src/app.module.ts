@@ -1,20 +1,15 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
+import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import type { DataSource } from 'typeorm';
 
 import { AccountService } from './account.service.js';
 import { AuditHandler } from './audit.handler.js';
 import { AccountOperationRow, AccountRow, AuditLogRow } from './entities.js';
-import { AccountOperationEvent } from './events.js';
 
 export interface PostgresConnection {
   readonly host: string;
@@ -42,17 +37,15 @@ export function readConfigFromEnv(): AuditLoggingConfig {
 }
 
 /**
- * Two DataSources, asymmetric stack. **Business DS** carries the
- * full outbox machinery — that is the source of `AccountOperationEvent`,
- * so it owns the `event_publication` table, the worker and the
- * `forFeature` registration. **Audit DS** registers only the
- * transactional adapter; it has no events of its own to publish, so
- * no outbox stack is wired for it.
+ * Two DataSources, asymmetric stack. **Business DS** carries the outbox:
+ * it is the source of `AccountOperationEvent`, so its database holds the
+ * `nest_outbox` tables, and the message commits with the account change.
+ * **Audit DS** registers only the transactional adapter; it has no
+ * events of its own to publish.
  *
- * Asymmetric wiring is deliberate. Adding an outbox to the audit
- * DS would add a worker that has nothing to deliver — pure overhead.
- * The pattern composes cleanly with the multi-`forRoot` shape
- * (ADR-019): each DS gets exactly the components it needs.
+ * That asymmetry is also what the outbox requires: it lives in exactly
+ * one DataSource (ADR-023), and publishing from a transaction on another
+ * one is refused rather than written outside it.
  *
  * Cross-DS distributed transactions are **explicitly NOT supported**
  * (DD-023). Consistency between business and audit DBs is reached
@@ -61,7 +54,11 @@ export function readConfigFromEnv(): AuditLoggingConfig {
  */
 @Module({})
 export class AuditLoggingModule {
-  static forConfig(config: AuditLoggingConfig): DynamicModule {
+  /** `relay: false` lets tests deliver with `OutboxRelay.runOnce()`. */
+  static forConfig(
+    config: AuditLoggingConfig,
+    options: { readonly relay?: boolean } = {},
+  ): DynamicModule {
     return {
       module: AuditLoggingModule,
       imports: [
@@ -69,12 +66,7 @@ export class AuditLoggingModule {
         TypeOrmModule.forRoot({
           type: 'postgres',
           ...config.business,
-          entities: [
-            AccountRow,
-            AccountOperationRow,
-            EventPublicationEntity,
-            EventPublicationArchiveEntity,
-          ],
+          entities: [AccountRow, AccountOperationRow],
           synchronize: true, // example-only — production runs migrations
           logging: false,
         }),
@@ -96,18 +88,20 @@ export class AuditLoggingModule {
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
         TypeOrmTransactionalModule.forRoot({ dataSource: 'audit' }),
 
-        // ----- Outbox stack: business DS only -----
-        OutboxTypeOrmModule.forRoot({ schemaInitialization: { enabled: false } }),
-        OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider(),
-          processor: { pollingInterval: 100, batchSize: 50 },
-        }),
-        OutboxModule.forFeature([AccountOperationEvent]),
-        OutboxProcessingModule,
-
-        CqrsTransactionalModule.forRoot(),
+        // ----- Outbox: business DS only -----
+        OutboxModule.forRoot({ relay: { enabled: options.relay ?? true, pollInterval: 100 } }),
+        TransactionalOutboxModule.forRoot(),
       ],
-      providers: [AccountService, AuditHandler],
+      providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
+        AccountService,
+        AuditHandler,
+      ],
     };
   }
 }

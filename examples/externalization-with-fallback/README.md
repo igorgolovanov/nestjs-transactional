@@ -1,242 +1,141 @@
 # externalization-with-fallback
 
-What a `COMPLETED` publication does and does not prove, and what to
-build on the consumer side regardless. Single Postgres DataSource,
-single RabbitMQ broker, single domain event (`RefundRequestedEvent`).
+What a delivered message does and does not prove, what happens when the
+broker is down, and what to build on the consumer side regardless.
+Single Postgres DataSource, single RabbitMQ broker, single domain event
+(`RefundRequestedEvent`).
 
-## What a successful publish means
+## What a delivery means
 
-A publication is marked `COMPLETED` when the externalizer resolves,
-and what `emit()` waits for is transport-specific.
+[`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox)'s relay
+removes a message from the outbox when the transport's `emit()`
+resolves, and what `emit()` waits for is transport-specific.
 
 On the RabbitMQ used here it waits for a **publisher confirm**
-(`amqp-connection-manager` enables confirms by default), so stopping
-the broker makes `emit()` reject, the publication goes to `FAILED`
-with a readable `failureReason`, and the retry and resubmit machinery
-engages. Kafka behaves the same way, resolving `producer.send()` with
-`kafkajs`' default `acks: -1`. Core NATS and TCP acknowledge nothing
-at all, and gRPC cannot be used for externalization. The full table
-is in
-[ADR-021](../../docs/adr/021-externalization-acknowledgement-per-transport.md).
+(`amqp-connection-manager` enables confirms by default), so a broker that
+is down makes `emit()` reject and the message stays in the outbox. Kafka
+behaves the same way, resolving `producer.send()` with kafkajs's default
+`acks: -1`. Core NATS, Redis and TCP acknowledge less or nothing at all,
+and gRPC cannot be used. The full table is in
+[ADR-021](../../docs/adr/021-externalization-acknowledgement-per-transport.md),
+and `@nestjs/outbox`'s own documentation reached the same conclusion
+independently.
 
-So the producer-side story is stronger than a naive reading of
-"fire-and-forget" suggests, and it is still not the whole story: a
-broker can acknowledge and then lose a message before durable
-storage, and duplicates are expected by construction. That is what
-the consumer-side pattern below is for.
-
-> This example was originally built to demonstrate an ADR-016
-> "silent success" limitation, on the premise that `emit()` could
-> never report a broker failure. It was re-measured and it can.
-> The example is reframed rather than deleted: the consumer-side
-> inbox and the resubmit flow were always the valuable parts.
+So the producer side is stronger than "fire-and-forget" suggests, and
+still not the whole story: a broker can acknowledge and then lose a
+message before durable storage, and delivery is at-least-once, so
+duplicates are expected by construction. That is what the consumer-side
+inbox below is for.
 
 ## What to actually configure
 
-Do not give away what the defaults provide, before wiring the client
-to `OutboxMicroservicesModule`:
+- **RabbitMQ**: pass `persistent: true`, as this example does. NestJS
+  defaults it to `false`, and RabbitMQ confirms a non-persistent message
+  without writing it to disk, so a broker restart loses a message the
+  outbox already counted as delivered. Confirms themselves are on by
+  default.
+- **Kafka** (kafkajs): the default `acks: -1` already waits for every
+  in-sync replica. Add `producer: { idempotent: true }` against
+  duplicates from producer retries, and do not set `acks: 0`.
+- **Retries**: size `retry` in `OutboxModule` to how long the broker may
+  be down. This example allows three attempts so the demo and tests
+  reach a dead letter quickly; `@nestjs/outbox`'s default, 20 attempts,
+  spans 30 to 60 minutes.
 
-- **RabbitMQ**: pass `persistent: true`. NestJS defaults it to
-  `false`, and RabbitMQ confirms a non-persistent message without
-  writing it to disk, so a broker restart loses it. Confirms
-  themselves are already on; you do not need to add them.
-- **Kafka** (kafkajs): the default `acks: -1` already waits for
-  every in-sync replica. Add `producer: { idempotent: true }` to
-  protect against duplicates from producer retries, and do not set
-  `acks: 0`.
-- **A different externalizer** where the transport cannot help. The
-  `EVENT_EXTERNALIZER` SPI from DD-018 is public, so a
-  JetStream-based NATS implementation slots into the same place.
+## The fallback path
 
-This is configuration rather than a code pattern, so the example
-does not demonstrate it at the code level. It is still the first
-thing to get right.
+1. **The broker rejects.** The message stays in `nest_outbox.messages`
+   with the reason in `last_error` and is scheduled for a retry with
+   backoff.
+2. **The broker recovers before the attempts run out.** The next retry
+   delivers it, and it leaves the outbox.
+3. **The attempts run out.** The message moves to
+   `nest_outbox.dead_letters` with reason `exhausted` and its full error
+   history.
+4. **An operator requeues it** once the broker is back:
+   `OutboxDeadLetters.requeue(id)`. It returns to the outbox with a fresh
+   retry budget and the **same id**, so a consumer's inbox still
+   recognises it if an earlier attempt did get through.
 
-## Consumer-side inbox / dedup table
+## Consumer-side inbox
 
-Track every publication id the consumer has processed. Reject
-duplicates. This makes consumer execution at-most-once even when
-delivery is at-least-once or unreliable.
+`RefundConsumerService` is a consumer-side template. In a real deployment
+it lives in another process and receives the envelope from RabbitMQ
+through an `@EventPattern('refunds')` handler; here it exposes
+`process(envelope)` so the tests can simulate a delivery and its
+duplicate.
 
-- [`src/processed-refunds.entity.ts`](src/processed-refunds.entity.ts)
-  — the inbox table.
-- [`src/refund-consumer.service.ts`](src/refund-consumer.service.ts)
-  — the `process(event, publicationId)` method that SELECTs the
-  inbox first, dedupes, and INSERTs as part of the processing
-  transaction.
+It deduplicates with `@nestjs/outbox`'s inbox:
+`OutboxInbox.processInTransaction(tx, consumer, envelope.id, work)`
+records the message id through the transaction it is given and runs the
+work only if the id is new. The record and the work commit together, so
+a redelivered message changes nothing, even if the consumer crashed
+halfway through the first one.
 
-This is the **complementary pattern to the outbox**:
-- Producer's outbox (this framework) → at-least-once *delivery
-  attempts*.
-- Consumer's inbox (this example's pattern) → at-most-once
-  *processed effects*.
+The transaction it is given is the one `@Transactional` opened
+(`getCurrentEntityManager()`), so this side needs no transaction passed
+by hand either. In a real consumer the inbox lives in the consumer's own
+database, next to the effects it guards, and `OutboxInbox.prune('30d')`
+runs from a scheduled job, since nothing prunes it for you.
 
-Together: exactly-once *effects*, even with at-least-once delivery
-and an unreliable broker.
+Together:
+- the producer's outbox gives at-least-once *delivery attempts*;
+- the consumer's inbox gives at-most-once *effects* per message id.
 
-The integration test pins this end-to-end: invoke the consumer
-twice with the same publication id — first call processes, second
-call is a no-op.
-
-## `FailedEventPublications.resubmit` for surfaced failures
-
-When the externalizer DOES detect a failure (proxy threw, broker
-explicitly rejected the message, network partition the proxy
-surfaced as an error), the publication transitions to `FAILED`
-with `failureReason` recorded. Operators can:
-
-```ts
-const failed = app.get(FailedEventPublications);
-const count = await failed.count();              // how many?
-const failures = await failed.findAll();          // inspect details
-const resubmitted = await failed.resubmit();      // FAILED → RESUBMITTED
-                                                  // processor picks up next poll
-```
-
-This is the Spring Modulith equivalent. The integration test pins
-the round trip: emit throws → publication FAILED → operator calls
-`resubmit()` → next poll succeeds → publication COMPLETED.
-
-The outbox's `StartupRecoveryService` calls
-`incomplete.resubmitIncompletePublications` at boot for crashed
-in-flight rows; `FailedEventPublications` is the operator-driven
-equivalent for explicit failures.
-
-## When to use this example
-
-- You're evaluating the framework for production and want to know
-  what the failure modes look like.
-- You're building a consumer service and need a reference for
-  the inbox / dedup pattern.
-- You're operating a deployment and want to validate the recovery
-  flow before relying on it.
-
-For the basic externalization shape see
-[`externalization-kafka`](../externalization-kafka). This example
-deliberately does not demonstrate multi-broker or multi-DS — those
-axes are orthogonal to the reliability story.
+That is exactly-once *effects*, even with at-least-once delivery.
 
 ## Prerequisites
 
 - **Docker Desktop / Colima / Rancher Desktop running.** Both the
-  integration test (Postgres via testcontainers) and the visual
-  demo (Postgres + RabbitMQ via `docker-compose`) need a Docker
-  daemon.
+  integration test (Postgres via testcontainers) and the visual demo
+  (Postgres + RabbitMQ via `docker-compose`) need a Docker daemon.
 
 ## Run
 
 ```bash
-pnpm install                                                  # from monorepo root
+pnpm install                                                 # from monorepo root
 
 # Integration tests (Docker required for Postgres testcontainers):
 pnpm -C examples/externalization-with-fallback test:integration
 
-# Unit tests (none right now; passWithNoTests for symmetry):
-pnpm -C examples/externalization-with-fallback test
-
-# Visual demo against real Postgres + real RabbitMQ:
+# Visual demo against real Postgres + RabbitMQ:
 docker-compose -f examples/externalization-with-fallback/docker-compose.yml up -d
 pnpm -C examples/externalization-with-fallback start
-# When prompted: `docker-compose stop rabbitmq` (in a second terminal)
-# Press ENTER to continue. Repeat for the restart step.
-docker-compose -f examples/externalization-with-fallback/docker-compose.yml down -v
+# Stop RabbitMQ mid-demo to watch the fallback:
+docker-compose -f examples/externalization-with-fallback/docker-compose.yml stop rabbitmq
 ```
-
-The visual demo deliberately requires manual broker operations
-(stop / start) at two points. Watching the publication go to
-`FAILED` with a real reason and then recover on `resubmit()` is the
-point; automating the broker stop would hide it.
-
-## What the integration test pins
-
-1. **The completion contract** (1 test). Mocked `emit()` resolves
-   `of(undefined)`; the publication transitions to COMPLETED. The
-   externalizer treats a completion as success and does not
-   second-guess it, which is the correct behaviour and is all it can
-   do. What a completion proves about the broker is the transport's
-   business, measured per transport in
-   [ADR-021](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
-   and pinned against live brokers in the `outbox-microservices`
-   package.
-
-2. **Failed.resubmit recovery** (2 tests).
-   - Single failed publication round trip: emit throws → row FAILED
-     → `resubmit()` → next poll → COMPLETED.
-   - Batch resubmit: three publications all fail under a sustained
-     emit-throws regime; flipping the broker back and calling
-     `resubmit()` once transitions all three.
-
-3. **Consumer-side dedup template** (2 tests).
-   - First invocation processes; second invocation with the same
-     publication id is a no-op. The dedup table holds exactly one
-     row.
-   - Different publication ids of the same event class process
-     independently — dedup is keyed on publication id, not event
-     content.
 
 ## Key files
 
-- [`src/refund-requested.event.ts`](src/refund-requested.event.ts)
-  — the domain event with `@Externalized({ target: 'refunds',
-  client: REFUNDS_BROKER })`. JSDoc enumerates what can happen to a
-  publication.
-- [`src/refund.service.ts`](src/refund.service.ts) — producer.
-  Single-unit atomicity (DD-019); the method returns once the row is
-  committed, long before the broker is involved.
-- [`src/refund-ledger.handler.ts`](src/refund-ledger.handler.ts) —
-  local listener that always fires once per publication regardless
-  of broker outcome. Useful for in-process bookkeeping.
-- [`src/processed-refunds.entity.ts`](src/processed-refunds.entity.ts)
-  — the inbox / dedup table.
-- [`src/refund-consumer.service.ts`](src/refund-consumer.service.ts)
-  — consumer-side template. SELECT-then-INSERT inside a single
-  transaction, with the table's PRIMARY KEY as the racy correctness
-  gate.
-- [`src/main.ts`](src/main.ts) — four-step visual demo with manual
-  broker operations.
-- [`docker-compose.yml`](docker-compose.yml) — Postgres + RabbitMQ
-  stack. RabbitMQ management UI is exposed on port 15672 for
-  verifying queue contents during the demo.
+- [`src/app.module.ts`](src/app.module.ts) — RabbitMQ with
+  `persistent: true`, the transport, `externalizedRoute()`, and the
+  retry policy.
+- [`src/refund-requested.event.ts`](src/refund-requested.event.ts) —
+  `@Externalized({ target: 'refunds', client, headers })`.
+- [`src/refund.service.ts`](src/refund.service.ts) — the producer.
+- [`src/refund-consumer.service.ts`](src/refund-consumer.service.ts) —
+  the consumer's inbox through `@Transactional`.
 - [`test/with-fallback.integration.spec.ts`](test/with-fallback.integration.spec.ts)
-  — testcontainers Postgres + mocked ClientProxy, five tests across
-  three describe blocks.
+  — delivery, a rejected emit, recovery on retry, exhaustion into a
+  dead letter and an operator requeue, and the inbox on redelivery.
 
-## Common pitfalls
+## How the tests stay fast
 
-- **How much `event_publication.status === COMPLETED` proves depends
-  on your transport.** On the RabbitMQ here it means a publisher
-  confirm arrived; on core NATS it means nothing at all. Check the
-  table at the top before relying on it.
-- **The dedup table needs cleanup in production.** A real deployment
-  TTLs old rows (e.g. archive after 30 days). The example doesn't
-  bother — the table just grows.
-- **`resubmit()` works for FAILED rows only.** Stuck PROCESSING
-  rows are handled by `StalenessMonitor` + `IncompleteEventPublications`
-  separately. See `outbox` README for the staleness story.
-- **The producer's `@Transactional()` returns before the broker is
-  ever contacted.** Delivery happens later, on the processor's poll.
-  Don't infer anything about delivery from the publishing
-  transaction committing.
-- **`OutboxEventPublisher` injected by class token, NOT
-  `@InjectOutboxPublisher`** (smart facade — DD-024). Same rule as
-  every other Tier 3 example.
+The broker is a recorded `ClientProxy`; what a real RabbitMQ
+acknowledgement means is measured in the outbox package's broker suite.
+The relay is off and driven with `runOnce()`, and between attempts the
+test moves the waiting message's `available_at` to now rather than
+sleeping through the backoff.
 
 ## Related examples
 
-- [`externalization-kafka`](../externalization-kafka) — single-DS,
-  single-broker baseline (Kafka instead of RabbitMQ; same shape).
-- [`externalization-multi-broker`](../externalization-multi-broker)
-  — three brokers, per-event `@Externalized({ client })` routing.
-- [`externalization-multi-datasource`](../externalization-multi-datasource)
-  — multi-DS + multi-broker combined.
+- [`externalization-kafka`](../externalization-kafka) — the Kafka record
+  in detail.
+- [`saga-pattern`](../saga-pattern) — idempotent steps on the handler
+  side.
 
 ## Further reading
 
-- [ADR-021 — what `emit()` acknowledges, per transport](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
-  (the measurements, and the supersession of the silent-success
-  finding this example was built around).
-- [ADR-015 — event externalization architecture](../../docs/adr/015-event-externalization-architecture.md)
-- [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)
-- [`packages/outbox-microservices/README.md`](../../packages/outbox-microservices/README.md)
-  — the per-transport table, package level.
-- [Spring Modulith — externalization patterns](https://docs.spring.io/spring-modulith/reference/events.html#externalization)
+- [ADR-021 — what each transport acknowledges](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
+- [ADR-023 — delivery through `@nestjs/outbox`](../../docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
+- [`@nestjs/outbox`: retries and the dead-letter queue](https://docs.nestjs.com/reliability/outbox#retries-and-the-dead-letter-queue)

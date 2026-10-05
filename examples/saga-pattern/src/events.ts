@@ -1,14 +1,14 @@
 /**
  * Saga step events. Each event names what just happened in the
- * preceding step; the next step's `@IntegrationEventsHandler`
- * subscribes to it. Events flow through the outbox — every step
- * commits its business write atomically with the publication of its
- * outcome event (DD-019), and the worker delivers the event to the
- * next step's handler in a fresh transaction.
+ * preceding step; the next step's `@OnOutboxMessage` handler
+ * subscribes to it by class name. Events flow through the outbox:
+ * every step commits its business write atomically with the message
+ * of its outcome event, and `@nestjs/outbox`'s relay delivers it to
+ * the next step's handler, which opens a fresh transaction.
  *
  * Failure events (`InventoryReservationFailedEvent`,
  * `PaymentFailedEvent`) drive the compensation handler. The
- * compensation handler is a regular `@IntegrationEventsHandler` —
+ * compensation handler is a regular `@OnOutboxMessage` handler —
  * compensation in this saga is "another step that runs because a
  * failure event was published," not a separate framework concept.
  */

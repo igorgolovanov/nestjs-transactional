@@ -1,14 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
 import { OrderRow, StockItemRow } from './entities.js';
-import { InventoryReservationFailedEvent, PaymentFailedEvent } from './events.js';
+import type { InventoryReservationFailedEvent, PaymentFailedEvent } from './events.js';
 
 /**
  * Compensation step. Subscribes to **both** failure events and runs
@@ -21,7 +18,7 @@ import { InventoryReservationFailedEvent, PaymentFailedEvent } from './events.js
  *   so this branch is mostly observability/logging.
  * - `PaymentFailedEvent` — the reservation handler did decrement
  *   stock, so we restore it AND mark the order
- *   `'failed-payment'`. Both writes commit atomically (DD-019).
+ *   `'failed-payment'`. Both writes commit atomically.
  *
  * Compensation here is choreographic: just another step that
  * happens to run because a failure event was published. There is no
@@ -34,13 +31,7 @@ import { InventoryReservationFailedEvent, PaymentFailedEvent } from './events.js
  * is encoded as a conditional UPDATE — see the per-branch comments.
  */
 @Injectable()
-@IntegrationEventsHandler({
-  events: [InventoryReservationFailedEvent, PaymentFailedEvent],
-  id: 'Saga.Compensation',
-})
-export class CompensationHandler
-  implements IIntegrationEventHandler<InventoryReservationFailedEvent | PaymentFailedEvent>
-{
+export class CompensationHandler {
   private readonly logger = new Logger(CompensationHandler.name);
 
   constructor(
@@ -50,23 +41,26 @@ export class CompensationHandler
     private readonly stock: Repository<StockItemRow>,
   ) {}
 
-  @Transactional()
-  async handle(event: InventoryReservationFailedEvent | PaymentFailedEvent): Promise<void> {
-    if (event instanceof InventoryReservationFailedEvent) {
-      // Reservation failed before stock was decremented — nothing to
-      // restore. Confirm the terminal status (the reservation handler
-      // wrote it; if it's already there we still want this branch to
-      // be a no-op, not an error).
-      this.logger.log(`Compensation: reservation-failed for ${event.orderId} (no stock to release)`);
-      return;
-    }
+  /**
+   * Reservation failed before stock was decremented, so there is
+   * nothing to restore. The reservation handler already wrote the
+   * terminal status; this step only records that compensation ran.
+   */
+  @OnOutboxMessage('InventoryReservationFailedEvent', { consumer: 'saga.compensation' })
+  onReservationFailed(event: InventoryReservationFailedEvent): void {
+    this.logger.log(`Compensation: reservation-failed for ${event.orderId} (no stock to release)`);
+  }
 
-    // PaymentFailedEvent — restore the reserved stock and mark the
-    // order failed-payment. The conditional `WHERE status = 'reserved'`
-    // is the idempotency gate: a retried delivery finds the order in
-    // `'failed-payment'` and the UPDATE affects zero rows, so the
-    // stock-restoration branch is gated by the same predicate via
-    // the inner `if`.
+  /**
+   * Payment failed after stock was reserved: restore the stock and mark
+   * the order failed-payment. The conditional `WHERE status = 'reserved'`
+   * is the idempotency gate: a retried delivery finds the order in
+   * `'failed-payment'`, the UPDATE affects zero rows, and the stock is
+   * not restored twice.
+   */
+  @OnOutboxMessage('PaymentFailedEvent', { consumer: 'saga.compensation' })
+  @Transactional()
+  async onPaymentFailed(event: PaymentFailedEvent): Promise<void> {
     const update = await this.orders.update(
       { id: event.orderId, status: 'reserved' },
       { status: 'failed-payment' },
@@ -84,6 +78,8 @@ export class CompensationHandler
       .where('sku = :sku', { sku: event.sku })
       .execute();
 
-    this.logger.warn(`Compensation: released ${event.quantity} of ${event.sku} for ${event.orderId}`);
+    this.logger.warn(
+      `Compensation: released ${event.quantity} of ${event.sku} for ${event.orderId}`,
+    );
   }
 }

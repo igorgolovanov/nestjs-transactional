@@ -5,12 +5,8 @@ import { Logger } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module.js';
@@ -19,7 +15,10 @@ import { OrderPlacedEvent } from '../src/events.js';
 import { OrderService } from '../src/order.service.js';
 import { ReservationHandler } from '../src/reservation.handler.js';
 
-async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
+async function waitFor(
+  predicate: () => Promise<boolean> | boolean,
+  timeoutMs = 8_000,
+): Promise<void> {
   const start = Date.now();
   while (!(await predicate())) {
     if (Date.now() - start > timeoutMs) {
@@ -37,7 +36,6 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
   let reservation: ReservationHandler;
 
   beforeAll(async () => {
-    OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
     TypeOrmTransactionalModule.resetForTesting();
 
@@ -55,9 +53,8 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
       ],
     }).compile();
 
-    // Worker briefly observes rolled-back rows during the atomicity
-    // test below — its `markFailed` then errors on a missing row.
-    // Expected noise; suppress all log levels for the suite.
+    // The relay runs in the background here: a saga is a chain of
+    // deliveries, and the test waits for its end state.
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -76,7 +73,7 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
   });
 
   beforeEach(async () => {
-    await ds.query('TRUNCATE TABLE event_publication, event_publication_archive RESTART IDENTITY');
+    await ds.query('TRUNCATE nest_outbox.messages, nest_outbox.inbox');
     await ds.getRepository(PaymentRow).clear();
     await ds.getRepository(ReservationRow).clear();
     await ds.getRepository(OrderRow).clear();
@@ -92,11 +89,18 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
 
     await orders.placeOrder('ord-happy', 'WIDGET', 2, 100);
 
-    await waitFor(async () => (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-happy' }))?.status === 'shipped');
+    await waitFor(
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-happy' }))?.status === 'shipped',
+    );
 
     expect((await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(3);
-    expect((await ds.getRepository(ReservationRow).findOneBy({ orderId: 'ord-happy' }))?.quantity).toBe(2);
-    expect((await ds.getRepository(PaymentRow).findOneBy({ orderId: 'ord-happy' }))?.status).toBe('charged');
+    expect(
+      (await ds.getRepository(ReservationRow).findOneBy({ orderId: 'ord-happy' }))?.quantity,
+    ).toBe(2);
+    expect((await ds.getRepository(PaymentRow).findOneBy({ orderId: 'ord-happy' }))?.status).toBe(
+      'charged',
+    );
   });
 
   it('payment-failure path: charge fails → compensation restores stock and marks order failed-payment', async () => {
@@ -105,13 +109,17 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
     await orders.placeOrder('ord-payfail', 'WIDGET', 2, 12_000);
 
     await waitFor(
-      async () => (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-payfail' }))?.status === 'failed-payment',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-payfail' }))?.status ===
+        'failed-payment',
     );
 
     // Stock fully restored — reservation decremented by 2, compensation added 2 back.
     expect((await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(5);
     // Payment row records the failure (created atomically with the failure event).
-    expect((await ds.getRepository(PaymentRow).findOneBy({ orderId: 'ord-payfail' }))?.status).toBe('failed');
+    expect((await ds.getRepository(PaymentRow).findOneBy({ orderId: 'ord-payfail' }))?.status).toBe(
+      'failed',
+    );
   });
 
   it('reservation-failure path: out of stock → no payment, stock unchanged, order failed-reservation', async () => {
@@ -121,7 +129,8 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
 
     await waitFor(
       async () =>
-        (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-oos' }))?.status === 'failed-reservation',
+        (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-oos' }))?.status ===
+        'failed-reservation',
     );
 
     expect((await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(1);
@@ -131,7 +140,7 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
 
   it('idempotent step: re-invoking the reservation handler with the same event does not double-decrement stock', async () => {
     // This test calls the handler directly to simulate the outbox
-    // worker's at-least-once retry. The handler is @Transactional and
+    // relay's at-least-once retry. The handler is @Transactional and
     // its primary-key INSERT into `reservations` throws unique_violation
     // on the second run — caught by the handler as the idempotency
     // gate. Stock is decremented exactly once; no second
@@ -156,30 +165,41 @@ describe('saga-pattern (Postgres via testcontainers)', () => {
     // Stock decremented exactly once.
     expect((await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(3);
     // Reservation row exists with the original quantity.
-    expect((await ds.getRepository(ReservationRow).findOneBy({ orderId: 'ord-retry' }))?.quantity).toBe(2);
+    expect(
+      (await ds.getRepository(ReservationRow).findOneBy({ orderId: 'ord-retry' }))?.quantity,
+    ).toBe(2);
   });
 
   it('atomicity at saga entry: a duplicate placeOrder fails, no second OrderPlacedEvent is published, no second saga runs', async () => {
     await seedStock('WIDGET', 5);
 
     await orders.placeOrder('ord-dup', 'WIDGET', 1, 100);
-    await waitFor(async () => (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-dup' }))?.status === 'shipped');
+    await waitFor(
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: 'ord-dup' }))?.status === 'shipped',
+    );
 
-    const stockAfterFirst = (await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available;
+    const stockAfterFirst = (await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))
+      ?.available;
 
     // Second call with the same orderId — INSERT fails on the orders
     // PK, the @Transactional rolls back, and the OrderPlacedEvent
-    // publication that was being scheduled for this transaction is
-    // discarded too (DD-019). No second saga ever runs.
+    // message added in this transaction is discarded with it. No
+    // second saga ever runs.
     await expect(orders.placeOrder('ord-dup', 'WIDGET', 1, 100)).rejects.toThrow();
 
-    // Give the worker a moment in case anything stray landed.
+    // Give the relay a moment in case anything stray landed.
     await new Promise((r) => setTimeout(r, 300));
 
     // Stock unchanged from the first run.
-    expect((await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(stockAfterFirst);
-    // Still exactly one reservation and one payment.
-    expect(await ds.getRepository(ReservationRow).count()).toBe(1);
-    expect(await ds.getRepository(PaymentRow).count()).toBe(1);
+    expect((await ds.getRepository(StockItemRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(
+      stockAfterFirst,
+    );
+    // Still exactly one reservation and one payment for this order.
+    // Counted per order rather than per table: the relay runs in the
+    // background, so a message an earlier test published can still be
+    // delivered while this one runs, and it would add rows of its own.
+    expect(await ds.getRepository(ReservationRow).countBy({ orderId: 'ord-dup' })).toBe(1);
+    expect(await ds.getRepository(PaymentRow).countBy({ orderId: 'ord-dup' })).toBe(1);
   });
 });

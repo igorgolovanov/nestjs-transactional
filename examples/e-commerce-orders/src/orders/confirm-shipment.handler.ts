@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventPublisher } from '@nestjs/cqrs';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
 import { PaymentChargedEvent } from '../shared/events.js';
@@ -14,10 +11,7 @@ import { OrderRow } from './order.entity.js';
 
 /**
  * Final happy-path step. `PaymentChargedEvent` was published by the
- * billing context's outbox; the orders worker (this DS owns no
- * publication for this event, but the cross-package
- * `OUTBOX_LISTENER_REGISTRAR` registrar resolves the owning DS via
- * the per-DS `EventTypeRegistry` — Cat A) delivers it.
+ * billing context, and `@nestjs/outbox`'s relay delivers it here.
  *
  * The handler:
  *   1. Loads the persisted `OrderRow`, hydrates an `Order` aggregate.
@@ -26,9 +20,9 @@ import { OrderRow } from './order.entity.js';
  *   3. Updates the row to `confirmed` status and stamps
  *      `confirmedAt`.
  *   4. `aggregate.commit()` — `OrderConfirmedEvent` flows through
- *      `HybridEventPublisher`. The class carries `@Externalized`
- *      metadata so the outbox row is, on processor delivery,
- *      forwarded to the Kafka `ClientProxy`.
+ *      `HybridEventPublisher`. The class carries `@Externalized`, so
+ *      it becomes an outbox message in this transaction, and the
+ *      relay forwards it to Kafka after the commit.
  *
  * Idempotency: gated on `status = 'placed'` in the conditional
  * UPDATE. A retried delivery finds the order already `confirmed`,
@@ -36,8 +30,7 @@ import { OrderRow } from './order.entity.js';
  * `OrderConfirmedEvent` reaches Kafka.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [PaymentChargedEvent], id: 'Orders.ConfirmShipment' })
-export class ConfirmShipmentHandler implements IIntegrationEventHandler<PaymentChargedEvent> {
+export class ConfirmShipmentHandler {
   private readonly logger = new Logger(ConfirmShipmentHandler.name);
 
   constructor(
@@ -46,6 +39,7 @@ export class ConfirmShipmentHandler implements IIntegrationEventHandler<PaymentC
     private readonly publisher: EventPublisher,
   ) {}
 
+  @OnOutboxMessage('PaymentChargedEvent', { consumer: 'orders.confirm-shipment' })
   @Transactional()
   async handle(event: PaymentChargedEvent): Promise<void> {
     const row = await this.orders.findOneBy({ id: event.orderId });

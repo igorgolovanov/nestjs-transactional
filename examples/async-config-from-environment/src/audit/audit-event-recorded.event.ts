@@ -1,7 +1,7 @@
 /**
- * Domain event published from `AuditService.recordEvent`. Registered
- * with `OutboxModule.forFeature([AuditEventRecordedEvent])` so the
- * outbox can serialize it to `event_publication`.
+ * Domain event published from `AuditService.recordEvent`. The outbox
+ * bridge adds it under its class name, `AuditEventRecordedEvent`, which
+ * `AuditArchivalHandler` subscribes to.
  */
 export class AuditEventRecordedEvent {
   constructor(

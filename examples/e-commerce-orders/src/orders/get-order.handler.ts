@@ -20,8 +20,7 @@ export class GetOrderQuery {
  * style on a smaller scale.
  *
  * `CqrsTransactionalModule` auto-wraps query handlers as readonly
- * (Convention #14 carry-over); the actual lookup runs autocommit
- * on the orders DS.
+ * (Convention #14 carry-over); the actual lookup runs autocommit.
  */
 @QueryHandler(GetOrderQuery)
 export class GetOrderHandler implements IQueryHandler<GetOrderQuery, OrderResponseDto> {

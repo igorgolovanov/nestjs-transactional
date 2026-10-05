@@ -1,8 +1,8 @@
 # async-config-from-environment
 
-**Tier 5 — Production realism.** Wire the entire stack
-(`TypeOrmModule`, `TypeOrmTransactionalModule`, `OutboxModule`,
-`OutboxTypeOrmModule`) through `forRootAsync` + `ConfigService`,
+**Tier 5 — Production realism.** Wire the stack (`TypeOrmModule`,
+`TypeOrmTransactionalModule` and `@nestjs/outbox`'s `OutboxModule`)
+through `forRootAsync` + `ConfigService`,
 backed by per-environment `.env` files and Joi validation. The
 intent is "this is the boring, correct shape for a real
 deployment" rather than "shortest illustration of X".
@@ -14,23 +14,24 @@ deployment" rather than "shortest illustration of X".
 - You want a copy-paste skeleton with env-file profiles
   (`development`, `staging`, `production`) and schema validation
   already wired.
-- You want to see how operational tunables (outbox polling
+- You want to see how operational tunables (the outbox relay's poll
   interval, batch size, concurrency) flow from a single env source
-  into the framework runtime.
+  into the runtime.
 
 ## What's different from the sync-config baseline
 
-`basic-typeorm-outbox` calls `forRoot({...})` four times with
-hard-coded values. This example:
+`basic-typeorm-outbox` calls `forRoot({...})` with hard-coded values.
+This example:
 
 1. Uses `ConfigModule.forRoot` with a Joi schema covering every
    key the app reads. Bootstrap fails fast on a malformed
    environment, with all violations reported in one pass
    (`abortEarly: false`).
-2. Replaces all four `forRoot` calls with `forRootAsync`
-   (`TypeOrmModule`, `TypeOrmTransactionalModule`, `OutboxModule`,
-   `OutboxTypeOrmModule`). Every factory `inject`s `ConfigService`
-   and reads the validated env into typed config blocks.
+2. Replaces the configurable `forRoot` calls with `forRootAsync`
+   (`TypeOrmModule`, `TypeOrmTransactionalModule`, `OutboxModule`).
+   Every factory `inject`s `ConfigService` and reads the validated env
+   into typed config blocks. `TransactionalOutboxModule` has nothing to
+   tune per environment and stays `forRoot()`.
 3. Ships three `.env.*` profiles. `NODE_ENV` selects which file
    loads, so the same binary deploys to dev / staging / prod
    without recompilation.
@@ -59,19 +60,16 @@ plumbing, not anything in `audit/`.
 TypeOrmModule.       TypeOrmTransactional   OutboxModule.
   forRootAsync         Module.forRootAsync    forRootAsync
        │                       │                       │
-       │                       │                       │  reads
-       │                       │                       │  pollingInterval,
+       │                       │                       │  relay:
+       │                       │                       │  pollInterval,
        │                       │                       │  batchSize,
-       │                       │                       │  maxConcurrent
+       │                       │                       │  concurrency
        ▼                       ▼                       ▼
-   DataSource              Adapter +              Per-DS
-   (Postgres)              transparent           processor +
-                           repos                 staleness monitor
-                                                       │
-                                  OutboxTypeOrmModule.forRootAsync
-                                  registers the typeorm-backed
-                                  EventPublicationRepository under
-                                  the same DataSource.
+   DataSource              Adapter +              @nestjs/outbox
+   (Postgres)              transparent            relay, on a
+                           repos                  PostgresOutboxStore
+                                                  over the same
+                                                  DataSource
 ```
 
 ## Configuration
@@ -122,43 +120,40 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
 
 ## What it shows (verified by integration tests)
 
-1. **`forRootAsync` symmetry across the stack.** All four modules
-   accept the same `imports + inject + useFactory` shape.
+1. **`forRootAsync` symmetry across the stack.** Every configurable
+   module accepts the same `imports + inject + useFactory` shape.
    `ConfigService` is the single read source for every layer.
 2. **Joi schema validates fail-fast.** A missing required key
    (`PG_HOST` omitted) and an out-of-range numeric
    (`OUTBOX_POLLING_INTERVAL_MS=0`) both throw on bootstrap, with
    the error message pointing at the offending key. Tests assert
    on the throw, not on later runtime symptoms.
-3. **Per-environment outbox tunables flow through.** The
-   integration test reads `app.get(OUTBOX_PROCESSOR_OPTIONS)` for
-   dev and prod profiles and asserts the resolved
-   `pollingInterval`, `batchSize`, and `maxConcurrent` mirror the
-   `.env.*` file values — proof that the async factory actually
-   plumbs config into the processor, not just the framework
+3. **Per-environment relay tunables flow through.** The
+   integration test reads `@nestjs/outbox`'s `OUTBOX_MODULE_OPTIONS`
+   for the dev and prod profiles and asserts the resolved
+   `relay.pollInterval`, `relay.batchSize` and `relay.concurrency`
+   mirror the `.env.*` file values: proof that the async factory
+   really plumbs config into the relay, not just the package
    defaults.
 4. **Behavior under `forRootAsync` matches the sync baseline.**
-   `AuditService.recordEvent` writes both rows in one transaction
-   (DD-019), the publication reaches `COMPLETED` once the worker
-   dispatches it. The transparent-repository / outbox machinery
-   is unaffected by the async wiring path.
+   `AuditService.recordEvent` writes the audit row and its outbox
+   message in one transaction, and the relay delivers it to the
+   `@OnOutboxMessage` handler. The transparent-repository / outbox
+   machinery is unaffected by the async wiring path.
 
 ## Common pitfalls
 
-- **`OutboxModule.forRootAsync({ repository })` — `repository` lives
-  on the OPTIONS object, NOT on the async factory result.**
-  Provider tokens must be declared at module-build time, so the
-  module reads `repository` (and `serializer`) from the options
-  argument synchronously. The async factory's return shape
-  (`OutboxModuleAsyncFactoryResult`) only carries *runtime tunables*
-  — `processor`, `staleness`, `republishOnStartup`,
-  `startupBatchSize`, `completionMode`. Putting `repository` inside
-  `useFactory`'s return is silently ignored: the module falls back
-  to `InMemoryEventPublicationRepository`, the publication never
-  reaches Postgres, and the worker never delivers anything.
-  This example registers `repository:
-  typeOrmEventPublicationRepositoryProvider()` at the top level —
-  see [`src/app.module.ts`](src/app.module.ts).
+- **The env keys keep their names, the options do not.**
+  `OUTBOX_POLLING_INTERVAL_MS`, `OUTBOX_BATCH_SIZE` and
+  `OUTBOX_MAX_CONCURRENT` map onto `@nestjs/outbox`'s
+  `relay.pollInterval`, `relay.batchSize` and `relay.concurrency`.
+  The env names stayed so a deployment's configuration did not have
+  to change with the upgrade.
+- **The store is a provider, not a factory result.** `OutboxModule`'s
+  async factory returns options only. The `PostgresOutboxStore` is an
+  ordinary provider that registers itself with `OutboxStorage`, so it
+  sits in `providers` next to the services; see
+  [`src/app.module.ts`](src/app.module.ts).
 - **dotenv refuses to overwrite an existing `process.env` key.**
   Two consequences: (1) tests that load different `.env` files
   sequentially in the same process get cross-contamination — an
@@ -169,16 +164,6 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
   win over a committed file. Don't rely on `.env` to "reset" a
   variable that has already been set in the deployment
   environment.
-- **`dataSource` name is statically declared, not async-resolved.**
-  `OutboxModule.forRootAsync({ dataSource: 'inventory' })` and
-  `OutboxTypeOrmModule.forRootAsync({ dataSource: 'inventory' })`
-  both require the name *as a literal*, because NestJS provider
-  tokens like `getOutboxProcessorOptionsToken('inventory')` must
-  exist at module-build time. The async factory resolves only
-  the *remaining* options. If you genuinely need
-  `dataSource = ConfigService.get('DS_NAME')`, pre-resolve it in
-  bootstrap code and call `forRoot` (sync) with the result. See
-  the JSDoc on `OutboxModuleAsyncOptions`.
 - **`TransactionalModule.forRootAsync` does not accept a `dataSource` field.**
   The per-DS adapter token isn't registered for the async path
   for the same reason as above. The `AdapterRegistry`-routed
@@ -200,22 +185,17 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
   fetches secrets at boot through Vault / AWS Secrets Manager /
   Doppler / Kubernetes secrets. Joi validation enforces *shape*,
   not authenticity.
-- **`Joi.validate` is async-style; `validationSchema` is sync.**
-  `ConfigModule.forRoot({ validationSchema })` runs synchronously
-  during `forRoot` execution. The throw happens before any DI
-  provider resolves, so the integration tests can wrap
-  `AppModule.forEnv({ envFilePath: '...broken' })` in
-  `expect(() => ...).toThrow()` without `await`.
+- **`ConfigModule.forRoot` is async.** Its returned Promise is what
+  rejects on a schema violation, so a test must await module
+  compilation: `await expect(Test.createTestingModule(...).compile())
+  .rejects.toThrow(...)`. A synchronous `expect(() => ...).toThrow()`
+  would pass while catching nothing.
 
 ## Related examples
 
 - [`basic-typeorm-outbox`](../basic-typeorm-outbox) — the sync
   baseline. Compare `app.module.ts` side-by-side to see what
   `forRootAsync` adds.
-- [`multi-datasource-outbox`](../multi-datasource-outbox) —
-  multi-DS shape; combine the per-DS pattern from there with the
-  per-DS *async* config from here for a realistic multi-DS prod
-  setup.
 - [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship.
   Uses sync config to keep the saga the focus; in production
   you'd swap each `forRoot` for the `forRootAsync` shape from
@@ -223,8 +203,7 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-- [ADR-019 — multi-`forRoot` per dataSource](../../docs/adr/019-outbox-multi-forroot-pattern.md)
+- [ADR-023 — delivery through `@nestjs/outbox`](../../docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
 - `@nestjs/config` upstream docs:
   https://docs.nestjs.com/techniques/configuration

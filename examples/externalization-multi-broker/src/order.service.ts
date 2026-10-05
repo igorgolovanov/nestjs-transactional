@@ -11,26 +11,21 @@ import { RefundRequestedEvent } from './refund-requested.event.js';
 
 /**
  * Demonstrates that a single `@Transactional` method can publish
- * multiple events that each route to DIFFERENT brokers. The outbox
- * packs all three publications into the single business transaction
- * (DD-019 single-unit atomicity); the worker dispatches them one by
- * one and the externalizer picks the right `ClientProxy` for each
- * via `metadata.client`.
+ * multiple events that each route to a DIFFERENT broker. All three
+ * outbox messages commit with the order in one transaction; afterwards
+ * `@nestjs/outbox`'s relay delivers each through the transport its
+ * `@Externalized({ client })` names, and a broker that fails holds back
+ * only its own message.
  *
  * `placeOrder` writes the order, then publishes:
  *   - `OrderPlacedEvent`        → Kafka  (KAFKA_CLIENT)
- *   - `RefundRequestedEvent`    → RabbitMQ (RABBITMQ_CLIENT) — only
- *     when the optional `refundReason` parameter is set, simulating
- *     a refund created in the same business operation.
- *   - `CacheInvalidationEvent`  → Redis pub/sub (REDIS_CLIENT) —
+ *   - `RefundRequestedEvent`    → RabbitMQ (RABBITMQ_CLIENT), only
+ *     when `refundCents` is given, simulating a refund created in the
+ *     same business operation.
+ *   - `CacheInvalidationEvent`  → Redis pub/sub (REDIS_CLIENT),
  *     unconditionally, to drop any cached pricing for this customer.
  *
- * On rollback NONE of the brokers receives anything (atomic gate).
- *
- * `OutboxEventPublisher` is injected by class token (smart facade,
- * DD-024) — the canonical default. The `@InjectOutboxPublisher`
- * decorator binds the per-DS underlying publisher and bypasses
- * smart-facade routing.
+ * On rollback none of the brokers receives anything.
  */
 @Injectable()
 export class OrderService {
@@ -62,7 +57,7 @@ export class OrderService {
     );
 
     if (options?.fail === true) {
-      throw new Error('simulated failure — all three publications + the order roll back together');
+      throw new Error('simulated failure — the order and all three messages roll back together');
     }
   }
 

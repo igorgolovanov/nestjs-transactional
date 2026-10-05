@@ -15,12 +15,12 @@ import { AccountOperationEvent } from './events.js';
  * Three writes commit atomically per call:
  *   1. `AccountRow.balance` update
  *   2. `AccountOperationRow` insert (durable record of the op)
- *   3. `event_publication` row from `OutboxEventPublisher.publish`
+ *   3. The outbox message added by `OutboxEventPublisher.publish`
  *
- * Either ALL three commit or NONE do (DD-019). The audit DataSource
- * is not touched by this transaction at all — the audit handler
- * runs LATER, in a separate audit-DS transaction, after the worker
- * picks up the publication.
+ * Either ALL three commit or NONE do. The audit DataSource is not
+ * touched by this transaction at all — the audit handler runs LATER,
+ * in a separate audit-DS transaction, after the relay delivers the
+ * message.
  */
 @Injectable()
 export class AccountService {

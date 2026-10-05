@@ -7,10 +7,9 @@ import { ArticleQueryService } from './article.query-service.js';
 import { ArticleService } from './article.service.js';
 
 async function main(): Promise<void> {
-  const app = await NestFactory.createApplicationContext(
-    AppModule.forConfig(readConfigFromEnv()),
-    { logger: ['error', 'warn', 'log'] },
-  );
+  const app = await NestFactory.createApplicationContext(AppModule.forConfig(readConfigFromEnv()), {
+    logger: ['error', 'warn', 'log'],
+  });
 
   const articles = app.get(ArticleService);
   const query = app.get(ArticleQueryService);

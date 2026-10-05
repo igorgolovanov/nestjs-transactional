@@ -2,16 +2,12 @@ import 'reflect-metadata';
 
 import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
+import { OutboxRelay } from '@nestjs/outbox';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, PublicationStatus } from '@nestjs-transactional/outbox';
-import { EventPublicationEntity } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
 import { AccountService } from '../src/account.service.js';
@@ -20,16 +16,6 @@ import { AuditLoggingModule } from '../src/app.module.js';
 import { AccountOperationRow, AccountRow, AuditLogRow } from '../src/entities.js';
 import { AccountOperationEvent } from '../src/events.js';
 
-async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
-  const start = Date.now();
-  while (!(await predicate())) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(`waitFor: timed out after ${timeoutMs} ms`);
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
-
 describe('audit-logging (Postgres via testcontainers)', () => {
   let container: StartedPostgreSqlContainer;
   let module: TestingModule;
@@ -37,9 +23,12 @@ describe('audit-logging (Postgres via testcontainers)', () => {
   let auditDs: DataSource;
   let accounts: AccountService;
   let audit: AuditHandler;
+  let relay: OutboxRelay;
+
+  const pending = async (): Promise<{ attempts: number; last_error: string | null }[]> =>
+    businessDs.query('SELECT attempts, last_error FROM nest_outbox.messages ORDER BY seq');
 
   beforeAll(async () => {
-    OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
     TypeOrmTransactionalModule.resetForTesting();
 
@@ -61,27 +50,29 @@ describe('audit-logging (Postgres via testcontainers)', () => {
 
     module = await Test.createTestingModule({
       imports: [
-        AuditLoggingModule.forConfig({
-          business: {
-            host: container.getHost(),
-            port: container.getPort(),
-            username: container.getUsername(),
-            password: container.getPassword(),
-            database: container.getDatabase(),
+        AuditLoggingModule.forConfig(
+          {
+            business: {
+              host: container.getHost(),
+              port: container.getPort(),
+              username: container.getUsername(),
+              password: container.getPassword(),
+              database: container.getDatabase(),
+            },
+            audit: {
+              host: container.getHost(),
+              port: container.getPort(),
+              username: container.getUsername(),
+              password: container.getPassword(),
+              database: 'audit_db',
+            },
           },
-          audit: {
-            host: container.getHost(),
-            port: container.getPort(),
-            username: container.getUsername(),
-            password: container.getPassword(),
-            database: 'audit_db',
-          },
-        }),
+          // Deliver with `relay.runOnce()`, so nothing races the assertions.
+          { relay: false },
+        ),
       ],
     }).compile();
 
-    // Worker briefly observes rolled-back rows during the rollback test
-    // — its `markFailed` then errors on a missing row. Expected noise.
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -93,7 +84,8 @@ describe('audit-logging (Postgres via testcontainers)', () => {
     auditDs = module.get<DataSource>(getDataSourceToken('audit'));
     accounts = module.get(AccountService);
     audit = module.get(AuditHandler);
-  }, 90_000);
+    relay = module.get(OutboxRelay);
+  }, 120_000);
 
   afterAll(async () => {
     await module.close();
@@ -101,9 +93,7 @@ describe('audit-logging (Postgres via testcontainers)', () => {
   });
 
   beforeEach(async () => {
-    await businessDs.query(
-      'TRUNCATE TABLE event_publication, event_publication_archive RESTART IDENTITY',
-    );
+    await businessDs.query('TRUNCATE nest_outbox.messages, nest_outbox.inbox');
     await businessDs.getRepository(AccountOperationRow).clear();
     await businessDs.getRepository(AccountRow).clear();
     await auditDs.getRepository(AuditLogRow).clear();
@@ -111,99 +101,76 @@ describe('audit-logging (Postgres via testcontainers)', () => {
     await businessDs.getRepository(AccountRow).insert({ id: 'acc-1', balance: 100 });
   });
 
-  it('happy path: deposit commits balance + operation + publication; audit row appears', async () => {
-    await accounts.deposit('acc-1', 'op-1', 50);
+  it('happy path: deposit commits balance + operation + message; the relay writes the audit row', async () => {
+    await accounts.deposit('acc-1', 'op-1', 25);
 
-    // Business side committed atomically (DD-019).
-    expect((await businessDs.getRepository(AccountRow).findOneBy({ id: 'acc-1' }))?.balance).toBe(150);
-    expect(await businessDs.getRepository(AccountOperationRow).countBy({ id: 'op-1' })).toBe(1);
-    const pub = await businessDs.getRepository(EventPublicationEntity).findOne({
-      where: { eventType: 'AccountOperationEvent' },
-    });
-    expect(pub).not.toBeNull();
-
-    // Audit row appears after the worker delivers — wait for it.
-    await waitFor(
-      async () => (await auditDs.getRepository(AuditLogRow).countBy({ operationId: 'op-1' })) === 1,
+    expect((await businessDs.getRepository(AccountRow).findOneBy({ id: 'acc-1' }))?.balance).toBe(
+      125,
     );
-    const audited = await auditDs.getRepository(AuditLogRow).findOneBy({ operationId: 'op-1' });
-    expect(audited?.balanceAfter).toBe(150);
-    expect(audited?.amount).toBe(50);
-    expect(audited?.type).toBe('deposit');
+    expect(await businessDs.getRepository(AccountOperationRow).countBy({ id: 'op-1' })).toBe(1);
+    expect(await pending()).toHaveLength(1);
 
-    // Publication transitions to COMPLETED once the handler returned.
-    // Default `completionMode: UPDATE` keeps the row in the hot queue
-    // with `status = COMPLETED` and a `completionDate` set.
-    await waitFor(async () => {
-      const reread = await businessDs.getRepository(EventPublicationEntity).findOne({
-        where: { id: pub!.id },
-      });
-      return reread?.status === PublicationStatus.COMPLETED;
+    await relay.runOnce();
+
+    const row = await auditDs.getRepository(AuditLogRow).findOneBy({ operationId: 'op-1' });
+    expect(row).toMatchObject({
+      accountId: 'acc-1',
+      type: 'deposit',
+      amount: 25,
+      balanceAfter: 125,
     });
+    expect(await pending()).toEqual([]);
   });
 
-  it('business rollback: overdraw throws; balance unchanged; no operation row; no publication; no audit row', async () => {
-    await expect(accounts.withdraw('acc-1', 'op-overdraw', 99_999)).rejects.toThrow('insufficient');
+  it('business rollback: overdraw throws; balance unchanged; no operation row; no message; no audit row', async () => {
+    await expect(accounts.withdraw('acc-1', 'op-2', 9_999)).rejects.toThrow('insufficient');
 
-    // Brief wait — give the worker a chance to misbehave if the
-    // publication leaked.
-    await new Promise((r) => setTimeout(r, 300));
+    expect((await businessDs.getRepository(AccountRow).findOneBy({ id: 'acc-1' }))?.balance).toBe(
+      100,
+    );
+    expect(await businessDs.getRepository(AccountOperationRow).countBy({ id: 'op-2' })).toBe(0);
+    expect(await pending()).toEqual([]);
 
-    // Business side: nothing changed (DD-019).
-    expect((await businessDs.getRepository(AccountRow).findOneBy({ id: 'acc-1' }))?.balance).toBe(100);
-    expect(await businessDs.getRepository(AccountOperationRow).countBy({ id: 'op-overdraw' })).toBe(0);
-    expect(
-      await businessDs
-        .getRepository(EventPublicationEntity)
-        .countBy({ eventType: 'AccountOperationEvent' }),
-    ).toBe(0);
-
-    // Audit DB completely untouched (DD-023).
-    expect(await auditDs.getRepository(AuditLogRow).countBy({ operationId: 'op-overdraw' })).toBe(0);
+    await relay.runOnce();
+    expect(await auditDs.getRepository(AuditLogRow).countBy({ operationId: 'op-2' })).toBe(0);
   });
 
-  it('idempotent audit: re-invoking the handler with the same event does not duplicate the audit row', async () => {
-    const event = new AccountOperationEvent('op-idempotent', 'acc-1', 'deposit', 25, 125);
+  it('idempotent audit: a second delivery of the same operation does not duplicate the audit row', async () => {
+    const event = new AccountOperationEvent('op-3', 'acc-1', 'deposit', 5, 105);
 
-    await audit.handle(event);
-    await audit.handle(event); // simulated outbox retry — second delivery
+    await audit.log(event);
+    await audit.log(event); // a redelivery that got past the inbox
 
-    const rows = await auditDs.getRepository(AuditLogRow).findBy({ operationId: 'op-idempotent' });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.amount).toBe(25);
+    expect(await auditDs.getRepository(AuditLogRow).countBy({ operationId: 'op-3' })).toBe(1);
   });
 
-  it('audit DS down → publication stays PUBLISHED until audit DB recovers; business is not blocked', async () => {
+  it('audit DS down: the business write commits, the message waits, and a retry writes the audit row', async () => {
     // Simulate the audit DS being unavailable by destroying its
-    // connection pool. New audit transactions will fail; the worker
-    // marks publications FAILED, and a future delivery (after we
-    // restore) succeeds idempotently.
+    // connection pool. The audit transaction fails, so the relay keeps
+    // the message and schedules a retry.
     await auditDs.destroy();
 
-    // Business operation succeeds despite the audit outage — that is
+    // The business operation succeeds despite the audit outage, which is
     // the whole point of the cross-DS-via-outbox pattern.
     await accounts.deposit('acc-1', 'op-during-outage', 10);
-    expect((await businessDs.getRepository(AccountRow).findOneBy({ id: 'acc-1' }))?.balance).toBe(110);
+    expect((await businessDs.getRepository(AccountRow).findOneBy({ id: 'acc-1' }))?.balance).toBe(
+      110,
+    );
 
-    // Wait for the worker to mark the publication FAILED.
-    await waitFor(async () => {
-      const pub = await businessDs.getRepository(EventPublicationEntity).findOne({
-        where: { eventType: 'AccountOperationEvent' },
-      });
-      return pub?.status === PublicationStatus.FAILED;
-    });
+    await relay.runOnce();
+    const [waiting] = await pending();
+    expect(waiting).toMatchObject({ attempts: 1 });
+    expect(waiting!.last_error).toBeTruthy();
 
-    // Bring the audit DS back up. Re-init via TypeORM's `initialize()`.
+    // The audit DS comes back. Make the scheduled retry due now rather
+    // than sleeping through the backoff, and let the relay deliver it.
     await auditDs.initialize();
+    await businessDs.query('UPDATE nest_outbox.messages SET available_at = 0');
+    await relay.runOnce();
 
-    // Manually invoke the audit handler (the worker would do this on
-    // next poll after a `resubmit`; in the test we drive it directly
-    // to keep the assertion deterministic).
-    await audit.handle(new AccountOperationEvent('op-during-outage', 'acc-1', 'deposit', 10, 110));
-
-    // Audit row eventually appears.
     expect(
       await auditDs.getRepository(AuditLogRow).countBy({ operationId: 'op-during-outage' }),
     ).toBe(1);
+    expect(await pending()).toEqual([]);
   });
 });

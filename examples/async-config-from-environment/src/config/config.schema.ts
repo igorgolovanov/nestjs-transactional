@@ -65,11 +65,11 @@ export interface DatabaseConfig {
 }
 
 /**
- * Outbox processor tunables extracted from the validated env. Used
- * by the `OutboxModule.forRootAsync` factory.
+ * `@nestjs/outbox` relay tunables extracted from the validated env, as
+ * the `OutboxModule.forRootAsync` factory passes them on.
  */
 export interface OutboxConfig {
-  readonly pollingInterval: number;
+  readonly pollInterval: number;
   readonly batchSize: number;
-  readonly maxConcurrent: number;
+  readonly concurrency: number;
 }

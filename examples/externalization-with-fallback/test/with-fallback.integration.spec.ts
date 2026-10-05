@@ -3,77 +3,53 @@ import 'reflect-metadata';
 import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { type ClientProxy } from '@nestjs/microservices';
+import { type OutboxEnvelope, OutboxDeadLetters, OutboxRelay } from '@nestjs/outbox';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-} from '@nestjs-transactional/outbox-typeorm';
-import {
-  FailedEventPublications,
-  OutboxModule,
-  PublicationStatus,
-} from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { of } from 'rxjs';
 import type { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module.js';
 import { REFUNDS_BROKER } from '../src/clients.js';
-import { ProcessedRefundEntity } from '../src/processed-refunds.entity.js';
 import { RefundConsumerService } from '../src/refund-consumer.service.js';
 import { RefundEntity } from '../src/refund.entity.js';
-import { RefundLedgerHandler } from '../src/refund-ledger.handler.js';
-import { RefundRequestedEvent } from '../src/refund-requested.event.js';
+import type { RefundRequestedEvent } from '../src/refund-requested.event.js';
 import { RefundService } from '../src/refund.service.js';
 
-interface ProxyMock {
-  proxy: ClientProxy;
-  emit: jest.Mock;
-}
-
-function makeProxy(): ProxyMock {
-  const emit = jest.fn().mockReturnValue(of(undefined));
-  const proxy = { emit } as unknown as ClientProxy;
-  return { proxy, emit };
-}
-
-async function waitFor(
-  predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 5_000,
-): Promise<void> {
-  const start = Date.now();
-  while (!(await predicate())) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(`waitFor: timed out after ${timeoutMs} ms`);
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
-
-describe('externalization-with-fallback (Postgres real, ClientProxy mocked)', () => {
+describe('externalization-with-fallback (Postgres real, ClientProxy recorded)', () => {
   let container: StartedPostgreSqlContainer;
   let module: TestingModule;
   let dataSource: DataSource;
   let refunds: RefundService;
-  let ledger: RefundLedgerHandler;
   let consumer: RefundConsumerService;
-  let failed: FailedEventPublications;
-  let broker: ProxyMock;
+  let relay: OutboxRelay;
+  let deadLetters: OutboxDeadLetters;
+  let emit: jest.Mock<(pattern: string, data: unknown) => unknown>;
+
+  const pending = async (): Promise<{ attempts: number; last_error: string | null }[]> =>
+    dataSource.query('SELECT attempts, last_error FROM nest_outbox.messages ORDER BY seq');
+
+  /**
+   * Makes every scheduled retry due now. The module backs off a second
+   * and more between attempts, as a real deployment would; the test
+   * moves the clock of the waiting messages instead of sleeping through
+   * it.
+   */
+  const makeRetriesDue = async (): Promise<void> => {
+    await dataSource.query('UPDATE nest_outbox.messages SET available_at = 0');
+  };
 
   beforeAll(async () => {
-    OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
     TypeOrmTransactionalModule.resetForTesting();
 
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
 
-    broker = makeProxy();
+    emit = jest.fn((_pattern: string, _data: unknown) => of(undefined));
+    const proxy = { emit } as unknown as ClientProxy;
 
     module = await Test.createTestingModule({
       imports: [
@@ -86,11 +62,12 @@ describe('externalization-with-fallback (Postgres real, ClientProxy mocked)', ()
             database: container.getDatabase(),
           },
           { url: 'amqp://unused' },
+          { relay: false },
         ),
       ],
     })
       .overrideProvider(REFUNDS_BROKER)
-      .useValue(broker.proxy)
+      .useValue(proxy)
       .compile();
 
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -102,173 +79,125 @@ describe('externalization-with-fallback (Postgres real, ClientProxy mocked)', ()
 
     dataSource = module.get<DataSource>(getDataSourceToken());
     refunds = module.get(RefundService);
-    ledger = module.get(RefundLedgerHandler);
     consumer = module.get(RefundConsumerService);
-    failed = module.get(FailedEventPublications);
-  }, 60_000);
+    relay = module.get(OutboxRelay);
+    deadLetters = module.get(OutboxDeadLetters);
+  }, 120_000);
 
   afterAll(async () => {
-    await module.close();
-    await container.stop();
+    await module?.close();
+    await container?.stop();
   });
 
   beforeEach(async () => {
-    await dataSource.getRepository(EventPublicationArchiveEntity).clear();
-    await dataSource.getRepository(EventPublicationEntity).clear();
+    await dataSource.query(
+      'TRUNCATE nest_outbox.messages, nest_outbox.dead_letters, nest_outbox.inbox',
+    );
     await dataSource.getRepository(RefundEntity).clear();
-    await dataSource.getRepository(ProcessedRefundEntity).clear();
-    ledger.handled.length = 0;
     consumer.processed.length = 0;
-    broker.emit.mockReset();
-    broker.emit.mockReturnValue(of(undefined));
+    emit.mockClear();
+    emit.mockImplementation(() => of(undefined));
   });
 
-  describe('completion contract', () => {
-    it('emit() resolves → publication COMPLETED with no failure reason', async () => {
-      // The mocked emit returns `of(undefined)`, which is what a
-      // successful publish looks like to the externalizer. What that
-      // completion proves about the broker is transport-specific and
-      // is measured in ADR-021; the real-broker suite lives in the
-      // outbox-microservices package.
-      await refunds.requestRefund('rf-1', 'order-1', 5_000);
+  describe('producer side', () => {
+    it('a resolved emit delivers the envelope and the message leaves the outbox', async () => {
+      await refunds.requestRefund('rf-1', 'order-1', 1_500);
+      await relay.runOnce();
 
-      await waitFor(() => ledger.handled.some((e) => e.refundId === 'rf-1'));
-      await waitFor(() => broker.emit.mock.calls.length >= 1);
-
-      // The publication COMPLETES because emit() returned without
-      // throwing. That is the whole rule the processor applies.
-      await waitFor(async () => {
-        const row = await dataSource
-          .getRepository(EventPublicationEntity)
-          .findOne({ where: { eventType: 'RefundRequestedEvent' } });
-        return row?.status === PublicationStatus.COMPLETED;
-      });
-
-      const row = await dataSource
-        .getRepository(EventPublicationEntity)
-        .findOne({ where: { eventType: 'RefundRequestedEvent' } });
-      expect(row?.status).toBe(PublicationStatus.COMPLETED);
-      expect(row?.failureReason).toBeNull();
-
-      // Duplicates remain possible even on a transport that
-      // acknowledges, because delivery is at-least-once by design.
-      // The consumer-side inbox is what handles that (last describe
-      // block).
-    });
-  });
-
-  describe('FailedEventPublications.resubmit recovery', () => {
-    it('emit() throws → publication FAILED → operator resubmits → next poll COMPLETES', async () => {
-      // First emit attempt throws. Against a real Kafka or RabbitMQ
-      // this is what a broker that is down actually produces; the
-      // mock just makes it deterministic.
-      broker.emit.mockImplementationOnce(() => {
-        throw new Error('simulated broker rejection');
-      });
-
-      await refunds.requestRefund('rf-fail', 'order-fail', 9_999);
-
-      // Local ledger handler ran first (DD-019 ordering) — it always
-      // sees the event regardless of broker outcome.
-      await waitFor(() => ledger.handled.some((e) => e.refundId === 'rf-fail'));
-
-      // Externalizer error → publication FAILED with failureReason.
-      await waitFor(async () => {
-        const row = await dataSource
-          .getRepository(EventPublicationEntity)
-          .findOne({ where: { eventType: 'RefundRequestedEvent' } });
-        return row?.status === PublicationStatus.FAILED;
-      });
-
-      const failedRow = await dataSource
-        .getRepository(EventPublicationEntity)
-        .findOne({ where: { eventType: 'RefundRequestedEvent' } });
-      expect(failedRow?.failureReason).toMatch(/simulated broker rejection/);
-
-      // Operator API: count + resubmit.
-      const beforeCount = await failed.count();
-      expect(beforeCount).toBe(1);
-
-      const resubmittedCount = await failed.resubmit();
-      expect(resubmittedCount).toBe(1);
-
-      // The processor picks up the RESUBMITTED row on the next poll.
-      // Subsequent emit attempts use the default mock (succeeds).
-      await waitFor(async () => {
-        const row = await dataSource
-          .getRepository(EventPublicationEntity)
-          .findOne({ where: { eventType: 'RefundRequestedEvent' } });
-        return row?.status === PublicationStatus.COMPLETED;
-      });
-
-      // Two emit attempts happened: one threw, one succeeded.
-      expect(broker.emit.mock.calls.length).toBeGreaterThanOrEqual(2);
-
-      const afterCount = await failed.count();
-      expect(afterCount).toBe(0);
+      expect(emit).toHaveBeenCalledTimes(1);
+      const [pattern, envelope] = emit.mock.calls[0]! as [
+        string,
+        OutboxEnvelope<RefundRequestedEvent>,
+      ];
+      expect(pattern).toBe('refunds');
+      expect(envelope.payload).toMatchObject({ refundId: 'rf-1', amountCents: 1_500 });
+      expect(envelope.headers).toMatchObject({ 'x-correlation-id': 'rf-1' });
+      expect(await pending()).toEqual([]);
     });
 
-    it('multiple failed publications resubmit in one operator call', async () => {
-      broker.emit.mockImplementation(() => {
-        throw new Error('simulated broker rejection');
+    it('a rejected emit keeps the message, with the reason, for a retry', async () => {
+      emit.mockImplementation(() => {
+        throw new Error('simulated broker outage');
       });
 
-      await refunds.requestRefund('rf-a', 'order-a', 1_000);
-      await refunds.requestRefund('rf-b', 'order-b', 2_000);
-      await refunds.requestRefund('rf-c', 'order-c', 3_000);
+      await refunds.requestRefund('rf-2', 'order-2', 2_000);
+      await relay.runOnce();
 
-      await waitFor(async () => (await failed.count()) === 3);
+      const [message] = await pending();
+      expect(message).toMatchObject({ attempts: 1 });
+      expect(message!.last_error).toMatch(/simulated broker outage/);
+    });
 
-      // Now flip the broker back to succeeding so the resubmits clear.
-      broker.emit.mockReset();
-      broker.emit.mockReturnValue(of(undefined));
-
-      const resubmitted = await failed.resubmit();
-      expect(resubmitted).toBe(3);
-
-      await waitFor(async () => {
-        const rows = await dataSource.getRepository(EventPublicationEntity).find();
-        return rows.every((r) => r.status === PublicationStatus.COMPLETED);
+    it('a broker that recovers before the attempts run out gets the message on the retry', async () => {
+      emit.mockImplementationOnce(() => {
+        throw new Error('simulated broker blip');
       });
 
-      const rows = await dataSource.getRepository(EventPublicationEntity).find();
-      expect(rows).toHaveLength(3);
-      expect(rows.every((r) => r.status === PublicationStatus.COMPLETED)).toBe(true);
+      await refunds.requestRefund('rf-3', 'order-3', 3_000);
+      await relay.runOnce();
+      expect(await pending()).toHaveLength(1);
+
+      await makeRetriesDue();
+      await relay.runOnce();
+
+      expect(emit).toHaveBeenCalledTimes(2);
+      expect(await pending()).toEqual([]);
+    });
+
+    it('exhausted attempts dead-letter the message; an operator requeue delivers it', async () => {
+      emit.mockImplementation(() => {
+        throw new Error('simulated long outage');
+      });
+
+      await refunds.requestRefund('rf-4', 'order-4', 4_000);
+      // The module allows three attempts.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await makeRetriesDue();
+        await relay.runOnce();
+      }
+
+      expect(await pending()).toEqual([]);
+      const [dead] = await deadLetters.list();
+      expect(dead).toMatchObject({ topic: 'refunds', reason: 'exhausted', attempts: 3 });
+      expect(dead!.history).toHaveLength(3);
+      expect(dead!.lastError).toMatch(/simulated long outage/);
+
+      // The broker is back. The operator requeues, with a fresh budget.
+      emit.mockImplementation(() => of(undefined));
+      expect(await deadLetters.requeue(dead!.id)).toBe(1);
+      await relay.runOnce();
+
+      expect(await deadLetters.list()).toEqual([]);
+      const delivered = emit.mock.calls.at(-1)![1] as OutboxEnvelope<RefundRequestedEvent>;
+      // The same message, same id, so a consumer's inbox still recognises it.
+      expect(delivered.id).toBe(dead!.id);
     });
   });
 
-  describe('Consumer-side inbox dedup template', () => {
-    it('first invocation processes; second invocation with same publication id is a no-op', async () => {
-      const event = new RefundRequestedEvent('rf-dedup', 'order-dedup', 1_500);
-      const publicationId = 'pub-id-rf-dedup';
-
-      const first = await consumer.process(event, publicationId);
-      const second = await consumer.process(event, publicationId);
-
-      expect(first).toBe('processed');
-      expect(second).toBe('duplicate');
-
-      // Only one entry in the consumer's processed log.
-      expect(consumer.processed).toHaveLength(1);
-      expect(consumer.processed[0]?.event.refundId).toBe('rf-dedup');
-
-      // Inbox table holds exactly one row for this publication id.
-      const inbox = await dataSource.getRepository(ProcessedRefundEntity).find();
-      expect(inbox).toHaveLength(1);
-      expect(inbox[0]?.publicationId).toBe(publicationId);
+  describe('consumer side (inbox)', () => {
+    const envelope = (id: string, refundId: string): OutboxEnvelope<RefundRequestedEvent> => ({
+      id,
+      topic: 'refunds',
+      key: null,
+      headers: {},
+      createdAt: Date.now(),
+      payload: { refundId, orderId: `order-${refundId}`, amountCents: 100 },
     });
 
-    it('different publication ids of the same event class are processed independently', async () => {
-      const event = new RefundRequestedEvent('rf-multi', 'order-multi', 4_000);
+    it('the first delivery is processed; a redelivery of the same id is a no-op', async () => {
+      const message = envelope('m-1', 'rf-10');
 
-      await consumer.process(event, 'pub-1');
-      await consumer.process(event, 'pub-2');
-      await consumer.process(event, 'pub-1'); // duplicate of pub-1
+      expect(await consumer.process(message)).toBe('processed');
+      expect(await consumer.process(message)).toBe('duplicate');
 
-      expect(consumer.processed).toHaveLength(2);
-      const inbox = await dataSource.getRepository(ProcessedRefundEntity).find();
-      const ids = inbox.map((r) => r.publicationId).sort();
-      expect(ids).toEqual(['pub-1', 'pub-2']);
+      expect(consumer.processed).toEqual([{ refundId: 'rf-10', messageId: 'm-1' }]);
+    });
+
+    it('different message ids are processed independently', async () => {
+      expect(await consumer.process(envelope('m-2', 'rf-11'))).toBe('processed');
+      expect(await consumer.process(envelope('m-3', 'rf-12'))).toBe('processed');
+
+      expect(consumer.processed.map((p) => p.messageId)).toEqual(['m-2', 'm-3']);
     });
   });
 });

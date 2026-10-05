@@ -11,10 +11,9 @@ is really showing.
 - You are starting a new project that uses this framework and
   want a copy-paste skeleton for the test setup.
 - You have an existing project and want to see what each
-  test-side utility (`InMemoryTransactionAdapter`,
-  `InMemoryEventPublicationRepository`, `PublishedEvents`,
-  `AssertablePublishedEvents`, testcontainers Postgres) is
-  actually for and when to reach for it.
+  test-side tool (`InMemoryTransactionAdapter`, a recording
+  `Outbox`, testcontainers Postgres with `OutboxRelay.runOnce()`)
+  is actually for and when to reach for it.
 - You're deciding whether a particular invariant belongs to a
   unit test or an integration test.
 
@@ -40,44 +39,38 @@ TransactionalModule.forRoot({ adapter: new InMemoryTransactionAdapter() })
 The repository is provided as a Jest mock under the
 `WALLET_REPOSITORY` token — no TypeORM module is imported at all.
 
-### Tier 2 — outbox unit tests with `InMemoryEventPublicationRepository`
+### Tier 2 — outbox unit tests with a recording `Outbox`
 
-`test/wallet-outbox.spec.ts`. Still no database, but now the
-outbox machinery is wired. Verifies what the service **published**
-without actually delivering anything. Two assertion styles:
+`test/wallet-outbox.spec.ts`. Still no database. The real
+`OutboxEventPublisher` runs inside real `@Transactional` transactions on
+the in-memory adapter, against a stand-in for `@nestjs/outbox`'s `Outbox`
+that records each `add()`. That verifies what the service **hands the
+outbox**: which messages, on which topic, with which payload and headers.
 
-- `PublishedEvents` — Spring-Modulith-style fluent view, returns
-  raw arrays for ad-hoc Jest matchers.
-- `AssertablePublishedEvents` — fluent assertions that throw
-  `PublishedEventsAssertionError` on mismatch and chain
-  naturally.
+The wiring is a global module that provides `Outbox`, plus
+`TransactionalOutboxModule.forRoot({ transactionResolver: (active) =>
+active.handle })`: the in-memory adapter's handle is not a TypeORM
+`EntityManager`, so the resolver hands the handle itself to the stand-in.
 
-The wiring trick: `OutboxModule.forRoot({})` **without** an
-explicit `repository` option defaults to
-`InMemoryEventPublicationRepository`. There is no swap-in step;
-just leave the option off in test code.
-
-A subtle property worth exercising: the in-memory repository
-registers an `afterRollback` hook for every `createAll`. A
-publication created inside a rolled-back transaction **disappears**
-from `PublishedEvents.all()` after the rollback runs. The third
-test in the file pins this — same visibility guarantee a real
-DB-backed outbox gives.
+What this tier deliberately does **not** assert is atomicity. Whether a
+message rolls back with the wallet row is decided by the database
+transaction the store writes through, so a stand-in can only pretend.
+That assertion lives in Tier 3, where there is a database to decide it.
 
 ### Tier 3 — integration tests with testcontainers Postgres
 
-`test/wallet.integration.spec.ts`. Real Postgres, real outbox
-tables, real worker. Slower (a few seconds per suite once the
-image is cached) but exercises:
+`test/wallet.integration.spec.ts`. Real Postgres, the real
+`PostgresOutboxStore`, the real relay. Slower (a few seconds per suite
+once the image is cached) but exercises:
 
-- Row-level isolation between transactions.
-- The worker poll loop and status transitions
-  (`PUBLISHED → COMPLETED`).
+- The message committing and rolling back **with** the wallet row.
+- Delivery to the `@OnOutboxMessage` listener (`WalletProjection`).
 - The actual TypeORM Repository implementation injected under
   `WALLET_REPOSITORY` (the production `TypeOrmWalletRepository`).
-- The outbox-routed `@IntegrationEventsHandler` listener under
-  realistic asynchronous timing — `waitFor(...)` because the worker
-  delivers in its own poll cycle, not synchronously at commit.
+
+The module is built with `relay: false`, and each test calls
+`OutboxRelay.runOnce()` to deliver: no polling, no `waitFor`, no timing
+to race. This is the testing pattern `@nestjs/outbox` documents.
 
 Each integration test catches significantly more regressions than
 its unit-tier counterpart. Keep a healthy ratio of both: the unit
@@ -105,34 +98,24 @@ pnpm -C examples/testing-patterns test:integration
 
 ## What's NOT covered here
 
-- **Externalization tests with a mocked broker `ClientProxy`.** That
-  pattern is documented in
+- **Externalization tests with a recorded broker `ClientProxy`.** See
   [`externalization-with-fallback`](../externalization-with-fallback)
-  and the other Tier 3 externalization examples — the mock returns
-  `of(undefined)` from `emit()` for a delivered event and throws for
-  a failed one, which is enough to drive both publication outcomes
-  without a broker container.
-- **Multi-DataSource testing.** See
-  [`multi-datasource-outbox`](../multi-datasource-outbox) for the
-  testcontainers + multi-DB pattern (one container, two databases).
+  and the other Tier 3 externalization examples: the stand-in returns
+  `of(undefined)` from `emit()` for a delivered message and throws for a
+  failed one, which drives both outcomes without a broker container.
 - **Saga / compensation tests.** See [`saga-pattern`](../saga-pattern).
 
 ## Common pitfalls
 
-- **Testing the framework instead of your code.** Resist the urge
-  to assert that `OutboxEventPublisher` writes to
-  `event_publication` correctly — that is covered by the
-  framework's own tests. Assert what *your* domain emits and how
+- **Testing the framework instead of your code.** Resist the urge to
+  assert how `@nestjs/outbox` stores or claims messages; its own
+  contract suites cover that. Assert what *your* domain emits and how
   *your* listeners react.
-- **Snapshotting publication rows.** The `id`, `publicationDate`,
-  `completionDate` columns are non-deterministic. Use
-  `PublishedEvents.ofType(...).matching(...)` on the deserialized
-  payload instead of `toMatchSnapshot` on the raw row.
-- **Forgetting `OutboxModule.resetForTesting()` in `beforeEach`.**
-  The module's `forFeature` aggregations live in module-static
-  state. Without `resetForTesting`, a prior test's event class
-  registrations leak into the next test. The wallet-outbox spec
-  does this correctly.
+- **Snapshotting outbox rows.** Message ids, sequence numbers and
+  timestamps are non-deterministic. Assert on topic and payload instead.
+- **Waiting on a background relay in tests.** A relay that polls on its
+  own makes every assertion a race against the poll interval. Turn it
+  off and call `runOnce()`.
 - **Sharing testcontainers Postgres across test files.** The
   containers are isolated per `describe` block in this example
   for clarity. In a larger suite you can share via Jest's
@@ -152,8 +135,6 @@ pnpm -C examples/testing-patterns test:integration
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
-- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
+- [DD-028 — the outbox bridge contract](../../docs/dd/028-outbox-bridge-contract.md)
 - [`packages/core/src/testing/in-memory.adapter.ts`](../../packages/core/src/testing/in-memory.adapter.ts)
-- [`packages/outbox/src/testing/published-events.ts`](../../packages/outbox/src/testing/published-events.ts)
-- [`packages/outbox/src/testing/assertable-published-events.ts`](../../packages/outbox/src/testing/assertable-published-events.ts)
+- [`@nestjs/outbox` testing guide](https://docs.nestjs.com/reliability/outbox#testing)

@@ -6,13 +6,8 @@ import { type ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, PublicationStatus } from '@nestjs-transactional/outbox';
-import { EventPublicationEntity } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { of } from 'rxjs';
 import request from 'supertest';
 import type { DataSource } from 'typeorm';
@@ -31,7 +26,7 @@ interface KafkaMock {
 
 function makeKafkaMock(): KafkaMock {
   // `ClientProxy.emit` returns an Observable that completes on
-  // success, so a mocked `of(undefined)` is exactly what the worker
+  // success, so a mocked `of(undefined)` is exactly what the relay
   // sees when a real broker accepts the message.
   const emit = jest.fn().mockReturnValue(of(undefined));
   const proxy = { emit } as unknown as ClientProxy;
@@ -51,51 +46,31 @@ async function waitFor(
   }
 }
 
-describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
+describe('e-commerce-orders (Postgres real, Kafka recorded)', () => {
   let container: StartedPostgreSqlContainer;
   let module: TestingModule;
   let app: INestApplication;
-  let ordersDs: DataSource;
-  let inventoryDs: DataSource;
-  let billingDs: DataSource;
+  let ds: DataSource;
   let kafka: KafkaMock;
 
   beforeAll(async () => {
-    OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
     TypeOrmTransactionalModule.resetForTesting();
 
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
 
-    // One container, three databases — same trick as Tier 2 multi-DS examples.
-    const { Client } = await import('pg');
-    const admin = new Client({
-      host: container.getHost(),
-      port: container.getPort(),
-      user: container.getUsername(),
-      password: container.getPassword(),
-      database: container.getDatabase(),
-    });
-    await admin.connect();
-    await admin.query('CREATE DATABASE inventory_db');
-    await admin.query('CREATE DATABASE billing_db');
-    await admin.end();
-
     kafka = makeKafkaMock();
-
-    const conn = {
-      host: container.getHost(),
-      port: container.getPort(),
-      username: container.getUsername(),
-      password: container.getPassword(),
-    };
 
     module = await Test.createTestingModule({
       imports: [
         AppModule.forConfig({
-          orders: { ...conn, database: container.getDatabase() },
-          inventory: { ...conn, database: 'inventory_db' },
-          billing: { ...conn, database: 'billing_db' },
+          postgres: {
+            host: container.getHost(),
+            port: container.getPort(),
+            username: container.getUsername(),
+            password: container.getPassword(),
+            database: container.getDatabase(),
+          },
           kafkaBrokers: ['unused:9092'],
         }),
       ],
@@ -104,9 +79,8 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
       .useValue(kafka.proxy)
       .compile();
 
-    // Worker briefly observes rolled-back rows during the failure
-    // tests — `markFailed` then errors on a missing row. Expected
-    // noise; suppress all log levels for the suite.
+    // The relay runs in the background: a saga is a chain of
+    // deliveries, and each test waits for its end state.
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -115,9 +89,7 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     app = module.createNestApplication();
     await app.init();
 
-    ordersDs = module.get<DataSource>(getDataSourceToken());
-    inventoryDs = module.get<DataSource>(getDataSourceToken('inventory'));
-    billingDs = module.get<DataSource>(getDataSourceToken('billing'));
+    ds = module.get<DataSource>(getDataSourceToken());
   }, 90_000);
 
   afterAll(async () => {
@@ -128,17 +100,15 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
 
   beforeEach(async () => {
     kafka.emit.mockClear();
-    await ordersDs.query('TRUNCATE TABLE event_publication, event_publication_archive RESTART IDENTITY');
-    await inventoryDs.query('TRUNCATE TABLE event_publication, event_publication_archive RESTART IDENTITY');
-    await billingDs.query('TRUNCATE TABLE event_publication, event_publication_archive RESTART IDENTITY');
-    await ordersDs.getRepository(OrderRow).clear();
-    await inventoryDs.getRepository(ReservationRow).clear();
-    await inventoryDs.getRepository(ProductRow).clear();
-    await billingDs.getRepository(PaymentRow).clear();
+    await ds.query('TRUNCATE nest_outbox.messages, nest_outbox.dead_letters, nest_outbox.inbox');
+    await ds.getRepository(OrderRow).clear();
+    await ds.getRepository(ReservationRow).clear();
+    await ds.getRepository(ProductRow).clear();
+    await ds.getRepository(PaymentRow).clear();
   });
 
   async function seedStock(sku: string, available: number): Promise<void> {
-    await inventoryDs.getRepository(ProductRow).save({ sku, available });
+    await ds.getRepository(ProductRow).save({ sku, available });
   }
 
   async function placeOrder(body: object): Promise<{ statusCode: number; orderId?: string }> {
@@ -160,30 +130,30 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     const orderId = placed.orderId!;
 
     await waitFor(
-      async () => (await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'confirmed',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'confirmed',
     );
 
     // Inventory + payment side-effects landed.
-    expect((await inventoryDs.getRepository(ProductRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(8);
+    expect((await ds.getRepository(ProductRow).findOneBy({ sku: 'WIDGET' }))?.available).toBe(8);
     expect(
-      (await inventoryDs.getRepository(ReservationRow).findOneBy({ id: `${orderId}:WIDGET` }))?.status,
+      (await ds.getRepository(ReservationRow).findOneBy({ id: `${orderId}:WIDGET` }))?.status,
     ).toBe('reserved');
-    expect((await billingDs.getRepository(PaymentRow).findOneBy({ orderId }))?.status).toBe('charged');
+    expect((await ds.getRepository(PaymentRow).findOneBy({ orderId }))?.status).toBe('charged');
 
-    // OrderConfirmedEvent reached the Kafka mock — externalization
-    // happens AFTER the worker delivers, so we wait for it.
-    // Note: `@Externalized` `headers` / `routingKey` callbacks are
-    // currently a documented limitation — they're not
-    // routed to `ClientProxy.emit` yet. Tests assert on the event
-    // payload itself.
-    await waitFor(() =>
-      kafka.emit.mock.calls.some(([target]) => target === 'orders.confirmed'),
-    );
-    const confirmedCall = kafka.emit.mock.calls.find(
-      ([target]) => target === 'orders.confirmed',
-    );
+    // OrderConfirmedEvent reached Kafka as a keyed record: the relay
+    // delivers it after the confirming transaction commits.
+    await waitFor(() => kafka.emit.mock.calls.some(([target]) => target === 'orders.confirmed'));
+    const confirmedCall = kafka.emit.mock.calls.find(([target]) => target === 'orders.confirmed');
     expect(confirmedCall).toBeDefined();
-    expect(confirmedCall![1]).toMatchObject({
+    const record = confirmedCall![1] as {
+      key: string;
+      headers: Record<string, string>;
+      value: { payload: unknown };
+    };
+    expect(record.key).toBe(orderId);
+    expect(record.headers).toMatchObject({ 'x-order-id': orderId, 'x-customer-id': 'c-1' });
+    expect(record.value.payload).toMatchObject({
       orderId,
       customerId: 'c-1',
       totalAmountCents: 3000,
@@ -200,7 +170,8 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     const orderId = placed.orderId!;
 
     await waitFor(
-      async () => (await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'confirmed',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'confirmed',
     );
 
     const res = await request(app.getHttpServer()).get(`/orders/${orderId}`);
@@ -223,9 +194,7 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
   it('POST validation rejects bodies missing customerId / items', async () => {
     expect((await placeOrder({})).statusCode).toBe(400);
     expect((await placeOrder({ customerId: 'c-1' })).statusCode).toBe(400);
-    expect(
-      (await placeOrder({ customerId: 'c-1', items: [] })).statusCode,
-    ).toBe(400);
+    expect((await placeOrder({ customerId: 'c-1', items: [] })).statusCode).toBe(400);
     expect(
       (
         await placeOrder({
@@ -246,23 +215,23 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     const orderId = placed.orderId!;
 
     await waitFor(
-      async () => (await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'failed',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'failed',
     );
 
-    const order = await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId });
+    const order = await ds.getRepository(OrderRow).findOneBy({ id: orderId });
     expect(order?.failureReason).toContain('out of stock');
 
     // Stock unchanged — the @Transactional inside ReserveStockHandler rolled back.
-    expect((await inventoryDs.getRepository(ProductRow).findOneBy({ sku: 'SCARCE' }))?.available).toBe(1);
-    expect(await billingDs.getRepository(PaymentRow).countBy({ orderId })).toBe(0);
+    expect((await ds.getRepository(ProductRow).findOneBy({ sku: 'SCARCE' }))?.available).toBe(1);
+    expect(await ds.getRepository(PaymentRow).countBy({ orderId })).toBe(0);
 
     // OrderConfirmedEvent never emitted.
     await new Promise((r) => setTimeout(r, 300));
     expect(
       kafka.emit.mock.calls.some(
         ([target, payload]) =>
-          target === 'orders.confirmed' &&
-          (payload as { headers?: { 'x-order-id'?: string } })?.headers?.['x-order-id'] === orderId,
+          target === 'orders.confirmed' && (payload as { key?: string })?.key === orderId,
       ),
     ).toBe(false);
   });
@@ -279,24 +248,25 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     const orderId = placed.orderId!;
 
     await waitFor(
-      async () => (await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'failed',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'failed',
       10_000,
     );
 
-    const payment = await billingDs.getRepository(PaymentRow).findOneBy({ orderId });
+    const payment = await ds.getRepository(PaymentRow).findOneBy({ orderId });
     expect(payment?.status).toBe('failed');
 
     // Stock fully released by ReleaseStockHandler — back to 5.
     await waitFor(
-      async () => (await inventoryDs.getRepository(ProductRow).findOneBy({ sku: 'PRICY' }))?.available === 5,
+      async () => (await ds.getRepository(ProductRow).findOneBy({ sku: 'PRICY' }))?.available === 5,
       10_000,
     );
     expect(
-      (await inventoryDs.getRepository(ReservationRow).findOneBy({ id: `${orderId}:PRICY` }))?.status,
+      (await ds.getRepository(ReservationRow).findOneBy({ id: `${orderId}:PRICY` }))?.status,
     ).toBe('released');
   });
 
-  it('cross-DS rollback isolation: a poisoned product row in inventory never touches orders or billing on placement', async () => {
+  it('context isolation: an unknown product fails the reservation without touching billing', async () => {
     // No stock seeded for 'INVALID' — reservation will OOS-fail.
     const placed = await placeOrder({
       customerId: 'c-cross',
@@ -304,22 +274,23 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     });
     const orderId = placed.orderId!;
 
-    // The ORDER row IS persisted (the placement transaction
-    // committed in orders DS atomically with the OrderPlacedEvent
-    // publication, before reservation runs).
-    expect(await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId })).not.toBeNull();
+    // The order row IS persisted: the placement transaction committed
+    // it together with the OrderPlacedEvent message, before reservation
+    // runs.
+    expect(await ds.getRepository(OrderRow).findOneBy({ id: orderId })).not.toBeNull();
 
     await waitFor(
-      async () => (await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'failed',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'failed',
     );
 
     // Billing untouched.
-    expect(await billingDs.getRepository(PaymentRow).countBy({ orderId })).toBe(0);
+    expect(await ds.getRepository(PaymentRow).countBy({ orderId })).toBe(0);
     // Inventory untouched (no rows since no SKU matched).
-    expect(await inventoryDs.getRepository(ReservationRow).countBy({ orderId })).toBe(0);
+    expect(await ds.getRepository(ReservationRow).countBy({ orderId })).toBe(0);
   });
 
-  it('outbox status transitions: every publication ends COMPLETED on each DS', async () => {
+  it('the outbox drains: every saga message is delivered, none dead-lettered', async () => {
     await seedStock('GIZMO', 10);
 
     const placed = await placeOrder({
@@ -329,27 +300,26 @@ describe('e-commerce-orders (Postgres × 3 real, Kafka mocked)', () => {
     const orderId = placed.orderId!;
 
     await waitFor(
-      async () => (await ordersDs.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'confirmed',
+      async () =>
+        (await ds.getRepository(OrderRow).findOneBy({ id: orderId }))?.status === 'confirmed',
     );
 
-    // Wait for every per-DS publication to be COMPLETED. Default
-    // completionMode is UPDATE — rows stay in the hot queue with
-    // status='COMPLETED' (Convention learned in audit-logging).
+    // Delivered messages leave the outbox; wait until none is waiting.
     await waitFor(async () => {
-      const allDs = [ordersDs, inventoryDs, billingDs];
-      for (const ds of allDs) {
-        const pending = await ds.getRepository(EventPublicationEntity).count({
-          where: { status: PublicationStatus.PUBLISHED },
-        });
-        if (pending > 0) return false;
-      }
-      return true;
+      const [{ n }] = await ds.query('SELECT count(*)::int AS n FROM nest_outbox.messages');
+      return n === 0;
     });
+    const [{ dead }] = await ds.query('SELECT count(*)::int AS dead FROM nest_outbox.dead_letters');
+    expect(dead).toBe(0);
 
-    // Sanity: every DS produced at least one publication.
-    for (const ds of [ordersDs, inventoryDs, billingDs]) {
-      const total = await ds.getRepository(EventPublicationEntity).count();
-      expect(total).toBeGreaterThan(0);
-    }
+    // Each step recorded its delivery in its own inbox.
+    const consumers: { consumer: string }[] = await ds.query(
+      'SELECT DISTINCT consumer FROM nest_outbox.inbox ORDER BY consumer',
+    );
+    expect(consumers.map((c) => c.consumer)).toEqual([
+      'billing.charge-payment',
+      'inventory.reserve-stock',
+      'orders.confirm-shipment',
+    ]);
   });
 });

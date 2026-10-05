@@ -8,23 +8,17 @@ import { OrderEntity } from './order.entity.js';
 import { OrderPlacedEvent } from './order-placed.event.js';
 
 /**
- * Single-unit atomicity (DD-019) extended to externalization:
+ * Atomicity extended to a broker:
  *
  *   1. INSERT into `orders` via the transparent repository.
- *   2. APPEND a publication row through `OutboxEventPublisher.publish`.
+ *   2. Add an outbox message through `OutboxEventPublisher.publish`.
  *
- * Both writes commit together. The `EventPublicationProcessor` worker
- * then picks the row up, invokes the local `@OutboxEventsHandler`
- * (`ShippingHandler`), and finally calls the externalizer to emit
- * the event onto Kafka. If the LOCAL listener succeeds but the
- * externalizer throws, the publication stays `FAILED` and is retried
- * on the next poll — see `EventPublicationProcessor.processOne`.
- *
- * Note on DI: `OutboxEventPublisher` is injected via class token —
- * NOT via `@InjectOutboxPublisher(...)`. The class-token form gives
- * the smart facade (DD-024) which is the canonical default. The
- * decorator form binds the per-DS underlying publisher and is only
- * needed for advanced multi-DS routing scenarios.
+ * Both writes commit together. After the commit `@nestjs/outbox`'s relay
+ * emits the message to Kafka. If the broker rejects it, the message stays
+ * in the outbox and is retried with backoff, and after the last attempt
+ * it is dead-lettered with its error history. A rollback leaves no
+ * message, so nothing ever reaches Kafka for an order that does not
+ * exist.
  */
 @Injectable()
 export class OrderService {
@@ -48,7 +42,7 @@ export class OrderService {
   ): Promise<void> {
     await this.orders.save({ id: orderId, customerEmail, totalCents });
     await this.outbox.publish(new OrderPlacedEvent(orderId, customerEmail, totalCents));
-    throw new Error('simulated failure — both orders row and publication row roll back');
+    throw new Error('simulated failure — both the order and its outbox message roll back');
   }
 
   async listAll(): Promise<OrderEntity[]> {

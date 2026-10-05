@@ -4,7 +4,7 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
  * Payment ledger. PK on `orderId` so the duplicate-INSERT idempotency
  * gate (Tier 4 saga-pattern carry-over) works for billing too.
  */
-@Entity({ name: 'payments' })
+@Entity({ schema: 'billing', name: 'payments' })
 export class PaymentRow {
   @PrimaryColumn({ type: 'text' })
   orderId!: string;

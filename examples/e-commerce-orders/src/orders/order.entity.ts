@@ -11,7 +11,7 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
  * to keep the schema minimal. A real app likely models lines as a
  * separate table for query flexibility.
  */
-@Entity({ name: 'orders' })
+@Entity({ schema: 'orders', name: 'orders' })
 export class OrderRow {
   @PrimaryColumn({ type: 'text' })
   id!: string;

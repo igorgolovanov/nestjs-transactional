@@ -7,9 +7,9 @@ out-of-stock during reservation, and authorisation-decline during
 payment (which restores the previously-reserved stock).
 
 Each step writes its business row and publishes its outcome event in
-**one local transaction** (DD-019). The outbox worker delivers the
-event to the next step's `@IntegrationEventsHandler`, which opens
-its own fresh transaction. There is no distributed transaction;
+**one local transaction**. `@nestjs/outbox`'s relay delivers the event
+to the next step's `@OnOutboxMessage` handler, which opens its own fresh
+transaction. There is no distributed transaction;
 saga consistency is reached through eventual propagation of locally-
 atomic units.
 
@@ -19,14 +19,14 @@ atomic units.
   subscription activation, refund flow) where each step writes to
   the same database AND a step's failure must roll back the prior
   step's effects.
-- You want to see how `@IntegrationEventsHandler` chains under the
-  outbox — same decorator, durable retries, idempotent steps.
+- You want to see how `@OnOutboxMessage` handlers chain through the
+  outbox: durable retries, an inbox per step, idempotent steps.
 - You want a starting template for the **inbox / dedup pattern at
   the step level**: primary-key INSERT as the idempotency gate so
   the outbox's at-least-once delivery does not double-charge.
 
-For multi-DataSource sagas (each step owning its own database) see
-the upcoming Tier 5 [`e-commerce-orders`](../). For the consumer-side
+For a saga across bounded contexts, started from an aggregate and ending
+on Kafka, see [`e-commerce-orders`](../e-commerce-orders). For the consumer-side
 inbox/dedup template applied to externalized events see
 [`externalization-with-fallback`](../externalization-with-fallback).
 
@@ -85,16 +85,16 @@ pnpm -C examples/saga-pattern start
 1. **Step entry through `@Transactional` + `OutboxEventPublisher`.**
    `OrderService.placeOrder` is the saga's entry point: it persists
    the order row and publishes `OrderPlacedEvent` atomically.
-2. **Step chaining via `@IntegrationEventsHandler`.** Each
-   subsequent step (`ReservationHandler`, `PaymentHandler`,
-   `ShipmentHandler`, `CompensationHandler`) listens for the
-   previous step's outcome event. Identical decorator everywhere —
-   the framework treats compensation handlers as just another step.
+2. **Step chaining via `@OnOutboxMessage`.** Each subsequent step
+   (`ReservationHandler`, `PaymentHandler`, `ShipmentHandler`,
+   `CompensationHandler`) subscribes to the previous step's outcome
+   event by class name. Identical decorator everywhere: compensation
+   is just another step.
 3. **Atomic step writes.** Inside each handler's `@Transactional`
    block, the business row (`ReservationRow`, `PaymentRow`,
    `OrderRow.status` update) AND the outcome event publication
    commit together. If the handler throws mid-flight, both roll
-   back; the outbox worker retries.
+   back; the relay keeps the incoming message and retries it.
 4. **Idempotency gates per step.** `ReservationRow` and
    `PaymentRow` use `orderId` as the primary key. A retried delivery
    tries the same `INSERT`, hits Postgres `unique_violation`, and
@@ -103,15 +103,16 @@ pnpm -C examples/saga-pattern start
    payment-compensation branch use **conditional `UPDATE`** instead
    (gated on the previous status) — same idempotency property
    without an additional uniqueness constraint.
-5. **Compensation as a regular handler.** `CompensationHandler`
-   subscribes to `InventoryReservationFailedEvent` AND
-   `PaymentFailedEvent`. The `PaymentFailedEvent` branch restores
+5. **Compensation as a regular handler.** `CompensationHandler` has one
+   method per failure event, `InventoryReservationFailedEvent` and
+   `PaymentFailedEvent`; the payload is plain JSON, so the event type
+   is told apart by topic, not by `instanceof`. The `PaymentFailedEvent` branch restores
    stock and marks the order `'failed-payment'` atomically — a
    normal local transaction, no special framework support.
-6. **Single-unit atomicity at saga entry (DD-019).** The integration
-   test `atomicity at saga entry` places the same order id twice;
-   the second call's PK violation rolls back the @Transactional
-   AND discards the in-flight `OrderPlacedEvent` publication. The
+6. **Atomicity at saga entry.** The integration test
+   `atomicity at saga entry` places the same order id twice; the
+   second call's PK violation rolls back the @Transactional AND
+   discards the `OrderPlacedEvent` message added in it. The
    saga's second instance never starts.
 
 ## Architecture diagram
@@ -147,39 +148,34 @@ pnpm -C examples/saga-pattern start
   retry. The framework cannot enforce this — it is a per-step
   contract.
 - **Mixing aggregate-root events into the saga.** This example
-  uses plain `OutboxEventPublisher.publish(...)` calls. If you
-  layer `AggregateRoot.commit()` on top, register the events with
-  `OutboxModule.forFeature` so the outbox sees them. Aggregate-
-  emitted events that are NOT in the registry stay in-memory only
-  and the saga chain breaks silently. (See
-  [`e-commerce-orders`](../e-commerce-orders) for the aggregate-
-  root + outbox combo at Tier 5 scale.)
+  uses plain `OutboxEventPublisher.publish(...)` calls. An aggregate's
+  events reach the outbox through `aggregate.commit()` only when they
+  carry `@Externalized`; the rest stay in-memory, and a saga step
+  waiting on one would never run. For an in-process step, use
+  `@Externalized({ target, client: 'local' })`, as
+  [`e-commerce-orders`](../e-commerce-orders) does to start its saga.
 - **Compensation publishing more events.** This example's
   compensation handler is a leaf — it does not publish further
   events. If your compensation needs to fan out (e.g. notify a
   refund service), the same `OutboxEventPublisher.publish` works,
   but design the recipients' idempotency gates carefully — failure-
   driven flows tend to retry more aggressively than success flows.
-- **`CqrsModule` double-import.** Do NOT import `@nestjs/cqrs`'s
-  `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.
-  See [`docs/status/conventions.md`](../../docs/status/conventions.md) #6.
+- **Stable `consumer` names.** Each step's inbox is keyed by its
+  `consumer`; renaming one makes every past message look new to it.
 
 ## Related examples
 
 - [`basic-typeorm-outbox`](../basic-typeorm-outbox) — single-step
   outbox delivery with TypeORM persistence. Foundation pattern.
 - [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
-  with the same saga pattern at multi-DataSource scale plus REST
-  surface and Kafka externalization.
-- [`multi-datasource-outbox`](../multi-datasource-outbox) — outbox
-  per dataSource with decorator-driven handler routing.
+  with the same saga pattern across three bounded contexts, plus REST
+  and Kafka.
 - [`externalization-with-fallback`](../externalization-with-fallback) —
   consumer-side inbox/dedup pattern complementing the producer
   outbox.
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
-- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
+- [DD-028 — the outbox bridge contract](../../docs/dd/028-outbox-bridge-contract.md)
 - [Convention #26 — idempotency gate at every outbox-driven step](../../docs/status/conventions.md)
 - [Convention #25 — inbox / dedup as consumer-side complement](../../docs/status/conventions.md)

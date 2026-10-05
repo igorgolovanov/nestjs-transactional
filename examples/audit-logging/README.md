@@ -3,7 +3,7 @@
 Two physical Postgres databases — **business** and **audit** —
 demonstrating cross-DataSource audit logging without distributed
 transactions. Business operations commit atomically in one DS; the
-audit consumer writes to the other DS after the outbox worker
+audit consumer writes to the other DS after `@nestjs/outbox`'s relay
 delivers the event. Consistency between the two DBs is reached
 through at-least-once delivery + an idempotency gate on the
 audit-row primary key (DD-023).
@@ -17,13 +17,12 @@ audit-row primary key (DD-023).
   audit rows appear within milliseconds under load, but a brief
   audit-DB outage does not block business operations.
 - You want a template for the **asymmetric multi-DS shape**: one
-  DS with the full outbox stack, one DS with only the transactional
-  adapter, no outbox tables on the sink side.
+  DS with the outbox, one DS with only the transactional adapter,
+  no outbox tables on the sink side. It is also the shape the outbox
+  supports: it lives in exactly one DataSource (ADR-023).
 
 For a saga across multiple steps within ONE DataSource see
-[`saga-pattern`](../saga-pattern). For multiple DataSources both
-producing AND consuming events see
-[`multi-datasource-outbox`](../multi-datasource-outbox).
+[`saga-pattern`](../saga-pattern).
 
 ## Why not co-locate the audit table in the business DB?
 
@@ -41,10 +40,11 @@ disagree) but trades away independence:
 
 The cross-DS pattern in this example accepts a millisecond-scale
 window where the business operation is committed but the audit row
-is not yet written. If the audit DS is unreachable when the worker
-runs, the publication moves to `FAILED` and is retried by an
-operator. The audit log catches up; it does not lose data
-(at-least-once + idempotency).
+is not yet written. If the audit DS is unreachable when the relay
+delivers, the handler's transaction fails, the message stays in the
+outbox, and the relay retries it with backoff until the audit DS is
+back. The audit log catches up; it does not lose data (at-least-once +
+idempotency).
 
 When the stronger atomicity is required (e.g. financial regulation
 forbids any window between business-write and audit-write), keep
@@ -60,13 +60,13 @@ both writes in one transaction in one DB and accept the coupling.
    │  │            │   │   operations   │     │
    │  └────────────┘   └────────────────┘     │
    │  ┌─────────────────────────────────┐     │
-   │  │ event_publication               │     │
+   │  │ nest_outbox.messages / .inbox   │     │
    │  └─────────────────────────────────┘     │
    │              │                           │
-   │              │ worker (poll)             │
+   │              │ @nestjs/outbox relay      │
    └──────────────┼───────────────────────────┘
                   │
-                  ▼ AuditHandler.handle (cross-DS hop)
+                  ▼ AuditHandler.log (cross-DS hop)
    ┌──────────────────────────────────────────┐
    │  Audit DS (Postgres "audit_db")          │
    │  ┌─────────────────────────────────┐     │
@@ -103,37 +103,39 @@ pnpm -C examples/audit-logging start
 
 ## What it shows
 
-1. **Asymmetric multi-`forRoot` wiring.** Business DS gets the full
-   outbox stack (`OutboxTypeOrmModule.forRoot` +
-   `OutboxModule.forRoot` + worker via `OutboxProcessingModule` +
-   `forFeature` registration). Audit DS gets only
-   `TypeOrmTransactionalModule.forRoot({ dataSource: 'audit' })` —
-   no `event_publication` table, no worker. The audit DB is a sink.
-2. **Single-unit atomicity per DS (DD-019).** Inside
+1. **Asymmetric wiring.** The business DS gets the outbox:
+   `@nestjs/outbox`'s `OutboxModule` with a `PostgresOutboxStore` on the
+   business DataSource, plus `TransactionalOutboxModule`. The audit DS
+   gets only `TypeOrmTransactionalModule.forRoot({ dataSource: 'audit' })`;
+   no outbox tables, no relay. The audit DB is a sink.
+2. **Atomicity in the business DS.** Inside
    `AccountService.deposit/withdraw`, three writes commit together
    in the business DS: the `accounts.balance` update, the
-   `account_operations` insert, and the outbox row. A throw rolls
+   `account_operations` insert, and the outbox message. A throw rolls
    ALL of them back — the integration test
    `business rollback: overdraw throws...` pins this.
 3. **Cross-DS isolation (DD-023).** A business-DS rollback never
    leaks into the audit DS — there was nothing to leak: the audit
    handler had not yet been invoked. The audit DS sees only
    committed business operations; abandoned ones are invisible.
-4. **`@Transactional({ dataSource: 'audit' })` on the consumer.**
-   The audit handler runs in a fresh **audit-DS** transaction. The
-   worker that invoked it ran on the business DS — the framework
-   tracks per-DS `AsyncLocalStorage` (DD-023) so the consumer's
-   own `@Transactional` opens in the right context.
-5. **Idempotent audit consumer.** `AuditLogRow.operationId` is the
-   primary key. Retried delivery surfaces as `unique_violation`
-   and is skipped — the audit log gains exactly one row per business
-   operation regardless of how many times the publication is
-   delivered.
+4. **`@OnOutboxMessage` + `@Transactional({ dataSource: 'audit' })` on
+   one method.** The audit handler runs in a fresh **audit-DS**
+   transaction. `@nestjs/outbox` calls the method through the instance
+   at delivery time, so it gets the transactional version, and the
+   framework tracks per-DS `AsyncLocalStorage` (DD-023), so it opens in
+   the right context.
+5. **Idempotent audit consumer, in two layers.** The handler's inbox
+   skips a message it already completed, but it lives in the business
+   DB and cannot commit with the audit row. `AuditLogRow.operationId`,
+   the primary key, closes that gap: a delivery that wrote the row but
+   crashed before its inbox record surfaces on the retry as
+   `unique_violation` and is skipped. The audit log gains exactly one
+   row per business operation however many times the message arrives.
 6. **Audit DS outage does not block business.** The integration
-   test `audit DS down → publication stays PUBLISHED...` destroys
-   the audit DS connection pool, runs a deposit (which succeeds),
-   waits for the worker to mark the publication FAILED, restores
-   the audit DS, and confirms the audit row eventually catches up.
+   test `audit DS down...` destroys the audit DS connection pool,
+   runs a deposit (which succeeds), sees the relay keep the message
+   with one failed attempt, restores the audit DS, and confirms the
+   retry writes the audit row.
 
 ## Common pitfalls
 
@@ -147,28 +149,22 @@ pnpm -C examples/audit-logging start
   business DS. The audit-DS write goes through autocommit, and the
   audit-DS read-your-write semantics inside the handler are lost.
   More subtly, the handler's `@Transactional` would attempt to join
-  any ambient business-DS transaction (worker context typically has
-  none, but a chained-handler scenario could surprise you).
-- **Tying audit retention to the outbox archive.** The outbox
-  archive lives in the business DS — it follows business-DS
-  retention. If your compliance regime requires keeping the audit
-  trail for years, the audit DB's `audit_log` retention is what
-  matters; the outbox archive is operational data.
-- **`CqrsModule` double-import.** Do NOT import `@nestjs/cqrs`'s
-  `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.
-  See [`docs/status/conventions.md`](../../docs/status/conventions.md) #6.
+  any ambient business-DS transaction (the relay's context has none,
+  but a chained-handler scenario could surprise you).
+- **Treating the outbox as the audit trail.** `@nestjs/outbox` removes
+  a message once it is delivered; it keeps only dead letters. The audit
+  trail is `audit_log` in the audit DB, with the retention your
+  compliance regime requires.
 
 ## Related examples
 
 - [`saga-pattern`](../saga-pattern) — multi-step coordination
   through the outbox within a single DataSource.
-- [`multi-datasource-outbox`](../multi-datasource-outbox) —
-  symmetric multi-DS where both DSes produce events.
 - [`externalization-with-fallback`](../externalization-with-fallback) —
   the consumer-side inbox/dedup pattern in detail.
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
+- [ADR-023 — delivery through `@nestjs/outbox`, one outbox DataSource](../../docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
 - [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)

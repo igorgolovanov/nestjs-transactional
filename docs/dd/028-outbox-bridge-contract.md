@@ -47,6 +47,15 @@ and therefore public API under ADR-004.
    same buffering 2.x used, so the messages still commit or roll back
    with the transaction. Only `@Externalized` events are scheduled. The
    rest stay with the in-memory dispatcher, as before.
+
+   Scheduling every aggregate event was rejected on measurement:
+   `@nestjs/outbox`'s `local` transport throws `OutboxNoHandlerError`
+   for a topic nobody subscribes to, so each event without a durable
+   subscriber would retry and then dead-letter. An aggregate event that
+   does need durable in-process delivery opts in with
+   `@Externalized({ target, client: 'local' })`, which routes it to the
+   `local` transport and its `@OnOutboxMessage` handlers. The
+   `e-commerce-orders` example starts its saga that way.
 6. **Routing.** `@Externalized({ client })` names a `@nestjs/outbox`
    transport and is now a `string`, since transport names are strings.
    The decorator records `target → client` at decoration time, and two

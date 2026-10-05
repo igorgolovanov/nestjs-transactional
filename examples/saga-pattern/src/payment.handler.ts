@@ -1,19 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { QueryFailedError, Repository } from 'typeorm';
 
 import { PaymentRow } from './entities.js';
-import {
-  InventoryReservedEvent,
-  PaymentChargedEvent,
-  PaymentFailedEvent,
-} from './events.js';
+import { InventoryReservedEvent, PaymentChargedEvent, PaymentFailedEvent } from './events.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 
@@ -33,8 +26,7 @@ const POSTGRES_UNIQUE_VIOLATION = '23505';
  * delivery could double-charge.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [InventoryReservedEvent], id: 'Saga.Payment' })
-export class PaymentHandler implements IIntegrationEventHandler<InventoryReservedEvent> {
+export class PaymentHandler {
   private readonly logger = new Logger(PaymentHandler.name);
 
   /** Toy authorisation rule. Amounts at or above this fail. */
@@ -46,6 +38,7 @@ export class PaymentHandler implements IIntegrationEventHandler<InventoryReserve
     private readonly outbox: OutboxEventPublisher,
   ) {}
 
+  @OnOutboxMessage('InventoryReservedEvent', { consumer: 'saga.payment' })
   @Transactional()
   async handle(event: InventoryReservedEvent): Promise<void> {
     const willFail = event.amount >= PaymentHandler.UNAUTHORISED_AMOUNT;
@@ -58,7 +51,10 @@ export class PaymentHandler implements IIntegrationEventHandler<InventoryReserve
         status,
       });
     } catch (err) {
-      if (err instanceof QueryFailedError && (err.driverError as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION) {
+      if (
+        err instanceof QueryFailedError &&
+        (err.driverError as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION
+      ) {
         this.logger.log(`Payment for ${event.orderId} already recorded — idempotent skip`);
         return;
       }
@@ -68,12 +64,7 @@ export class PaymentHandler implements IIntegrationEventHandler<InventoryReserve
     if (willFail) {
       this.logger.warn(`Payment failed for ${event.orderId} — emitting failure`);
       await this.outbox.publish(
-        new PaymentFailedEvent(
-          event.orderId,
-          event.sku,
-          event.quantity,
-          'authorisation-declined',
-        ),
+        new PaymentFailedEvent(event.orderId, event.sku, event.quantity, 'authorisation-declined'),
       );
       return;
     }

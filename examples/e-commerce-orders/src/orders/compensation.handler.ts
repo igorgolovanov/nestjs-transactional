@@ -1,16 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
-import {
-  PaymentFailedEvent,
-  StockReservationFailedEvent,
-} from '../shared/events.js';
+import { PaymentFailedEvent, StockReservationFailedEvent } from '../shared/events.js';
 import { OrderRow } from './order.entity.js';
 
 /**
@@ -21,20 +15,14 @@ import { OrderRow } from './order.entity.js';
  * **Two events, one handler.** Both branches do the same conditional
  * UPDATE. The compensation in inventory (releasing reserved stock
  * on `PaymentFailedEvent`) is owned by `inventory/release-stock.handler.ts`
- * — different bounded context, different DS, different worker.
+ * — a different bounded context with its own handler and inbox.
  * Choreography keeps the contexts decoupled.
  *
  * Idempotency: conditional `UPDATE WHERE status = 'placed'`. A
  * retry finds the order already failed and zero-affects.
  */
 @Injectable()
-@IntegrationEventsHandler({
-  events: [StockReservationFailedEvent, PaymentFailedEvent],
-  id: 'Orders.Compensation',
-})
-export class OrdersCompensationHandler
-  implements IIntegrationEventHandler<StockReservationFailedEvent | PaymentFailedEvent>
-{
+export class OrdersCompensationHandler {
   private readonly logger = new Logger(OrdersCompensationHandler.name);
 
   constructor(
@@ -42,6 +30,9 @@ export class OrdersCompensationHandler
     private readonly orders: Repository<OrderRow>,
   ) {}
 
+  @OnOutboxMessage(['StockReservationFailedEvent', 'PaymentFailedEvent'], {
+    consumer: 'orders.compensation',
+  })
   @Transactional()
   async handle(event: StockReservationFailedEvent | PaymentFailedEvent): Promise<void> {
     const update = await this.orders.update(

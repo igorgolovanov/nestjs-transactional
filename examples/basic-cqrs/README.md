@@ -20,13 +20,13 @@ together, not persistence.
 - You want a regression template for command handlers with
   AFTER_COMMIT side effects.
 - You are evaluating the difference between in-memory phase-aware
-  delivery (this example) and durable outbox delivery (`basic-outbox`).
+  delivery (this example) and durable outbox delivery
+  (`basic-typeorm-outbox`).
 
 For a more involved CQRS setup (TypeORM persistence, multiple phases,
-projections, queries, REST controller, multi-DataSource saga) see
+projections, queries, REST controller, a saga over the outbox) see
 the Tier 5 [`e-commerce-orders`](../e-commerce-orders) flagship.
-For durable cross-process delivery see [`basic-outbox`](../basic-outbox)
-and [`basic-typeorm-outbox`](../basic-typeorm-outbox).
+For durable delivery see [`basic-typeorm-outbox`](../basic-typeorm-outbox).
 
 ## Run
 
@@ -105,7 +105,8 @@ Expected `pnpm start` output:
 - **`@TransactionalEventsHandler` is in-memory and process-local.**
   If the process crashes between `commit()` and the AFTER_COMMIT
   hook running, the event is lost. For durable cross-process
-  delivery use `@OutboxEventsHandler` (see `basic-outbox`).
+  delivery publish through the outbox and handle with `@nestjs/outbox`'s
+  `@OnOutboxMessage` (see `basic-typeorm-outbox`).
 - **One event class — one bound class-level handler.** ADR-014
   enforces single-responsibility. Need multiple side effects? Use
   multiple handler classes.
@@ -131,12 +132,10 @@ The full enum is in `@nestjs-transactional/cqrs`'s
 
 - [`basic-transactional`](../basic-transactional) — `@Transactional()`
   on plain services, no CQRS.
-- [`basic-outbox`](../basic-outbox) — durable equivalent
-  (`@OutboxEventsHandler`), in-memory backend.
 - [`basic-typeorm-outbox`](../basic-typeorm-outbox) — durable
   outbox + Postgres + atomicity testcontainers test.
 - [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
-  combining TypeORM persistence, multi-DataSource saga, projections,
+  combining TypeORM persistence, a saga over the outbox, projections,
   query handlers, REST controller, and Kafka externalization.
 
 ## Further reading

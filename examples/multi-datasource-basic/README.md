@@ -110,8 +110,9 @@ EntityManager for that dataSource.
   `inventoryService.upsertStock(...)` from inside a billing
   `@Transactional()` method does NOT enrol the inventory write into the
   billing transaction. Each runs in its own scope. The recommended
-  pattern for cross-DS consistency is the outbox stack — see
-  [`multi-datasource-outbox`](../multi-datasource-outbox).
+  pattern for cross-DS consistency is an outbox on one DataSource
+  feeding a consumer on the other — see
+  [`audit-logging`](../audit-logging).
 - **`TransactionalModule.resetForTesting()` /
   `TypeOrmTransactionalModule.resetForTesting()` between tests when each
   test rebuilds the module from scratch.** Multi-`forRoot` dedup uses
@@ -125,13 +126,13 @@ EntityManager for that dataSource.
 
 - [`basic-transactional`](../basic-transactional) — single DataSource,
   same `@Transactional` semantics. Start here if multi-DS is overkill.
-- [`multi-datasource-outbox`](../multi-datasource-outbox) — adds
-  durable cross-DS event integration via the outbox.
+- [`audit-logging`](../audit-logging) — durable cross-DS delivery:
+  an outbox on one DataSource, a consumer writing to another.
 - [`multi-datasource-cqrs`](../multi-datasource-cqrs) — adds
   `@nestjs/cqrs` handlers per dataSource (per-dataSource routing in
   the cqrs in-memory dispatcher).
-- [`shared-database-modular-monolith`](../shared-database-modular-monolith)
-  — same physical Postgres, separate schemas per module.
+- [`e-commerce-orders`](../e-commerce-orders) — one physical Postgres,
+  a schema per bounded context, all on one DataSource.
 
 ## Further reading
 

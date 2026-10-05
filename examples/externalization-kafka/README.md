@@ -1,26 +1,28 @@
 # externalization-kafka
 
-Outbox externalization to **Apache Kafka** via `@nestjs/microservices`
-`ClientProxy` — single Postgres DataSource, single Kafka broker. The
-canonical event-externalization / Tier 3 baseline.
+Events to **Apache Kafka** through the outbox: single Postgres
+DataSource, single Kafka broker. The canonical externalization baseline.
 
-A successful `@Transactional` method commits the business INSERT and
-the `event_publication` row in one transaction; the worker dispatches
-to BOTH the local `@OutboxEventsHandler` AND to Kafka. Single-unit
-atomicity (DD-019) is preserved end-to-end.
+A successful `@Transactional` method commits the order and its outbox
+message in one transaction. After the commit,
+[`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox)'s relay
+emits the message to Kafka through `ClientProxyTransport`. If Kafka
+rejects it, the message stays in the outbox and is retried; a rollback
+leaves no message, so nothing reaches Kafka for an order that does not
+exist.
 
 ## When to use this example
 
 - You have one DataSource, one broker, and want to see the simplest
   outbox-to-Kafka wiring.
-- You want a regression template for externalization-publishing
-  services with mocked `ClientProxy` (fast jest tests) plus a real
-  Kafka stack via `docker-compose` (visual demo).
-- You're evaluating event externalization before adopting it.
+- You want a regression template with a recorded `ClientProxy` (fast
+  jest tests) plus a real Kafka stack via `docker-compose` (visual
+  demo).
+- You want Kafka keys and headers that come from the event.
 
-For multi-broker per-event routing see
-[`externalization-multi-broker`](../externalization-multi-broker).
-For the FAILED-then-resubmit recovery path against a live broker see
+For per-event routing to several brokers see
+[`externalization-multi-broker`](../externalization-multi-broker). For
+what happens when the broker stays down, dead letters included, see
 [`externalization-with-fallback`](../externalization-with-fallback).
 
 ## Prerequisites
@@ -39,154 +41,100 @@ pnpm install                                            # from monorepo root
 # Integration tests (Docker required for Postgres testcontainers):
 pnpm -C examples/externalization-kafka test:integration
 
-# Unit tests (none right now; passWithNoTests for symmetry):
-pnpm -C examples/externalization-kafka test
-
 # Visual demo against real Postgres + real Kafka:
 docker-compose -f examples/externalization-kafka/docker-compose.yml up -d
 pnpm -C examples/externalization-kafka start
-docker-compose -f examples/externalization-kafka/docker-compose.yml down -v
 ```
 
 ## Architectural shape
 
 ```
-   @Transactional()
-       |
-       v
-  +-----------------+        commit
-  | OrderService    |  ----> [orders row]   (Postgres)
-  | placeOrder()    |  ----> [event_publication row]   (Postgres)
-  +-----------------+
-                                  |
-                                  v
-                  +---------------------------+
-                  | EventPublicationProcessor |  poll, claim by UPDATE
-                  +-------------+-------------+
-                                |
-                  +-------------+-------------+
-                  v                           v
-          ShippingHandler           MicroservicesEventExternalizer
-          (local listener)          (KAFKA_CLIENT.emit('orders.placed', event))
-                                              |
-                                              v
-                                          [Kafka topic
-                                           'orders.placed']
+OrderService.placeOrder  (@Transactional)
+  ├─ INSERT orders
+  └─ OutboxEventPublisher.publish(OrderPlacedEvent)
+       └─ outbox.add(<the transaction @Transactional opened>, message)
+                                         │  commit: both rows, or neither
+                                         ▼
+                         nest_outbox.messages
+                                         │  @nestjs/outbox relay
+                                         ▼
+       route: externalizedRoute({ defaultTransport: KAFKA_CLIENT })
+                                         │
+                                         ▼
+       ClientProxyTransport(KAFKA_CLIENT, { toPacket: toKafkaPacket })
+                                         │
+                                         ▼
+       Kafka topic `orders.placed`
+         key      = order id                      (routingKey)
+         headers  = x-customer, x-event-type, x-outbox-id
+         value    = { id, topic, key, headers, createdAt, payload }
 ```
-
-**Execution order (DD-019)**: local handlers run BEFORE
-externalization. If `ShippingHandler.handle` throws, Kafka is NEVER
-emitted and the publication stays `FAILED` for retry. If the local
-handler succeeds and Kafka emit throws, the publication ALSO ends up
-`FAILED` — single-unit atomicity covers both halves.
-
-## Why the integration test mocks `ClientProxy`
-
-Deterministic timing and no Kafka container per example run. What
-this example demonstrates is the wiring and the routing metadata,
-neither of which needs a real broker to be convincing.
-
-The broker behaviour itself is measured elsewhere: the
-`outbox-microservices` package runs a testcontainers Kafka and
-RabbitMQ suite in CI, pinning that `emit()` resolves on a real
-acknowledgement and rejects when the broker is gone (ADR-021). For
-the FAILED-then-resubmit path against a live broker you can drive by
-hand, see
-[`externalization-with-fallback`](../externalization-with-fallback)
-and run its `pnpm start` demo.
 
 ## What it shows
 
-1. **Atomic commit + dual delivery.** `OrderService.placeOrder` runs
-   `orders.save(...)` and `outbox.publish(...)` in one
-   `@Transactional` method. After commit the worker invokes BOTH the
-   local `ShippingHandler` AND the externalizer (Kafka emit). On
-   success the publication transitions to `COMPLETED`.
-2. **Atomic rollback.** `placeOrderAndFail` does the same writes and
-   throws. Neither row is persisted, the local handler never runs,
-   Kafka never emits.
-3. **Externalizer failure surfacing.** When `KAFKA_CLIENT.emit`
-   throws, the publication is marked `FAILED` with `failureReason`
-   set. The local handler still ran (DD-019 ordering). Against a real
-   Kafka this is what an unreachable broker produces, since
-   `producer.send()` rejects.
-4. **Per-event Kafka routing key + headers.**
-   `@Externalized<OrderPlacedEvent>({ routingKey: e => e.orderId,
-   headers: e => ({ ... }) })` derives partition affinity (Kafka
-   message key) and tracing headers from the event instance. Today
-   `MicroservicesEventExternalizer` passes `(target, event)` to
-   `client.emit` — `routingKey` and `headers` are stored in
-   `ExternalizationMetadata` and available for transport-aware
-   externalizers in future iterations.
+1. **Atomicity across a broker.** The message commits with the order or
+   rolls back with it. The relay only ever sees committed messages.
+2. **The routing key is the Kafka key.** `@Externalized({ routingKey })`
+   becomes the message key, and `toKafkaPacket` puts it on the Kafka
+   record, so one order's events land on one partition, in commit order.
+3. **Headers are Kafka headers**: the decorator's, plus `x-event-type`
+   and `x-outbox-id`.
+4. **The value is the envelope.** A consumer gets the event as
+   `payload`, and a stable `id` to deduplicate on.
+5. **A rejected emit is not lost.** The message stays in the outbox with
+   the reason in `last_error`, and is retried with backoff.
+
+## Why the integration test records `ClientProxy`
+
+The test overrides `KAFKA_CLIENT` with an object whose `emit` records its
+arguments. That keeps the suite at a few seconds and makes the Kafka
+record itself the thing under test. What a real Kafka acknowledgement
+means for an outbox message is measured once, against a testcontainers
+broker, in the outbox package's broker suite (ADR-021).
+
+The test also turns the relay off and calls `OutboxRelay.runOnce()`, so
+delivery happens exactly when the test asks for it.
 
 ## Key files
 
-- [`src/order-placed.event.ts`](src/order-placed.event.ts) — the
-  domain event with `@Externalized({ target: 'orders.placed',
-  routingKey, headers })`.
-- [`src/order.service.ts`](src/order.service.ts) — `@Transactional()`
-  method that writes the entity AND publishes via the outbox.
-  `OutboxEventPublisher` is injected by class token (smart facade,
-  DD-024) — NOT via `@InjectOutboxPublisher`.
-- [`src/shipping.handler.ts`](src/shipping.handler.ts) — local
-  `@OutboxEventsHandler` with a stable id (`Shipping.createShipment`).
-- [`src/app.module.ts`](src/app.module.ts) — wiring:
-  `ClientsModule.register([{ name: KAFKA_CLIENT, transport:
-  Transport.KAFKA, ... }])` (per DD-017 the user registers clients),
-  then `OutboxMicroservicesModule.forRoot({ defaultClient:
-  KAFKA_CLIENT })`.
-- [`src/main.ts`](src/main.ts) — visual demo with a kafkajs consumer
-  that prints messages off the topic so the externalization is
-  visible in the terminal.
-- [`docker-compose.yml`](docker-compose.yml) — Postgres + Kafka KRaft
-  stack for the visual demo.
+- [`src/order-placed.event.ts`](src/order-placed.event.ts) —
+  `@Externalized({ target, routingKey, headers })`.
+- [`src/app.module.ts`](src/app.module.ts) — `ClientsModule.register`
+  imported both by the app and by `OutboxModule`, the Kafka transport
+  with `toKafkaPacket`, `externalizedRoute`, the store, and
+  `TransactionalOutboxModule`.
+- [`src/order.service.ts`](src/order.service.ts) — the
+  `@Transactional()` method.
 - [`test/order.service.integration.spec.ts`](test/order.service.integration.spec.ts)
-  — testcontainers Postgres + mocked `KAFKA_CLIENT` ClientProxy.
+  — commit, rollback, and a rejected emit.
 
 ## Common pitfalls
 
-- **`OutboxEventPublisher` is injected by class token, NOT
-  `@InjectOutboxPublisher`.** The decorator binds the per-DS
-  underlying publisher, bypassing smart-facade routing (DD-024).
-  Single-DS examples like this one don't notice the difference, but
-  the class-token form is the canonical default — the decorator is
-  for advanced multi-DS routing scenarios. See
-  `multi-datasource-outbox` for the case where it matters.
-- **`ClientsModule` registers the proxy; the framework module does
-  NOT** (DD-017). `OutboxMicroservicesModule.forRoot({ defaultClient
-  })` only wires the externalizer; the user owns the
-  `ClientsModule.register([...])` call.
-- **Production must NOT use `synchronize: true` for outbox tables.**
-  This example uses it for one-shot demo simplicity; production
-  runs the migration shipped with
-  `@nestjs-transactional/outbox-typeorm`.
-- **Do not set `acks: 0` on the producer.** `kafkajs` defaults to
-  `acks: -1`, every in-sync replica, which is what makes `emit()`
-  reject when the message did not land. Setting it to 0 gives that
-  up, and the publication is then marked `COMPLETED` with no
-  guarantee behind it (ADR-021).
-- **Listener id stability.** Default `${ClassName}#${EventName}`
-  rolls when you rename the handler class. This example pins
-  `id: 'Shipping.createShipment'` so a future rename does not
-  invalidate stored publications.
+- **Import `ClientsModule` into `OutboxModule` too.** The transport
+  resolves the client by its token in `OutboxModule`'s own context, so
+  pass the registered module in `OutboxModule.forRoot({ imports })`.
+- **Without `toKafkaPacket`, the Kafka key is empty.** The envelope still
+  carries the key, but Kafka partitions by its own record key.
+- **Keep `acks` at its default.** kafkajs's `acks: -1` waits for every
+  in-sync replica; `acks: 0` would make "delivered" mean nothing.
+  Consider `producer: { idempotent: true }` against duplicates from
+  producer retries.
+- **Version the payload.** A message added by the previous release can
+  still be delivered after a deploy.
 
 ## Related examples
 
-- [`basic-typeorm-outbox`](../basic-typeorm-outbox) — same
-  Postgres + outbox shape WITHOUT externalization. The base case
-  this example extends.
-- [`externalization-multi-broker`](../externalization-multi-broker)
-  — single DS, multiple brokers (Kafka + RabbitMQ + Redis), per-event
-  `@Externalized({ client })` routing.
-- [`externalization-multi-datasource`](../externalization-multi-datasource)
-  — multi-DS + multi-broker, combined complexity.
-- [`externalization-with-fallback`](../externalization-with-fallback)
-  — what a `COMPLETED` publication proves, plus
-  `FailedEventPublications.resubmit` and consumer-side idempotency.
+- [`basic-typeorm-outbox`](../basic-typeorm-outbox) — the outbox without
+  a broker.
+- [`externalization-multi-broker`](../externalization-multi-broker) —
+  three brokers, routed per event.
+- [`externalization-with-fallback`](../externalization-with-fallback) —
+  retries, dead letters, requeue, and the consumer's inbox.
+- [`e-commerce-orders`](../e-commerce-orders) — Kafka at the end of a
+  saga.
 
 ## Further reading
 
-- [ADR-015 — event externalization architecture](../../docs/adr/015-event-externalization-architecture.md)
-- [ADR-021 — what `emit()` acknowledges, per transport](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
-- [`docs/architecture/event-externalization.md`](../../docs/architecture/event-externalization.md)
-- [Spring Modulith — event externalization reference](https://docs.spring.io/spring-modulith/reference/events.html#externalization)
+- [ADR-021 — what each transport acknowledges](../../docs/adr/021-externalization-acknowledgement-per-transport.md)
+- [ADR-023 — delivery through `@nestjs/outbox`](../../docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
+- [DD-028 — the bridge contract](../../docs/dd/028-outbox-bridge-contract.md)

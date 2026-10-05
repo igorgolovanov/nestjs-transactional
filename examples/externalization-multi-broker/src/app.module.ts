@@ -1,26 +1,20 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientProxyTransport, OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
-import { OutboxMicroservicesModule } from '@nestjs-transactional/outbox-microservices';
 import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
+  externalizedRoute,
+  toKafkaPacket,
+  TransactionalOutboxModule,
+} from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import type { DataSource } from 'typeorm';
 
-import { AccountingHandler } from './accounting.handler.js';
-import { CacheInvalidationEvent } from './cache-invalidation.event.js';
 import { KAFKA_CLIENT, RABBITMQ_CLIENT, REDIS_CLIENT } from './clients.js';
-import { LocalCacheInvalidator } from './local-cache.handler.js';
 import { OrderEntity } from './order.entity.js';
-import { OrderPlacedEvent } from './order-placed.event.js';
 import { OrderService } from './order.service.js';
-import { RefundRequestedEvent } from './refund-requested.event.js';
-import { ShippingHandler } from './shipping.handler.js';
 
 export interface PostgresConfig {
   readonly host: string;
@@ -58,46 +52,50 @@ export function readBrokerConfigFromEnv(): BrokerConfig {
 
 @Module({})
 export class AppModule {
-  static forInfrastructure(postgres: PostgresConfig, brokers: BrokerConfig): DynamicModule {
+  static forInfrastructure(
+    postgres: PostgresConfig,
+    brokers: BrokerConfig,
+    options: { readonly relay?: boolean } = {},
+  ): DynamicModule {
+    // One entry per broker. Each `name` is also the transport name in
+    // `OutboxModule` below and the `client` an event names in
+    // `@Externalized`, so one string ties the three together.
+    const clients = ClientsModule.register([
+      {
+        name: KAFKA_CLIENT,
+        transport: Transport.KAFKA,
+        options: {
+          client: {
+            clientId: 'externalization-multi-broker-example',
+            brokers: [...brokers.kafkaBrokers],
+          },
+        },
+      },
+      {
+        name: RABBITMQ_CLIENT,
+        transport: Transport.RMQ,
+        options: {
+          urls: [brokers.rabbitmqUrl],
+          queue: 'refunds',
+          queueOptions: { durable: true },
+        },
+      },
+      {
+        name: REDIS_CLIENT,
+        transport: Transport.REDIS,
+        options: { host: brokers.redisHost, port: brokers.redisPort },
+      },
+    ]);
+
     return {
       module: AppModule,
       imports: [
-        // Per DD-017 the user registers ALL clients themselves —
-        // the framework module does NOT register clients. Three
-        // entries here, one per broker. Each `name` matches the
-        // string token consumed by `@Externalized({ client })` on
-        // the corresponding event class.
-        ClientsModule.register([
-          {
-            name: KAFKA_CLIENT,
-            transport: Transport.KAFKA,
-            options: {
-              client: {
-                clientId: 'externalization-multi-broker-example',
-                brokers: [...brokers.kafkaBrokers],
-              },
-            },
-          },
-          {
-            name: RABBITMQ_CLIENT,
-            transport: Transport.RMQ,
-            options: {
-              urls: [brokers.rabbitmqUrl],
-              queue: 'refunds',
-              queueOptions: { durable: true },
-            },
-          },
-          {
-            name: REDIS_CLIENT,
-            transport: Transport.REDIS,
-            options: { host: brokers.redisHost, port: brokers.redisPort },
-          },
-        ]),
+        clients,
 
         TypeOrmModule.forRoot({
           type: 'postgres',
           ...postgres,
-          entities: [OrderEntity, EventPublicationEntity, EventPublicationArchiveEntity],
+          entities: [OrderEntity],
           synchronize: true,
           logging: false,
         }),
@@ -105,31 +103,32 @@ export class AppModule {
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
         TypeOrmTransactionalModule.forRoot(),
-        OutboxTypeOrmModule.forRoot({ schemaInitialization: { enabled: false } }),
 
         OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider(),
-          processor: { pollingInterval: 100, batchSize: 50 },
+          imports: [clients],
+          transports: {
+            // Kafka gets `toKafkaPacket`, so the routing key becomes the
+            // partition key. RabbitMQ and Redis take the envelope as is.
+            [KAFKA_CLIENT]: ClientProxyTransport(KAFKA_CLIENT, { toPacket: toKafkaPacket }),
+            [RABBITMQ_CLIENT]: ClientProxyTransport(RABBITMQ_CLIENT),
+            [REDIS_CLIENT]: ClientProxyTransport(REDIS_CLIENT),
+          },
+          // Every event here names its client, so routing is read off the
+          // decorators. An event without one would fail its routing and
+          // dead-letter rather than land on some broker by default.
+          route: externalizedRoute(),
+          relay: { enabled: options.relay ?? true, pollInterval: 100 },
         }),
-        OutboxModule.forFeature([OrderPlacedEvent, RefundRequestedEvent, CacheInvalidationEvent]),
-
-        // `defaultClient` is required for bootstrap validation
-        // (`@Optional()` resolution path through DI) — every event
-        // in this example declares its own `client:` override on
-        // `@Externalized`, so the default never fires at runtime.
-        // We point it at Kafka because Kafka is the heaviest broker
-        // here; if a user accidentally publishes an event WITHOUT
-        // the decorator, the resulting "stuck on default" failure
-        // mode is loudest there.
-        OutboxMicroservicesModule.forRoot({ defaultClient: KAFKA_CLIENT }),
-
-        OutboxProcessingModule,
+        TransactionalOutboxModule.forRoot(),
       ],
       providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
         OrderService,
-        ShippingHandler,
-        AccountingHandler,
-        LocalCacheInvalidator,
       ],
     };
   }

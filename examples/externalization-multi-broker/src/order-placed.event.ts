@@ -16,7 +16,6 @@ import { KAFKA_CLIENT } from './clients.js';
   client: KAFKA_CLIENT,
   routingKey: (event) => event.orderId,
   headers: (event) => ({
-    'x-event-type': 'OrderPlacedEvent',
     'x-customer': event.customerEmail,
   }),
 })

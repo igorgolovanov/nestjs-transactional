@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { QueryFailedError, Repository } from 'typeorm';
 
@@ -34,12 +31,11 @@ const POSTGRES_UNIQUE_VIOLATION = '23505';
  *      with the writes above.
  *
  * Because `(2) → (4)` all live in one transaction, any failure rolls
- * the whole step back; the outbox worker requeues the publication
- * and retries.
+ * the whole step back; the relay keeps the message and retries it
+ * with backoff.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Saga.Reservation' })
-export class ReservationHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
+export class ReservationHandler {
   private readonly logger = new Logger(ReservationHandler.name);
 
   constructor(
@@ -52,6 +48,7 @@ export class ReservationHandler implements IIntegrationEventHandler<OrderPlacedE
     private readonly outbox: OutboxEventPublisher,
   ) {}
 
+  @OnOutboxMessage('OrderPlacedEvent', { consumer: 'saga.reservation' })
   @Transactional()
   async handle(event: OrderPlacedEvent): Promise<void> {
     try {
@@ -61,7 +58,10 @@ export class ReservationHandler implements IIntegrationEventHandler<OrderPlacedE
         quantity: event.quantity,
       });
     } catch (err) {
-      if (err instanceof QueryFailedError && (err.driverError as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION) {
+      if (
+        err instanceof QueryFailedError &&
+        (err.driverError as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION
+      ) {
         this.logger.log(`Reservation for ${event.orderId} already exists — idempotent skip`);
         return;
       }

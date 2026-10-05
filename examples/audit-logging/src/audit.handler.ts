@@ -1,41 +1,38 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { QueryFailedError, Repository } from 'typeorm';
 
 import { AuditLogRow } from './entities.js';
-import { AccountOperationEvent } from './events.js';
+import type { AccountOperationEvent } from './events.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 /**
- * Cross-DataSource audit consumer. The outbox worker (running on
- * the **business** DataSource — that's where `AccountOperationEvent`
- * is registered) picks up the publication and invokes this handler;
- * the handler then opens its own `@Transactional({ dataSource: 'audit' })`
+ * Cross-DataSource audit consumer. `@nestjs/outbox`'s relay delivers
+ * `AccountOperationEvent` from the business database's outbox to this
+ * handler, which opens its own `@Transactional({ dataSource: 'audit' })`
  * to write into the audit database.
  *
  * Two DataSources, two transactions. There is no distributed
- * transaction across them and there is no need for one — the outbox
- * publication on the business side is the durable trigger; the
+ * transaction across them and there is no need for one: the outbox
+ * message on the business side is the durable trigger, and the
  * audit-side INSERT is the idempotent effect.
  *
- * `@InjectRepository(AuditLogRow, 'audit')` — the second argument
- * names the DataSource. Without it, `AuditLogRow` would resolve
- * against the default (business) DS where its table does not exist.
+ * `@InjectRepository(AuditLogRow, 'audit')`: the second argument names
+ * the DataSource. Without it, `AuditLogRow` would resolve against the
+ * default (business) DS where its table does not exist.
  *
- * Idempotency: `AuditLogRow.operationId` is the primary key. A
- * retried delivery surfaces as `unique_violation` and is treated
- * as a no-op. Without the gate, the audit log would gain duplicate
- * rows on every transient failure that did not propagate cleanly.
+ * Idempotency has two layers here. The handler's inbox (`consumer`)
+ * skips a message it already completed, but it lives in the business
+ * database and so cannot commit together with the audit row. The audit
+ * row's primary key, `operationId`, closes that gap: a delivery that
+ * wrote the row but crashed before its inbox record surfaces on the
+ * retry as `unique_violation`, which is treated as a no-op.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [AccountOperationEvent], id: 'Audit.LogOperation' })
-export class AuditHandler implements IIntegrationEventHandler<AccountOperationEvent> {
+export class AuditHandler {
   private readonly logger = new Logger(AuditHandler.name);
 
   constructor(
@@ -43,8 +40,9 @@ export class AuditHandler implements IIntegrationEventHandler<AccountOperationEv
     private readonly audit: Repository<AuditLogRow>,
   ) {}
 
+  @OnOutboxMessage('AccountOperationEvent', { consumer: 'audit.log-operation' })
   @Transactional({ dataSource: 'audit' })
-  async handle(event: AccountOperationEvent): Promise<void> {
+  async log(event: AccountOperationEvent): Promise<void> {
     try {
       await this.audit.insert({
         operationId: event.operationId,
