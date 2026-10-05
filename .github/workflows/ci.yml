@@ -403,6 +403,61 @@ jobs:
       - name: Integration tests
         run: pnpm -r --filter './packages/*' test:integration
 
+  nest-11:
+    name: NestJS 11 and @nestjs/cqrs 11 (Node 22)
+    runs-on: ubuntu-latest
+    # The lockfile pins NestJS 12 and @nestjs/cqrs 12.1, so every other
+    # job tests the top of the `^11 || ^12` peer range. This one forces
+    # the bottom with pnpm overrides, the same mechanism as the TypeORM
+    # matrix. The cqrs package reaches into EventBus and AggregateRoot,
+    # whose behaviour changed between 11.0 and 12.1, so it is the
+    # package this leg mostly exists for.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          for pkg in common core testing microservices platform-express; do
+            npm pkg set "pnpm.overrides.@nestjs/$pkg=^11.1.0"
+          done
+          npm pkg set 'pnpm.overrides.@nestjs/cqrs=11.0.3'
+          pnpm install --no-frozen-lockfile
+
+      # Overrides fail silently when pnpm ignores them; see the TypeORM
+      # matrix above. Assert what actually landed.
+      - name: Verify the NestJS versions under test
+        run: |
+          core=$(node -p "require('./packages/cqrs/node_modules/@nestjs/core/package.json').version")
+          cqrs=$(node -p "require('./packages/cqrs/node_modules/@nestjs/cqrs/package.json').version")
+          case "$core" in 11.*) ;; *) echo "::error::expected @nestjs/core 11, resolved $core"; exit 1 ;; esac
+          if [ "$cqrs" != "11.0.3" ]; then
+            echo "::error::expected @nestjs/cqrs 11.0.3, resolved $cqrs"
+            exit 1
+          fi
+          echo "@nestjs/core $core, @nestjs/cqrs $cqrs"
+
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Type check
+        run: pnpm -r --filter './packages/*' exec tsc --noEmit
+
+      - name: Unit tests
+        run: pnpm -r --filter './packages/*' test
+
+      - name: Integration tests
+        run: pnpm -r --filter './packages/*' test:integration
+
   broker-integration:
     name: Broker integration tests (Kafka, RabbitMQ)
     runs-on: ubuntu-latest

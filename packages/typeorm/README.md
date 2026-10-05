@@ -178,8 +178,8 @@ if you inject adapters by token.
 | --- | --- |
 | Node.js | `>=22.13.0` |
 | `typeorm` | `^0.3.0 \|\| ^1.0.0` |
-| `@nestjs/typeorm` | `^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0` |
-| `@nestjs/common` / `@nestjs/core` | `^10.0.0 \|\| ^11.0.0 \|\| ^12.0.0` |
+| `@nestjs/typeorm` | `^11.0.0 \|\| ^12.0.0` |
+| `@nestjs/common` / `@nestjs/core` | `^11.0.0 \|\| ^12.0.0` |
 | `reflect-metadata` | `^0.1.13 \|\| ^0.2.0` |
 | `rxjs` | `^7.0.0` |
 
