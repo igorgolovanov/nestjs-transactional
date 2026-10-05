@@ -1,16 +1,14 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": [
-    "@changesets/changelog-github",
-    { "repo": "igorgolovanov/nestjs-transactional" }
-  ],
+  "changelog": ["@changesets/changelog-github", { "repo": "igorgolovanov/nestjs-transactional" }],
   "commit": false,
   "fixed": [
     [
       "@nestjs-transactional/core",
       "@nestjs-transactional/typeorm",
       "@nestjs-transactional/cqrs",
-      "@nestjs-transactional/outbox"
+      "@nestjs-transactional/outbox",
+      "@nestjs-transactional/workflows"
     ]
   ],
   "linked": [],

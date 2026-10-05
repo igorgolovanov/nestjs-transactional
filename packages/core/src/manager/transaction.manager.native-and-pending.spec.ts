@@ -54,6 +54,21 @@ describe('TransactionManager.nativeTransactionOf', () => {
   });
 });
 
+describe('TransactionManager.dialectOf', () => {
+  it("returns the adapter's dialect, or undefined when it reports none", async () => {
+    class PostgresAdapter extends InMemoryTransactionAdapter {
+      readonly dialect = 'postgres';
+    }
+
+    const reported = await setup(new PostgresAdapter()).run({}, async () => active());
+    const withDialect = setup(new PostgresAdapter());
+    const withoutDialect = setup(new InMemoryTransactionAdapter());
+
+    expect(withDialect.dialectOf(reported)).toBe('postgres');
+    expect(withoutDialect.dialectOf(reported)).toBeUndefined();
+  });
+});
+
 describe('TransactionManager.trackPending', () => {
   it('waits for a pending write before COMMIT', async () => {
     const adapter = new InMemoryTransactionAdapter();

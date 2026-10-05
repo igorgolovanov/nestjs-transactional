@@ -50,7 +50,7 @@ body:
     attributes:
       label: Package version
       description: >
-        All four packages ship as one version cohort, so one number is
+        All five packages ship as one version cohort, so one number is
         usually enough (`pnpm why @nestjs-transactional/core`). Say so
         if you have a mixed set.
       placeholder: 2.0.0
@@ -66,7 +66,9 @@ body:
         - label: '`typeorm`'
         - label: '`cqrs`'
         - label: '`outbox`'
+        - label: '`workflows`'
         - label: '`@nestjs/outbox` (state its version in the description)'
+        - label: '`@nestjs/workflows` (state its version in the description)'
 
   - type: dropdown
     id: dialect

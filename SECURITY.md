@@ -12,7 +12,7 @@ a suspected vulnerability before it has been addressed.
 
 What helps most in a report:
 
-- the affected package and version (all four packages ship as one
+- the affected package and version (all five packages ship as one
   version cohort, so naming one is usually enough);
 - what an attacker gains — the data they can read, write, or bypass;
 - a minimal reproduction, ideally a failing test rather than prose;
@@ -43,7 +43,7 @@ never maintained, and `1.0.0` is where this policy started.
 
 ## Scope
 
-In scope: anything in the four published packages under
+In scope: anything in the five published packages under
 `@nestjs-transactional/*`.
 
 Out of scope, though still worth telling us about as ordinary issues:
