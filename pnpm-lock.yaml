@@ -1542,6 +1542,9 @@ importers:
       '@types/node':
         specifier: ^22.20.2
         version: 22.20.2
+      amqplib:
+        specifier: ^2.2.0
+        version: 2.2.0
       jest:
         specifier: ^30.5.1
         version: 30.5.1(@types/node@22.20.2)

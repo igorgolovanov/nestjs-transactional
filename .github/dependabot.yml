@@ -1,7 +1,7 @@
 version: 2
 updates:
   # pnpm workspaces: Dependabot reads the root lockfile and opens one PR
-  # per dependency across every workspace project, so the six packages,
+  # per dependency across every workspace project, so the four packages,
   # the 19 examples and the root tooling are all covered by this entry.
   - package-ecosystem: npm
     directory: '/'

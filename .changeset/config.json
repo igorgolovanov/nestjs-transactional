@@ -10,9 +10,7 @@
       "@nestjs-transactional/core",
       "@nestjs-transactional/typeorm",
       "@nestjs-transactional/cqrs",
-      "@nestjs-transactional/outbox",
-      "@nestjs-transactional/outbox-typeorm",
-      "@nestjs-transactional/outbox-microservices"
+      "@nestjs-transactional/outbox"
     ]
   ],
   "linked": [],

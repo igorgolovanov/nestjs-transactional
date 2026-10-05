@@ -246,12 +246,11 @@ jobs:
     # not dropped below baseline" quality gate, which was previously
     # unverifiable in CI.
     #
-    # `typeorm` and `outbox-typeorm` measure coverage through
-    # `jest.coverage.config.js`, which includes their testcontainers
-    # suites, so this job needs Docker and takes about as long as the
-    # integration job. That cost buys numbers that mean something: with
-    # the integration tests excluded, `outbox-typeorm` reported 62 / 31
-    # against real figures of 90 / 69.
+    # `typeorm` measures coverage through `jest.coverage.config.js`, which
+    # includes its testcontainers suites, so this job needs Docker and
+    # takes about as long as the integration job. That cost buys numbers
+    # that mean something: unit tests alone under-report an adapter whose
+    # behaviour only shows against a real database.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -349,15 +348,16 @@ jobs:
       fail-fast: false
       matrix:
         typeorm-version: ['0.3.31', '1.0.0', '1.1.0']
-    # ubuntu-latest ships with Docker — testcontainers spins up Postgres
-    # per-suite. Currently `typeorm` and `outbox-typeorm` define
-    # `test:integration`; pnpm filter-run skips packages without it.
+    # ubuntu-latest ships with Docker, and testcontainers spins up Postgres
+    # per suite. `typeorm` and `outbox` define `test:integration`; pnpm
+    # filter-run skips packages without it. The outbox suite belongs in
+    # this matrix: what it exercises is `@nestjs/outbox`'s TypeORM
+    # executor joining the transaction `@Transactional` opened.
     #
-    # `outbox-microservices` also defines one, and it is excluded here on
-    # purpose: it talks to Kafka and RabbitMQ and never touches TypeORM,
-    # so running it in this matrix would start two brokers three times
-    # for one signal, under a job label naming a TypeORM version that has
-    # nothing to do with the result. It has its own job below.
+    # The outbox's broker suite is a separate script, `test:brokers`, and
+    # runs in its own job below. Running it here would start two brokers
+    # three times for one signal, under a job label naming a TypeORM
+    # version that has nothing to do with the result.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -401,18 +401,15 @@ jobs:
         run: pnpm -r --filter './packages/*' build
 
       - name: Integration tests
-        run: |
-          pnpm -r \
-            --filter './packages/*' \
-            --filter '!@nestjs-transactional/outbox-microservices' \
-            test:integration
+        run: pnpm -r --filter './packages/*' test:integration
 
   broker-integration:
     name: Broker integration tests (Kafka, RabbitMQ)
     runs-on: ubuntu-latest
-    # Single cell: the question this job answers is what `ClientProxy.emit()`
-    # reports back from a real broker, which does not vary by Node or
-    # TypeORM version. About 40 seconds for both brokers.
+    # Single cell: the question this job answers is what a real broker's
+    # acknowledgement means for an outbox message, delivered and removed
+    # or kept for a retry, which does not vary by Node or TypeORM
+    # version. About 40 seconds for both brokers.
     #
     # This job exists because the answer was once recorded wrong. ADR-016
     # concluded from a failing experiment that `emit()` cannot report
@@ -440,7 +437,7 @@ jobs:
         run: pnpm -r --filter './packages/*' build
 
       - name: Integration tests
-        run: pnpm --filter @nestjs-transactional/outbox-microservices test:integration
+        run: pnpm --filter @nestjs-transactional/outbox test:brokers
 
   api-surface:
     name: API surface

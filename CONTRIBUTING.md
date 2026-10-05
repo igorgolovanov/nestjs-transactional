@@ -45,7 +45,7 @@ All three of these should succeed on a clean clone.
 
 ESLint is deliberately not in the pre-commit hook: the config uses
 type-aware rules that resolve cross-package imports through
-`dist/*.d.ts`, so running it would mean building six packages on every
+`dist/*.d.ts`, so running it would mean building four packages on every
 commit. `pnpm lint` and the `lint` CI job cover it instead.
 
 To bypass a hook once — a work-in-progress commit on a local branch,
@@ -467,10 +467,10 @@ Releases are fully automated by the `release` workflow:
 
 Maintainers do not run `changeset publish` manually.
 
-### One version for all six
+### One version for all four
 
 The cohort is `fixed` in `.changeset/config.json`, not `linked`: every
-release publishes all six packages at the same version, including the
+release publishes all four packages at the same version, including the
 ones with no changes.
 
 That follows from how the packages are actually consumed. None of them
@@ -481,7 +481,7 @@ deployment is `core` plus an adapter, and every other package peers on
 per-package version number carries no information anybody reads. What
 people do instead is upgrade the set, and `fixed` turns that into "set
 everything to the same number" rather than a compatibility puzzle
-across six changelogs. It is what NestJS does with its own monorepo:
+across four changelogs. It is what NestJS does with its own monorepo:
 `common`, `core`, `microservices`, `testing` and `platform-express`
 publish in lockstep.
 
@@ -498,6 +498,10 @@ This was `linked` until `2.0.0`. Switching was only clean at that point:
 left the cohort split three-and-three, so flipping earlier would have
 jumped three packages a version for nothing. `2.0.0` brought all six
 back to one number, which is the moment the change costs nothing.
+
+The cohort was six until `3.0.0`, when `outbox-typeorm` and
+`outbox-microservices` were discontinued in favour of `@nestjs/outbox`
+(ADR-023).
 
 ## Publishing and npm provenance
 
