@@ -24,7 +24,7 @@ module.exports = {
     // to write a vaguer one.
     'subject-case': [0],
 
-    // Off for both: bodies here carry URLs to Spring documentation and
+    // Off for both: bodies here carry URLs to reference documentation and
     // occasional inline code, neither of which should be hard-wrapped to
     // satisfy a linter. Prose in bodies is wrapped by hand anyway.
     'body-max-line-length': [0],

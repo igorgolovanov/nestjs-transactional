@@ -140,7 +140,7 @@ The full enum is in `@nestjs-transactional/cqrs`'s
 
 ## Further reading
 
-- [ADR-002 — transactional events with Spring semantics](../../docs/adr/002-transactional-events-spring-semantics.md)
+- [ADR-002: transactional event phases](../../docs/adr/002-transactional-events-spring-semantics.md)
 - [ADR-003 — not patching `@nestjs/cqrs`](../../docs/adr/003-not-patching-nestjs-cqrs.md)
 - [ADR-005 — method wrapping strategy](../../docs/adr/005-method-wrapping-strategy.md)
 - [ADR-014 — class-level handler API](../../docs/adr/014-handler-api-redesign.md)

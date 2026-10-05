@@ -29,7 +29,7 @@ landing, but it is a real difference between environments.
 
 `readOnly` also applies only when the adapter *starts* the transaction —
 a `REQUIRED` call joining an existing read-write transaction cannot make
-it read-only after the fact. Spring behaves the same way.
+it read-only after the fact.
 
 **`timeout` is not implemented and deliberately not approximated.**
 TypeORM exposes no transaction-level timeout. The nearest dialect

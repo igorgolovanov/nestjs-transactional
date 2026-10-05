@@ -3,12 +3,8 @@
  * `@IntegrationEventsHandler` — the smart-default decorator for
  * cross-module / cross-service event handlers.
  *
- * The Spring Modulith equivalent is `@ApplicationModuleListener`.
- * The name `@IntegrationEventsHandler` is preferred in the NestJS
- * ecosystem because "Application Module" overlaps with NestJS's own
- * `@Module()` (a DI concept), and "Integration events" is the
- * established DDD/microservices term for the role this decorator
- * plays.
+ * "Integration events" is the established DDD/microservices term for
+ * the role this decorator plays.
  *
  * Shape is identical to {@link ITransactionalEventHandler}; the two
  * interfaces exist separately as marker types so code can

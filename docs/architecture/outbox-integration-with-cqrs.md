@@ -113,7 +113,7 @@ decoupling cannot erode unnoticed.
 
 - [ADR-014 — class-level handler API](../adr/014-handler-api-redesign.md)
 - [ADR-023 — delivery through `@nestjs/outbox`](../adr/023-delegate-delivery-to-nestjs-outbox.md)
-- [ADR-024 — events through the `EventBus`](../adr/024-cqrs-events-through-the-event-bus.md)
-- [DD-029 — the publisher chain contract](../dd/029-cqrs-publisher-chain-contract.md)
+- [ADR-024: events through the `EventBus`](../adr/024-cqrs-events-through-the-event-bus.md)
+- [DD-029: the publisher chain contract](../dd/029-cqrs-publisher-chain-contract.md)
 - [DD-028 — the bridge contract](../dd/028-outbox-bridge-contract.md)
 - [Outbox pattern](outbox-pattern.md)

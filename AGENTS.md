@@ -2,9 +2,10 @@
 
 ## Overview
 
-This repository aims to deliver Spring Modulith-equivalent transaction and
-event-delivery infrastructure for NestJS applications, split across a
-growing set of npm packages organised by concern.
+This repository delivers declarative transactions for NestJS
+applications, and connects them to event delivery and to NestJS's
+reliability modules, split across a set of npm packages organised by
+concern.
 
 ### Current (published / in-tree)
 
@@ -16,7 +17,7 @@ growing set of npm packages organised by concern.
   `@nestjs/typeorm`.
 - **@nestjs-transactional/cqrs** — integration with `@nestjs/cqrs`: runtime
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
-  `@TransactionalEventsHandler` with Spring-like phases,
+  `@TransactionalEventsHandler` with commit-aware phases,
   `@IntegrationEventsHandler`, and `TransactionalEventBusPublisher` in the
   `EventBus`'s publisher chain, so every event schedules its phases and
   carries `{ transaction }` to wrapping publishers such as
@@ -29,7 +30,7 @@ growing set of npm packages organised by concern.
   Storage, the relay, retries, dead letters, inboxes and broker
   transports are `@nestjs/outbox`'s. One outbox DataSource. What a
   successful publish acknowledges varies by transport: see ADR-021.
-- **@nestjs-transactional/workflows** — bridge onto the first-party
+- **@nestjs-transactional/workflows**: bridge onto the first-party
   `@nestjs/workflows` (DD-031): `WorkflowClient.start()` and `signal()`
   called inside `@Transactional`, directly or through
   `WorkflowsCqrsModule`'s `@StartOn` / `@SignalOn`, write in that
@@ -47,12 +48,18 @@ discontinued at 3.0.0.
 
 ## Mission Statement
 
-Give NestJS applications transaction management on par with Spring
-Framework: a declarative `@Transactional`, the full set of propagation
-modes, support for multiple DataSources in the same app, and a tight
-integration with event-driven paradigms through CQRS with phase-aware
-listeners. See [docs/architecture/spring-modulith-parity.md](docs/architecture/spring-modulith-parity.md)
-for the explicit scope-coverage matrix and Spring-Modulith mapping.
+Give NestJS applications declarative transaction management: a
+`@Transactional` decorator, the full set of propagation modes, multiple
+DataSources in the same app, phase-aware event handlers through CQRS,
+and one transaction shared with NestJS's reliability modules (the outbox
+and workflows) without a transaction parameter in application code. See
+[docs/architecture/scope-and-coverage.md](docs/architecture/scope-and-coverage.md)
+for the scope-coverage matrix.
+
+User-facing text (READMEs, package descriptions and keywords, guides,
+issue templates) describes the library on its own terms and does not
+lean on Spring. Architecture documents, ADRs and DDs may still compare
+with Spring where the comparison carries information.
 
 ## Technology Stack
 
@@ -95,7 +102,7 @@ the linked docs for depth.
 | Topic | Where |
 |---|---|
 | Architectural principles | [docs/architecture/principles.md](docs/architecture/principles.md) |
-| Spring Modulith parity goal + scope coverage | [docs/architecture/spring-modulith-parity.md](docs/architecture/spring-modulith-parity.md) |
+| Scope coverage, and the comparison with Spring Modulith | [docs/architecture/scope-and-coverage.md](docs/architecture/scope-and-coverage.md) |
 | Monorepo structure (file tree) | [docs/architecture/monorepo-structure.md](docs/architecture/monorepo-structure.md) |
 | Per-package architecture deep-dives | [docs/architecture/](docs/architecture/) — `core-design.md`, `outbox-pattern.md`, `outbox-integration-with-cqrs.md`, `event-externalization.md` |
 | Architecture Decision Records | [docs/adr/](docs/adr/) — see ADR index below |
@@ -293,8 +300,8 @@ so `@nestjs/cqrs` 12.1's `commit(context)` and `@nestjs/workflows`'
 `@StartOn` / `@SignalOn` work inside `@Transactional`, and NestJS 10
 leaves the peer ranges. A fifth package, `@nestjs-transactional/workflows`,
 does for `@nestjs/workflows` what the outbox bridge does for
-`@nestjs/outbox` (DD-031). The cohort is five packages —
-`@nestjs-transactional/{core,typeorm,cqrs,outbox,workflows}` — versioned as one
+`@nestjs/outbox` (DD-031). The cohort is five packages,
+`@nestjs-transactional/{core,typeorm,cqrs,outbox,workflows}`, versioned as one
 (`fixed`): see CONTRIBUTING, "One version for all five". Upgrading is in
 `docs/guides/migrating-to-3.md`.
 

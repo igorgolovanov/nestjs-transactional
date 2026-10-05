@@ -3,12 +3,13 @@
 [![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
-Declarative transactions for NestJS, with Spring's semantics.
+Declarative transactions for NestJS.
 
 Put `@Transactional()` on a method and everything it touches runs in
 one transaction — across `await` boundaries, without threading a
-manager through your call stack. All seven Spring propagation modes are
-implemented, including `NESTED` via savepoints.
+manager through your call stack. All seven propagation modes are
+implemented, from `REQUIRED` and `REQUIRES_NEW` to `NESTED` via
+savepoints.
 
 This package is ORM-agnostic and does nothing on its own: it needs an
 adapter. Most applications install
@@ -134,8 +135,8 @@ Two options carry caveats worth knowing before you rely on them:
 
 - **`readOnly`** is enforced by the database only on Postgres-family
   dialects, where the adapter issues `SET TRANSACTION READ ONLY`.
-  Elsewhere it documents intent and nothing rejects a write. Spring
-  treats it as a hint too. See
+  Elsewhere it documents intent and nothing rejects a write: it is a
+  hint by design. See
   [DD-027](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/027-readonly-and-timeout-semantics.md).
 - **`timeout`** is **deprecated** and goes in the next major. It was
   never implemented by the TypeORM adapter, and deliberately not

@@ -5,9 +5,16 @@
 [![Node: 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-brightgreen)](https://nodejs.org)
 [![TypeScript: 5.5+](https://img.shields.io/badge/typescript-5.5+-blue)](https://www.typescriptlang.org/)
 
-**Spring's transaction model, for NestJS.** One decorator, and
+**Declarative transactions for NestJS.** One decorator, and
 everything underneath it commits or rolls back together — including the
 repositories you already inject and the events you already publish.
+
+NestJS's own reliability modules, [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox)
+and [`@nestjs/workflows`](https://docs.nestjs.com/reliability/workflows),
+write in your transaction when you hand it to them. `@Transactional` is
+what hands it over, so the outbox message and the workflow instance
+commit with your rows without a transaction parameter anywhere in your
+code.
 
 ## The thing this fixes
 
@@ -86,6 +93,27 @@ Either the order and the intent to notify both land, or neither does.
 `outbox.add(tx, ...)` through every layer; `@Transactional` is what
 removes that parameter.
 
+**Workflows that start with the order.** The same goes for
+[`@nestjs/workflows`](https://docs.nestjs.com/reliability/workflows):
+a durable workflow started inside the transaction exists if and only if
+the order does, and so does one that `@StartOn` starts from an event
+the aggregate publishes:
+
+```ts
+@Transactional()
+async placeOrder(dto: PlaceOrderDto) {
+  const order = await this.orders.save(dto);
+  await this.workflows.start(FulfilOrder, order, { id: `order-${order.id}` }); // no { transaction }
+  return order;
+}
+```
+
+**Retries the database asks for.** Under `SERIALIZABLE`, PostgreSQL
+fails one of two conflicting transactions and expects you to run it
+again. `@Transactional({ isolation: 'SERIALIZABLE', retry: 3 })` does,
+from the frame that owns the transaction, with fresh hooks on every
+attempt.
+
 **All seven propagation modes**, not the two that are easy.
 `REQUIRES_NEW` gives you the audit row that survives the caller's
 rollback. `NESTED` gives you a savepoint — and on a driver without
@@ -96,6 +124,20 @@ your "nested" transaction as part of the outer one.
 `@Transactional({ dataSource: 'billing' })` routes to the right adapter,
 and a repository bound to another one falls back to its own manager
 rather than silently joining.
+
+## Next to the NestJS reliability modules
+
+NestJS ships its reliability tooling as separate modules. None of them
+has an ambient transaction; the ones that write to your database take it
+explicitly. This is how each one meets `@Transactional`:
+
+| Module | What this repository adds |
+| --- | --- |
+| [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox) | [`outbox`](packages/outbox): publish inside the transaction, `@Externalized` routing to brokers |
+| [`@nestjs/workflows`](https://docs.nestjs.com/reliability/workflows) | [`workflows`](packages/workflows): `start()`, `signal()`, `@StartOn` and `@SignalOn` inside the transaction |
+| [`@nestjs/cqrs`](https://docs.nestjs.com/recipes/cqrs) | [`cqrs`](packages/cqrs): handlers in a transaction, phase-aware event handlers, `{ transaction }` in the event bus's dispatcher context |
+| [`@nestjs/resilience`](https://docs.nestjs.com/reliability/resilience) | `@Transactional({ retry })` for the retries only the transaction's owner can do; guidance on where `@Retry` belongs |
+| [`@nestjs/locks`](https://docs.nestjs.com/reliability/locks), [`@nestjs/idempotency`](https://docs.nestjs.com/reliability/idempotency) | nothing to bridge: both keep their state outside your transaction by design. The [guide](docs/guides/reliability-modules.md) covers the ordering that keeps them correct |
 
 ## Install
 
@@ -120,8 +162,9 @@ export class AppModule {}
 That is the entire setup for the first half of this page. Add
 `@nestjs-transactional/cqrs` for the event phases,
 `@nestjs-transactional/outbox` with `@nestjs/outbox` for durable delivery
-and brokers — each is additive, and none of them changes code you have
-already written.
+and brokers, `@nestjs-transactional/workflows` with `@nestjs/workflows`
+for durable workflows. Each is additive, and none of them changes code
+you have already written.
 
 **These packages are ESM only**, from `2.0.0`, matching NestJS 12. A
 CommonJS application still consumes them: Node loads ESM from
@@ -167,8 +210,13 @@ These are documented, tested, and worth knowing before you adopt:
   store per application, so publishing from a transaction on another
   DataSource throws rather than writing outside it.
   ([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md))
-- **`@nestjs/outbox` is pre-1.0.** The bridge pins `~0.1.0` and widens
-  only after each release passes its integration suite.
+- **`@nestjs/outbox` and `@nestjs/workflows` are pre-1.0.** The bridges
+  pin `~0.1.0` and `~0.0.1` and widen only after each release passes
+  their integration suites.
+- **A workflow signal needs READ COMMITTED on PostgreSQL.** Inside a
+  `SERIALIZABLE` or `REPEATABLE_READ` transaction it fails before
+  anything is written, rather than risk missing a wake-up.
+  ([DD-031](docs/dd/031-workflows-bridge-contract.md))
 - **No distributed transactions across dataSources.** That is a design
   decision, not a gap — cross-dataSource atomicity goes through the
   outbox.
@@ -219,12 +267,13 @@ picking a starting point.
 
 - **Per-package guides** — [core](packages/core/README.md),
   [typeorm](packages/typeorm/README.md), [cqrs](packages/cqrs/README.md),
-  [outbox](packages/outbox/README.md)
+  [outbox](packages/outbox/README.md), [workflows](packages/workflows/README.md)
 - **Architecture** — [core design](docs/architecture/core-design.md),
   [the outbox pattern](docs/architecture/outbox-pattern.md),
   [outbox × CQRS](docs/architecture/outbox-integration-with-cqrs.md),
   [event externalization](docs/architecture/event-externalization.md),
-  [Spring Modulith parity](docs/architecture/spring-modulith-parity.md)
+  [scope and coverage](docs/architecture/scope-and-coverage.md)
+- **With the NestJS reliability modules**: [outbox, workflows, cqrs, resilience, locks, idempotency](docs/guides/reliability-modules.md)
 - **Migrating** — [from 2.x to 3.0](docs/guides/migrating-to-3.md),
   [from in-memory handlers to the outbox](docs/guides/migrating-to-outbox.md)
 - **Why things are the way they are** — [ADRs](docs/adr/) and

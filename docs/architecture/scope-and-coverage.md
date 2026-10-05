@@ -1,11 +1,29 @@
-# Spring Modulith Parity Goal
+# Scope and coverage
 
-This monorepo aims to provide Spring Modulith-equivalent functionality
-for NestJS applications, not just Spring Framework core.
+What `@nestjs-transactional` covers, what it leaves to NestJS's own
+modules, and what is out of scope. The last part compares the result
+with Spring, for readers who know it.
 
-## Scope coverage
+## What the library covers
 
-**Spring Framework core features (covered in existing packages):**
+- **Declarative transactions** (core): `@Transactional`, all seven
+  propagation modes, isolation, rollback rules, commit and rollback
+  hooks, retry of serialization failures and deadlocks.
+- **Transactional context across `await`** (core), on
+  `AsyncLocalStorage`, so nothing passes a transaction by hand.
+- **Repositories that join the transaction** (typeorm), and multiple
+  DataSources in one application.
+- **Commit-aware event handlers** (cqrs): `@TransactionalEventsHandler`
+  at a chosen transaction phase, command and query handlers in a
+  transaction, and `{ transaction }` in the `EventBus`'s dispatcher
+  context.
+- **One transaction with NestJS's reliability modules**: an outbox
+  message (outbox) and a workflow instance or signal (workflows) commit
+  with the business rows.
+
+## Compared with Spring
+
+**Spring Framework core, and where it lives here:**
 - `@Transactional` with propagation modes (core)
 - `@TransactionalEventListener` with transaction phases (cqrs)
 - Multi-DataSource support (typeorm)
@@ -37,6 +55,25 @@ not acknowledge at all, and gRPC cannot be used. Per-transport table and
 measurements in
 [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
 
+**Next to the NestJS reliability modules, from 3.0.0:**
+
+Spring Modulith is one framework that owns its event publication.
+NestJS chose separate first-party modules instead, and this repository
+sits beside them rather than replacing them: it supplies the ambient
+transaction they take as an argument.
+
+| Concern | Spring | NestJS, with this repository |
+| --- | --- | --- |
+| Declarative transactions, propagation | `@Transactional` | `@Transactional` (core) |
+| Phase-aware listeners | `@TransactionalEventListener` | `@TransactionalEventsHandler` (cqrs) |
+| Event publication in the business transaction | Event Publication Registry | `@nestjs/outbox` + the outbox bridge |
+| Durable processes, sagas | Spring Modulith has none; Temporal or a state machine | `@nestjs/workflows` + the workflows bridge |
+| Retry of a failed transaction | Spring Retry around `@Transactional` | `@Transactional({ retry })` (DD-032) |
+
+How each module meets `@Transactional`, including those with nothing to
+bridge (locks, idempotency):
+[the reliability modules guide](../guides/reliability-modules.md).
+
 **Explicitly out of scope:**
 - Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)
   — use `@nx/enforce-module-boundaries` or similar for this
@@ -44,15 +81,17 @@ measurements in
 
 ## Positioning note
 
-This is a deliberate scope commitment made after comparing with Spring
-Modulith 2.0.5 documentation
-(https://docs.spring.io/spring-modulith/reference/events.html).
-Prior positioning of "Spring Framework equivalent" was insufficient —
-production systems need the delivery guarantees Spring Modulith provides.
+The scope once aimed at Spring Modulith equivalence, after comparing with
+Spring Modulith 2.0.5's documentation
+(https://docs.spring.io/spring-modulith/reference/events.html): production
+systems need delivery guarantees, not only transactions. From 3.0.0 the
+delivery itself belongs to NestJS's first-party modules (ADR-023), and
+this repository supplies the transaction they write in.
 
 ## Spring Framework reference points
 
-Since we model the API on Spring, useful reference points:
+The transaction API follows Spring's where it can, so these are useful
+reference points:
 
 - **Spring @Transactional**: https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html
 - **Propagation modes**: https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html

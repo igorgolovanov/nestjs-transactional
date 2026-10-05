@@ -20,7 +20,7 @@ import { OrderRow } from './order.entity.js';
  *      `OrderConfirmedEvent` onto the queue.
  *   3. Updates the row to `confirmed` status and stamps
  *      `confirmedAt`.
- *   4. `aggregate.commit()` — `OrderConfirmedEvent` goes through the
+ *   4. `aggregate.commit()`: `OrderConfirmedEvent` goes through the
  *      `EventBus`. The class carries `@Externalized`, so
  *      it becomes an outbox message in this transaction, and the
  *      relay forwards it to Kafka after the commit.

@@ -92,7 +92,7 @@ class OrderService {
    * but writes to the *default*-DS Order repo. Per DD-023, the
    * billing transaction is active for billing only — this Repository
    * (default-DS) sees no active transaction for its dataSource and
-   * autocommits. Spring-style cross-DS isolation: a transaction on
+   * autocommits. Cross-DS isolation: a transaction on
    * dataSource A does NOT silently enrol dataSource B.
    */
   @Transactional({ dataSource: 'billing' })

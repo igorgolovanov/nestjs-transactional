@@ -41,7 +41,7 @@ type InternalResult<T> =
  * before/after-commit and after-rollback hooks that the surrounding
  * transaction fires at the appropriate phase.
  *
- * All seven Spring-compatible propagation modes are supported:
+ * All seven propagation modes are supported:
  * `REQUIRED`, `REQUIRES_NEW`, `NESTED`, `SUPPORTS`, `NOT_SUPPORTED`,
  * `NEVER`, `MANDATORY`. See {@link TransactionManager.run} for the
  * per-mode behaviour.
@@ -511,8 +511,8 @@ export class TransactionManager {
    * The manager intentionally does NOT create a new
    * {@link ActiveTransaction} for the savepoint — hook registrations inside
    * `fn` fall through {@link currentTransaction} to the outer transaction,
-   * which is the Spring-style semantic: nested events "promote" to the
-   * enclosing transaction and fire when that transaction commits.
+   * so nested events "promote" to the enclosing transaction and fire when
+   * that transaction commits.
    *
    * Rollback semantics follow `shouldRollback`: errors that match the
    * rollback rules cause the adapter to roll back to the savepoint (the
@@ -563,7 +563,7 @@ export class TransactionManager {
   }
 
   /**
-   * Spring-style decision on whether a thrown error should trigger rollback:
+   * Decides whether a thrown error should trigger rollback:
    *
    * 1. If `noRollbackFor` is set and matches, commit anyway (precedence).
    * 2. Else if `rollbackFor` is set, roll back only when the error matches

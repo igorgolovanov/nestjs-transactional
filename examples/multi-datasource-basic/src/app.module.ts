@@ -11,7 +11,7 @@ import { InventoryService } from './inventory.service.js';
  * Multi-DataSource example using two SQLite in-memory databases via
  * `sql.js`. No Docker, no external setup. The two DataSources are
  * fully independent — neither knows about the other's tables —
- * demonstrating Spring-style cross-DS isolation (DD-023): a
+ * demonstrating cross-DS isolation (DD-023): a
  * transaction on dataSource A does NOT silently enrol dataSource B.
  *
  * Wiring follows ADR-018 multi-`forRoot` pattern: one

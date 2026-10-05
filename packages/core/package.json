@@ -19,7 +19,6 @@
     "nestjs",
     "transaction",
     "transactional",
-    "spring",
     "async-local-storage",
     "declarative"
   ],

@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?style=flat-square&label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/LICENSE)
 
-Transactions and Spring-style event phases for
+Transactions and commit-aware event phases for
 [`@nestjs/cqrs`](https://docs.nestjs.com/recipes/cqrs).
 
 It solves the race everyone hits with domain events: an aggregate emits
@@ -167,9 +167,8 @@ lose on a crash, such as cache invalidation and metrics, and when you
 need a phase other than after-commit.
 
 `@IntegrationEventsHandler` is the opinionated form for cross-module
-code: after the commit, asynchronously, in a transaction of its own. It
-mirrors Spring Modulith's `@ApplicationModuleListener`. Delivery is
-still in-memory, so a crash between the commit and the handler loses
+code: after the commit, asynchronously, in a transaction of its own.
+Delivery is still in-memory, so a crash between the commit and the handler loses
 the call.
 
 When the work must survive that (external API calls, emails, billing),
@@ -205,7 +204,7 @@ Handlers of any scope are supported, including `Scope.REQUEST` and
 ## Documentation
 
 - [Getting started and full docs](https://github.com/igorgolovanov/nestjs-transactional#readme)
-- [Transactional events and Spring semantics (ADR-002)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/002-transactional-events-spring-semantics.md)
+- [Transactional event phases (ADR-002)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/002-transactional-events-spring-semantics.md)
 - [Handler API design (ADR-014)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/014-handler-api-redesign.md)
 - [Why `@nestjs/cqrs` is not forked (DD-002)](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/002-no-fork-nestjs-cqrs.md)
 - Runnable examples:

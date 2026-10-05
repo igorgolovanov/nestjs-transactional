@@ -22,7 +22,6 @@
     "typeorm",
     "transaction",
     "transactional",
-    "spring",
     "entity-manager",
     "savepoint"
   ],

@@ -36,17 +36,15 @@ body:
       required: false
 
   - type: input
-    id: spring-parity
+    id: prior-art
     attributes:
-      label: Spring / Spring Modulith equivalent
+      label: Prior art
       description: >
-        This project's mission is Spring parity for NestJS, so "Spring
-        does X, and here is the Spring documentation for it" is the
-        single strongest argument a request can carry. Leave this blank
-        if there is no equivalent — several features here go past Spring
-        deliberately, and that is a fine thing to propose, just a
-        different argument.
-      placeholder: e.g. Spring's @Transactional(timeout = 5)
+        Another framework or library that already does this, with a link
+        to its documentation. A precedent with known semantics is a
+        strong argument for a request. Leave this blank if there is none:
+        a new idea is fine to propose too.
+      placeholder: e.g. a link to the documentation of the same feature elsewhere
     validations:
       required: false
 
