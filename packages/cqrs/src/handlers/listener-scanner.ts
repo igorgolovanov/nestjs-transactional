@@ -23,7 +23,7 @@ import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatch
  * instantiated by the time the scan runs. Providers with no instance
  * or no metatype are skipped silently.
  *
- * Wired into the application by `CqrsTransactionalModule`. Not
+ * Wired into the application by `TransactionalCqrsModule`. Not
  * exported for direct consumer instantiation.
  */
 @Injectable()

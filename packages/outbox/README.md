@@ -46,7 +46,7 @@ import {
   imports: [
     TypeOrmModule.forRoot({ type: 'postgres' /* ... */ }),
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
 
     ClientsModule.register([{ name: 'KAFKA', transport: Transport.KAFKA, options: {/* ... */} }]),
     OutboxModule.forRoot({

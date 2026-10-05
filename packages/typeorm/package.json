@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": [
-    "./dist/module/typeorm-transactional.module.js"
+    "./dist/module/transactional-typeorm.module.js"
   ],
   "author": "Igor Golovanov",
   "repository": {

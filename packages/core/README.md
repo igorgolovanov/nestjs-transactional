@@ -47,13 +47,11 @@ Reasoning and measurements: [ADR-022](https://github.com/igorgolovanov/nestjs-tr
 ```ts
 import { Module } from '@nestjs/common';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      /* ... */
-    }),
+    TypeOrmModule.forRoot({/* ... */}),
 
     // Infrastructure only: TransactionManager, AdapterRegistry, the
     // interceptor. `isGlobal` matters — the adapter package below
@@ -61,7 +59,7 @@ import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
     TransactionalModule.forRoot({ isGlobal: true }),
 
     // Registers the TypeORM adapter for the default dataSource.
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
   ],
 })
 export class AppModule {}
@@ -91,15 +89,15 @@ export class OrdersService {
 transactional method is called from inside another one. The default,
 `REQUIRED`, joins the caller — which is what you want almost always.
 
-| Mode | Caller has a transaction | Caller has none |
-| --- | --- | --- |
-| `REQUIRED` *(default)* | join it | start one |
-| `REQUIRES_NEW` | suspend it, run independently, resume | start one |
-| `NESTED` | run in a savepoint | start one |
-| `SUPPORTS` | join it | run without a transaction |
-| `NOT_SUPPORTED` | suspend it, run without one, resume | run without one |
-| `NEVER` | throw `IllegalTransactionStateError` | run without one |
-| `MANDATORY` | join it | throw `IllegalTransactionStateError` |
+| Mode                   | Caller has a transaction              | Caller has none                      |
+| ---------------------- | ------------------------------------- | ------------------------------------ |
+| `REQUIRED` _(default)_ | join it                               | start one                            |
+| `REQUIRES_NEW`         | suspend it, run independently, resume | start one                            |
+| `NESTED`               | run in a savepoint                    | start one                            |
+| `SUPPORTS`             | join it                               | run without a transaction            |
+| `NOT_SUPPORTED`        | suspend it, run without one, resume   | run without one                      |
+| `NEVER`                | throw `IllegalTransactionStateError`  | run without one                      |
+| `MANDATORY`            | join it                               | throw `IllegalTransactionStateError` |
 
 `REQUIRES_NEW` is how you make a side effect survive the caller's
 rollback — an audit row that must persist even when the operation

@@ -4,7 +4,7 @@ import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
 import { OrderEntity } from './order.entity.js';
@@ -57,7 +57,7 @@ export class AppModule {
         TypeOrmModule.forFeature([OrderEntity]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
 
         // `@nestjs/outbox`, configured as its documentation shows. With
         // no transports every message goes to its `local` transport,

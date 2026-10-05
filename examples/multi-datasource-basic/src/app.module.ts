@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { BillingService } from './billing.service.js';
 import { InventoryService } from './inventory.service.js';
@@ -15,7 +15,7 @@ import { InvoiceEntity, StockItemEntity } from './entities.js';
  * transaction on dataSource A does NOT silently enrol dataSource B.
  *
  * Wiring follows ADR-018 multi-`forRoot` pattern: one
- * `TypeOrmTransactionalModule.forRoot` per dataSource, plus the
+ * `TransactionalTypeOrmModule.forRoot` per dataSource, plus the
  * standard `@nestjs/typeorm` `TypeOrmModule.forRoot/forFeature`
  * registrations under the matching dataSource name.
  */
@@ -46,13 +46,13 @@ import { InvoiceEntity, StockItemEntity } from './entities.js';
     // Process-wide infrastructure — registered once.
     TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
 
-    // One TypeOrmTransactionalModule.forRoot per DataSource (ADR-018).
+    // One TransactionalTypeOrmModule.forRoot per DataSource (ADR-018).
     // The first call (default) marks itself with `isDefault: true`;
     // the second registers under its named identifier. Importing
     // either module also activates the transparent-repository
     // patches at module-load time.
-    TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-    TypeOrmTransactionalModule.forRoot({ dataSource: 'inventory' }),
+    TransactionalTypeOrmModule.forRoot({ isDefault: true }),
+    TransactionalTypeOrmModule.forRoot({ dataSource: 'inventory' }),
   ],
   providers: [BillingService, InventoryService],
 })

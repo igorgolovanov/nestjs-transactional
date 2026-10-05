@@ -7,7 +7,7 @@
 
 cqrs events go through the `@nestjs/cqrs` EventBus, and NestJS 10 leaves the peer ranges
 
-`CqrsTransactionalModule` no longer overrides `EventPublisher`. It
+`TransactionalCqrsModule` no longer overrides `EventPublisher`. It
 imports `CqrsModule.forRoot()` with its own publisher in the `EventBus`,
 so every event, from `aggregate.commit()` or `eventBus.publish()`,
 schedules its transaction phases and the outbox, then reaches
@@ -32,7 +32,7 @@ contract: DD-029. Upgrading: section 7 of
 - **Removed from cqrs**: `HybridEventPublisher`,
   `TransactionalEventPublisher`, `TransactionalEventPublisherAdapter`,
   `AggregateConstructor` and the `useTransactionalEventPublisher` option.
-  `CqrsModule` options go to `CqrsTransactionalModule.forRoot({ cqrs })`,
+  `CqrsModule` options go to `TransactionalCqrsModule.forRoot({ cqrs })`,
   a bus publisher of your own to `forRoot({ eventPublisher })`.
 - **Bootstrap fails** when a second `EventBus` exists or
   `EventBus.publisher` no longer reaches the transactional publisher.

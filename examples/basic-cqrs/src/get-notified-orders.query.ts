@@ -10,7 +10,7 @@ import { NotificationHandler } from './notification.handler.js';
  *
  * - `CqrsHandlerWrapper` decorates `execute` at bootstrap (the cqrs
  *   package's `OnApplicationBootstrap` mechanism).
- * - `CqrsTransactionalModule.forRoot()` defaults
+ * - `TransactionalCqrsModule.forRoot()` defaults
  *   `defaultQueryOptions = { readOnly: true }`, so the wrapped
  *   transaction is read-only — a hint that downstream adapters
  *   (TypeORM, Prisma) can use to optimize or to refuse writes.

@@ -33,7 +33,7 @@ export {
 
 /**
  * Apply both prototype-level patch families in one call. Used by
- * `TypeOrmTransactionalModule.forRoot`'s registration factory.
+ * `TransactionalTypeOrmModule.forRoot`'s registration factory.
  * Idempotent — calling more than once is a no-op (each install
  * routine guards on its own `installed` flag).
  *

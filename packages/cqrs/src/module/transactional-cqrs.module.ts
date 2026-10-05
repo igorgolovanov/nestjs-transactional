@@ -12,7 +12,7 @@ import { CqrsModule, type CqrsModuleOptions, type IEventPublisher } from '@nestj
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 import { CqrsEventBusBinding } from '../event-publisher/event-bus-binding.js';
 import { TransactionalEventBusPublisher } from '../event-publisher/transactional-event-bus-publisher.js';
-import { CqrsTransactionalBootstrap } from '../handlers/bootstrap.js';
+import { TransactionalCqrsBootstrap } from '../handlers/bootstrap.js';
 import {
   CQRS_HANDLER_WRAPPER_OPTIONS,
   CqrsHandlerWrapper,
@@ -21,9 +21,9 @@ import {
 import { IntegrationEventsHandlerScanner } from '../handlers/integration-events-handler-scanner.js';
 import { TransactionalListenerScanner } from '../handlers/listener-scanner.js';
 
-import { CQRS_TRANSACTIONAL_OPTIONS } from './tokens.js';
+import { TRANSACTIONAL_CQRS_OPTIONS } from './tokens.js';
 
-export { CQRS_TRANSACTIONAL_OPTIONS };
+export { TRANSACTIONAL_CQRS_OPTIONS };
 
 /**
  * Options read at runtime, from `forRoot` directly or from
@@ -38,7 +38,7 @@ export { CQRS_TRANSACTIONAL_OPTIONS };
  *   (DD-027)
  * - `eventsDataSource`: `'default'`
  */
-export interface CqrsTransactionalAsyncFactoryResult extends HandlerWrapperOptions {
+export interface TransactionalCqrsAsyncFactoryResult extends HandlerWrapperOptions {
   /**
    * The DataSource whose transaction a publish inside `@Transactional`
    * carries in its dispatcher context, as `{ transaction }`: what
@@ -52,7 +52,7 @@ export interface CqrsTransactionalAsyncFactoryResult extends HandlerWrapperOptio
  * Options that shape the module itself, so NestJS needs them when the
  * module is defined, before any async factory has run (convention #21).
  */
-interface CqrsTransactionalStructuralOptions {
+interface TransactionalCqrsStructuralOptions {
   /**
    * Options for `@nestjs/cqrs`'s `CqrsModule.forRoot()`, which this
    * module imports. Pass them here rather than importing `CqrsModule`
@@ -69,22 +69,22 @@ interface CqrsTransactionalStructuralOptions {
   readonly eventPublisher?: IEventPublisher;
 }
 
-/** Options accepted by {@link CqrsTransactionalModule.forRoot}. */
-export interface CqrsTransactionalOptions
-  extends CqrsTransactionalAsyncFactoryResult, CqrsTransactionalStructuralOptions {}
+/** Options accepted by {@link TransactionalCqrsModule.forRoot}. */
+export interface TransactionalCqrsOptions
+  extends TransactionalCqrsAsyncFactoryResult, TransactionalCqrsStructuralOptions {}
 
 /**
- * Asynchronous options for {@link CqrsTransactionalModule.forRootAsync}.
+ * Asynchronous options for {@link TransactionalCqrsModule.forRootAsync}.
  *
- * There is still exactly one `CqrsTransactionalModule` registration per
+ * There is still exactly one `TransactionalCqrsModule` registration per
  * application regardless of how many dataSources are configured: the
  * cqrs runtime is dataSource-agnostic by design.
  */
-export interface CqrsTransactionalAsyncOptions
-  extends Pick<ModuleMetadata, 'imports'>, CqrsTransactionalStructuralOptions {
+export interface TransactionalCqrsAsyncOptions
+  extends Pick<ModuleMetadata, 'imports'>, TransactionalCqrsStructuralOptions {
   readonly useFactory: (
     ...args: never[]
-  ) => Promise<CqrsTransactionalAsyncFactoryResult> | CqrsTransactionalAsyncFactoryResult;
+  ) => Promise<TransactionalCqrsAsyncFactoryResult> | TransactionalCqrsAsyncFactoryResult;
   readonly inject?: readonly InjectionToken[];
 }
 
@@ -100,7 +100,7 @@ type ResolvedOptions = Required<
  * Single source of truth for the option defaults, so `forRoot` and
  * `forRootAsync` cannot drift apart.
  */
-function resolveOptions(options: CqrsTransactionalAsyncFactoryResult): ResolvedOptions {
+function resolveOptions(options: TransactionalCqrsAsyncFactoryResult): ResolvedOptions {
   return {
     wrapCommandHandlers: options.wrapCommandHandlers ?? true,
     wrapQueryHandlers: options.wrapQueryHandlers ?? true,
@@ -126,12 +126,12 @@ function resolveOptions(options: CqrsTransactionalAsyncFactoryResult): ResolvedO
  *   `WorkflowsCqrsModule`) writes in that transaction;
  * - {@link TransactionalEventDispatcher} and the scanners for
  *   `@TransactionalEventsHandler` and `@IntegrationEventsHandler`;
- * - {@link CqrsHandlerWrapper} and {@link CqrsTransactionalBootstrap},
+ * - {@link CqrsHandlerWrapper} and {@link TransactionalCqrsBootstrap},
  *   which run `@CommandHandler`, `@QueryHandler` and `@EventsHandler`
  *   methods in a transaction.
  *
  * Pair with `TransactionalModule.forRoot({ isGlobal: true })` at the
- * application root, and one `TypeOrmTransactionalModule.forRoot(...)` per
+ * application root, and one `TransactionalTypeOrmModule.forRoot(...)` per
  * DataSource (ADR-019).
  *
  * Do NOT import `@nestjs/cqrs`'s `CqrsModule` alongside this module
@@ -146,9 +146,9 @@ function resolveOptions(options: CqrsTransactionalAsyncFactoryResult): ResolvedO
  * @Module({
  *   imports: [
  *     TransactionalModule.forRoot({ isGlobal: true }),
- *     TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+ *     TransactionalTypeOrmModule.forRoot({ isDefault: true }),
  *     // No `CqrsModule` here: see the note above.
- *     CqrsTransactionalModule.forRoot(),
+ *     TransactionalCqrsModule.forRoot(),
  *   ],
  * })
  * export class AppModule {}
@@ -159,10 +159,10 @@ function resolveOptions(options: CqrsTransactionalAsyncFactoryResult): ResolvedO
  * `OUTBOX_PUBLICATION_SCHEDULER`. Nothing to declare here.
  */
 @Module({})
-export class CqrsTransactionalModule {
-  static forRoot(options: CqrsTransactionalOptions = {}): DynamicModule {
+export class TransactionalCqrsModule {
+  static forRoot(options: TransactionalCqrsOptions = {}): DynamicModule {
     return buildModule({
-      optionsProvider: { provide: CQRS_TRANSACTIONAL_OPTIONS, useValue: resolveOptions(options) },
+      optionsProvider: { provide: TRANSACTIONAL_CQRS_OPTIONS, useValue: resolveOptions(options) },
       structural: options,
     });
   }
@@ -174,7 +174,7 @@ export class CqrsTransactionalModule {
    *
    * @example
    * ```ts
-   * CqrsTransactionalModule.forRootAsync({
+   * TransactionalCqrsModule.forRootAsync({
    *   imports: [ConfigModule],
    *   inject: [ConfigService],
    *   useFactory: (cfg: ConfigService) => ({
@@ -184,9 +184,9 @@ export class CqrsTransactionalModule {
    * });
    * ```
    */
-  static forRootAsync(options: CqrsTransactionalAsyncOptions): DynamicModule {
+  static forRootAsync(options: TransactionalCqrsAsyncOptions): DynamicModule {
     const optionsProvider: FactoryProvider = {
-      provide: CQRS_TRANSACTIONAL_OPTIONS,
+      provide: TRANSACTIONAL_CQRS_OPTIONS,
       useFactory: async (...args: never[]): Promise<ResolvedOptions> =>
         resolveOptions(await options.useFactory(...args)),
       inject: options.inject ? [...options.inject] : undefined,
@@ -198,13 +198,13 @@ export class CqrsTransactionalModule {
 
 /**
  * Shared module shape for both registration paths. The only difference
- * between them is how {@link CQRS_TRANSACTIONAL_OPTIONS} is provided:
+ * between them is how {@link TRANSACTIONAL_CQRS_OPTIONS} is provided:
  * everything downstream injects that token, so the provider matrix is
  * identical.
  */
 function buildModule(args: {
   optionsProvider: Provider;
-  structural: CqrsTransactionalStructuralOptions;
+  structural: TransactionalCqrsStructuralOptions;
   imports?: ModuleMetadata['imports'];
 }): DynamicModule {
   // One instance per registration, handed to `CqrsModule.forRoot()` so
@@ -213,7 +213,7 @@ function buildModule(args: {
   const publisher = new TransactionalEventBusPublisher(args.structural.eventPublisher);
 
   return {
-    module: CqrsTransactionalModule,
+    module: TransactionalCqrsModule,
     imports: [
       DiscoveryModule,
       CqrsModule.forRoot({ ...args.structural.cqrs, eventPublisher: publisher }),
@@ -221,13 +221,13 @@ function buildModule(args: {
     ],
     providers: [
       args.optionsProvider,
-      { provide: CQRS_HANDLER_WRAPPER_OPTIONS, useExisting: CQRS_TRANSACTIONAL_OPTIONS },
+      { provide: CQRS_HANDLER_WRAPPER_OPTIONS, useExisting: TRANSACTIONAL_CQRS_OPTIONS },
       { provide: TransactionalEventBusPublisher, useValue: publisher },
       TransactionalEventDispatcher,
       TransactionalListenerScanner,
       IntegrationEventsHandlerScanner,
       CqrsHandlerWrapper,
-      CqrsTransactionalBootstrap,
+      TransactionalCqrsBootstrap,
       CqrsEventBusBinding,
     ],
     exports: [TransactionalEventDispatcher, TransactionalEventBusPublisher],

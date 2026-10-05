@@ -20,6 +20,28 @@ export function getCurrentEntityManager(adapterInstance?: string, fallback?: Dat
 export function isInTransaction(adapterInstance?: string): boolean;
 
 // @public
+export interface TransactionalTypeOrmAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+    // (undocumented)
+    readonly inject?: readonly InjectionToken[];
+    // (undocumented)
+    readonly useFactory: (...args: never[]) => Promise<TransactionalTypeOrmOptions> | TransactionalTypeOrmOptions;
+}
+
+// @public
+export class TransactionalTypeOrmModule {
+    static forRoot(options?: TransactionalTypeOrmOptions): DynamicModule;
+    static forRootAsync(options: TransactionalTypeOrmAsyncOptions): DynamicModule;
+    // @internal
+    static resetForTesting(): void;
+}
+
+// @public
+export interface TransactionalTypeOrmOptions {
+    readonly dataSource?: string;
+    readonly isDefault?: boolean;
+}
+
+// @public
 export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTransactionHandle> {
     constructor(dataSource: DataSource,
     instanceName: string);
@@ -35,27 +57,17 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
     runInTransaction<T>(options: TransactionOptions, fn: (handle: TypeOrmTransactionHandle) => Promise<T>): Promise<T>;
 }
 
-// @public
-export interface TypeOrmTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
-    // (undocumented)
-    readonly inject?: readonly InjectionToken[];
-    // (undocumented)
-    readonly useFactory: (...args: never[]) => Promise<TypeOrmTransactionalOptions> | TypeOrmTransactionalOptions;
-}
+// @public @deprecated (undocumented)
+export type TypeOrmTransactionalAsyncOptions = TransactionalTypeOrmAsyncOptions;
 
-// @public
-export class TypeOrmTransactionalModule {
-    static forRoot(options?: TypeOrmTransactionalOptions): DynamicModule;
-    static forRootAsync(options: TypeOrmTransactionalAsyncOptions): DynamicModule;
-    // @internal
-    static resetForTesting(): void;
-}
+// @public @deprecated (undocumented)
+export const TypeOrmTransactionalModule: typeof TransactionalTypeOrmModule;
 
-// @public
-export interface TypeOrmTransactionalOptions {
-    readonly dataSource?: string;
-    readonly isDefault?: boolean;
-}
+// @public @deprecated (undocumented)
+export type TypeOrmTransactionalModule = TransactionalTypeOrmModule;
+
+// @public @deprecated (undocumented)
+export type TypeOrmTransactionalOptions = TransactionalTypeOrmOptions;
 
 // @public
 export interface TypeOrmTransactionHandle extends TransactionHandle {

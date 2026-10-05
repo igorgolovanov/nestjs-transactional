@@ -39,7 +39,7 @@ const WRAPPED_MARKER: symbol = Symbol.for('@nestjs-transactional/wrapped');
 
 /**
  * DI injection token for {@link HandlerWrapperOptions}. The wrapper reads
- * options via this token so `CqrsTransactionalModule` can provide them
+ * options via this token so `TransactionalCqrsModule` can provide them
  * synchronously or asynchronously.
  */
 export const CQRS_HANDLER_WRAPPER_OPTIONS = Symbol('CQRS_HANDLER_WRAPPER_OPTIONS');

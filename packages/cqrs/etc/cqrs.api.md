@@ -22,8 +22,8 @@ import { Type } from '@nestjs/common';
 // @public
 export const CQRS_HANDLER_WRAPPER_OPTIONS: unique symbol;
 
-// @public
-export const CQRS_TRANSACTIONAL_OPTIONS = "CQRS_TRANSACTIONAL_OPTIONS";
+// @public @deprecated (undocumented)
+export const CQRS_TRANSACTIONAL_OPTIONS = "TRANSACTIONAL_CQRS_OPTIONS";
 
 // @public
 export class CqrsEventBusBinding implements OnApplicationBootstrap {
@@ -43,38 +43,26 @@ export class CqrsHandlerWrapper implements OnModuleDestroy {
     wrapAll(): void;
 }
 
-// @public
-export interface CqrsTransactionalAsyncFactoryResult extends HandlerWrapperOptions {
-    readonly eventsDataSource?: string;
-}
+// @public @deprecated (undocumented)
+export type CqrsTransactionalAsyncFactoryResult = TransactionalCqrsAsyncFactoryResult;
 
-// Warning: (ae-forgotten-export) The symbol "CqrsTransactionalStructuralOptions" needs to be exported by the entry point index.d.ts
-//
-// @public
-export interface CqrsTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'>, CqrsTransactionalStructuralOptions {
-    // (undocumented)
-    readonly inject?: readonly InjectionToken[];
-    // (undocumented)
-    readonly useFactory: (...args: never[]) => Promise<CqrsTransactionalAsyncFactoryResult> | CqrsTransactionalAsyncFactoryResult;
-}
+// @public @deprecated (undocumented)
+export type CqrsTransactionalAsyncOptions = TransactionalCqrsAsyncOptions;
 
-// @public
-export class CqrsTransactionalBootstrap implements OnApplicationBootstrap {
-    constructor(wrapper: CqrsHandlerWrapper);
-    // (undocumented)
-    onApplicationBootstrap(): void;
-}
+// @public @deprecated (undocumented)
+export const CqrsTransactionalBootstrap: typeof TransactionalCqrsBootstrap;
 
-// @public
-export class CqrsTransactionalModule {
-    // (undocumented)
-    static forRoot(options?: CqrsTransactionalOptions): DynamicModule;
-    static forRootAsync(options: CqrsTransactionalAsyncOptions): DynamicModule;
-}
+// @public @deprecated (undocumented)
+export type CqrsTransactionalBootstrap = TransactionalCqrsBootstrap;
 
-// @public
-export interface CqrsTransactionalOptions extends CqrsTransactionalAsyncFactoryResult, CqrsTransactionalStructuralOptions {
-}
+// @public @deprecated (undocumented)
+export const CqrsTransactionalModule: typeof TransactionalCqrsModule;
+
+// @public @deprecated (undocumented)
+export type CqrsTransactionalModule = TransactionalCqrsModule;
+
+// @public @deprecated (undocumented)
+export type CqrsTransactionalOptions = TransactionalCqrsOptions;
 
 // @public
 export interface DispatcherListenerMetadata {
@@ -156,7 +144,43 @@ export interface OutboxPublicationScheduler {
 }
 
 // @public
+export const TRANSACTIONAL_CQRS_OPTIONS = "TRANSACTIONAL_CQRS_OPTIONS";
+
+// @public
 export const TRANSACTIONAL_EVENTS_HANDLER_METADATA: unique symbol;
+
+// @public
+export interface TransactionalCqrsAsyncFactoryResult extends HandlerWrapperOptions {
+    readonly eventsDataSource?: string;
+}
+
+// Warning: (ae-forgotten-export) The symbol "TransactionalCqrsStructuralOptions" needs to be exported by the entry point index.d.ts
+//
+// @public
+export interface TransactionalCqrsAsyncOptions extends Pick<ModuleMetadata, 'imports'>, TransactionalCqrsStructuralOptions {
+    // (undocumented)
+    readonly inject?: readonly InjectionToken[];
+    // (undocumented)
+    readonly useFactory: (...args: never[]) => Promise<TransactionalCqrsAsyncFactoryResult> | TransactionalCqrsAsyncFactoryResult;
+}
+
+// @public
+export class TransactionalCqrsBootstrap implements OnApplicationBootstrap {
+    constructor(wrapper: CqrsHandlerWrapper);
+    // (undocumented)
+    onApplicationBootstrap(): void;
+}
+
+// @public
+export class TransactionalCqrsModule {
+    // (undocumented)
+    static forRoot(options?: TransactionalCqrsOptions): DynamicModule;
+    static forRootAsync(options: TransactionalCqrsAsyncOptions): DynamicModule;
+}
+
+// @public
+export interface TransactionalCqrsOptions extends TransactionalCqrsAsyncFactoryResult, TransactionalCqrsStructuralOptions {
+}
 
 // @public
 export class TransactionalEventBusPublisher implements IEventPublisher {

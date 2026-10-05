@@ -12,7 +12,7 @@ import { PlaceOrderCommand } from './place-order.handler.js';
  * transactional / saga / outbox / externalization mechanics.
  *
  * Commands and queries go through `CommandBus` and `QueryBus`, which
- * `CqrsTransactionalModule` makes injectable everywhere: it imports the
+ * `TransactionalCqrsModule` makes injectable everywhere: it imports the
  * global `CqrsModule.forRoot()` itself (convention #6).
  */
 @Controller('orders')

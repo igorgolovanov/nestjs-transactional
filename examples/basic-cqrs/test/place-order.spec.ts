@@ -48,7 +48,7 @@ describe('basic-cqrs', () => {
     expect(notifications.notified.sort()).toEqual(['o-3', 'o-5']);
   });
 
-  it('dispatches a QueryHandler — auto-wrapped in a read-only transaction by CqrsTransactionalModule', async () => {
+  it('dispatches a QueryHandler — auto-wrapped in a read-only transaction by TransactionalCqrsModule', async () => {
     await commandBus.execute(new PlaceOrderCommand('o-6'));
     await commandBus.execute(new PlaceOrderCommand('o-7'));
 

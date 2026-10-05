@@ -5,11 +5,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
+import { TransactionalTypeOrmModule } from '../../src/module/transactional-typeorm.module.js';
 import { TestUser } from '../shared/test-user.entity.js';
 
 /**
- * Pin the `TypeOrmTransactionalModule.forRootAsync` contract: it
+ * Pin the `TransactionalTypeOrmModule.forRootAsync` contract: it
  * must compose cleanly with `@nestjs/typeorm`'s
  * `TypeOrmModule.forRootAsync` and let the resulting app boot.
  *
@@ -21,7 +21,7 @@ import { TestUser } from '../shared/test-user.entity.js';
  * provider. Each `it` below is a self-contained compose so the
  * regression can be filtered to a single case if it returns.
  */
-describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via testcontainers)', () => {
+describe('TransactionalTypeOrmModule.forRootAsync (integration, Postgres via testcontainers)', () => {
   let container: StartedPostgreSqlContainer;
 
   beforeAll(async () => {
@@ -34,7 +34,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
 
   beforeEach(() => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
   });
 
   function dbConfig(): {
@@ -75,7 +75,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
   });
 
   // Sync `forRoot` — proves the framework module's sync path works.
-  it('+ TypeOrmTransactionalModule.forRoot() (sync) — boots and connects', async () => {
+  it('+ TransactionalTypeOrmModule.forRoot() (sync) — boots and connects', async () => {
     const module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRootAsync({
@@ -87,7 +87,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
           }),
         }),
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
       ],
     }).compile();
     try {
@@ -97,7 +97,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
     }
   });
 
-  // The regression: `TypeOrmTransactionalModule.forRootAsync` paired
+  // The regression: `TransactionalTypeOrmModule.forRootAsync` paired
   // with `TypeOrmModule.forRootAsync` previously failed with
   // `TypeError: this.postgres.Pool is not a constructor`, surfaced
   // diagnosed as a cascade from
@@ -107,7 +107,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
   // `OnModuleInit` hook on a generated `@Injectable()` class, which
   // runs after every provider is instantiated. This test pins that
   // contract.
-  it('+ TypeOrmTransactionalModule.forRootAsync — boots and connects', async () => {
+  it('+ TransactionalTypeOrmModule.forRootAsync — boots and connects', async () => {
     const module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRootAsync({
@@ -119,7 +119,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
           }),
         }),
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRootAsync({
+        TransactionalTypeOrmModule.forRootAsync({
           useFactory: () => ({}),
         }),
       ],
@@ -134,7 +134,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
   // Async path with `inject` and a meaningful payload — proves the
   // generated registration class injects the resolved options
   // correctly (not just the empty-options happy path).
-  it('+ TypeOrmTransactionalModule.forRootAsync with inject and resolved options', async () => {
+  it('+ TransactionalTypeOrmModule.forRootAsync with inject and resolved options', async () => {
     const module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRootAsync({
@@ -146,7 +146,7 @@ describe('TypeOrmTransactionalModule.forRootAsync (integration, Postgres via tes
           }),
         }),
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRootAsync({
+        TransactionalTypeOrmModule.forRootAsync({
           useFactory: () => ({ isDefault: true }),
         }),
       ],

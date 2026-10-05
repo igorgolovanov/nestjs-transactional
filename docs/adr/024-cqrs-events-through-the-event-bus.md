@@ -48,7 +48,7 @@ module, so applications could not inject `CommandBus` or `EventBus`
 Events go through the `EventBus`, and our logic sits inside its
 publisher chain, in two layers:
 
-1. **The bus's publisher.** `CqrsTransactionalModule` imports
+1. **The bus's publisher.** `TransactionalCqrsModule` imports
    `CqrsModule.forRoot({ eventPublisher })` itself, with a
    `TransactionalEventBusPublisher`. `EventBus` installs it in its
    constructor, so a publisher that wraps `EventBus.publisher` later,
@@ -93,7 +93,7 @@ aggregate, which the second layer replaces.
   `AggregateConstructor`, `HybridEventPublisher`,
   `TransactionalEventPublisher` and the `useTransactionalEventPublisher`
   option are removed. `CqrsModule` options move to
-  `CqrsTransactionalModule.forRoot({ cqrs })`, and an application's own
+  `TransactionalCqrsModule.forRoot({ cqrs })`, and an application's own
   bus publisher to `forRoot({ eventPublisher })`. Released with 3.0.0.
 - We wrap a third-party instance (`EventBus.publish`). A symbol guard
   keeps the wrap single, and both `@nestjs/cqrs` 11.0.3 and 12.1 run in

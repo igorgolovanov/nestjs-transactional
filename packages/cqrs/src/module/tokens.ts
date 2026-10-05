@@ -1,6 +1,6 @@
 /**
- * DI token for the resolved `CqrsTransactionalOptions` object.
+ * DI token for the resolved `TransactionalCqrsOptions` object.
  * Consumers normally do not inject this directly: the module's providers
  * read it.
  */
-export const CQRS_TRANSACTIONAL_OPTIONS = 'CQRS_TRANSACTIONAL_OPTIONS';
+export const TRANSACTIONAL_CQRS_OPTIONS = 'TRANSACTIONAL_CQRS_OPTIONS';

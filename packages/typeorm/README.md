@@ -55,7 +55,7 @@ Reasoning and measurements: [ADR-022](https://github.com/igorgolovanov/nestjs-tr
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 @Module({
   imports: [
@@ -63,7 +63,7 @@ import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
     TypeOrmModule.forFeature([Order]),
 
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
   ],
 })
 export class AppModule {}
@@ -121,7 +121,7 @@ harmlessly rather than surprisingly:
   as the transaction's first statement and the database refuses a write.
   On other dialects it is a silent no-op. MySQL is not merely
   unimplemented but unimplementable: `SET TRANSACTION` there applies to
-  the *next* transaction and errors inside a started one. Worth knowing
+  the _next_ transaction and errors inside a started one. Worth knowing
   if you develop on SQLite and deploy to Postgres — the constraint
   appears in production for the first time.
   ([DD-027](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/027-readonly-and-timeout-semantics.md))
@@ -135,8 +135,8 @@ harmlessly rather than surprisingly:
 One `forRoot` call per dataSource:
 
 ```ts
-TypeOrmTransactionalModule.forRoot({ isDefault: true }),        // 'default'
-TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),  // 'billing'
+TransactionalTypeOrmModule.forRoot({ isDefault: true }),        // 'default'
+TransactionalTypeOrmModule.forRoot({ dataSource: 'billing' }),  // 'billing'
 ```
 
 ```ts
@@ -156,7 +156,7 @@ is what the outbox is for.
 ## Async configuration
 
 ```ts
-TypeOrmTransactionalModule.forRootAsync({
+TransactionalTypeOrmModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (cfg: ConfigService) => ({
@@ -174,14 +174,14 @@ if you inject adapters by token.
 
 ## Compatibility
 
-| Peer | Supported range |
-| --- | --- |
-| Node.js | `>=22.13.0` |
-| `typeorm` | `^0.3.0 \|\| ^1.0.0` |
-| `@nestjs/typeorm` | `^11.0.0 \|\| ^12.0.0` |
+| Peer                              | Supported range        |
+| --------------------------------- | ---------------------- |
+| Node.js                           | `>=22.13.0`            |
+| `typeorm`                         | `^0.3.0 \|\| ^1.0.0`   |
+| `@nestjs/typeorm`                 | `^11.0.0 \|\| ^12.0.0` |
 | `@nestjs/common` / `@nestjs/core` | `^11.0.0 \|\| ^12.0.0` |
-| `reflect-metadata` | `^0.1.13 \|\| ^0.2.0` |
-| `rxjs` | `^7.0.0` |
+| `reflect-metadata`                | `^0.1.13 \|\| ^0.2.0`  |
+| `rxjs`                            | `^7.0.0`               |
 
 Both stable TypeORM lines are supported. CI runs the full unit and
 integration matrix — including savepoints and isolation against a real

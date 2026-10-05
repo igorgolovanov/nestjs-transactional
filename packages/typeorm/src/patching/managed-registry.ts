@@ -19,7 +19,7 @@ import { TYPEORM_DATA_SOURCE_NAME } from './symbols.js';
  * `Repository.prototype.manager` getter consults this set to decide
  * whether to dispatch transactionally or pass through unchanged —
  * non-managed DataSources (e.g. those a user created manually outside
- * `TypeOrmTransactionalModule`) MUST behave exactly as TypeORM does
+ * `TransactionalTypeOrmModule`) MUST behave exactly as TypeORM does
  * normally.
  *
  * `WeakSet` over `Set`: a managed DataSource that is destroyed and
@@ -47,7 +47,7 @@ let managedDataSources = new WeakSet<DataSource>();
  * Idempotent — calling twice with the same `(dataSource, name)` pair
  * is a no-op. Calling twice with different names overwrites the
  * stamped name silently; in practice every callsite is
- * `TypeOrmTransactionalModule.forRoot`, which dedups upstream via its
+ * `TransactionalTypeOrmModule.forRoot`, which dedups upstream via its
  * own static-Map mechanism, so this collision should never occur in
  * production.
  */

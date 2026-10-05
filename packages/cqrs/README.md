@@ -57,8 +57,8 @@ Reasoning and measurements: [ADR-022](https://github.com/igorgolovanov/nestjs-tr
 @Module({
   imports: [
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot(),
-    CqrsTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
+    TransactionalCqrsModule.forRoot(),
   ],
 })
 export class AppModule {}
@@ -129,7 +129,7 @@ events are dropped with a warning), and `async: true` fires it through
 
 ## What gets wrapped
 
-`CqrsTransactionalModule.forRoot()` wraps handlers at bootstrap:
+`TransactionalCqrsModule.forRoot()` wraps handlers at bootstrap:
 
 - **Command handlers** carrying `@Transactional()` (method- or
   class-level). Set `defaultCommandOptions` to wrap them all.
@@ -144,7 +144,7 @@ events are dropped with a warning), and `async: true` fires it through
 Async configuration works the same way, with one wrinkle:
 
 ```ts
-CqrsTransactionalModule.forRootAsync({
+TransactionalCqrsModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (cfg: ConfigService) => ({ wrapQueryHandlers: cfg.get('WRAP') !== 'false' }),

@@ -5,7 +5,7 @@ Foundational CQRS example covering all three handler types from
 
 - `@CommandHandler` decorated with `@Transactional()` (write path)
 - `@QueryHandler` auto-wrapped in a read-only transaction by
-  `CqrsTransactionalModule`
+  `TransactionalCqrsModule`
 - `@TransactionalEventsHandler` firing **only after the surrounding
   transaction commits**
 
@@ -45,7 +45,7 @@ Or from this directory: `pnpm start` / `pnpm test`.
    `CqrsHandlerWrapper` does this at bootstrap.
 2. Inside `execute`, `EventPublisher.mergeObjectContext(new Order(id))`
    makes `aggregate.commit()` publish on the `EventBus`, whose
-   publisher `CqrsTransactionalModule` installs. The event becomes an
+   publisher `TransactionalCqrsModule` installs. The event becomes an
    AFTER_COMMIT hook on the active transaction for the
    `@TransactionalEventsHandler`, rather than firing before the commit.
 3. On success, the transaction commits and `NotificationHandler.handle`
@@ -89,7 +89,7 @@ Expected `pnpm start` output:
   `@TransactionalEventsHandler(OrderPlacedEvent)` (default phase
   `AFTER_COMMIT`).
 - [`src/app.module.ts`](src/app.module.ts) — wiring
-  (`InMemoryTransactionAdapter` + `CqrsTransactionalModule.forRoot()`).
+  (`InMemoryTransactionAdapter` + `TransactionalCqrsModule.forRoot()`).
 - [`test/place-order.spec.ts`](test/place-order.spec.ts) — jest tests
   for AFTER_COMMIT delivery + rollback non-delivery + sibling-tx
   isolation.
@@ -97,7 +97,7 @@ Expected `pnpm start` output:
 ## Common pitfalls
 
 - **Do NOT import `CqrsModule` directly alongside
-  `CqrsTransactionalModule.forRoot()`.** `CqrsTransactionalModule`
+  `TransactionalCqrsModule.forRoot()`.** `TransactionalCqrsModule`
   imports `CqrsModule` internally and overrides the `EventPublisher`
   DI token; a duplicate import shadows the override and aggregate
   events bypass the dispatcher

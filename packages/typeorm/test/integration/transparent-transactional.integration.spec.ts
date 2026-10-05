@@ -14,7 +14,7 @@ import {
 } from '@nestjs-transactional/core';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
+import { TransactionalTypeOrmModule } from '../../src/module/transactional-typeorm.module.js';
 import {
   type PostgresTestContext,
   startPostgresContainer,
@@ -27,7 +27,7 @@ import { TestUser } from '../shared/test-user.entity.js';
  * Repository providers are supplied by `@nestjs/typeorm`'s
  * `TypeOrmModule.forRoot(...)` / `TypeOrmModule.forFeature(...)`,
  * which register them as `@Global()` so child modules (like
- * `TypeOrmTransactionalModule`) can inject them. For these
+ * `TransactionalTypeOrmModule`) can inject them. For these
  * integration tests we replicate that visibility with a tiny
  * `@Global()` fixture.
  */
@@ -166,7 +166,7 @@ describe('Transparent transactional repositories (Postgres via testcontainers)',
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
     await ctx.dataSource.getRepository(TestUser).clear();
 
     moduleRef = await Test.createTestingModule({
@@ -175,7 +175,7 @@ describe('Transparent transactional repositories (Postgres via testcontainers)',
         // register the DataSource and per-entity Repository
         // providers under the standard `@nestjs/typeorm` tokens
         // (and inside a `@Global()` module so the
-        // `TypeOrmTransactionalModule` child scope can see them).
+        // `TransactionalTypeOrmModule` child scope can see them).
         buildFakeTypeOrmModule([
           { provide: getDataSourceToken(), useValue: ctx.dataSource },
           { provide: EntityManager, useValue: ctx.dataSource.manager },
@@ -187,7 +187,7 @@ describe('Transparent transactional repositories (Postgres via testcontainers)',
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ]) as any,
         TransactionalModule.forRoot({ isGlobal: true }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
       ],
       providers: [
         RepoUserService,

@@ -57,7 +57,7 @@ import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
   imports: [
     TypeOrmModule.forRoot({ type: 'postgres' /* ... */ }),
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
 
     OutboxModule.forRoot(),
     TransactionalOutboxModule.forRoot(),

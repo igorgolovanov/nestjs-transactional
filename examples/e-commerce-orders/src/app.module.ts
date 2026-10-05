@@ -4,13 +4,13 @@ import { ClientProxyTransport, OutboxModule, OutboxStorage } from '@nestjs/outbo
 import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
+import { TransactionalCqrsModule } from '@nestjs-transactional/cqrs';
 import {
   externalizedRoute,
   toKafkaPacket,
   TransactionalOutboxModule,
 } from '@nestjs-transactional/outbox';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import { DataSource } from 'typeorm';
 
 import { BillingModule } from './billing/billing.module.js';
@@ -66,7 +66,7 @@ export function readConfigFromEnv(): ECommerceConfig {
  *    not add a message atomically. For transactions across separate
  *    DataSources without an outbox, see `multi-datasource-basic` and
  *    `multi-datasource-cqrs`.
- * 2. **CQRS**: `CqrsTransactionalModule.forRoot` puts its publisher in
+ * 2. **CQRS**: `TransactionalCqrsModule.forRoot` puts its publisher in
  *    the `EventBus`, and `TransactionalOutboxModule` binds its outbox
  *    port, so `aggregate.commit()` sends `@Externalized` events to the
  *    outbox in the aggregate's transaction.
@@ -119,7 +119,7 @@ export class AppModule {
         TypeOrmModule.forFeature([OrderRow]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
 
         clients,
         OutboxModule.forRoot({
@@ -134,7 +134,7 @@ export class AppModule {
         }),
         TransactionalOutboxModule.forRoot(),
 
-        CqrsTransactionalModule.forRoot(),
+        TransactionalCqrsModule.forRoot(),
 
         InventoryModule,
         BillingModule,

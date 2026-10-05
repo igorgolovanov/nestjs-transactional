@@ -5,7 +5,7 @@ import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { externalizedRoute, TransactionalOutboxModule } from '@nestjs-transactional/outbox';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
 import { REFUNDS_BROKER } from './clients.js';
@@ -78,7 +78,7 @@ export class AppModule {
         TypeOrmModule.forFeature([RefundEntity]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
 
         OutboxModule.forRoot({
           imports: [clients],

@@ -10,7 +10,7 @@ import {
 import type { DataSource } from 'typeorm';
 
 import { getCurrentEntityManager, isInTransaction } from '../../src/helpers/get-entity-manager.js';
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
+import { TransactionalTypeOrmModule } from '../../src/module/transactional-typeorm.module.js';
 import {
   createAdditionalDatabase,
   type PostgresTestContext,
@@ -22,7 +22,7 @@ import { TestUser } from '../shared/test-user.entity.js';
 /**
  * Stand-in for `TypeOrmModule.forRoot(...)` — registers the
  * `getDataSourceToken(name)` providers in a `@Global()` module
- * so child modules (notably `TypeOrmTransactionalModule`) can
+ * so child modules (notably `TransactionalTypeOrmModule`) can
  * resolve them. In a real app `@nestjs/typeorm` already provides
  * this global visibility.
  */
@@ -63,7 +63,7 @@ class UserServiceWithFallback {
   }
 }
 
-describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)', () => {
+describe('TransactionalTypeOrmModule (integration, Postgres via testcontainers)', () => {
   let ctx: PostgresTestContext;
 
   beforeAll(async () => {
@@ -79,7 +79,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
     await ctx.dataSource.getRepository(TestUser).clear();
   });
 
@@ -93,7 +93,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
       // Each top-level `describe` is its own ownership boundary;
       // sibling describes do NOT share infrastructure singletons.
       TransactionalModule.resetForTesting();
-      TypeOrmTransactionalModule.resetForTesting();
+      TransactionalTypeOrmModule.resetForTesting();
 
       moduleRef = await Test.createTestingModule({
         imports: [
@@ -102,7 +102,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ]) as any,
           TransactionalModule.forRoot({ isGlobal: true }),
-          TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+          TransactionalTypeOrmModule.forRoot({ isDefault: true }),
         ],
         providers: [UserService],
       }).compile();
@@ -150,7 +150,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
     beforeAll(async () => {
       TransactionalModule.resetForTesting();
-      TypeOrmTransactionalModule.resetForTesting();
+      TransactionalTypeOrmModule.resetForTesting();
 
       billingDs = await createAdditionalDatabase(ctx, 'billing_test', {
         entities: [TestUser],
@@ -170,8 +170,8 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
           // registry default so `getCurrentEntityManager()` (no arg)
           // resolves to it; the prior test's `UserService.save` uses
           // that exact lookup.
-          TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-          TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
+          TransactionalTypeOrmModule.forRoot({ isDefault: true }),
+          TransactionalTypeOrmModule.forRoot({ dataSource: 'billing' }),
         ],
         providers: [UserService, BillingService],
       }).compile();
@@ -313,7 +313,7 @@ describe('TypeOrmTransactionalModule (integration, Postgres via testcontainers)'
 
     beforeAll(async () => {
       TransactionalModule.resetForTesting();
-      TypeOrmTransactionalModule.resetForTesting();
+      TransactionalTypeOrmModule.resetForTesting();
 
       moduleRef = await Test.createTestingModule({
         imports: [

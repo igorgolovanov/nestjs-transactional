@@ -14,7 +14,7 @@ export interface TransactionalEventBusPublisherDependencies {
 
 /**
  * The publisher behind `@nestjs/cqrs`'s `EventBus` while
- * `CqrsTransactionalModule` is imported (ADR-024, DD-029). Every event
+ * `TransactionalCqrsModule` is imported (ADR-024, DD-029). Every event
  * the bus publishes, from `AggregateRoot.commit()` or `eventBus.publish()`
  * alike, passes through it:
  *
@@ -36,7 +36,7 @@ export class TransactionalEventBusPublisher implements IEventPublisher {
 
   /**
    * @param delegate The application's own publisher, from
-   *   `CqrsTransactionalModule.forRoot({ eventPublisher })`. It replaces
+   *   `TransactionalCqrsModule.forRoot({ eventPublisher })`. It replaces
    *   the in-memory delivery to `@EventsHandler`s, as it would have
    *   replaced `@nestjs/cqrs`'s default publisher.
    */
@@ -80,7 +80,7 @@ export class TransactionalEventBusPublisher implements IEventPublisher {
   private require(): TransactionalEventBusPublisherDependencies {
     if (this.dependencies === undefined) {
       throw new Error(
-        'TransactionalEventBusPublisher received an event before CqrsTransactionalModule ' +
+        'TransactionalEventBusPublisher received an event before TransactionalCqrsModule ' +
           'finished initialising. Publish events from lifecycle hooks (onModuleInit and later), ' +
           'not from provider constructors.',
       );

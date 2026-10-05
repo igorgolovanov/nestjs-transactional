@@ -16,7 +16,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { Transactional, TransactionalModule } from '@nestjs-transactional/core';
 import {
-  TypeOrmTransactionalModule,
+  TransactionalTypeOrmModule,
   getCurrentEntityManager,
   isInTransaction,
 } from '@nestjs-transactional/typeorm';
@@ -25,7 +25,7 @@ import { DataSource, Entity, PrimaryColumn } from 'typeorm';
 import { TransactionalEventsHandler } from '../decorators/transactional-events-handler.decorator.js';
 import { TransactionPhase } from '../types/transactional-listener.types.js';
 
-import { CqrsTransactionalModule } from './cqrs-transactional.module.js';
+import { TransactionalCqrsModule } from './transactional-cqrs.module.js';
 
 // Aggregate events reach @nestjs/cqrs's EventBus, so @EventsHandler,
 // sagas and publishers that wrap EventBus.publisher (WorkflowsCqrsModule)
@@ -214,8 +214,8 @@ async function build(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       fakeTypeOrm(ds) as any,
       TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-      TypeOrmTransactionalModule.forRoot(),
-      CqrsTransactionalModule.forRoot(),
+      TransactionalTypeOrmModule.forRoot(),
+      TransactionalCqrsModule.forRoot(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...((extra.imports ?? []) as any[]),
     ],
@@ -252,13 +252,13 @@ const itOnCommitContext = commitForwardsContext() ? it : it.skip;
 
 const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
-describe('CqrsTransactionalModule and the @nestjs/cqrs EventBus', () => {
+describe('TransactionalCqrsModule and the @nestjs/cqrs EventBus', () => {
   let ds: DataSource;
   let module: TestingModule | undefined;
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
     ds = new DataSource({ type: 'sqljs', synchronize: true, entities: [OrderRow] });
     await ds.initialize();
   });

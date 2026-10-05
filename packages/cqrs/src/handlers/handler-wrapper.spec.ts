@@ -26,7 +26,7 @@ import {
 
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
-import { CqrsTransactionalBootstrap } from './bootstrap.js';
+import { TransactionalCqrsBootstrap } from './bootstrap.js';
 import {
   CQRS_HANDLER_WRAPPER_OPTIONS,
   CqrsHandlerWrapper,
@@ -199,7 +199,7 @@ const buildModule = async (
     providers: [
       { provide: CQRS_HANDLER_WRAPPER_OPTIONS, useValue: options },
       CqrsHandlerWrapper,
-      CqrsTransactionalBootstrap,
+      TransactionalCqrsBootstrap,
       TransactionalEventDispatcher,
       TransactionalListenerScanner,
       PlaceOrderHandler,

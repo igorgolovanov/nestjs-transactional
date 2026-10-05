@@ -178,6 +178,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-027](docs/dd/027-readonly-and-timeout-semantics.md) — `readOnly` honoured per dialect; `timeout` stays an extension point
 - [DD-028](docs/dd/028-outbox-bridge-contract.md) - The outbox bridge contract
 - [DD-029](docs/dd/029-cqrs-publisher-chain-contract.md) - The cqrs publisher chain contract
+- [DD-030](docs/dd/030-transactional-first-names.md) - Public names lead with `Transactional`
 
 ## DO NOT cheat-sheet
 
@@ -213,7 +214,7 @@ The most-violated rules. Full coding conventions in
   `OutboxMicroservicesModule`** — reuse the user's existing
   `ClientsModule` registration via `defaultClient` (DD-017).
 - **DO NOT import `CqrsModule` directly alongside
-  `CqrsTransactionalModule.forRoot()`** — the override of
+  `TransactionalCqrsModule.forRoot()`** — the override of
   `EventPublisher` gets shadowed; aggregate events bypass the
   dispatcher. See `docs/status/conventions.md` Convention #6.
 
@@ -382,7 +383,7 @@ up as a reviewable diff.
   and its first three iterations. **Docs accuracy**: `readOnly` /
   `timeout` documented as unimplemented (item A1 stopgap; the
   implement-or-deprecate DD is still open), the
-  `CqrsTransactionalModule` `@example` no longer violates
+  `TransactionalCqrsModule` `@example` no longer violates
   convention #6 or calls a non-existent `forFeature`, and the
   `FOR UPDATE SKIP LOCKED` claim was corrected everywhere —
   [DD-025](docs/dd/025-claim-atomicity-obligation.md) relocates the
@@ -442,7 +443,7 @@ up as a reviewable diff.
   inline body and Revision-history bullet dates avoided in favour
   of phase anchors.
 - Framework fix landed for Convention #22 (follow-up to Phase 14.8e
-  closure) — `TypeOrmTransactionalModule.forRootAsync` registration
+  closure) — `TransactionalTypeOrmModule.forRootAsync` registration
   moved from a `useFactory` provider to an `OnModuleInit`-driven
   `@Injectable()` class generated per `forRootAsync` call. Root
   cause was `markAsManaged(undefined)` cascading from
@@ -460,11 +461,11 @@ up as a reviewable diff.
   indirection for `@Transactional` inside `@IntegrationEventsHandler`;
   #19 `@Externalized` events still need a local
   `@OutboxEventsHandler` to materialise a publication;
-  #20 `CqrsTransactionalModule` does not export `CommandBus` /
+  #20 `TransactionalCqrsModule` does not export `CommandBus` /
   `QueryBus` (controllers inject handlers directly);
   #21 `OutboxModule.forRootAsync({ repository })` lives on options,
   not on the async factory result; #22 historical record of the
-  `TypeOrmTransactionalModule.forRootAsync` bug (now fixed — see
+  `TransactionalTypeOrmModule.forRootAsync` bug (now fixed — see
   decision above); #23 dotenv refuses to overwrite `process.env`
   (snapshot/restore between tests); #24 user-side
   `OutboxDrainService` complement to the then-synchronous

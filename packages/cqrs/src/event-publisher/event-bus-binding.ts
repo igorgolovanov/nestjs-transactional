@@ -8,7 +8,7 @@ import {
 } from '@nestjs-transactional/core';
 
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
-import { CQRS_TRANSACTIONAL_OPTIONS } from '../module/tokens.js';
+import { TRANSACTIONAL_CQRS_OPTIONS } from '../module/tokens.js';
 
 import {
   OUTBOX_PUBLICATION_SCHEDULER,
@@ -46,7 +46,7 @@ export class CqrsEventBusBinding implements OnApplicationBootstrap {
     dispatcher: TransactionalEventDispatcher,
     private readonly manager: TransactionManager,
     private readonly discovery: DiscoveryService,
-    @Inject(CQRS_TRANSACTIONAL_OPTIONS) options: { readonly eventsDataSource?: string },
+    @Inject(TRANSACTIONAL_CQRS_OPTIONS) options: { readonly eventsDataSource?: string },
     @Optional() @Inject(OUTBOX_PUBLICATION_SCHEDULER) outbox?: OutboxPublicationScheduler,
   ) {
     this.dataSource = options.eventsDataSource ?? 'default';
@@ -71,18 +71,18 @@ export class CqrsEventBusBinding implements OnApplicationBootstrap {
     );
     if (buses.size > 1) {
       throw new Error(
-        `Found ${buses.size} @nestjs/cqrs EventBus instances. CqrsTransactionalModule imports ` +
+        `Found ${buses.size} @nestjs/cqrs EventBus instances. TransactionalCqrsModule imports ` +
           'CqrsModule.forRoot() itself; importing CqrsModule again creates a second EventBus that ' +
           'bypasses the transactional publisher. Remove the other CqrsModule import and pass its ' +
-          'options as CqrsTransactionalModule.forRoot({ cqrs: { ... } }).',
+          'options as TransactionalCqrsModule.forRoot({ cqrs: { ... } }).',
       );
     }
     if (!reaches(this.eventBus.publisher, this.publisher)) {
       const name = (this.eventBus.publisher as object | undefined)?.constructor?.name ?? 'nothing';
       throw new Error(
         `EventBus.publisher was replaced (by ${name}) with a publisher that does not wrap ` +
-          "CqrsTransactionalModule's, so events would bypass transaction phases and the outbox. " +
-          'Pass your publisher as CqrsTransactionalModule.forRoot({ eventPublisher }) instead, ' +
+          "TransactionalCqrsModule's, so events would bypass transaction phases and the outbox. " +
+          'Pass your publisher as TransactionalCqrsModule.forRoot({ eventPublisher }) instead, ' +
           'or wrap the existing EventBus.publisher rather than replacing it.',
       );
     }

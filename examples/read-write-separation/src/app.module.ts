@@ -1,7 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { ArticleQueryService } from './article.query-service.js';
 import { ArticleRow } from './article.entity.js';
@@ -47,7 +47,7 @@ export function readConfigFromEnv(): ReadWriteSeparationConfig {
  *   testcontainers replica is writable.
  *
  * Only the master DS is registered with
- * `TypeOrmTransactionalModule.forRoot`. This is intentional:
+ * `TransactionalTypeOrmModule.forRoot`. This is intentional:
  *
  * - Writes inside `@Transactional` route to master automatically
  *   (master is the only adapter, and the only DS bound to a
@@ -111,7 +111,7 @@ export class AppModule {
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
         // ONLY master is registered with the transactional adapter.
         // No `forRoot({ dataSource: 'replica' })` — see class JSDoc.
-        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+        TransactionalTypeOrmModule.forRoot({ isDefault: true }),
       ],
       providers: [ArticleService, ArticleQueryService],
     };

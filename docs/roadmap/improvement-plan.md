@@ -147,7 +147,7 @@ Two things surfaced while doing it:
 Original finding:
 
 Core and typeorm modules expose `forRootAsync`; the cqrs module only
-has `forRoot` (`packages/cqrs/src/module/cqrs-transactional.module.ts`).
+has `forRoot` (`packages/cqrs/src/module/transactional-cqrs.module.ts`).
 The wrapper infrastructure already supports async option provision
 (`CQRS_HANDLER_WRAPPER_OPTIONS`), so this is an omission, not a
 design constraint. While there, remove the

@@ -28,7 +28,7 @@ is preserved as a stub; subsequent numbers do not shift.
 
 3. **`TransactionalModule.forRoot({ isGlobal: true })` is the
    default.** Single-call setups pairing with
-   `TypeOrmTransactionalModule` rely on `isGlobal: true` so that
+   `TransactionalTypeOrmModule` rely on `isGlobal: true` so that
    `AdapterRegistry` is visible in the typeorm module's provider
    scope; multi-`forRoot` setups additionally rely on it for the
    second-and-later calls' per-DS providers to find the singletons
@@ -54,19 +54,19 @@ is preserved as a stub; subsequent numbers do not shift.
    kept stable; `#6+` retain their numbers so cross-references
    elsewhere stay valid.
 
-6. **Do NOT import `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.**
+6. **Do NOT import `CqrsModule` directly alongside `TransactionalCqrsModule.forRoot()`.**
    The transactional module imports `CqrsModule.forRoot()` itself, with
    its publisher in the `EventBus` (ADR-024). A second `CqrsModule`
    import creates a second `EventBus` that bypasses that publisher; from
    3.0.0 bootstrap fails on it instead of events silently skipping their
    phases. Pass `CqrsModule` options as
-   `CqrsTransactionalModule.forRoot({ cqrs })`. Documented in
+   `TransactionalCqrsModule.forRoot({ cqrs })`. Documented in
    `packages/cqrs/README.md`.
 
-7. **`CQRS_TRANSACTIONAL_OPTIONS` + `CQRS_HANDLER_WRAPPER_OPTIONS` are
+7. **`TRANSACTIONAL_CQRS_OPTIONS` + `CQRS_HANDLER_WRAPPER_OPTIONS` are
    separate injection tokens.** The module-level token is a string
-   (`'CQRS_TRANSACTIONAL_OPTIONS'`); the handler-wrapper-level one is a
-   `Symbol`. `CqrsTransactionalModule` binds the Symbol to the string
+   (`'TRANSACTIONAL_CQRS_OPTIONS'`); the handler-wrapper-level one is a
+   `Symbol`. `TransactionalCqrsModule` binds the Symbol to the string
    token with `useExisting`. If you instantiate `CqrsHandlerWrapper`
    outside the module, provide the Symbol token yourself.
 
@@ -126,11 +126,11 @@ is preserved as a stub; subsequent numbers do not shift.
 12. **Patches in `@nestjs-transactional/typeorm` install at module-load
     time, NOT at `forRoot` factory time.** Importing
     `@nestjs-transactional/typeorm` triggers `applyAllPatches()` as a
-    side effect of evaluating `typeorm-transactional.module.ts`.
+    side effect of evaluating `transactional-typeorm.module.ts`.
     Reason: NestJS resolves providers in dependency order; a
     `useFactory` provider that calls `dataSource.getRepository(Entity)`
     (e.g. `@InjectRepository`'s internal factory) may run BEFORE
-    `TypeOrmTransactionalModule.forRoot`'s factory if it has no DI
+    `TransactionalTypeOrmModule.forRoot`'s factory if it has no DI
     dependency on the latter. A Repository constructed before patches
     are installed gets `this.manager = manager` as an own-property,
     which permanently shadows the prototype getter we install later.
@@ -141,7 +141,7 @@ is preserved as a stub; subsequent numbers do not shift.
     Idempotent: install-once flags inside each patch module make
     re-imports (e.g. via pnpm hoisting glitches) safe.
 
-13. **`TypeOrmTransactionalModule.resetForTesting` resets the
+13. **`TransactionalTypeOrmModule.resetForTesting` resets the
     managed-DataSource WeakSet only — prototype patches stay installed
     for the process lifetime.** Reverting a prototype
     patch by deleting the descriptor would silently break Repository
@@ -252,7 +252,7 @@ is preserved as a stub; subsequent numbers do not shift.
 20. **(Retired at 3.0.0)** `CommandBus`, `QueryBus` and `EventBus` are
     injectable anywhere, since the module imports the global
     `CqrsModule.forRoot()` (ADR-024). The 2.x record follows.
-    ~~**`CqrsTransactionalModule` does NOT export `CommandBus` / `QueryBus`
+    ~~**`TransactionalCqrsModule` does NOT export `CommandBus` / `QueryBus`
     to consumers**~~ (surfaced in the `e-commerce-orders` example). The
     module imports `CqrsModule` internally and overrides
     `EventPublisher` (Convention #6); a duplicate `CqrsModule.forRoot()`
@@ -280,7 +280,7 @@ is preserved as a stub; subsequent numbers do not shift.
     in-memory listener (Convention #15 again). Canonical correct
     placement in `examples/async-config-from-environment/src/app.module.ts`.
 
-22. **`TypeOrmTransactionalModule.forRootAsync` registers via
+22. **`TransactionalTypeOrmModule.forRootAsync` registers via
     `OnModuleInit`, not via a `useFactory` provider** (fixed in the
     same session that surfaced it). Originally surfaced as
     a bootstrap failure (`TypeError: this.postgres.Pool is not a
@@ -391,10 +391,10 @@ is preserved as a stub; subsequent numbers do not shift.
     dataSource is purely a sink** (surfaced in the
     `audit-logging` example). Multi-DS apps where one dataSource only consumes
     integration events do NOT need the full outbox stack on the sink
-    side — only `TypeOrmTransactionalModule.forRoot({ dataSource: '<sink>' })`
+    side — only `TransactionalTypeOrmModule.forRoot({ dataSource: '<sink>' })`
     so the sink-side handler can run inside a `@Transactional({ dataSource: '<sink>' })`
     block. The producing dataSource(s) get the full stack
-    (`TypeOrmTransactionalModule` + `OutboxTypeOrmModule` +
+    (`TransactionalTypeOrmModule` + `OutboxTypeOrmModule` +
     `OutboxModule.forRoot` per DS). Cross-DS distributed transactions
     are intentionally absent (DD-023); consistency comes from
     at-least-once delivery + the consumer-side idempotency gate

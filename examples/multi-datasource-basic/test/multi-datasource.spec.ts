@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { AppModule } from '../src/app.module.js';
 import { BillingService } from '../src/billing.service.js';
@@ -17,7 +17,7 @@ describe('multi-datasource-basic', () => {
     // Multi-`forRoot` dedup uses static class storage — must reset
     // between tests when each test rebuilds the module from scratch.
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
 
     module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     await module.init();

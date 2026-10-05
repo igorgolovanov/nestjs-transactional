@@ -27,7 +27,7 @@ import { ArticleRow } from './article.entity.js';
  *    (`BEGIN`/`COMMIT`) for no isolation benefit — single-statement
  *    autocommit reads are simpler.
  * 3. The replica DataSource is **not registered with**
- *    `TypeOrmTransactionalModule.forRoot` (see `app.module.ts`), so
+ *    `TransactionalTypeOrmModule.forRoot` (see `app.module.ts`), so
  *    `@Transactional({ dataSource: 'replica' })` would resolve at
  *    bootstrap to "no adapter registered for dataSource 'replica'."
  *    The framework refuses to silently fall back.

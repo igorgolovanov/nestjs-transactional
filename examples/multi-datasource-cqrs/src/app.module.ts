@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalCqrsModule } from '@nestjs-transactional/cqrs';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { BillingNotificationListener } from './billing.listener.js';
 import { InventoryNotificationListener } from './inventory.listener.js';
@@ -18,7 +18,7 @@ import { PlaceReservationHandler } from './place-reservation.handler.js';
  * transaction by reading the listener's `dataSource` decorator option.
  *
  * Important: do NOT import `@nestjs/cqrs`'s `CqrsModule` directly.
- * `CqrsTransactionalModule` imports `CqrsModule.forRoot()` itself, with
+ * `TransactionalCqrsModule` imports `CqrsModule.forRoot()` itself, with
  * its publisher in the `EventBus`; a second import creates a second
  * `EventBus` and bootstrap fails (`docs/status/conventions.md` #6).
  */
@@ -45,13 +45,13 @@ import { PlaceReservationHandler } from './place-reservation.handler.js';
     TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
 
     // One adapter per DataSource (ADR-018 multi-`forRoot`).
-    TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-    TypeOrmTransactionalModule.forRoot({ dataSource: 'inventory' }),
+    TransactionalTypeOrmModule.forRoot({ isDefault: true }),
+    TransactionalTypeOrmModule.forRoot({ dataSource: 'inventory' }),
 
-    // Single CqrsTransactionalModule call — it covers all dataSources.
+    // Single TransactionalCqrsModule call — it covers all dataSources.
     // The dispatcher inspects each listener's `dataSource` option at
     // bootstrap and routes hooks accordingly.
-    CqrsTransactionalModule.forRoot(),
+    TransactionalCqrsModule.forRoot(),
   ],
   providers: [
     IssueInvoiceHandler,

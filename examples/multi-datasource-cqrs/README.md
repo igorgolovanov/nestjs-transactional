@@ -38,10 +38,10 @@ Or from this directory: `pnpm start` / `pnpm test`.
 
 1. **Two `TypeOrmModule.forRoot` calls** — billing (default) and
    inventory (named). Each backs one aggregate.
-2. **Two `TypeOrmTransactionalModule.forRoot` calls** —
+2. **Two `TransactionalTypeOrmModule.forRoot` calls** —
    `isDefault: true` and `dataSource: 'inventory'` (ADR-018
    multi-`forRoot`).
-3. **One `CqrsTransactionalModule.forRoot()` call** — the cqrs module
+3. **One `TransactionalCqrsModule.forRoot()` call** — the cqrs module
    is dataSource-agnostic. Its dispatcher inspects each listener's
    `dataSource` option at bootstrap and attaches AFTER_COMMIT hooks
    to the matching per-DS transaction context.
@@ -127,7 +127,7 @@ semantics) — same pattern as
 ## Common pitfalls
 
 - **Do NOT import `CqrsModule` directly alongside
-  `CqrsTransactionalModule.forRoot()`.** The transactional module
+  `TransactionalCqrsModule.forRoot()`.** The transactional module
   imports `CqrsModule.forRoot()` itself, with its publisher in the
   `EventBus`; a second import creates a second `EventBus`, and
   bootstrap fails
@@ -148,7 +148,7 @@ semantics) — same pattern as
   TWO independent transactions; if billing rolls back, inventory
   has already committed. For cross-DS consistency use the outbox.
 - **`TransactionalModule.resetForTesting()` /
-  `TypeOrmTransactionalModule.resetForTesting()` between tests when
+  `TransactionalTypeOrmModule.resetForTesting()` between tests when
   each test rebuilds the module from scratch.** Multi-`forRoot` dedup
   uses static class storage.
 

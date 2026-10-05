@@ -16,9 +16,9 @@ import { TransactionalEventBusPublisher } from '../event-publisher/transactional
 import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper.js';
 
 import {
-  CQRS_TRANSACTIONAL_OPTIONS,
-  CqrsTransactionalModule,
-} from './cqrs-transactional.module.js';
+  TRANSACTIONAL_CQRS_OPTIONS,
+  TransactionalCqrsModule,
+} from './transactional-cqrs.module.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -50,7 +50,7 @@ class FakeConfig {
 @Module({ providers: [FakeConfig], exports: [FakeConfig] })
 class ConfigFixtureModule {}
 
-describe('CqrsTransactionalModule.forRootAsync', () => {
+describe('TransactionalCqrsModule.forRootAsync', () => {
   let module: TestingModule | undefined;
 
   beforeEach(() => {
@@ -84,7 +84,7 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
 
   it('resolves wrapper options from the async factory', async () => {
     const built = await build([
-      CqrsTransactionalModule.forRootAsync({
+      TransactionalCqrsModule.forRootAsync({
         useFactory: async () => {
           await Promise.resolve();
           return {
@@ -96,7 +96,7 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
       }),
     ]);
 
-    const options = built.get<HandlerWrapperOptions>(CQRS_TRANSACTIONAL_OPTIONS);
+    const options = built.get<HandlerWrapperOptions>(TRANSACTIONAL_CQRS_OPTIONS);
 
     expect(options.wrapCommandHandlers).toBe(false);
     expect(options.wrapEventHandlers).toBe(false);
@@ -105,12 +105,12 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
 
   it('applies the same defaults as forRoot when the factory returns nothing', async () => {
     const built = await build([
-      CqrsTransactionalModule.forRootAsync({
+      TransactionalCqrsModule.forRootAsync({
         useFactory: () => ({}),
       }),
     ]);
 
-    const options = built.get<HandlerWrapperOptions>(CQRS_TRANSACTIONAL_OPTIONS);
+    const options = built.get<HandlerWrapperOptions>(TRANSACTIONAL_CQRS_OPTIONS);
 
     expect(options).toMatchObject({
       wrapCommandHandlers: true,
@@ -122,14 +122,14 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
 
   it('injects dependencies into the factory', async () => {
     const built = await build([
-      CqrsTransactionalModule.forRootAsync({
+      TransactionalCqrsModule.forRootAsync({
         imports: [ConfigFixtureModule],
         inject: [FakeConfig],
         useFactory: (config: FakeConfig) => ({ wrapQueryHandlers: config.wrapQueries }),
       }),
     ]);
 
-    const options = built.get<HandlerWrapperOptions>(CQRS_TRANSACTIONAL_OPTIONS);
+    const options = built.get<HandlerWrapperOptions>(TRANSACTIONAL_CQRS_OPTIONS);
 
     expect(options.wrapQueryHandlers).toBe(false);
   });
@@ -146,7 +146,7 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
     }
 
     it('imports CqrsModule.forRoot() with the transactional publisher and the cqrs options', () => {
-      const built = CqrsTransactionalModule.forRootAsync({
+      const built = TransactionalCqrsModule.forRootAsync({
         cqrs: { rethrowUnhandled: true },
         useFactory: () => ({}),
       });
@@ -161,7 +161,7 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
     it('hands events on to the eventPublisher option', async () => {
       const published: unknown[] = [];
       const built = await build([
-        CqrsTransactionalModule.forRootAsync({
+        TransactionalCqrsModule.forRootAsync({
           eventPublisher: { publish: (event) => void published.push(event) },
           useFactory: () => ({}),
         }),
@@ -174,11 +174,11 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
     });
 
     it('matches what forRoot produces', () => {
-      // The two paths differ only in how CQRS_TRANSACTIONAL_OPTIONS is
+      // The two paths differ only in how TRANSACTIONAL_CQRS_OPTIONS is
       // provided; the rest of the provider matrix must stay identical,
       // or the async path silently loses wiring.
-      const sync = CqrsTransactionalModule.forRoot();
-      const async = CqrsTransactionalModule.forRootAsync({ useFactory: () => ({}) });
+      const sync = TransactionalCqrsModule.forRoot();
+      const async = TransactionalCqrsModule.forRootAsync({ useFactory: () => ({}) });
 
       expect(async.exports).toEqual(sync.exports);
       expect(async.providers).toHaveLength(sync.providers?.length ?? 0);
@@ -188,7 +188,7 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
   it('resolves the wrapper it wired', async () => {
     // Regression guard for the `exports: exportTokens as never[]` smell
     // the typed exports array replaced.
-    const built = await build([CqrsTransactionalModule.forRootAsync({ useFactory: () => ({}) })]);
+    const built = await build([TransactionalCqrsModule.forRootAsync({ useFactory: () => ({}) })]);
 
     expect(built.get(CqrsHandlerWrapper)).toBeInstanceOf(CqrsHandlerWrapper);
     expect(built.get(TransactionalEventDispatcher)).toBeInstanceOf(TransactionalEventDispatcher);

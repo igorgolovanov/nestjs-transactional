@@ -34,7 +34,7 @@ import {
 // Why module-load: NestJS resolves providers in dependency order
 // during `compile()`. A `useFactory` provider that calls
 // `dataSource.getRepository(Entity)` (e.g. `@InjectRepository`'s
-// internal factory) runs BEFORE `TypeOrmTransactionalModule.forRoot`'s
+// internal factory) runs BEFORE `TransactionalTypeOrmModule.forRoot`'s
 // factory if it has no DI dependency on the latter. A Repository
 // constructed before the patches are installed gets its
 // `this.manager = manager` assignment as an own-property, which
@@ -51,7 +51,7 @@ import {
 applyAllPatches();
 
 /**
- * Options accepted by {@link TypeOrmTransactionalModule.forRoot}.
+ * Options accepted by {@link TransactionalTypeOrmModule.forRoot}.
  *
  * Reshaped so this module now resolves the actual TypeORM
  * `DataSource` via DI (using `getDataSourceToken` from
@@ -59,7 +59,7 @@ applyAllPatches();
  * The new contract is "TypeORM is configured by `@nestjs/typeorm`'s
  * `TypeOrmModule.forRoot(...)`; we just bind to it by name."
  */
-export interface TypeOrmTransactionalOptions {
+export interface TransactionalTypeOrmOptions {
   /**
    * DataSource name as used by `@nestjs/typeorm`'s
    * `TypeOrmModule.forRoot({ name })`. Defaults to `'default'`. The
@@ -78,7 +78,7 @@ export interface TypeOrmTransactionalOptions {
 }
 
 /**
- * Asynchronous flavour of {@link TypeOrmTransactionalOptions}.
+ * Asynchronous flavour of {@link TransactionalTypeOrmOptions}.
  *
  * **Per-DS DI token limitation**: the per-dataSource adapter token
  * (`getTransactionalAdapterToken(ds)`) is NOT registered for
@@ -96,15 +96,15 @@ export interface TypeOrmTransactionalOptions {
  * Mirrors the documented limitation on
  * `TransactionalModule.forRootAsync`.
  */
-export interface TypeOrmTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+export interface TransactionalTypeOrmAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
   readonly useFactory: (
     ...args: never[]
-  ) => Promise<TypeOrmTransactionalOptions> | TypeOrmTransactionalOptions;
+  ) => Promise<TransactionalTypeOrmOptions> | TransactionalTypeOrmOptions;
   readonly inject?: readonly InjectionToken[];
 }
 
 const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
-  Symbol(`TYPEORM_TRANSACTIONAL_ASYNC_OPTIONS[${id}]`);
+  Symbol(`TRANSACTIONAL_TYPEORM_ASYNC_OPTIONS[${id}]`);
 
 /**
  * NestJS module that binds a TypeORM {@link DataSource} to the core
@@ -136,8 +136,8 @@ const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
  *     TypeOrmModule.forRoot({ type: 'postgres', name: 'billing', ... }),
  *
  *     TransactionalModule.forRoot({}),                           // infra
- *     TypeOrmTransactionalModule.forRoot(),                      // default
- *     TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
+ *     TransactionalTypeOrmModule.forRoot(),                      // default
+ *     TransactionalTypeOrmModule.forRoot({ dataSource: 'billing' }),
  *   ],
  * })
  * export class AppModule {}
@@ -149,7 +149,7 @@ const ASYNC_OPTIONS_TOKEN = (id: number): symbol =>
  * patches — they continue to behave as TypeORM does normally.
  */
 @Module({})
-export class TypeOrmTransactionalModule {
+export class TransactionalTypeOrmModule {
   /**
    * @internal
    * Counter for `forRootAsync`-only token uniqueness. Mirrors the
@@ -189,15 +189,15 @@ export class TypeOrmTransactionalModule {
    *
    * @example Default DataSource
    * ```ts
-   * TypeOrmTransactionalModule.forRoot()
+   * TransactionalTypeOrmModule.forRoot()
    * ```
    *
    * @example Named DataSource
    * ```ts
-   * TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' })
+   * TransactionalTypeOrmModule.forRoot({ dataSource: 'billing' })
    * ```
    */
-  static forRoot(options: TypeOrmTransactionalOptions = {}): DynamicModule {
+  static forRoot(options: TransactionalTypeOrmOptions = {}): DynamicModule {
     const dataSourceName = options.dataSource ?? 'default';
     const dataSourceToken = getDataSourceToken(dataSourceName);
     const adapterToken = getTransactionalAdapterToken(dataSourceName);
@@ -215,7 +215,7 @@ export class TypeOrmTransactionalModule {
     };
 
     return {
-      module: TypeOrmTransactionalModule,
+      module: TransactionalTypeOrmModule,
       providers: [adapterProvider],
       exports: [adapterToken],
     };
@@ -223,14 +223,14 @@ export class TypeOrmTransactionalModule {
 
   /**
    * Asynchronous registration. Resolves
-   * {@link TypeOrmTransactionalOptions} via a NestJS-style async
+   * {@link TransactionalTypeOrmOptions} via a NestJS-style async
    * factory before binding the adapter. See
-   * {@link TypeOrmTransactionalAsyncOptions} for the per-DS-token
+   * {@link TransactionalTypeOrmAsyncOptions} for the per-DS-token
    * limitation.
    *
    * @example
    * ```ts
-   * TypeOrmTransactionalModule.forRootAsync({
+   * TransactionalTypeOrmModule.forRootAsync({
    *   imports: [ConfigModule],
    *   inject: [ConfigService],
    *   useFactory: (cfg: ConfigService) => ({
@@ -240,7 +240,7 @@ export class TypeOrmTransactionalModule {
    * });
    * ```
    */
-  static forRootAsync(options: TypeOrmTransactionalAsyncOptions): DynamicModule {
+  static forRootAsync(options: TransactionalTypeOrmAsyncOptions): DynamicModule {
     const id = this.asyncCounter++;
     const asyncToken = ASYNC_OPTIONS_TOKEN(id);
 
@@ -273,7 +273,7 @@ export class TypeOrmTransactionalModule {
     const providers: Provider[] = [asyncOptionsProvider, RegistrationCls];
 
     return {
-      module: TypeOrmTransactionalModule,
+      module: TransactionalTypeOrmModule,
       imports: options.imports ?? [],
       providers,
       // Nothing exports `registrationToken` for this path — the
@@ -288,7 +288,7 @@ export class TypeOrmTransactionalModule {
 /**
  * Generate a unique `OnModuleInit` registration class per
  * `forRootAsync` call. The class injects the async-resolved
- * `TypeOrmTransactionalOptions`, the global `AdapterRegistry`, and
+ * `TransactionalTypeOrmOptions`, the global `AdapterRegistry`, and
  * `ModuleRef`. In `onModuleInit()` it resolves the actual
  * `DataSource` (every DI provider is ready by then) and calls
  * {@link registerManagedDataSource}.
@@ -302,10 +302,10 @@ export class TypeOrmTransactionalModule {
  */
 function createAsyncRegistrationClass(id: number, asyncToken: symbol): Type<OnModuleInit> {
   @Injectable()
-  class TypeOrmTransactionalAsyncRegistration implements OnModuleInit {
+  class TransactionalTypeOrmAsyncRegistration implements OnModuleInit {
     constructor(
       @Inject(asyncToken)
-      private readonly resolved: TypeOrmTransactionalOptions,
+      private readonly resolved: TransactionalTypeOrmOptions,
       @Inject(ADAPTER_REGISTRY)
       private readonly registry: AdapterRegistry,
       private readonly moduleRef: ModuleRef,
@@ -329,10 +329,10 @@ function createAsyncRegistrationClass(id: number, asyncToken: symbol): Type<OnMo
   // logging consumer can tell them apart. Class identity itself is
   // already unique per call (each `class` expression yields a fresh
   // constructor), but a meaningful `name` helps with stack traces.
-  Object.defineProperty(TypeOrmTransactionalAsyncRegistration, 'name', {
-    value: `TypeOrmTransactionalAsyncRegistration_${id}`,
+  Object.defineProperty(TransactionalTypeOrmAsyncRegistration, 'name', {
+    value: `TransactionalTypeOrmAsyncRegistration_${id}`,
   });
-  return TypeOrmTransactionalAsyncRegistration;
+  return TransactionalTypeOrmAsyncRegistration;
 }
 
 /**

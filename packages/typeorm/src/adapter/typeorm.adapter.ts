@@ -172,7 +172,7 @@ const READ_ONLY_DIALECTS: ReadonlySet<string> = new Set([
  * Ask the database to reject writes for the remainder of this
  * transaction, on the dialects that can do it.
  *
- * A silent no-op elsewhere, deliberately: `CqrsTransactionalModule`
+ * A silent no-op elsewhere, deliberately: `TransactionalCqrsModule`
  * defaults every query handler to `readOnly: true`, so throwing here
  * would break consumers on MySQL or SQLite over an option they never
  * set. `readOnly` is a hint in Spring too — honoured where possible

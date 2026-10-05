@@ -37,7 +37,29 @@ outbox, read [section 7](#cqrs-event-bus) and
 | `CqrsTransactionalModule` overrides `EventPublisher` | events go through the `EventBus`; `@EventsHandler`s and sagas receive aggregate events |
 | `HybridEventPublisher`, `TransactionalEventPublisher`, `TransactionalEventPublisherAdapter` | `TransactionalEventBusPublisher`, in the bus's publisher chain |
 | `useTransactionalEventPublisher` | removed |
-| `CqrsModule` options nowhere | `CqrsTransactionalModule.forRoot({ cqrs, eventPublisher })` |
+| `TypeOrmTransactionalModule`, `CqrsTransactionalModule`, `CQRS_TRANSACTIONAL_OPTIONS` | `TransactionalTypeOrmModule`, `TransactionalCqrsModule`, `TRANSACTIONAL_CQRS_OPTIONS`; the old names are deprecated aliases |
+| `CqrsModule` options nowhere | `TransactionalCqrsModule.forRoot({ cqrs, eventPublisher })` |
+
+## Renamed, with deprecated aliases
+
+Public names now lead with `Transactional`, then the library they
+integrate, the way NestJS names `WorkflowsCqrsModule`
+([DD-030](../dd/030-transactional-first-names.md)):
+
+| 2.x | 3.0 |
+| --- | --- |
+| `TypeOrmTransactionalModule` | `TransactionalTypeOrmModule` |
+| `TypeOrmTransactionalOptions`, `TypeOrmTransactionalAsyncOptions` | `TransactionalTypeOrmOptions`, `TransactionalTypeOrmAsyncOptions` |
+| `CqrsTransactionalModule` | `TransactionalCqrsModule` |
+| `CqrsTransactionalOptions`, `CqrsTransactionalAsyncOptions`, `CqrsTransactionalAsyncFactoryResult` | `TransactionalCqrsOptions`, `TransactionalCqrsAsyncOptions`, `TransactionalCqrsAsyncFactoryResult` |
+| `CqrsTransactionalBootstrap` | `TransactionalCqrsBootstrap` |
+| `CQRS_TRANSACTIONAL_OPTIONS` | `TRANSACTIONAL_CQRS_OPTIONS` |
+
+The old names still compile: they are the same classes and values,
+marked `@deprecated`, and go in the next major. A search and replace
+finishes the move. The one thing an alias cannot cover is the options
+token's string value: inject `TRANSACTIONAL_CQRS_OPTIONS`, not the
+literal `'CQRS_TRANSACTIONAL_OPTIONS'`.
 
 ## 1. Drain the old outbox first
 
@@ -198,7 +220,7 @@ on it becoming durable once the outbox was wired, move the handler to
 
 ## <a id="cqrs-event-bus"></a>7. cqrs and the EventBus
 
-`CqrsTransactionalModule` no longer overrides `EventPublisher`. It
+`TransactionalCqrsModule` no longer overrides `EventPublisher`. It
 imports `CqrsModule.forRoot()` with its own publisher in the `EventBus`,
 so every event, from `aggregate.commit()` or `eventBus.publish()`, goes
 through the bus ([DD-029](../dd/029-cqrs-publisher-chain-contract.md)).
@@ -218,7 +240,7 @@ What that changes for you:
   finds it under `aggregate`.
 - **Options.** `useTransactionalEventPublisher` is gone. Options you
   passed to `CqrsModule.forRoot()` go to
-  `CqrsTransactionalModule.forRoot({ cqrs: { ... } })`, and an
+  `TransactionalCqrsModule.forRoot({ cqrs: { ... } })`, and an
   `eventPublisher` to `forRoot({ eventPublisher })`. Keep no other
   `CqrsModule` import: bootstrap now fails on a second `EventBus`.
 - **`CommandBus`, `QueryBus` and `EventBus` are injectable anywhere.**

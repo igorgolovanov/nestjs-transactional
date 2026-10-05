@@ -96,6 +96,6 @@ describe('TransactionalEventBusPublisher', () => {
   it('refuses events before it is attached, saying why', () => {
     const publisher = new TransactionalEventBusPublisher();
 
-    expect(() => publisher.publish(new First())).toThrow(/before CqrsTransactionalModule/);
+    expect(() => publisher.publish(new First())).toThrow(/before TransactionalCqrsModule/);
   });
 });

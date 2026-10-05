@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { UserEntity } from './user.entity.js';
 import { UserService } from './user.service.js';
 
 @Module({
   imports: [
-    // `@nestjs/typeorm`'s standard wiring. `TypeOrmTransactionalModule`
+    // `@nestjs/typeorm`'s standard wiring. `TransactionalTypeOrmModule`
     // resolves the actual DataSource through the same DI token, so the
     // standard NestJS pattern is the only one needed.
     TypeOrmModule.forRoot({
@@ -24,7 +24,7 @@ import { UserService } from './user.service.js';
     // dataSource. Importing this module is also what activates the
     // transparent-repository prototype patches at module-load time
     // (see `@nestjs-transactional/typeorm` JSDoc).
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
   ],
   providers: [UserService],
 })

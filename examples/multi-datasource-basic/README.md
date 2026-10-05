@@ -34,7 +34,7 @@ Or from this directory: `pnpm start` / `pnpm test`.
 1. Two `TypeOrmModule.forRoot` calls — one default (no `name`), one named
    `'inventory'`. Each registers its own `DataSource` in DI under
    `getDataSourceToken()` and `getDataSourceToken('inventory')`.
-2. Two `TypeOrmTransactionalModule.forRoot` calls (ADR-018 multi-`forRoot`
+2. Two `TransactionalTypeOrmModule.forRoot` calls (ADR-018 multi-`forRoot`
    per dataSource): the first marks itself `isDefault: true`, the second
    passes `dataSource: 'inventory'`. Both adapters live under distinct
    per-DS DI tokens.
@@ -94,7 +94,7 @@ EntityManager for that dataSource.
   `@Transactional({ dataSource: 'inventory' })` with
   `@InjectRepository(StockItemEntity, 'inventory')`.
 - [`src/app.module.ts`](src/app.module.ts) — two `TypeOrmModule.forRoot`
-  + two `TypeOrmTransactionalModule.forRoot` calls side by side.
+  - two `TransactionalTypeOrmModule.forRoot` calls side by side.
 - [`src/entities.ts`](src/entities.ts) — `InvoiceEntity` + `StockItemEntity`.
 - [`test/multi-datasource.spec.ts`](test/multi-datasource.spec.ts) — jest
   tests for routing, rollback, cross-DS isolation, multiple writes.
@@ -114,7 +114,7 @@ EntityManager for that dataSource.
   feeding a consumer on the other — see
   [`audit-logging`](../audit-logging).
 - **`TransactionalModule.resetForTesting()` /
-  `TypeOrmTransactionalModule.resetForTesting()` between tests when each
+  `TransactionalTypeOrmModule.resetForTesting()` between tests when each
   test rebuilds the module from scratch.** Multi-`forRoot` dedup uses
   static class storage; without reset, the second test sees "dataSource
   already registered" and throws.

@@ -21,7 +21,7 @@ that decorator stays in-memory and durable handlers are written with
 
 ## The EventBus publisher chain
 
-`CqrsTransactionalModule.forRoot()` imports `CqrsModule.forRoot()` with
+`TransactionalCqrsModule.forRoot()` imports `CqrsModule.forRoot()` with
 `TransactionalEventBusPublisher` as the `EventBus`'s publisher
 (ADR-024, DD-029). Every event the bus publishes passes through it:
 

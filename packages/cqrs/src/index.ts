@@ -33,7 +33,7 @@ export {
   type HandlerWrapperOptions,
 } from './handlers/handler-wrapper.js';
 
-export { CqrsTransactionalBootstrap } from './handlers/bootstrap.js';
+export { TransactionalCqrsBootstrap } from './handlers/bootstrap.js';
 
 export {
   TransactionalEventBusPublisher,
@@ -46,9 +46,11 @@ export {
 } from './event-publisher/outbox-publication-scheduler.js';
 
 export {
-  CQRS_TRANSACTIONAL_OPTIONS,
-  CqrsTransactionalModule,
-  type CqrsTransactionalAsyncFactoryResult,
-  type CqrsTransactionalAsyncOptions,
-  type CqrsTransactionalOptions,
-} from './module/cqrs-transactional.module.js';
+  TRANSACTIONAL_CQRS_OPTIONS,
+  TransactionalCqrsModule,
+  type TransactionalCqrsAsyncFactoryResult,
+  type TransactionalCqrsAsyncOptions,
+  type TransactionalCqrsOptions,
+} from './module/transactional-cqrs.module.js';
+
+export * from './deprecated.js';

@@ -106,7 +106,7 @@ pnpm -C examples/audit-logging start
 1. **Asymmetric wiring.** The business DS gets the outbox:
    `@nestjs/outbox`'s `OutboxModule` with a `PostgresOutboxStore` on the
    business DataSource, plus `TransactionalOutboxModule`. The audit DS
-   gets only `TypeOrmTransactionalModule.forRoot({ dataSource: 'audit' })`;
+   gets only `TransactionalTypeOrmModule.forRoot({ dataSource: 'audit' })`;
    no outbox tables, no relay. The audit DB is a sink.
 2. **Atomicity in the business DS.** Inside
    `AccountService.deposit/withdraw`, three writes commit together
