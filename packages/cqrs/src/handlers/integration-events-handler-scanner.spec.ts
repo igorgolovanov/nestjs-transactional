@@ -21,10 +21,6 @@ import type { IIntegrationEventHandler } from '../interfaces/integration-event-h
 import { TransactionPhase } from '../types/transactional-listener.types.js';
 
 import { IntegrationEventsHandlerScanner } from './integration-events-handler-scanner.js';
-import {
-  OUTBOX_LISTENER_REGISTRAR,
-  type OutboxListenerRegistrar,
-} from './outbox-listener-registrar.js';
 
 interface FakeHandle extends TransactionHandle {
   readonly id: string;
@@ -69,12 +65,6 @@ class ShippingHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
 }
 
 @Injectable()
-@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'shipping.stable-id' })
-class ShippingHandlerWithId implements IIntegrationEventHandler<OrderPlacedEvent> {
-  async handle(_event: OrderPlacedEvent): Promise<void> {}
-}
-
-@Injectable()
 @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
 class MultiEventHandler implements IIntegrationEventHandler<
   OrderPlacedEvent | OrderCancelledEvent
@@ -95,7 +85,6 @@ describe('IntegrationEventsHandlerScanner', () => {
 
   async function build(options: {
     extraProviders: unknown[];
-    withRegistrar?: OutboxListenerRegistrar;
   }): Promise<{ dispatcherCalls: DispatcherRegisterCall[] }> {
     adapter = new FakeAdapter();
     const adapterRegistry = new AdapterRegistry();
@@ -123,9 +112,6 @@ describe('IntegrationEventsHandlerScanner', () => {
       IntegrationEventsHandlerScanner,
       ...options.extraProviders,
     ];
-    if (options.withRegistrar !== undefined) {
-      providers.push({ provide: OUTBOX_LISTENER_REGISTRAR, useValue: options.withRegistrar });
-    }
 
     module = await Test.createTestingModule({
       imports: [DiscoveryModule],
@@ -142,70 +128,7 @@ describe('IntegrationEventsHandlerScanner', () => {
     module = undefined;
   });
 
-  describe('with outbox registrar bound', () => {
-    let registrar: OutboxListenerRegistrar & {
-      register: jest.Mock<OutboxListenerRegistrar['register']>;
-    };
-
-    beforeEach(() => {
-      registrar = { register: jest.fn() };
-    });
-
-    it('registers the handler as an outbox listener, once per event type', async () => {
-      await build({ extraProviders: [ShippingHandler], withRegistrar: registrar });
-
-      expect(registrar.register).toHaveBeenCalledTimes(1);
-      const [entry] = registrar.register.mock.calls[0] as [{ id: string; eventType: string }];
-      expect(entry.eventType).toBe('OrderPlacedEvent');
-      expect(entry.id).toBe('ShippingHandler#OrderPlacedEvent');
-    });
-
-    it('uses the explicit id as the base when provided', async () => {
-      await build({
-        extraProviders: [ShippingHandlerWithId],
-        withRegistrar: registrar,
-      });
-
-      const [entry] = registrar.register.mock.calls[0] as [{ id: string }];
-      expect(entry.id).toBe('shipping.stable-id#OrderPlacedEvent');
-    });
-
-    it('produces distinct listener ids for multi-event handlers', async () => {
-      await build({ extraProviders: [MultiEventHandler], withRegistrar: registrar });
-
-      expect(registrar.register).toHaveBeenCalledTimes(2);
-      const ids = registrar.register.mock.calls.map(([entry]: [{ id: string }]) => entry.id);
-      expect(ids).toEqual([
-        'MultiEventHandler#OrderPlacedEvent',
-        'MultiEventHandler#OrderCancelledEvent',
-      ]);
-    });
-
-    it('invoke closure wraps the handler call in a new transaction', async () => {
-      await build({ extraProviders: [ShippingHandler], withRegistrar: registrar });
-      const handler = module!.get(ShippingHandler);
-
-      const [entry] = registrar.register.mock.calls[0] as [
-        { invoke: (event: unknown) => Promise<void> },
-      ];
-      const event = new OrderPlacedEvent('order-42');
-      await entry.invoke(event);
-
-      expect(handler.invocations).toEqual([event]);
-      expect(adapter.committedTransactions).toHaveLength(1);
-    });
-
-    it('does not register with the in-memory dispatcher when the outbox is bound', async () => {
-      const { dispatcherCalls } = await build({
-        extraProviders: [ShippingHandler],
-        withRegistrar: registrar,
-      });
-
-      expect(dispatcherCalls).toHaveLength(0);
-    });
-  });
-
-  describe('without outbox registrar bound (in-memory fallback)', () => {
+  describe('dispatcher registration', () => {
     it('registers the handler with the dispatcher as AFTER_COMMIT + async, once per event type', async () => {
       const { dispatcherCalls } = await build({ extraProviders: [ShippingHandler] });
 
@@ -240,7 +163,7 @@ describe('IntegrationEventsHandlerScanner', () => {
 
       expect(handler.invocations.map((e) => e.orderId)).toEqual(['order-99']);
       // One outer commit + one inner (fresh) commit from the handler
-      // wrapper. The inner commit is what matches outbox semantics.
+      // wrapper.
       expect(adapter.committedTransactions.length).toBeGreaterThanOrEqual(2);
     });
   });

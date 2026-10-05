@@ -1467,9 +1467,6 @@ importers:
       '@nestjs-transactional/core':
         specifier: workspace:*
         version: link:../core
-      '@nestjs-transactional/outbox':
-        specifier: workspace:*
-        version: link:../outbox
       '@nestjs-transactional/typeorm':
         specifier: workspace:*
         version: link:../typeorm

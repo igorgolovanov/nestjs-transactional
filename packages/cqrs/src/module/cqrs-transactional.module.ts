@@ -156,12 +156,9 @@ function resolveWrapperOptions(options: HandlerWrapperOptions): ResolvedWrapperO
  * how many dataSources are configured — multi-DS routing emerges
  * from the structural-port wiring, not from a per-DS module instance.
  *
- * Wire {@link OUTBOX_PUBLICATION_SCHEDULER} and
- * {@link OUTBOX_LISTENER_REGISTRAR} to the outbox stack you want
- * cqrs to delegate to (`useExisting: OutboxEventPublisher` /
- * `useExisting: OutboxListenerRegistry`). Apps with multiple outbox
- * stacks (one `OutboxModule.forRoot()` per dataSource — ADR-019)
- * choose which one cqrs bridges to via the `useExisting` target.
+ * The outbox side is wired by `@nestjs-transactional/outbox`'s
+ * `TransactionalOutboxModule.forRoot()`, which binds
+ * {@link OUTBOX_PUBLICATION_SCHEDULER}. Nothing to declare here.
  *
  * Known limitation in multi-DS deployments: the in-memory
  * dispatcher's hook-attachment goes through

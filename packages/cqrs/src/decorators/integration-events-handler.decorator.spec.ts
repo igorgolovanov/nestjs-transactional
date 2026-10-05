@@ -25,7 +25,6 @@ describe('@IntegrationEventsHandler', () => {
       const metadata = getIntegrationEventsHandlerMetadata(Handler);
       expect(metadata).toBeDefined();
       expect(metadata?.eventTypes).toEqual([OrderPlacedEvent]);
-      expect(metadata?.id).toBeUndefined();
     });
 
     it('accepts multiple event types', () => {
@@ -40,15 +39,15 @@ describe('@IntegrationEventsHandler', () => {
   });
 
   describe('options long form', () => {
-    it('preserves the explicit id', () => {
-      @IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Shipping.createShipment' })
+    it('accepts the events and a dataSource', () => {
+      @IntegrationEventsHandler({ events: [OrderPlacedEvent], dataSource: 'billing' })
       class Handler implements IIntegrationEventHandler<OrderPlacedEvent> {
         async handle(_event: OrderPlacedEvent): Promise<void> {}
       }
 
       const metadata = getIntegrationEventsHandlerMetadata(Handler);
-      expect(metadata?.id).toBe('Shipping.createShipment');
       expect(metadata?.eventTypes).toEqual([OrderPlacedEvent]);
+      expect(metadata?.dataSource).toBe('billing');
     });
   });
 

@@ -26,10 +26,6 @@ export {
 
 export { TransactionalListenerScanner } from './handlers/listener-scanner.js';
 export { IntegrationEventsHandlerScanner } from './handlers/integration-events-handler-scanner.js';
-export {
-  OUTBOX_LISTENER_REGISTRAR,
-  type OutboxListenerRegistrar,
-} from './handlers/outbox-listener-registrar.js';
 
 export {
   CQRS_HANDLER_WRAPPER_OPTIONS,

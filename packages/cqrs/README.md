@@ -8,7 +8,7 @@ Transactions and Spring-style event phases for
 
 It solves the race everyone hits with domain events: an aggregate emits
 an event, a handler reacts, and then the transaction rolls back — the
-side effect already happened. Here, event handlers declare *when* they
+side effect already happened. Here, event handlers declare _when_ they
 run relative to the commit, and `AFTER_COMMIT` means the row really is
 in the database.
 
@@ -29,7 +29,7 @@ Built on
 [`@nestjs-transactional/core`](https://www.npmjs.com/package/@nestjs-transactional/core).
 Pair with
 [`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox)
-when a handler must survive a process crash.
+and `@nestjs/outbox` when a handler must survive a process crash.
 
 ## Install
 
@@ -95,12 +95,12 @@ what runs.
 
 ## Event phases
 
-| Phase | Fires | If the handler throws |
-| --- | --- | --- |
-| `BEFORE_COMMIT` | before COMMIT is issued | the transaction rolls back |
-| `AFTER_COMMIT` *(default)* | after COMMIT succeeds | logged and swallowed |
-| `AFTER_ROLLBACK` | after ROLLBACK, with the causing error | logged and swallowed |
-| `AFTER_COMPLETION` | on either outcome | logged and swallowed |
+| Phase                      | Fires                                  | If the handler throws      |
+| -------------------------- | -------------------------------------- | -------------------------- |
+| `BEFORE_COMMIT`            | before COMMIT is issued                | the transaction rolls back |
+| `AFTER_COMMIT` _(default)_ | after COMMIT succeeds                  | logged and swallowed       |
+| `AFTER_ROLLBACK`           | after ROLLBACK, with the causing error | logged and swallowed       |
+| `AFTER_COMPLETION`         | on either outcome                      | logged and swallowed       |
 
 ```ts
 @TransactionalEventsHandler({
@@ -144,40 +144,37 @@ CqrsTransactionalModule.forRootAsync({
 
 ## Choosing a handler decorator
 
-| | Persisted | Retried | Survives restart |
-| --- | --- | --- | --- |
-| `@TransactionalEventsHandler` | no | no | no |
-| `@OutboxEventsHandler` *(outbox package)* | yes | yes | yes |
-| `@IntegrationEventsHandler` | if the outbox is wired | if wired | if wired |
+|                                         | Persisted | Retried | Survives restart |
+| --------------------------------------- | --------- | ------- | ---------------- |
+| `@TransactionalEventsHandler`           | no        | no      | no               |
+| `@IntegrationEventsHandler`             | no        | no      | no               |
+| `@OnOutboxMessage` _(`@nestjs/outbox`)_ | yes       | yes     | yes              |
 
 Use `@TransactionalEventsHandler` for in-process work that is fine to
-lose on a crash — cache invalidation, metrics. Use
-`@OutboxEventsHandler` when at-least-once delivery matters: external
-API calls, emails, billing.
+lose on a crash, such as cache invalidation and metrics, and when you
+need a phase other than after-commit.
 
-`@IntegrationEventsHandler` is the one to reach for by default in
-cross-module code. It routes through the outbox when
-`OUTBOX_LISTENER_REGISTRAR` is bound and falls back to in-memory
-delivery when it is not — decided at bootstrap by module wiring, not at
-the call site. The same handler therefore runs in-memory during early
-development and durably once a worker exists, without touching the
-handler. It mirrors Spring Modulith's `@ApplicationModuleListener`.
+`@IntegrationEventsHandler` is the opinionated form for cross-module
+code: after the commit, asynchronously, in a transaction of its own. It
+mirrors Spring Modulith's `@ApplicationModuleListener`. Delivery is
+still in-memory, so a crash between the commit and the handler loses
+the call.
 
-To turn on durable delivery, bind both structural ports:
+When the work must survive that (external API calls, emails, billing),
+publish the event through
+[`@nestjs-transactional/outbox`](https://www.npmjs.com/package/@nestjs-transactional/outbox)
+and handle it with `@nestjs/outbox`'s `@OnOutboxMessage`, which retries,
+deduplicates and dead-letters. With `TransactionalOutboxModule`
+imported, events an aggregate commits reach the outbox too: the
+`@Externalized` ones are added just before the transaction commits, so a
+rollback leaves neither the in-memory handlers fired nor a message
+written.
 
-```ts
-providers: [
-  { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-  { provide: OUTBOX_LISTENER_REGISTRAR, useExisting: OutboxListenerRegistry },
-];
-```
-
-A rollback then undoes all of it: no in-memory handler fires, no
-publication row persists, nothing downstream runs.
-
-Listener ids are `${baseId}#${EventName}`, with `baseId` defaulting to
-the class name — so pass an explicit `id` if the class may be renamed,
-or stored publications will be orphaned.
+Until 2.x, `@IntegrationEventsHandler` became durable by itself once the
+outbox was wired, and took an `id` option for its stored listener. From
+3.0.0, durable delivery belongs to `@nestjs/outbox`, and the option is
+gone
+([ADR-023](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/023-delegate-delivery-to-nestjs-outbox.md)).
 
 ## Limitations
 
@@ -187,8 +184,9 @@ or stored publications will be orphaned.
 - **Arrow-function class fields are not wrapped.** The wrap point is the
   prototype, and `execute = async (q) => {}` shadows it. Use method
   syntax.
-- **`@nestjs/cqrs@11` only**, deliberately, while the other peers accept
-  `^10 || ^11`. The wrapping mechanism would work on v10, but
+- **`@nestjs/cqrs` 11 or 12 only**, deliberately, while `@nestjs/common`
+  and `@nestjs/core` still accept 10. The wrapping mechanism would work on
+  `@nestjs/cqrs` 10, but
   `AsyncContext` — which request-scoped handler support depends on —
   does not exist there, and advertising `^10` would promise a documented
   feature that cannot work.
