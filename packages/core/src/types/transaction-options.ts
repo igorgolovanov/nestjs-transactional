@@ -42,6 +42,12 @@ export interface TransactionOptions {
    * Budget for the whole transaction, in milliseconds. Omit for no
    * timeout.
    *
+   * @deprecated Accepted and ignored by every adapter this repository
+   * ships, and removed in the next major (DD-032). Bound a slow operation
+   * in the database instead, for instance with Postgres'
+   * `statement_timeout` or `idle_in_transaction_session_timeout`, whose
+   * meaning is exact.
+   *
    * NOT IMPLEMENTED by `TypeOrmTransactionAdapter`, and deliberately not
    * approximated (DD-027). TypeORM exposes no transaction-level timeout,
    * and the nearest dialect feature — Postgres' `statement_timeout` —
@@ -55,6 +61,32 @@ export interface TransactionOptions {
    * accepts exactly this.
    */
   readonly timeout?: number;
+}
+
+/**
+ * Retrying a transaction that failed for a reason the database expects
+ * the client to retry, such as a serialization failure or a deadlock
+ * (DD-032).
+ */
+export interface TransactionRetryOptions {
+  /** Attempts in total, the first included. An integer, at least 1. */
+  readonly maxAttempts: number;
+
+  /**
+   * Milliseconds to wait before the next attempt. A function receives
+   * the number of attempts made so far, from 1, and the error. Defaults
+   * to an exponential backoff from 10 ms, capped at 1 s, with full
+   * jitter, so that the transactions that collided do not collide again.
+   */
+  readonly delay?: number | ((attempt: number, error: unknown) => number);
+
+  /**
+   * Which errors to retry. Defaults to the adapter's
+   * `isRetryableError`, which for TypeORM means a serialization failure
+   * or a deadlock. An adapter without it retries nothing unless this is
+   * given.
+   */
+  readonly retryIf?: (error: unknown) => boolean;
 }
 
 /**
@@ -117,4 +149,22 @@ export interface ExtendedTransactionOptions extends TransactionOptions {
    * and the error is rethrown to the caller.
    */
   readonly noRollbackFor?: readonly Type<Error>[];
+
+  /**
+   * Retry the whole transaction when it fails with an error the database
+   * expects the client to retry: a serialization failure under
+   * `SERIALIZABLE`, or a deadlock. A number is `maxAttempts`.
+   *
+   * Only a call that starts the transaction retries. A call that joins
+   * an outer one (`REQUIRED` inside a transaction, `NESTED` as a
+   * savepoint) cannot: the failed transaction is the outer one's, and
+   * only its owner can run it again. Put `retry` on the outermost
+   * `@Transactional`.
+   *
+   * The method body runs again from the start on every attempt, so it
+   * must not have side effects outside the database, such as an HTTP
+   * call, that a retry would repeat. Errors that do not roll back
+   * (`noRollbackFor`) are never retried: their transaction committed.
+   */
+  readonly retry?: number | TransactionRetryOptions;
 }

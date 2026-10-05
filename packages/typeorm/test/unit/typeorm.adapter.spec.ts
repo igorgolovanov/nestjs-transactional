@@ -41,6 +41,29 @@ describe('TypeOrmTransactionAdapter (unit, SQLite in-memory)', () => {
     });
   });
 
+  describe('isRetryableError', () => {
+    it.each([
+      ['a Postgres serialization failure', { code: '40001' }],
+      ['a Postgres deadlock', { code: '40P01' }],
+      ['a MySQL deadlock by errno', { errno: 1213 }],
+      ['a MySQL deadlock by code', { code: 'ER_LOCK_DEADLOCK' }],
+      ['a wrapped driver error', { driverError: { code: '40001' } }],
+      ['an error with a retryable cause', new Error('outer', { cause: { code: '40P01' } })],
+    ])('retries %s', (_name, error) => {
+      expect(adapter.isRetryableError(error)).toBe(true);
+    });
+
+    it.each([
+      ['a unique violation', { code: '23505' }],
+      ['a lock wait timeout', { errno: 1205 }],
+      ['a plain error', new Error('boom')],
+      ['a string', '40001'],
+      ['null', null],
+    ])('does not retry %s', (_name, error) => {
+      expect(adapter.isRetryableError(error)).toBe(false);
+    });
+  });
+
   describe('runInTransaction', () => {
     it('commits saved entities on success — readable through the DataSource', async () => {
       await adapter.runInTransaction({}, async (handle) => {

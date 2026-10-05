@@ -62,6 +62,17 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
   }
 
   /**
+   * A serialization failure or a deadlock: the errors PostgreSQL and
+   * MySQL expect the client to retry the whole transaction for
+   * (`@Transactional({ retry })`, DD-032). TypeORM wraps the driver's
+   * error in a `QueryFailedError` and copies its `code` and `errno`, so
+   * both the wrapper and the driver error are read, and so is `cause`.
+   */
+  isRetryableError(error: unknown): boolean {
+    return isRetryableDriverError(error, 0);
+  }
+
+  /**
    * The transactional `EntityManager`: what `DataSource.transaction()`
    * hands its callback, and what `@nestjs/store-kit`'s `fromTypeOrm`
    * executor accepts as a transaction.
@@ -199,4 +210,28 @@ function mapIsolation(level: IsolationLevel | undefined): TypeOrmIsolationLevel 
     return undefined;
   }
   return level.replace(/_/g, ' ') as TypeOrmIsolationLevel;
+}
+
+/** PostgreSQL (and CockroachDB): serialization_failure, deadlock_detected. */
+const RETRYABLE_SQLSTATES = new Set(['40001', '40P01']);
+/** MySQL and MariaDB: ER_LOCK_DEADLOCK. */
+const RETRYABLE_MYSQL_ERRNOS = new Set([1213]);
+
+function isRetryableDriverError(error: unknown, depth: number): boolean {
+  if (typeof error !== 'object' || error === null || depth > 3) {
+    return false;
+  }
+  const { code, errno, driverError, cause } = error as {
+    code?: unknown;
+    errno?: unknown;
+    driverError?: unknown;
+    cause?: unknown;
+  };
+  if (typeof code === 'string' && (RETRYABLE_SQLSTATES.has(code) || code === 'ER_LOCK_DEADLOCK')) {
+    return true;
+  }
+  if (typeof errno === 'number' && RETRYABLE_MYSQL_ERRNOS.has(errno)) {
+    return true;
+  }
+  return isRetryableDriverError(driverError, depth + 1) || isRetryableDriverError(cause, depth + 1);
 }

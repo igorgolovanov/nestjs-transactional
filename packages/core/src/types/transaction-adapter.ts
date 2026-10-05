@@ -93,4 +93,12 @@ export interface TransactionAdapter<THandle extends TransactionHandle = Transact
    * when it is absent.
    */
   readonly dialect?: string;
+
+  /**
+   * Whether `error` is one the database expects the client to retry the
+   * whole transaction for: a serialization failure or a deadlock. Used by
+   * `@Transactional({ retry })` when the caller gives no `retryIf`.
+   * Optional; an adapter without it retries nothing by default.
+   */
+  isRetryableError?(error: unknown): boolean;
 }

@@ -152,10 +152,11 @@ These are documented, tested, and worth knowing before you adopt:
   applies to the *next* transaction there. Develop on SQLite, deploy on
   Postgres, and you meet the constraint for the first time in
   production. ([DD-027](docs/dd/027-readonly-and-timeout-semantics.md))
-- **`timeout` is accepted and not implemented.** Deliberately not
-  approximated: Postgres' `statement_timeout` bounds each statement, not
-  the transaction, so it would mean something quietly different from
-  what it says.
+- **`timeout` is deprecated, and was never implemented.** Deliberately
+  not approximated: Postgres' `statement_timeout` bounds each statement,
+  not the transaction, so it would mean something quietly different from
+  what it says. It goes in the next major.
+  ([DD-032](docs/dd/032-transaction-retry-and-timeout.md))
 - **Broker acknowledgement depends on the transport.** Kafka and
   RabbitMQ wait for a real acknowledgement, so a broker that is down
   keeps the message in the outbox and the relay retries it. NATS core

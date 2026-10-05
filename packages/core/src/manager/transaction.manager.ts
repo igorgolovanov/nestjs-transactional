@@ -50,6 +50,8 @@ type InternalResult<T> =
 export class TransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
   private readonly pending = new WeakMap<ActiveTransaction, Set<Promise<unknown>>>();
+  /** Errors a transaction was rolled back for: the only ones a retry may follow. */
+  private readonly rolledBack = new WeakSet<object>();
 
   constructor(
     @Inject(ADAPTER_REGISTRY)
@@ -103,20 +105,21 @@ export class TransactionManager {
     switch (propagation) {
       case PropagationMode.REQUIRED: {
         if (existing !== undefined) {
+          this.noteJoinedRetry(options, propagation);
           return fn();
         }
         const adapter = this.registry.get(adapterName, instanceName);
-        return this.startNew(adapter, adapterName, instanceName, options, fn);
+        return this.startNewWithRetry(adapter, adapterName, instanceName, options, fn);
       }
 
       case PropagationMode.REQUIRES_NEW: {
         const adapter = this.registry.get(adapterName, instanceName);
         if (existing === undefined) {
-          return this.startNew(adapter, adapterName, instanceName, options, fn);
+          return this.startNewWithRetry(adapter, adapterName, instanceName, options, fn);
         }
         TransactionContext.removeActiveTransaction(key);
         try {
-          return await this.startNew(adapter, adapterName, instanceName, options, fn);
+          return await this.startNewWithRetry(adapter, adapterName, instanceName, options, fn);
         } finally {
           TransactionContext.setActiveTransaction(key, existing);
         }
@@ -125,8 +128,9 @@ export class TransactionManager {
       case PropagationMode.NESTED: {
         const adapter = this.registry.get(adapterName, instanceName);
         if (existing === undefined) {
-          return this.startNew(adapter, adapterName, instanceName, options, fn);
+          return this.startNewWithRetry(adapter, adapterName, instanceName, options, fn);
         }
+        this.noteJoinedRetry(options, propagation);
         return this.runNestedSavepoint(adapter, existing, options, fn);
       }
 
@@ -296,6 +300,58 @@ export class TransactionManager {
     set.add(pending);
   }
 
+  /**
+   * {@link startNew}, run again while `options.retry` allows: the
+   * transaction rolled back, the error is retryable, and attempts remain
+   * (DD-032). Each attempt is a fresh transaction with fresh hooks.
+   */
+  private async startNewWithRetry<T>(
+    adapter: TransactionAdapter,
+    adapterName: string,
+    instanceName: string,
+    options: ExtendedTransactionOptions,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const retry = normalizeRetry(options.retry);
+    if (retry === undefined) {
+      return this.startNew(adapter, adapterName, instanceName, options, fn);
+    }
+    const retryable =
+      retry.retryIf ?? ((error: unknown) => adapter.isRetryableError?.(error) === true);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.startNew(adapter, adapterName, instanceName, options, fn);
+      } catch (error) {
+        const rolledBack =
+          typeof error === 'object' && error !== null && this.rolledBack.has(error);
+        if (attempt >= retry.maxAttempts || !rolledBack || !retryable(error)) {
+          throw error;
+        }
+        const wait = retry.delay(attempt, error);
+        this.logger.debug(
+          `Transaction on '${instanceName}' failed with a retryable error; attempt ${attempt + 1} ` +
+            `of ${retry.maxAttempts} in ${wait} ms: ${error instanceof Error ? error.message : typeof error}`,
+        );
+        if (wait > 0) {
+          await new Promise((resolve) => setTimeout(resolve, wait));
+        }
+      }
+    }
+  }
+
+  /**
+   * A `retry` on a call that joins an outer transaction cannot apply: the
+   * transaction is the outer one's. Said once per call site, at debug.
+   */
+  private noteJoinedRetry(options: ExtendedTransactionOptions, propagation: PropagationMode): void {
+    if (options.retry !== undefined) {
+      this.logger.debug(
+        `retry is ignored on a ${propagation} call that joins an outer transaction; ` +
+          'put it on the outermost @Transactional.',
+      );
+    }
+  }
+
   private async startNew<T>(
     adapter: TransactionAdapter,
     adapterName: string,
@@ -373,6 +429,9 @@ export class TransactionManager {
             rollbackCount: activeTx.afterRollbackHooks.length,
           });
           await this.runHooks(activeTx.afterRollbackHooks, rollbackError);
+        }
+        if (typeof rollbackError === 'object' && rollbackError !== null) {
+          this.rolledBack.add(rollbackError);
         }
         throw rollbackError;
       }
@@ -540,4 +599,34 @@ export class TransactionManager {
       }
     }
   }
+}
+
+interface NormalizedRetry {
+  readonly maxAttempts: number;
+  readonly delay: (attempt: number, error: unknown) => number;
+  readonly retryIf?: (error: unknown) => boolean;
+}
+
+/** The default backoff: exponential from 10 ms, capped at 1 s, full jitter. */
+function defaultDelay(attempt: number): number {
+  return Math.floor(Math.random() * Math.min(1000, 10 * 2 ** (attempt - 1)));
+}
+
+function normalizeRetry(retry: ExtendedTransactionOptions['retry']): NormalizedRetry | undefined {
+  if (retry === undefined) {
+    return undefined;
+  }
+  const options = typeof retry === 'number' ? { maxAttempts: retry } : retry;
+  if (!Number.isInteger(options.maxAttempts) || options.maxAttempts < 1) {
+    throw new TypeError(
+      `retry.maxAttempts must be an integer of at least 1, got ${String(options.maxAttempts)}.`,
+    );
+  }
+  const { delay } = options;
+  return {
+    maxAttempts: options.maxAttempts,
+    delay:
+      typeof delay === 'function' ? delay : typeof delay === 'number' ? () => delay : defaultDelay,
+    retryIf: options.retryIf,
+  };
 }

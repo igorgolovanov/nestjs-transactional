@@ -38,6 +38,7 @@ outbox, read [section 7](#cqrs-event-bus) and
 | `HybridEventPublisher`, `TransactionalEventPublisher`, `TransactionalEventPublisherAdapter` | `TransactionalEventBusPublisher`, in the bus's publisher chain |
 | `useTransactionalEventPublisher` | removed |
 | `TypeOrmTransactionalModule`, `CqrsTransactionalModule`, `CQRS_TRANSACTIONAL_OPTIONS` | `TransactionalTypeOrmModule`, `TransactionalCqrsModule`, `TRANSACTIONAL_CQRS_OPTIONS`; the old names are deprecated aliases |
+| `@Transactional({ timeout })`, accepted and ignored | deprecated, removed in the next major ([DD-032](../dd/032-transaction-retry-and-timeout.md)); `retry` is new |
 | `CqrsModule` options nowhere | `TransactionalCqrsModule.forRoot({ cqrs, eventPublisher })` |
 
 ## Renamed, with deprecated aliases

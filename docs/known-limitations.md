@@ -40,8 +40,11 @@ interrupt a statement already in flight. The option stays in the type
 surface as the extension point for adapters whose driver has a real
 transaction budget; Prisma's `$transaction` accepts exactly this.
 
-**Fix:** none planned for `readOnly` beyond the dialects above. For
-`timeout`, a future Prisma adapter can implement it natively.
+**Fix:** none planned for `readOnly` beyond the dialects above.
+`timeout` is deprecated from 3.0.0 and goes in the next major
+([DD-032](dd/032-transaction-retry-and-timeout.md)): no adapter in this
+repository implements it, and an option that silently does nothing is
+worse than none. Bound slow work in the database instead.
 
 ## Multi-adapter
 

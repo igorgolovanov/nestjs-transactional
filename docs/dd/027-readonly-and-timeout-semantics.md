@@ -1,5 +1,7 @@
 # DD-027: `readOnly` is honoured where the dialect allows it; `timeout` stays an unimplemented extension point
 
+> **The `timeout` half is superseded from 3.0.0** by [DD-032](./032-transaction-retry-and-timeout.md): `timeout` is deprecated and goes in the next major. The `readOnly` half stands.
+
 **Context**: `TransactionOptions` has carried `readOnly` and `timeout`
 since the core package shipped, with JSDoc that read like working
 features. Neither was ever implemented — the only shipped adapter
