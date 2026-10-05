@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import type { OrderResponseDto } from '../shared/dtos.js';
+
 import { OrderRow } from './order.entity.js';
 
 export class GetOrderQuery {

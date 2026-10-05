@@ -18,7 +18,7 @@ import { REDIS_CLIENT } from './clients.js';
 })
 export class CacheInvalidationEvent {
   constructor(
-    public readonly key: string,
-    public readonly reason: string,
+    readonly key: string,
+    readonly reason: string,
   ) {}
 }

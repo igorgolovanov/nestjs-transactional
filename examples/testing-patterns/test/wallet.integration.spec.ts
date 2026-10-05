@@ -10,9 +10,9 @@ import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
+import { WalletRow } from '../src/wallet.entity.js';
 import { WalletProjection } from '../src/wallet.listener.js';
 import { WalletModule } from '../src/wallet.module.js';
-import { WalletRow } from '../src/wallet.entity.js';
 import { WalletService } from '../src/wallet.service.js';
 
 /**

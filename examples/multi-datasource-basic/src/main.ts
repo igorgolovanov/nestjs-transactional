@@ -38,10 +38,10 @@ async function main(): Promise<void> {
   console.log("Cross-check isolation — neither DB knows the other's entity:");
   const billingDs = app.get<DataSource>(getDataSourceToken());
   const inventoryDs = app.get<DataSource>(getDataSourceToken('inventory'));
-  const billingHasStock = await billingDs.query(
+  const billingHasStock: unknown[] = await billingDs.query(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='stock_items'",
   );
-  const inventoryHasInvoices = await inventoryDs.query(
+  const inventoryHasInvoices: unknown[] = await inventoryDs.query(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='invoices'",
   );
   console.log('   billing has `stock_items` table?', billingHasStock.length > 0);

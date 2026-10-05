@@ -13,11 +13,11 @@ import request from 'supertest';
 import type { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module.js';
-import { KAFKA_CLIENT } from '../src/clients.js';
 import { PaymentRow } from '../src/billing/payment.entity.js';
-import { OrderRow } from '../src/orders/order.entity.js';
+import { KAFKA_CLIENT } from '../src/clients.js';
 import { ProductRow } from '../src/inventory/product.entity.js';
 import { ReservationRow } from '../src/inventory/reservation.entity.js';
+import { OrderRow } from '../src/orders/order.entity.js';
 
 interface KafkaMock {
   proxy: ClientProxy;

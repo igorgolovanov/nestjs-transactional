@@ -108,7 +108,10 @@ export class AppModule {
           // `synchronize` creates tables but not the schemas they live in,
           // so the three contexts' schemas are created first.
           dataSourceFactory: async (options) => {
-            const dataSource = await new DataSource(options!).initialize();
+            if (options === undefined) {
+              throw new Error('TypeOrmModule passed no DataSource options');
+            }
+            const dataSource = await new DataSource(options).initialize();
             for (const schema of BOUNDED_CONTEXT_SCHEMAS) {
               await dataSource.query(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
             }

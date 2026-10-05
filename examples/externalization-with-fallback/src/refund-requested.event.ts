@@ -27,8 +27,8 @@ import { REFUNDS_BROKER } from './clients.js';
 })
 export class RefundRequestedEvent {
   constructor(
-    public readonly refundId: string,
-    public readonly orderId: string,
-    public readonly amountCents: number,
+    readonly refundId: string,
+    readonly orderId: string,
+    readonly amountCents: number,
   ) {}
 }

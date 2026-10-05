@@ -6,6 +6,7 @@ import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { QueryFailedError, Repository } from 'typeorm';
 
 import { PaymentChargedEvent, PaymentFailedEvent, StockReservedEvent } from '../shared/events.js';
+
 import { PaymentRow } from './payment.entity.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';

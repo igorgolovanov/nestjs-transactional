@@ -6,6 +6,7 @@ import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
 import { PaymentChargedEvent } from '../shared/events.js';
+
 import { Order } from './order.aggregate.js';
 import { OrderRow } from './order.entity.js';
 

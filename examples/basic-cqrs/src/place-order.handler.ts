@@ -5,8 +5,8 @@ import { Order } from './order.aggregate.js';
 
 export class PlaceOrderCommand {
   constructor(
-    public readonly orderId: string,
-    public readonly shouldFail = false,
+    readonly orderId: string,
+    readonly shouldFail = false,
   ) {}
 }
 

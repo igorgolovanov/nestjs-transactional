@@ -4,11 +4,10 @@ import { jest } from '@jest/globals';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionManager, TransactionalModule } from '@nestjs-transactional/core';
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
-
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 
-import { WalletService } from '../src/wallet.service.js';
 import { WALLET_REPOSITORY, type WalletRepository } from '../src/wallet.repository.js';
+import { WalletService } from '../src/wallet.service.js';
 
 /**
  * **Tier 1: Unit tests with `InMemoryTransactionAdapter`.**

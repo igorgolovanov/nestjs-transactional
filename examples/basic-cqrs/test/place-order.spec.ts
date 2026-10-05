@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
-import { Test, type TestingModule } from '@nestjs/testing';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { Test, type TestingModule } from '@nestjs/testing';
 
 import { AppModule } from '../src/app.module.js';
 import { GetNotifiedOrdersQuery } from '../src/get-notified-orders.query.js';

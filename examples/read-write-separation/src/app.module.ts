@@ -3,8 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
-import { ArticleQueryService } from './article.query-service.js';
 import { ArticleRow } from './article.entity.js';
+import { ArticleQueryService } from './article.query-service.js';
 import { ArticleService } from './article.service.js';
 
 export interface PostgresConnection {

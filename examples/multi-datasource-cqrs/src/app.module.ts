@@ -5,8 +5,8 @@ import { TransactionalCqrsModule } from '@nestjs-transactional/cqrs';
 import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { BillingNotificationListener } from './billing.listener.js';
-import { InventoryNotificationListener } from './inventory.listener.js';
 import { InvoiceRow, ReservationRow } from './entities.js';
+import { InventoryNotificationListener } from './inventory.listener.js';
 import { IssueInvoiceHandler } from './issue-invoice.handler.js';
 import { PlaceReservationHandler } from './place-reservation.handler.js';
 

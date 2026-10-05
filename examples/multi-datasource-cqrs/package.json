@@ -8,7 +8,8 @@
     "build": "tsc",
     "clean": "rimraf dist",
     "start": "tsc && node dist/main.js",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@nestjs-transactional/core": "workspace:*",
@@ -27,11 +28,11 @@
     "@jest/globals": "^30.4.2",
     "@nestjs/testing": "^12.1.2",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.20.2",
+    "@types/node": "^22.20.5",
     "@types/sql.js": "^1.4.9",
-    "jest": "^30.5.1",
+    "jest": "^30.5.2",
     "rimraf": "^6.0.1",
-    "ts-jest": "^29.4.12",
+    "ts-jest": "^29.4.14",
     "typescript": "^6.0.3"
   }
 }

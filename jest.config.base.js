@@ -33,7 +33,16 @@ module.exports = {
     ],
   },
   testRegex: '.*\\.spec\\.ts$',
-  testPathIgnorePatterns: ['/node_modules/', '/dist/', '\\.integration\\.spec\\.ts$'],
+  // Integration and broker suites start containers; each has a config
+  // of its own (`test:integration`, `test:brokers`), and the unit run,
+  // which every matrix leg and the coverage job executes, must not pick
+  // them up.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '\\.integration\\.spec\\.ts$',
+    '\\.brokers\\.spec\\.ts$',
+  ],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.spec.ts',
