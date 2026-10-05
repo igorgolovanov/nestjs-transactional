@@ -1,5 +1,7 @@
 # DD-011: Hybrid event publishing (in-memory + persistent coexistence)
 
+> **Superseded from 3.0.0** by [DD-029](./029-cqrs-publisher-chain-contract.md): events go through the `@nestjs/cqrs` `EventBus`, and `HybridEventPublisher` is gone (ADR-024). Kept as the record of how 2.x works.
+
 **Context**: The cqrs package currently publishes events via the in-memory
 `TransactionalEventDispatcher`. Events also need to be routed to the
 outbox for persistence when the outbox is available, without breaking

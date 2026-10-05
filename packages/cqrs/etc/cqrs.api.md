@@ -4,11 +4,10 @@
 
 ```ts
 
-import { AsyncContext } from '@nestjs/cqrs';
+import { CqrsModuleOptions } from '@nestjs/cqrs';
 import { DiscoveryService } from '@nestjs/core';
 import { DynamicModule } from '@nestjs/common';
 import { EventBus } from '@nestjs/cqrs';
-import { EventPublisher } from '@nestjs/cqrs';
 import type { IEvent } from '@nestjs/cqrs';
 import { IEventPublisher } from '@nestjs/cqrs';
 import { InjectionToken } from '@nestjs/common';
@@ -20,14 +19,20 @@ import { TransactionalMetadata } from '@nestjs-transactional/core';
 import { TransactionManager } from '@nestjs-transactional/core';
 import { Type } from '@nestjs/common';
 
-// @public (undocumented)
-export type AggregateConstructor<T extends object = object> = new (...args: never[]) => T;
-
 // @public
 export const CQRS_HANDLER_WRAPPER_OPTIONS: unique symbol;
 
 // @public
 export const CQRS_TRANSACTIONAL_OPTIONS = "CQRS_TRANSACTIONAL_OPTIONS";
+
+// @public
+export class CqrsEventBusBinding implements OnApplicationBootstrap {
+    constructor(eventBus: EventBus, publisher: TransactionalEventBusPublisher, dispatcher: TransactionalEventDispatcher, manager: TransactionManager, discovery: DiscoveryService, options: {
+        readonly eventsDataSource?: string;
+    }, outbox?: OutboxPublicationScheduler);
+    // (undocumented)
+    onApplicationBootstrap(): void;
+}
 
 // @public
 export class CqrsHandlerWrapper implements OnModuleDestroy {
@@ -39,15 +44,18 @@ export class CqrsHandlerWrapper implements OnModuleDestroy {
 }
 
 // @public
-export type CqrsTransactionalAsyncFactoryResult = HandlerWrapperOptions;
+export interface CqrsTransactionalAsyncFactoryResult extends HandlerWrapperOptions {
+    readonly eventsDataSource?: string;
+}
 
+// Warning: (ae-forgotten-export) The symbol "CqrsTransactionalStructuralOptions" needs to be exported by the entry point index.d.ts
+//
 // @public
-export interface CqrsTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+export interface CqrsTransactionalAsyncOptions extends Pick<ModuleMetadata, 'imports'>, CqrsTransactionalStructuralOptions {
     // (undocumented)
     readonly inject?: readonly InjectionToken[];
     // (undocumented)
     readonly useFactory: (...args: never[]) => Promise<CqrsTransactionalAsyncFactoryResult> | CqrsTransactionalAsyncFactoryResult;
-    readonly useTransactionalEventPublisher?: boolean;
 }
 
 // @public
@@ -65,8 +73,7 @@ export class CqrsTransactionalModule {
 }
 
 // @public
-export interface CqrsTransactionalOptions extends HandlerWrapperOptions {
-    readonly useTransactionalEventPublisher?: boolean;
+export interface CqrsTransactionalOptions extends CqrsTransactionalAsyncFactoryResult, CqrsTransactionalStructuralOptions {
 }
 
 // @public
@@ -95,15 +102,6 @@ export interface HandlerWrapperOptions {
     readonly wrapCommandHandlers?: boolean;
     readonly wrapEventHandlers?: boolean;
     readonly wrapQueryHandlers?: boolean;
-}
-
-// @public
-export class HybridEventPublisher implements IEventPublisher {
-    constructor(dispatcher: TransactionalEventDispatcher, outbox?: OutboxPublicationScheduler | undefined);
-    // (undocumented)
-    publish<T extends IEvent>(event: T): void;
-    // (undocumented)
-    publishAll<T extends IEvent>(events: T[]): void;
 }
 
 // @public
@@ -161,26 +159,33 @@ export interface OutboxPublicationScheduler {
 export const TRANSACTIONAL_EVENTS_HANDLER_METADATA: unique symbol;
 
 // @public
+export class TransactionalEventBusPublisher implements IEventPublisher {
+    constructor(delegate?: IEventPublisher | undefined);
+    // (undocumented)
+    attach(dependencies: TransactionalEventBusPublisherDependencies): void;
+    // (undocumented)
+    readonly delegate?: IEventPublisher | undefined;
+    get inner(): IEventPublisher | undefined;
+    // (undocumented)
+    publish<T extends IEvent>(event: T, dispatcherContext?: unknown, asyncContext?: unknown): unknown;
+    // (undocumented)
+    publishAll<T extends IEvent>(events: T[], dispatcherContext?: unknown, asyncContext?: unknown): unknown;
+}
+
+// @public
+export interface TransactionalEventBusPublisherDependencies {
+    // (undocumented)
+    readonly dispatcher: TransactionalEventDispatcher;
+    readonly inner: IEventPublisher;
+    // (undocumented)
+    readonly outbox?: OutboxPublicationScheduler;
+}
+
+// @public
 export class TransactionalEventDispatcher {
     constructor(manager: TransactionManager);
     registerListener(instance: object, methodName: string, metadata: DispatcherListenerMetadata): void;
     scheduleDispatch(event: object): void;
-}
-
-// @public
-export class TransactionalEventPublisher implements IEventPublisher {
-    constructor(dispatcher: TransactionalEventDispatcher);
-    publish<T extends IEvent>(event: T): void;
-    publishAll<T extends IEvent>(events: T[]): void;
-}
-
-// @public
-export class TransactionalEventPublisherAdapter extends EventPublisher {
-    constructor(strategy: IEventPublisher, eventBus: EventBus);
-    // (undocumented)
-    mergeClassContext<T extends AggregateConstructor>(metatype: T, _asyncContext?: AsyncContext): T;
-    // (undocumented)
-    mergeObjectContext<T extends object>(object: T, _asyncContext?: AsyncContext): T;
 }
 
 // @public

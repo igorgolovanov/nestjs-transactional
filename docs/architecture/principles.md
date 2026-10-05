@@ -95,10 +95,12 @@ For DDD/CQRS projects using `AggregateRoot` from `@nestjs/cqrs`:
 const order = this.publisher.mergeObjectContext(Order.place(...));
 await this.orders.save(order);
 order.commit();
-// events will fire in AFTER_COMMIT listeners, not immediately
+// @TransactionalEventsHandler listeners fire at their phase, AFTER_COMMIT by default
 ```
 
-`commit()` is retargeted by swapping `EventPublisher` for our
-`TransactionalEventPublisherAdapter`. Events no longer go straight to the
-in-memory EventBus — they are registered on the current transaction as
-hooks for the appropriate phase.
+`commit()` publishes through `@nestjs/cqrs`'s `EventBus`, whose
+publisher is ours (ADR-024): each event is registered on the current
+transaction as a hook for its listeners' phase, and then delivered to
+plain `@EventsHandler`s and sagas as `@nestjs/cqrs` would. Inside a
+transaction, the bus hands its publisher chain `{ transaction }`, so
+`@nestjs/workflows`' `@StartOn` writes in the same transaction.

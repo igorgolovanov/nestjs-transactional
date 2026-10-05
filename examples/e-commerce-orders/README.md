@@ -93,8 +93,8 @@ business-meaningful terminal event crosses the boundary.
 1. **Place.** `POST /orders` → `PlaceOrderCommand`. The handler inserts
    the order and commits the `Order` aggregate. `OrderPlacedEvent`
    carries `@Externalized({ target: 'orders.placed', client: 'local' })`,
-   which is how an aggregate's event gets into the outbox: the
-   `HybridEventPublisher` takes only `@Externalized` events there, and
+   which is how an aggregate's event gets into the outbox: the cqrs
+   publisher takes only `@Externalized` events there, and
    `local` is `@nestjs/outbox`'s in-process transport.
 2. **Reserve.** `ReserveStockHandler` decrements stock and inserts
    reservations, then publishes `StockReservedEvent`. Out of stock rolls

@@ -44,10 +44,10 @@ Or from this directory: `pnpm start` / `pnpm test`.
    handler's `execute` method is wrapped with `@Transactional()` —
    `CqrsHandlerWrapper` does this at bootstrap.
 2. Inside `execute`, `EventPublisher.mergeObjectContext(new Order(id))`
-   retargets `aggregate.commit()` through
-   `TransactionalEventPublisher`. Aggregate-emitted events become
-   AFTER_COMMIT hooks on the active transaction rather than firing
-   immediately on the in-memory `EventBus`.
+   makes `aggregate.commit()` publish on the `EventBus`, whose
+   publisher `CqrsTransactionalModule` installs. The event becomes an
+   AFTER_COMMIT hook on the active transaction for the
+   `@TransactionalEventsHandler`, rather than firing before the commit.
 3. On success, the transaction commits and `NotificationHandler.handle`
    runs.
 4. On `shouldFail: true`, the handler throws AFTER `order.commit()` —

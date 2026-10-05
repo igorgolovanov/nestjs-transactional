@@ -39,7 +39,7 @@ nestjs-transactional-monorepo/
 │   │   │   ├── interfaces/                # ITransactionalEventHandler, IIntegrationEventHandler
 │   │   │   ├── types/                     # TransactionPhase
 │   │   │   ├── event-dispatcher/          # TransactionalEventDispatcher
-│   │   │   ├── event-publisher/           # TransactionalEventPublisher + HybridEventPublisher
+│   │   │   ├── event-publisher/           # TransactionalEventBusPublisher, CqrsEventBusBinding
 │   │   │   ├── handlers/                  # CqrsHandlerWrapper, scanners
 │   │   │   ├── module/                    # CqrsTransactionalModule
 │   │   │   └── index.ts

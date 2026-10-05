@@ -1,5 +1,7 @@
 # ADR-003: Not patching @nestjs/cqrs — integrate via runtime wrapping and DI override
 
+> **Mechanism 2 superseded from 3.0.0** by [ADR-024](./024-cqrs-events-through-the-event-bus.md): events now go through the `EventBus`, with our publisher in its chain, instead of an `EventPublisher` DI override. Mechanisms 1 and 3, and the decision not to fork, stand.
+
 ## Status
 
 Accepted — 2026-04-23.

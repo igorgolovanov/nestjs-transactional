@@ -1,6 +1,6 @@
 # Outbox Integration with `@nestjs/cqrs`
 
-`@nestjs-transactional/cqrs` connects `@nestjs/cqrs`'s `AggregateRoot` to
+`@nestjs-transactional/cqrs` connects `@nestjs/cqrs`'s `EventBus` to
 two delivery paths: the in-memory phase-aware dispatcher, and, when
 `@nestjs-transactional/outbox` is wired, the durable outbox delivered by
 [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox). One
@@ -19,26 +19,37 @@ outbox was wired. From 3.0.0 durability belongs to `@nestjs/outbox`, so
 that decorator stays in-memory and durable handlers are written with
 `@OnOutboxMessage` (ADR-023).
 
-## HybridEventPublisher
+## The EventBus publisher chain
 
-`CqrsTransactionalModule.forRoot()` installs `HybridEventPublisher` as
-the strategy behind `@nestjs/cqrs`'s `EventPublisher`:
+`CqrsTransactionalModule.forRoot()` imports `CqrsModule.forRoot()` with
+`TransactionalEventBusPublisher` as the `EventBus`'s publisher
+(ADR-024, DD-029). Every event the bus publishes passes through it:
 
 ```
-AggregateRoot.commit()
+aggregate.commit()  /  eventBus.publish(event)
       │
       ▼
-HybridEventPublisher.publish(event)
+EventBus.publish                    inside @Transactional: context becomes
+      │                             { transaction, aggregate? }; COMMIT
+      │                             waits for what the chain returns
+      ▼
+(a wrapping publisher, e.g. WorkflowsCqrsModule: @StartOn / @SignalOn
+ write through context.transaction, then forward)
+      │
+      ▼
+TransactionalEventBusPublisher.publish(event)
       │
       ├──▶ TransactionalEventDispatcher.scheduleDispatch(event)
-      │       in-memory; handlers fire at their phase
+      │       in-memory; phase handlers fire at their phase
       │
-      └──▶ OutboxPublicationScheduler.scheduleForPublication(event)
-              only when OUTBOX_PUBLICATION_SCHEDULER is bound,
-              and only for @Externalized events: buffered per
-              transaction and added to @nestjs/outbox by one
-              before-commit hook, so the messages commit with
-              the aggregate's writes
+      ├──▶ OutboxPublicationScheduler.scheduleForPublication(event)
+      │       only when OUTBOX_PUBLICATION_SCHEDULER is bound,
+      │       and only for @Externalized events: buffered per
+      │       transaction and added to @nestjs/outbox by one
+      │       before-commit hook, so the messages commit with
+      │       the aggregate's writes
+      │
+      └──▶ @EventsHandler / sagas, at once, inside the transaction
 ```
 
 `TransactionalOutboxModule.forRoot()` binds
@@ -96,11 +107,13 @@ decoupling cannot erode unnoticed.
 | The aggregate's transaction rolls back | No in-memory handler fires; no outbox message exists |
 | The process dies after the commit | In-memory handlers are lost; the outbox message is delivered after the restart |
 | An `@OnOutboxMessage` handler throws | Retried with backoff, dead-lettered after the last attempt |
-| `aggregate.commit()` outside a transaction | In-memory dispatch follows its fallback rules; an `@Externalized` event is dropped and logged, since a synchronous caller cannot be given the error |
+| `aggregate.commit()` or `eventBus.publish()` outside a transaction | In-memory dispatch follows its fallback rules; an `@Externalized` event is dropped and logged, since a synchronous caller cannot be given the error |
 
 ## Further reading
 
 - [ADR-014 — class-level handler API](../adr/014-handler-api-redesign.md)
 - [ADR-023 — delivery through `@nestjs/outbox`](../adr/023-delegate-delivery-to-nestjs-outbox.md)
+- [ADR-024 — events through the `EventBus`](../adr/024-cqrs-events-through-the-event-bus.md)
+- [DD-029 — the publisher chain contract](../dd/029-cqrs-publisher-chain-contract.md)
 - [DD-028 — the bridge contract](../dd/028-outbox-bridge-contract.md)
 - [Outbox pattern](outbox-pattern.md)

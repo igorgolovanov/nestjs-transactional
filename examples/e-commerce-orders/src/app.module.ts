@@ -66,11 +66,10 @@ export function readConfigFromEnv(): ECommerceConfig {
  *    not add a message atomically. For transactions across separate
  *    DataSources without an outbox, see `multi-datasource-basic` and
  *    `multi-datasource-cqrs`.
- * 2. **CQRS**: `CqrsTransactionalModule.forRoot` overrides the
- *    `EventPublisher` with `HybridEventPublisher`, and
- *    `TransactionalOutboxModule` binds its outbox port, so
- *    `aggregate.commit()` sends `@Externalized` events to the outbox in
- *    the aggregate's transaction.
+ * 2. **CQRS**: `CqrsTransactionalModule.forRoot` puts its publisher in
+ *    the `EventBus`, and `TransactionalOutboxModule` binds its outbox
+ *    port, so `aggregate.commit()` sends `@Externalized` events to the
+ *    outbox in the aggregate's transaction.
  * 3. **The saga** runs over `@nestjs/outbox`: each step is an
  *    `@OnOutboxMessage` handler, retried and deduplicated by its inbox.
  *    `OrderPlacedEvent` is `@Externalized` to the `local` transport so the

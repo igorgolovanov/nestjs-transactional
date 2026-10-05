@@ -64,10 +64,13 @@ Reasoning and measurements: [ADR-022](https://github.com/igorgolovanov/nestjs-tr
 export class AppModule {}
 ```
 
-> **Do not import `CqrsModule` as well.** This module imports it
-> internally and overrides the `EventPublisher` token. A second import
-> in your app shadows that override, and aggregate events silently stop
-> reaching the dispatcher — no error, just handlers that never fire.
+> **Do not import `CqrsModule` as well.** This module imports
+> `CqrsModule.forRoot()` itself, with its publisher in the `EventBus`.
+> A second import creates a second `EventBus` that bypasses it, so
+> bootstrap fails with an error that says so. Pass `CqrsModule` options
+> as `forRoot({ cqrs: { ... } })`, and a publisher of your own as
+> `forRoot({ eventPublisher })`. `CommandBus`, `QueryBus` and `EventBus`
+> are injectable anywhere.
 
 Then a command handler, transactional by decoration:
 
@@ -89,9 +92,19 @@ export class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand> {
 }
 ```
 
-`order.commit()` does not dispatch immediately. Each event attaches to
-the current transaction at its handler's phase, so the commit decides
-what runs.
+`order.commit()` publishes through the `@nestjs/cqrs` `EventBus`.
+Each `@TransactionalEventsHandler` attaches to the current transaction
+at its phase, so the commit decides what runs. A plain `@EventsHandler`
+and sagas run at once, inside the transaction, as `@nestjs/cqrs` always
+runs them. A direct `eventBus.publish(event)` takes the same route.
+
+Inside a transaction, the bus also hands its publisher chain
+`{ transaction }` as the dispatcher context, the convention
+`@nestjs/cqrs` 12.1 documents for `commit(context)`. That is what lets
+`@nestjs/workflows`' `WorkflowsCqrsModule` start and signal workflows in
+the business transaction: `@StartOn(OrderPlaced)` commits or rolls back
+with the order, and nobody passes the transaction by hand
+([ADR-024](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/adr/024-cqrs-events-through-the-event-bus.md)).
 
 ## Event phases
 
@@ -135,10 +148,9 @@ CqrsTransactionalModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (cfg: ConfigService) => ({ wrapQueryHandlers: cfg.get('WRAP') !== 'false' }),
-  // Structural, so it stays outside the factory: it decides whether the
-  // EventPublisher override provider exists at all, and NestJS needs
-  // provider tokens before any factory has run.
-  useTransactionalEventPublisher: true,
+  // Structural, so they stay outside the factory: they shape the
+  // CqrsModule import, which NestJS needs before any factory has run.
+  cqrs: { rethrowUnhandled: true },
 });
 ```
 
@@ -178,18 +190,13 @@ gone
 
 ## Limitations
 
-- **`eventBus.publish(...)` bypasses the dispatcher.** Only events
-  emitted by an aggregate through `mergeObjectContext` /
-  `mergeClassContext` and `commit()` become phase-aware.
+- **The dispatcher context names one DataSource.** `{ transaction }` is
+  the transaction on `eventsDataSource`, `'default'` unless configured.
 - **Arrow-function class fields are not wrapped.** The wrap point is the
   prototype, and `execute = async (q) => {}` shadows it. Use method
   syntax.
-- **`@nestjs/cqrs` 11 or 12 only**, deliberately, while `@nestjs/common`
-  and `@nestjs/core` still accept 10. The wrapping mechanism would work on
-  `@nestjs/cqrs` 10, but
-  `AsyncContext` — which request-scoped handler support depends on —
-  does not exist there, and advertising `^10` would promise a documented
-  feature that cannot work.
+- **`@nestjs/cqrs` 11 or 12, with NestJS 11 or 12.** CI runs both ends:
+  NestJS 12 with `@nestjs/cqrs` 12.1, and NestJS 11 with 11.0.3.
 
 Handlers of any scope are supported, including `Scope.REQUEST` and
 `Scope.TRANSIENT`, because the wrap is applied to the prototype

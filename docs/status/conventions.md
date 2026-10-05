@@ -55,18 +55,19 @@ is preserved as a stub; subsequent numbers do not shift.
    elsewhere stay valid.
 
 6. **Do NOT import `CqrsModule` directly alongside `CqrsTransactionalModule.forRoot()`.**
-   The transactional module imports `CqrsModule` internally and overrides
-   the `EventPublisher` DI token. A duplicate `CqrsModule` import in the
-   consumer shadows the override — handlers inject the original
-   `EventPublisher` from `CqrsModule` and aggregate events bypass the
-   dispatcher. Documented in `packages/cqrs/README.md`.
+   The transactional module imports `CqrsModule.forRoot()` itself, with
+   its publisher in the `EventBus` (ADR-024). A second `CqrsModule`
+   import creates a second `EventBus` that bypasses that publisher; from
+   3.0.0 bootstrap fails on it instead of events silently skipping their
+   phases. Pass `CqrsModule` options as
+   `CqrsTransactionalModule.forRoot({ cqrs })`. Documented in
+   `packages/cqrs/README.md`.
 
 7. **`CQRS_TRANSACTIONAL_OPTIONS` + `CQRS_HANDLER_WRAPPER_OPTIONS` are
    separate injection tokens.** The module-level token is a string
    (`'CQRS_TRANSACTIONAL_OPTIONS'`); the handler-wrapper-level one is a
-   `Symbol`. `CqrsTransactionalModule.forRoot` builds the wrapper via
-   `useFactory`, passing the resolved options directly — it does not
-   wire the Symbol token. If you instantiate `CqrsHandlerWrapper`
+   `Symbol`. `CqrsTransactionalModule` binds the Symbol to the string
+   token with `useExisting`. If you instantiate `CqrsHandlerWrapper`
    outside the module, provide the Symbol token yourself.
 
 8. **`WRAPPED_MARKER` is shared via `Symbol.for('@nestjs-transactional/wrapped')`.**
@@ -197,9 +198,10 @@ is preserved as a stub; subsequent numbers do not shift.
     tier). The in-memory dispatcher consumes from cqrs's
     `EventBus.publish` / `AggregateRoot.commit()` paths; the outbox
     consumes from `OutboxEventPublisher.publish`. To bridge: either
-    emit through cqrs (which `HybridEventPublisher` fans to both paths
-    when both are wired), or use `@IntegrationEventsHandler` (outbox-
-    routed when `OutboxModule` binds the registrar).
+    emit through cqrs (whose `EventBus` publisher fans an `@Externalized`
+    event to both paths when both are wired), or handle the outbox
+    message with `@OnOutboxMessage` (3.0.0; `@IntegrationEventsHandler`
+    is in-memory only since ADR-023).
 
 17. **Subpath imports require `module: Node16` + `moduleResolution:
     Node16` + `isolatedModules: true` in the consuming `tsconfig`**
@@ -247,8 +249,11 @@ is preserved as a stub; subsequent numbers do not shift.
     Canonical empty-stub form in
     `examples/e-commerce-orders/src/orders/externalized-event-stub.ts`.
 
-20. **`CqrsTransactionalModule` does NOT export `CommandBus` / `QueryBus`
-    to consumers** (surfaced in the `e-commerce-orders` example). The
+20. **(Retired at 3.0.0)** `CommandBus`, `QueryBus` and `EventBus` are
+    injectable anywhere, since the module imports the global
+    `CqrsModule.forRoot()` (ADR-024). The 2.x record follows.
+    ~~**`CqrsTransactionalModule` does NOT export `CommandBus` / `QueryBus`
+    to consumers**~~ (surfaced in the `e-commerce-orders` example). The
     module imports `CqrsModule` internally and overrides
     `EventPublisher` (Convention #6); a duplicate `CqrsModule.forRoot()`
     in the consumer would shadow the override. Consequently the module

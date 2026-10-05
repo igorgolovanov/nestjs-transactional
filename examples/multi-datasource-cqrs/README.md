@@ -128,9 +128,9 @@ semantics) — same pattern as
 
 - **Do NOT import `CqrsModule` directly alongside
   `CqrsTransactionalModule.forRoot()`.** The transactional module
-  imports `CqrsModule` internally and overrides the `EventPublisher`
-  DI token; a duplicate import shadows the override and aggregate
-  events bypass the dispatcher
+  imports `CqrsModule.forRoot()` itself, with its publisher in the
+  `EventBus`; a second import creates a second `EventBus`, and
+  bootstrap fails
   ([docs/status/conventions.md](../../docs/status/conventions.md) #6).
 - **Listeners that subscribe to events from a non-default DS MUST
   pass `dataSource` explicitly.** Without it the dispatcher attaches

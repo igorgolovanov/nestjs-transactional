@@ -18,10 +18,9 @@ import { PlaceReservationHandler } from './place-reservation.handler.js';
  * transaction by reading the listener's `dataSource` decorator option.
  *
  * Important: do NOT import `@nestjs/cqrs`'s `CqrsModule` directly.
- * `CqrsTransactionalModule` imports it internally and overrides the
- * `EventPublisher` DI token; a duplicate import shadows the override
- * and aggregate events bypass the dispatcher
- * (`docs/status/conventions.md` #6).
+ * `CqrsTransactionalModule` imports `CqrsModule.forRoot()` itself, with
+ * its publisher in the `EventBus`; a second import creates a second
+ * `EventBus` and bootstrap fails (`docs/status/conventions.md` #6).
  */
 @Module({
   imports: [

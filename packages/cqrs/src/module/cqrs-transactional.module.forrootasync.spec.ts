@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { jest } from '@jest/globals';
-import { type DynamicModule, Injectable, Logger, Module, type Provider } from '@nestjs/common';
-import { EventPublisher } from '@nestjs/cqrs';
+import { type DynamicModule, Injectable, Logger, Module } from '@nestjs/common';
+import { CqrsModule, EventBus } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
 import {
   TransactionalModule,
@@ -12,7 +12,7 @@ import {
 } from '@nestjs-transactional/core';
 
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
-import { HybridEventPublisher } from '../event-publisher/hybrid-event-publisher.js';
+import { TransactionalEventBusPublisher } from '../event-publisher/transactional-event-bus-publisher.js';
 import { CqrsHandlerWrapper, type HandlerWrapperOptions } from '../handlers/handler-wrapper.js';
 
 import {
@@ -134,44 +134,43 @@ describe('CqrsTransactionalModule.forRootAsync', () => {
     expect(options.wrapQueryHandlers).toBe(false);
   });
 
-  describe('useTransactionalEventPublisher', () => {
-    // Structural, so it stays on the options object rather than the
-    // factory result: it decides whether the `EventPublisher` override
-    // provider exists at all, and NestJS needs provider tokens at
-    // module-build time (same constraint as convention #21).
-    //
-    // Asserted on the DynamicModule the call returns, not via
-    // `module.get(EventPublisher)`. A non-strict `get` from the root
-    // scope finds `CqrsModule`'s own `EventPublisher` rather than the
-    // override — the override reaches consumers through this module's
-    // `exports`, which is also why a duplicate `CqrsModule` import
-    // shadows it (convention #6). Behavioural coverage of the override
-    // lives in the E2E spec.
+  describe('structural options', () => {
+    // `cqrs` and `eventPublisher` shape the module, so they sit beside
+    // the factory rather than in its result (convention #21).
 
-    function publisherProviderOf(built: DynamicModule): Provider | undefined {
-      return built.providers?.find(
-        (p): p is Provider =>
-          typeof p === 'object' && 'provide' in p && p.provide === EventPublisher,
+    function cqrsModuleOf(built: DynamicModule): DynamicModule | undefined {
+      return built.imports?.find(
+        (i): i is DynamicModule =>
+          typeof i === 'object' && 'module' in i && i.module === CqrsModule,
       );
     }
 
-    it('registers and exports the override by default', () => {
-      const built = CqrsTransactionalModule.forRootAsync({ useFactory: () => ({}) });
-
-      expect(publisherProviderOf(built)).toBeDefined();
-      expect(built.exports).toContain(EventPublisher);
-      expect(built.exports).toContain(HybridEventPublisher);
-    });
-
-    it('registers neither when disabled', () => {
+    it('imports CqrsModule.forRoot() with the transactional publisher and the cqrs options', () => {
       const built = CqrsTransactionalModule.forRootAsync({
-        useTransactionalEventPublisher: false,
+        cqrs: { rethrowUnhandled: true },
         useFactory: () => ({}),
       });
 
-      expect(publisherProviderOf(built)).toBeUndefined();
-      expect(built.exports).not.toContain(EventPublisher);
-      expect(built.exports).toContain(TransactionalEventDispatcher);
+      const options = (cqrsModuleOf(built)?.providers?.[0] as { useValue?: unknown }).useValue;
+      expect(options).toMatchObject({ rethrowUnhandled: true });
+      expect((options as { eventPublisher?: unknown }).eventPublisher).toBeInstanceOf(
+        TransactionalEventBusPublisher,
+      );
+    });
+
+    it('hands events on to the eventPublisher option', async () => {
+      const published: unknown[] = [];
+      const built = await build([
+        CqrsTransactionalModule.forRootAsync({
+          eventPublisher: { publish: (event) => void published.push(event) },
+          useFactory: () => ({}),
+        }),
+      ]);
+
+      const event = { name: 'e' };
+      await built.get(EventBus).publish(event);
+
+      expect(published).toEqual([event]);
     });
 
     it('matches what forRoot produces', () => {
