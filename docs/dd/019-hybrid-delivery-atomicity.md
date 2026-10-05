@@ -1,5 +1,7 @@
 # DD-019: Atomicity unit and execution order for hybrid delivery
 
+> **Superseded from 3.0.0** by [ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 **Context**: A single event may have local handlers
 (`@TransactionalEventsHandler` / `@OutboxEventsHandler` /
 `@IntegrationEventsHandler`) AND an `@Externalized` mapping. We must

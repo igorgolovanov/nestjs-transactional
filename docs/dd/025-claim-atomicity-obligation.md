@@ -1,5 +1,7 @@
 # DD-025: The claim carries the concurrency guarantee, not the poll
 
+> **Superseded from 3.0.0** by [ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 **Context**: [ADR-007](../adr/007-outbox-architecture.md) declared, in
 its `SPI contract` appendix, that production
 `findReadyForProcessing` implementations "must use

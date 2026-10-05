@@ -1,5 +1,7 @@
 # DD-016: Implement event externalization
 
+> **Superseded from 3.0.0** by [ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 **Context**: Spring Modulith provides `@Externalized` for routing events
 to external message brokers (Kafka, RabbitMQ, JMS, AMQP, ...). Our
 existing scope (Phases 5–9) covers internal eventing through the outbox

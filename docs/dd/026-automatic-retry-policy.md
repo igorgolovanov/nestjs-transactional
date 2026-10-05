@@ -1,5 +1,7 @@
 # DD-026: Automatic retry is an opt-in scheduler, not a new lifecycle state
 
+> **Superseded from 3.0.0** by [ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 **Context**: A publication that fails has, until now, exactly one route
 back: an operator calls `FailedEventPublications.resubmit(...)`. There is
 no backoff, and nothing consumes `completionAttempts` automatically — a

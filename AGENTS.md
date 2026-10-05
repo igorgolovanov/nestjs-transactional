@@ -123,6 +123,7 @@ the Design Decisions list below.
 - **ADR-020**: Prototype-level wrapping for CQRS handlers — [`docs/adr/020-prototype-level-cqrs-wrapping.md`](docs/adr/020-prototype-level-cqrs-wrapping.md)
 - **ADR-021**: What `ClientProxy.emit()` acknowledges, per transport — [`docs/adr/021-externalization-acknowledgement-per-transport.md`](docs/adr/021-externalization-acknowledgement-per-transport.md)
 - **ADR-022**: ESM-only packaging, and the 2.0.0 that comes with it — [`docs/adr/022-esm-only-packaging.md`](docs/adr/022-esm-only-packaging.md)
+- **ADR-023**: Delegate outbox delivery to `@nestjs/outbox`, keep the programming model - [`docs/adr/023-delegate-delivery-to-nestjs-outbox.md`](docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
 
 Superseded / Skipped (number reserved, not reused):
 
@@ -171,6 +172,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-025](docs/dd/025-claim-atomicity-obligation.md) — The claim carries the concurrency guarantee, not the poll
 - [DD-026](docs/dd/026-automatic-retry-policy.md) — Automatic retry is an opt-in scheduler, not a new lifecycle state
 - [DD-027](docs/dd/027-readonly-and-timeout-semantics.md) — `readOnly` honoured per dialect; `timeout` stays an extension point
+- [DD-028](docs/dd/028-outbox-bridge-contract.md) - The outbox bridge contract
 
 ## DO NOT cheat-sheet
 
