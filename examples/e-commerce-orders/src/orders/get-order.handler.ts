@@ -19,7 +19,7 @@ export class GetOrderQuery {
  * AFTER_COMMIT projections — see `basic-cqrs` for the projection
  * style on a smaller scale.
  *
- * `CqrsTransactionalModule` auto-wraps query handlers as readonly
+ * `TransactionalCqrsModule` auto-wraps query handlers as readonly
  * (Convention #14 carry-over); the actual lookup runs autocommit.
  */
 @QueryHandler(GetOrderQuery)

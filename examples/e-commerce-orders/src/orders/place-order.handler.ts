@@ -17,8 +17,8 @@ export class PlaceOrderCommand {
 
 /**
  * Saga entry point. `@Transactional()` opens the transaction;
- * `aggregate.commit()` routes `OrderPlacedEvent` through
- * `HybridEventPublisher`, which hands it to the in-memory dispatcher
+ * `aggregate.commit()` publishes `OrderPlacedEvent` on the `EventBus`,
+ * whose transactional publisher hands it to the in-memory dispatcher
  * and, because it is `@Externalized`, adds it to the outbox in the same
  * transaction as the order row.
  *

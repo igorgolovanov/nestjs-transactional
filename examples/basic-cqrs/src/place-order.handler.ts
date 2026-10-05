@@ -16,9 +16,9 @@ export class PlaceOrderCommand {
  * `execute()` is decorated with `@Transactional()`, so the entire
  * command runs in a transaction.
  *
- * `EventPublisher.mergeObjectContext` retargets `aggregate.commit()`
- * through `TransactionalEventPublisher` — buffered events become
- * AFTER_COMMIT hooks instead of an immediate dispatch.
+ * `EventPublisher.mergeObjectContext` makes `aggregate.commit()` publish
+ * on the `EventBus`, whose transactional publisher turns each event into
+ * an AFTER_COMMIT hook for `@TransactionalEventsHandler` listeners.
  */
 @CommandHandler(PlaceOrderCommand)
 export class PlaceOrderHandler implements ICommandHandler<PlaceOrderCommand, void> {

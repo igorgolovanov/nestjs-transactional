@@ -9,7 +9,7 @@ import {
   toKafkaPacket,
   TransactionalOutboxModule,
 } from '@nestjs-transactional/outbox';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
 import { KAFKA_CLIENT, RABBITMQ_CLIENT, REDIS_CLIENT } from './clients.js';
@@ -102,7 +102,7 @@ export class AppModule {
         TypeOrmModule.forFeature([OrderEntity]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
 
         OutboxModule.forRoot({
           imports: [clients],

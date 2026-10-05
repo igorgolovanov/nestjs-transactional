@@ -111,7 +111,7 @@ pnpm add @nestjs-transactional/core @nestjs-transactional/typeorm
     }),
 
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
   ],
 })
 export class AppModule {}

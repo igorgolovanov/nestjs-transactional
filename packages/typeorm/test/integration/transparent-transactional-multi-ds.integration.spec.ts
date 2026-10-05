@@ -9,7 +9,7 @@ import {
 } from '@nestjs-transactional/core';
 import { Column, DataSource, Entity, PrimaryGeneratedColumn, Repository } from 'typeorm';
 
-import { TypeOrmTransactionalModule } from '../../src/module/typeorm-transactional.module.js';
+import { TransactionalTypeOrmModule } from '../../src/module/transactional-typeorm.module.js';
 import {
   createAdditionalDatabase,
   type PostgresTestContext,
@@ -181,7 +181,7 @@ describe('Transparent transactional repositories — multi-DS', () => {
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
     await ctx.dataSource.getRepository(Order).clear();
     await billingDs.getRepository(Invoice).clear();
 
@@ -203,8 +203,8 @@ describe('Transparent transactional repositories — multi-DS', () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ]) as any,
         TransactionalModule.forRoot({ isGlobal: true }),
-        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-        TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
+        TransactionalTypeOrmModule.forRoot({ isDefault: true }),
+        TransactionalTypeOrmModule.forRoot({ dataSource: 'billing' }),
       ],
       providers: [OrderService, InvoiceService, CrossDsService],
     }).compile();

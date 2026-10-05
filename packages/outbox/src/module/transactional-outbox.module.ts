@@ -9,7 +9,8 @@ import { OUTBOX_PUBLICATION_SCHEDULER, TRANSACTIONAL_OUTBOX_OPTIONS } from './to
 
 /**
  * Binds {@link OutboxEventPublisher} to `@nestjs/outbox`, and to the cqrs
- * `HybridEventPublisher` so `AggregateRoot.commit()` reaches the outbox.
+ * `TransactionalEventBusPublisher` so events published on the cqrs
+ * `EventBus`, `AggregateRoot.commit()` included, reach the outbox.
  *
  * `OutboxModule` and its store are configured as `@nestjs/outbox`
  * documents them; this module adds only the transactional side.

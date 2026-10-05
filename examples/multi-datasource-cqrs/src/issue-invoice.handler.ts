@@ -20,9 +20,9 @@ export class IssueInvoiceCommand {
  * transaction; `aggregate.commit()` enqueues the event as an
  * AFTER_COMMIT hook on THAT transaction (Category B).
  *
- * `EventPublisher.mergeObjectContext` retargets `aggregate.commit()`
- * through `TransactionalEventPublisher` — events become hooks instead
- * of immediate dispatches.
+ * `EventPublisher.mergeObjectContext` makes `aggregate.commit()` publish
+ * on the `EventBus`, whose transactional publisher turns each event
+ * into a hook on this transaction for phase-aware listeners.
  */
 @CommandHandler(IssueInvoiceCommand)
 export class IssueInvoiceHandler implements ICommandHandler<IssueInvoiceCommand, void> {

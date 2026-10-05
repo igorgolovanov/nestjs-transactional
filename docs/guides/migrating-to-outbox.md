@@ -38,7 +38,7 @@ Upgrading an application from 2.x, which had its own outbox engine? See
 - `@Transactional` and everything about it: propagation, isolation, the
   transparent repositories.
 - `@TransactionalEventsHandler` for handlers that should stay in memory.
-- `AggregateRoot.commit()` and `HybridEventPublisher`.
+- `AggregateRoot.commit()`, which publishes through the `EventBus`.
 
 ## Step 1 — install
 
@@ -57,7 +57,7 @@ import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
   imports: [
     TypeOrmModule.forRoot({ type: 'postgres' /* ... */ }),
     TransactionalModule.forRoot({ isGlobal: true }),
-    TypeOrmTransactionalModule.forRoot(),
+    TransactionalTypeOrmModule.forRoot(),
 
     OutboxModule.forRoot(),
     TransactionalOutboxModule.forRoot(),

@@ -7,7 +7,7 @@ import { type OutboxEnvelope, OutboxRelay } from '@nestjs/outbox';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { of } from 'rxjs';
 import type { DataSource } from 'typeorm';
@@ -52,7 +52,7 @@ describe('externalization-multi-broker (Postgres real, three ClientProxy recorde
 
   beforeAll(async () => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
 
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
 

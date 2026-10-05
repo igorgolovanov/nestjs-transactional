@@ -29,7 +29,7 @@ nestjs-transactional-monorepo/
 │   │   │   ├── adapter/                   # TypeOrmTransactionAdapter
 │   │   │   ├── helpers/                   # getCurrentEntityManager, isInTransaction
 │   │   │   ├── patches/                   # transparent-repository prototype patches
-│   │   │   ├── module/                    # TypeOrmTransactionalModule
+│   │   │   ├── module/                    # TransactionalTypeOrmModule
 │   │   │   └── index.ts
 │   │   └── test/                          # unit + integration (testcontainers)
 │   │
@@ -39,9 +39,9 @@ nestjs-transactional-monorepo/
 │   │   │   ├── interfaces/                # ITransactionalEventHandler, IIntegrationEventHandler
 │   │   │   ├── types/                     # TransactionPhase
 │   │   │   ├── event-dispatcher/          # TransactionalEventDispatcher
-│   │   │   ├── event-publisher/           # TransactionalEventPublisher + HybridEventPublisher
+│   │   │   ├── event-publisher/           # TransactionalEventBusPublisher, CqrsEventBusBinding
 │   │   │   ├── handlers/                  # CqrsHandlerWrapper, scanners
-│   │   │   ├── module/                    # CqrsTransactionalModule
+│   │   │   ├── module/                    # TransactionalCqrsModule
 │   │   │   └── index.ts
 │   │
 │   └── outbox/                            # @nestjs-transactional/outbox: bridge onto @nestjs/outbox

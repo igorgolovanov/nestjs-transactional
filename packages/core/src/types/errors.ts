@@ -48,7 +48,7 @@ export class TransactionAdapterNotFoundError extends TransactionError {
     super(
       `Transaction adapter not found: ${adapterName}:${instanceName}. ` +
         `Did you register it via the corresponding transactional module ` +
-        `(e.g. TypeOrmTransactionalModule.forFeature())?`,
+        `(e.g. TransactionalTypeOrmModule.forFeature())?`,
     );
     this.adapterName = adapterName;
     this.instanceName = instanceName;

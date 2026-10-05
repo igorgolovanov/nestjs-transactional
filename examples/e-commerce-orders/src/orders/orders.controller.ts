@@ -1,8 +1,9 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import type { OrderResponseDto, PlaceOrderRequestDto } from '../shared/dtos.js';
-import { GetOrderHandler, GetOrderQuery } from './get-order.handler.js';
-import { PlaceOrderCommand, PlaceOrderHandler } from './place-order.handler.js';
+import { GetOrderQuery } from './get-order.handler.js';
+import { PlaceOrderCommand } from './place-order.handler.js';
 
 /**
  * REST surface — the production-realism bit Tier 5 introduces over
@@ -10,23 +11,15 @@ import { PlaceOrderCommand, PlaceOrderHandler } from './place-order.handler.js';
  * the items array shape) so the example stays focused on the
  * transactional / saga / outbox / externalization mechanics.
  *
- * **Why inject handlers directly instead of `CommandBus`/`QueryBus`?**
- * Convention #6 forbids importing `@nestjs/cqrs`'s `CqrsModule`
- * alongside `CqrsTransactionalModule` at the same module level —
- * the duplicate `CqrsModule` shadows the `EventPublisher` override
- * and aggregate events bypass the dispatcher. `CommandBus` and
- * `QueryBus` are exported by `CqrsModule` (not by
- * `CqrsTransactionalModule`); without bringing `CqrsModule` into
- * scope, they aren't visible to `OrdersController`. Direct handler
- * injection sidesteps the trade-off — the controller stays thin
- * and the cqrs decorators (`@CommandHandler`, `@QueryHandler`) still
- * apply for handler-bootstrap wrapping by `CqrsTransactionalModule`.
+ * Commands and queries go through `CommandBus` and `QueryBus`, which
+ * `TransactionalCqrsModule` makes injectable everywhere: it imports the
+ * global `CqrsModule.forRoot()` itself (convention #6).
  */
 @Controller('orders')
 export class OrdersController {
   constructor(
-    private readonly placeOrderHandler: PlaceOrderHandler,
-    private readonly getOrderHandler: GetOrderHandler,
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
   ) {}
 
   @Post()
@@ -49,7 +42,7 @@ export class OrdersController {
       }
     }
 
-    const orderId = await this.placeOrderHandler.execute(
+    const orderId = await this.commandBus.execute<PlaceOrderCommand, string>(
       new PlaceOrderCommand(body.customerId, body.items),
     );
     return { orderId };
@@ -57,6 +50,6 @@ export class OrdersController {
 
   @Get(':id')
   async getOrder(@Param('id') id: string): Promise<OrderResponseDto> {
-    return this.getOrderHandler.execute(new GetOrderQuery(id));
+    return this.queryBus.execute<GetOrderQuery, OrderResponseDto>(new GetOrderQuery(id));
   }
 }

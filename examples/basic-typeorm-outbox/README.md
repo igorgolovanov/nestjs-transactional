@@ -68,7 +68,7 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=post
 - [`src/shipping.handler.ts`](src/shipping.handler.ts) —
   `@OnOutboxMessage('OrderPlacedEvent', { consumer: 'shipping.create-shipment' })`.
 - [`src/app.module.ts`](src/app.module.ts) — wiring:
-  `TypeOrmModule`, `TransactionalModule`, `TypeOrmTransactionalModule`,
+  `TypeOrmModule`, `TransactionalModule`, `TransactionalTypeOrmModule`,
   `@nestjs/outbox`'s `OutboxModule` with a `PostgresOutboxStore` on
   `fromTypeOrm(dataSource)`, and `TransactionalOutboxModule`.
 - [`test/order.service.integration.spec.ts`](test/order.service.integration.spec.ts)

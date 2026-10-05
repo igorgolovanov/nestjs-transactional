@@ -24,9 +24,9 @@ type TypeOrmIsolationLevel =
  * SQL for nested transactions through the transactional
  * {@link EntityManager}.
  *
- * Only `isolation` from {@link TransactionOptions} is forwarded today.
- * `readOnly` and `timeout` are accepted for forward compatibility but do
- * not yet map to per-dialect statements.
+ * `isolation` is forwarded to `DataSource.transaction`. `readOnly` becomes
+ * `SET TRANSACTION READ ONLY` on Postgres-family dialects and is ignored
+ * elsewhere. `timeout` is accepted and not implemented (DD-027).
  *
  * `PropagationMode.NESTED` needs savepoints, so `runInSavepoint` first
  * checks the driver's own capability flag and rejects with
@@ -54,6 +54,20 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
    */
   get dataSourceName(): string {
     return this.instanceName;
+  }
+
+  /** The DataSource's driver type, e.g. `'postgres'`. */
+  get dialect(): string {
+    return this.dataSource.options.type;
+  }
+
+  /**
+   * The transactional `EntityManager`: what `DataSource.transaction()`
+   * hands its callback, and what `@nestjs/store-kit`'s `fromTypeOrm`
+   * executor accepts as a transaction.
+   */
+  nativeTransaction(handle: TypeOrmTransactionHandle): EntityManager {
+    return handle.entityManager;
   }
 
   async runInTransaction<T>(
@@ -158,7 +172,7 @@ const READ_ONLY_DIALECTS: ReadonlySet<string> = new Set([
  * Ask the database to reject writes for the remainder of this
  * transaction, on the dialects that can do it.
  *
- * A silent no-op elsewhere, deliberately: `CqrsTransactionalModule`
+ * A silent no-op elsewhere, deliberately: `TransactionalCqrsModule`
  * defaults every query handler to `readOnly: true`, so throwing here
  * would break consumers on MySQL or SQLite over an option they never
  * set. `readOnly` is a hint in Spring too — honoured where possible

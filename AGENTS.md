@@ -16,8 +16,11 @@ growing set of npm packages organised by concern.
   `@nestjs/typeorm`.
 - **@nestjs-transactional/cqrs** — integration with `@nestjs/cqrs`: runtime
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
-  `@TransactionalEventsHandler` with Spring-like phases, `HybridEventPublisher`
-  + `@IntegrationEventsHandler`, EventPublisher override for AggregateRoot.
+  `@TransactionalEventsHandler` with Spring-like phases,
+  `@IntegrationEventsHandler`, and `TransactionalEventBusPublisher` in the
+  `EventBus`'s publisher chain, so every event schedules its phases and
+  carries `{ transaction }` to wrapping publishers such as
+  `@nestjs/workflows`' (ADR-024, DD-029).
 - **@nestjs-transactional/outbox** — bridge onto the first-party
   `@nestjs/outbox` (ADR-023, DD-028): `OutboxEventPublisher` adds a
   message inside the transaction `@Transactional` opened,
@@ -56,16 +59,17 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
 - **Language**: TypeScript 5.5+ in strict mode, `module` /
   `moduleResolution` set to `NodeNext` (not `Node16`, which models the
   semantics that predate `require(esm)`)
-- **Core peer deps**: `@nestjs/common ^10.0.0 || ^11.0.0 || ^12.0.0`,
-  `@nestjs/core ^10.0.0 || ^11.0.0 || ^12.0.0`, `reflect-metadata`,
+- **Core peer deps**: `@nestjs/common ^11.0.0 || ^12.0.0`,
+  `@nestjs/core ^11.0.0 || ^12.0.0`, `reflect-metadata`,
   `rxjs ^7.0.0`
 - **TypeORM peer**: `typeorm ^0.3.0 || ^1.0.0`,
-  `@nestjs/typeorm ^10.0.0 || ^11.0.0 || ^12.0.0`. Development happens
+  `@nestjs/typeorm ^11.0.0 || ^12.0.0`. Development happens
   against `1.1.0` (what the lockfile pins); CI additionally forces
   `0.3.31` and `1.0.0` via `pnpm.overrides`
-- **CQRS peer**: `@nestjs/cqrs ^11.0.0 || ^12.0.0`
-- **Outbox peer**: `@nestjs/outbox ~0.1.0` (pre-1.0, pinned), with
-  `@nestjs/common` / `@nestjs/core` `^11.0.0 || ^12.0.0` for that package
+- **CQRS peer**: `@nestjs/cqrs ^11.0.0 || ^12.0.0`. Development happens
+  against NestJS 12 and `@nestjs/cqrs` 12.1 (the lockfile); the CI
+  `nest-11` job forces NestJS 11 and `@nestjs/cqrs` 11.0.3
+- **Outbox peer**: `@nestjs/outbox ~0.1.0` (pre-1.0, pinned)
 - **Package manager**: pnpm workspaces
 - **Build**: tsc with project references (no bundler — pure TypeScript)
 - **Test runner**: Jest + ts-jest, in ESM mode — see CONTRIBUTING,
@@ -123,6 +127,7 @@ the Design Decisions list below.
 - **ADR-021**: What `ClientProxy.emit()` acknowledges, per transport — [`docs/adr/021-externalization-acknowledgement-per-transport.md`](docs/adr/021-externalization-acknowledgement-per-transport.md)
 - **ADR-022**: ESM-only packaging, and the 2.0.0 that comes with it — [`docs/adr/022-esm-only-packaging.md`](docs/adr/022-esm-only-packaging.md)
 - **ADR-023**: Delegate outbox delivery to `@nestjs/outbox`, keep the programming model - [`docs/adr/023-delegate-delivery-to-nestjs-outbox.md`](docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
+- **ADR-024**: Aggregate events go through the `@nestjs/cqrs` EventBus - [`docs/adr/024-cqrs-events-through-the-event-bus.md`](docs/adr/024-cqrs-events-through-the-event-bus.md)
 
 Superseded / Skipped (number reserved, not reused):
 
@@ -172,6 +177,8 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-026](docs/dd/026-automatic-retry-policy.md) — Automatic retry is an opt-in scheduler, not a new lifecycle state
 - [DD-027](docs/dd/027-readonly-and-timeout-semantics.md) — `readOnly` honoured per dialect; `timeout` stays an extension point
 - [DD-028](docs/dd/028-outbox-bridge-contract.md) - The outbox bridge contract
+- [DD-029](docs/dd/029-cqrs-publisher-chain-contract.md) - The cqrs publisher chain contract
+- [DD-030](docs/dd/030-transactional-first-names.md) - Public names lead with `Transactional`
 
 ## DO NOT cheat-sheet
 
@@ -207,7 +214,7 @@ The most-violated rules. Full coding conventions in
   `OutboxMicroservicesModule`** — reuse the user's existing
   `ClientsModule` registration via `defaultClient` (DD-017).
 - **DO NOT import `CqrsModule` directly alongside
-  `CqrsTransactionalModule.forRoot()`** — the override of
+  `TransactionalCqrsModule.forRoot()`** — the override of
   `EventPublisher` gets shadowed; aggregate events bypass the
   dispatcher. See `docs/status/conventions.md` Convention #6.
 
@@ -271,7 +278,11 @@ becomes a bridge that adds messages inside the transaction
 `@Transactional` opened (DD-028), `outbox-typeorm` and
 `outbox-microservices` are discontinued, local durable handlers move to
 `@OnOutboxMessage`, the wire format becomes `@nestjs/outbox`'s
-envelope, and the outbox lives in one DataSource. The cohort is four
+envelope, and the outbox lives in one DataSource. In the same major,
+cqrs events go through the `@nestjs/cqrs` `EventBus` (ADR-024, DD-029),
+so `@nestjs/cqrs` 12.1's `commit(context)` and `@nestjs/workflows`'
+`@StartOn` / `@SignalOn` work inside `@Transactional`, and NestJS 10
+leaves the peer ranges. The cohort is four
 packages —
 `@nestjs-transactional/{core,typeorm,cqrs,outbox}` — versioned as one
 (`fixed`): see CONTRIBUTING, "One version for all four". Upgrading is in
@@ -291,9 +302,10 @@ up as a reviewable diff.
 
 ### Blocked / Awaiting
 
-- **The `3.0.0` release itself.** The major changeset is on
-  `feat/delegate-outbox`; after it merges, what remains is the normal
-  flow — merge the "Version Packages" PR and `release.yml` publishes
+- **The `3.0.0` release itself.** The major changeset is on `main`.
+  The "Version Packages" PR waits for the cqrs change of ADR-024
+  (`feat/cqrs-event-bus`) to merge; after that, what remains is the
+  normal flow: merge the "Version Packages" PR and `release.yml` publishes
   under `latest`. Then, by hand: `npm deprecate` the two discontinued
   packages with a pointer to `docs/guides/migrating-to-3.md`, and move
   SECURITY.md's supported-versions table and the README status line to
@@ -338,6 +350,20 @@ up as a reviewable diff.
 
 ### Five most recent decisions
 
+- cqrs events go through the `@nestjs/cqrs` `EventBus`
+  ([ADR-024](docs/adr/024-cqrs-events-through-the-event-bus.md),
+  [DD-029](docs/dd/029-cqrs-publisher-chain-contract.md)). Checked
+  against `@nestjs/cqrs` 12.1 and `@nestjs/workflows` 0.0.1, the old
+  `EventPublisher` override lost `commit(context)`, kept aggregate events
+  away from `@EventsHandler`s, sagas and `WorkflowsCqrsModule`, and
+  skipped phases for direct `eventBus.publish`. Now our publisher sits in
+  the bus's chain, and the bus's own `publish` puts the native
+  transaction into the dispatcher context and makes COMMIT wait for
+  whatever a wrapping publisher started. The transaction comes from a
+  new optional adapter SPI method, `nativeTransaction`, which the outbox
+  bridge now uses too. `@EventsHandler` keeps stock timing, at once and
+  inside the transaction. The CI gained a NestJS 11 / `@nestjs/cqrs` 11
+  job, and the lockfile moved to NestJS 12.
 - Outbox delivery delegated to `@nestjs/outbox`
   ([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md),
   [DD-028](docs/dd/028-outbox-bridge-contract.md)) after a side-by-side
@@ -357,7 +383,7 @@ up as a reviewable diff.
   and its first three iterations. **Docs accuracy**: `readOnly` /
   `timeout` documented as unimplemented (item A1 stopgap; the
   implement-or-deprecate DD is still open), the
-  `CqrsTransactionalModule` `@example` no longer violates
+  `TransactionalCqrsModule` `@example` no longer violates
   convention #6 or calls a non-existent `forFeature`, and the
   `FOR UPDATE SKIP LOCKED` claim was corrected everywhere —
   [DD-025](docs/dd/025-claim-atomicity-obligation.md) relocates the
@@ -417,7 +443,7 @@ up as a reviewable diff.
   inline body and Revision-history bullet dates avoided in favour
   of phase anchors.
 - Framework fix landed for Convention #22 (follow-up to Phase 14.8e
-  closure) — `TypeOrmTransactionalModule.forRootAsync` registration
+  closure) — `TransactionalTypeOrmModule.forRootAsync` registration
   moved from a `useFactory` provider to an `OnModuleInit`-driven
   `@Injectable()` class generated per `forRootAsync` call. Root
   cause was `markAsManaged(undefined)` cascading from
@@ -435,11 +461,11 @@ up as a reviewable diff.
   indirection for `@Transactional` inside `@IntegrationEventsHandler`;
   #19 `@Externalized` events still need a local
   `@OutboxEventsHandler` to materialise a publication;
-  #20 `CqrsTransactionalModule` does not export `CommandBus` /
+  #20 `TransactionalCqrsModule` does not export `CommandBus` /
   `QueryBus` (controllers inject handlers directly);
   #21 `OutboxModule.forRootAsync({ repository })` lives on options,
   not on the async factory result; #22 historical record of the
-  `TypeOrmTransactionalModule.forRootAsync` bug (now fixed — see
+  `TransactionalTypeOrmModule.forRootAsync` bug (now fixed — see
   decision above); #23 dotenv refuses to overwrite `process.env`
   (snapshot/restore between tests); #24 user-side
   `OutboxDrainService` complement to the then-synchronous

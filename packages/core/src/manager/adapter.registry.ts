@@ -168,7 +168,7 @@ export class AdapterRegistry {
     if (this.defaultAdapterName === null) {
       throw new IllegalTransactionStateError(
         'No default adapter registered. Register at least one adapter via ' +
-          'TypeOrmTransactionalModule.forFeature() or the corresponding ' +
+          'TransactionalTypeOrmModule.forFeature() or the corresponding ' +
           'transactional module for your ORM.',
       );
     }

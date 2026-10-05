@@ -4,7 +4,7 @@ import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
 import { CompensationHandler } from './compensation.handler.js';
@@ -68,7 +68,7 @@ export class AppModule {
 
         // ----- Process-wide transactional infrastructure -----
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+        TransactionalTypeOrmModule.forRoot({ isDefault: true }),
 
         // ----- Outbox -----
         // Aggressive polling so the visual demo finishes in a couple of

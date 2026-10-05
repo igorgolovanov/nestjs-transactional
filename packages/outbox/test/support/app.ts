@@ -11,7 +11,7 @@ import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { PropagationMode, Transactional, TransactionalModule } from '@nestjs-transactional/core';
-import { getCurrentEntityManager, TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { getCurrentEntityManager, TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
 
@@ -161,7 +161,7 @@ export async function buildApp(
   transportOptions?: ClientProxyTransportOptions,
 ): Promise<TestingModule> {
   TransactionalModule.resetForTesting();
-  TypeOrmTransactionalModule.resetForTesting();
+  TransactionalTypeOrmModule.resetForTesting();
 
   @Global()
   @Module({
@@ -182,7 +182,7 @@ export async function buildApp(
         registerInterceptor: false,
         registerMethodsBootstrap: true,
       }),
-      TypeOrmTransactionalModule.forRoot({ isDefault: true }),
+      TransactionalTypeOrmModule.forRoot({ isDefault: true }),
       OutboxModule.forRoot({
         transports: { [BROKER]: ClientProxyTransport(BROKER, transportOptions) },
         route: externalizedRoute(),

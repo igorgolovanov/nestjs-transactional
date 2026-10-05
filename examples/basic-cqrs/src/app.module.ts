@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { InMemoryTransactionAdapter } from '@nestjs-transactional/core/testing';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
+import { TransactionalCqrsModule } from '@nestjs-transactional/cqrs';
 
 import { GetNotifiedOrdersHandler } from './get-notified-orders.query.js';
 import { NotificationHandler } from './notification.handler.js';
@@ -13,10 +13,9 @@ import { PlaceOrderHandler } from './place-order.handler.js';
  * lifecycle, not persistence.
  *
  * Important: do NOT import `@nestjs/cqrs`'s `CqrsModule` directly.
- * `CqrsTransactionalModule` imports it internally and overrides the
- * `EventPublisher` DI token; a duplicate import shadows the override
- * and aggregate events bypass the dispatcher
- * (`docs/status/conventions.md` #6).
+ * `TransactionalCqrsModule` imports `CqrsModule.forRoot()` itself, with
+ * its publisher in the `EventBus`; a second import creates a second
+ * `EventBus` and bootstrap fails (`docs/status/conventions.md` #6).
  */
 @Module({
   imports: [
@@ -25,7 +24,7 @@ import { PlaceOrderHandler } from './place-order.handler.js';
       isGlobal: true,
       registerInterceptor: false,
     }),
-    CqrsTransactionalModule.forRoot(),
+    TransactionalCqrsModule.forRoot(),
   ],
   providers: [PlaceOrderHandler, GetNotifiedOrdersHandler, NotificationHandler],
 })

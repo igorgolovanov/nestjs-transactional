@@ -103,7 +103,7 @@ Repository instead.
    has the same limitation (undocumented). Use the Repository
    pattern instead.
 
-Documented in `packages/typeorm/src/module/typeorm-transactional.module.ts`
+Documented in `packages/typeorm/src/module/transactional-typeorm.module.ts`
 JSDoc and surfaces in the `transparent-transactional.integration.spec.ts`
 integration test as an explicit "documented limitation" canary —
 ensures the limitation stays visible through future refactors.

@@ -148,7 +148,7 @@ is usually the package name:
 ```
 feat(core): add NESTED propagation savepoint rollback semantics
 fix(typeorm): release savepoint on happy path even if entityManager throws
-docs: update getting-started example for CqrsTransactionalModule
+docs: update getting-started example for TransactionalCqrsModule
 refactor(cqrs): extract event-type lookup into a private method
 test(core): cover REQUIRES_NEW edge cases when suspension fails
 chore: update @nestjs/common peer range to ^11
@@ -244,7 +244,7 @@ export class TransactionAdapterNotFoundError extends TransactionError {
   constructor(adapterName: string, instanceName: string) {
     super(
       `Transaction adapter not found: ${adapterName}:${instanceName}. ` +
-      `Did you register it via TypeOrmTransactionalModule.forFeature()?`
+      `Did you register it via TransactionalTypeOrmModule.forFeature()?`
     );
   }
 }

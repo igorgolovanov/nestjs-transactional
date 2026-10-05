@@ -11,7 +11,7 @@ import { DataSource } from 'typeorm';
 
 import { TypeOrmTransactionAdapter } from '../adapter/typeorm.adapter.js';
 
-import { TypeOrmTransactionalModule } from './typeorm-transactional.module.js';
+import { TransactionalTypeOrmModule } from './transactional-typeorm.module.js';
 
 async function createSqlJsDataSource(): Promise<DataSource> {
   const ds = new DataSource({
@@ -27,7 +27,7 @@ async function createSqlJsDataSource(): Promise<DataSource> {
  * In production the `getDataSourceToken(name)` provider is supplied
  * by `@nestjs/typeorm`'s `TypeOrmModule.forRoot(...)`, which
  * registers it as `@Global()` so child modules (like
- * `TypeOrmTransactionalModule`) can inject it. For these unit
+ * `TransactionalTypeOrmModule`) can inject it. For these unit
  * tests we replicate that visibility with a tiny `@Global()`
  * fixture module.
  */
@@ -47,12 +47,12 @@ function buildFakeDataSourceModule(providers: Provider[]): unknown {
  * string name, not the DataSource instance). The DataSource
  * itself is resolved via `@nestjs/typeorm`'s `getDataSourceToken`.
  */
-describe('TypeOrmTransactionalModule.forRoot', () => {
+describe('TransactionalTypeOrmModule.forRoot', () => {
   let ds: DataSource;
 
   beforeEach(async () => {
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
     ds = await createSqlJsDataSource();
   });
 
@@ -66,7 +66,7 @@ describe('TypeOrmTransactionalModule.forRoot', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         buildFakeDataSourceModule([{ provide: getDataSourceToken(), useValue: ds }]) as any,
         TransactionalModule.forRoot({ isGlobal: true }),
-        TypeOrmTransactionalModule.forRoot(),
+        TransactionalTypeOrmModule.forRoot(),
       ],
     }).compile();
     await moduleRef.init();
@@ -90,7 +90,7 @@ describe('TypeOrmTransactionalModule.forRoot', () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ]) as any,
         TransactionalModule.forRoot({ isGlobal: true }),
-        TypeOrmTransactionalModule.forRoot({ dataSource: 'custom' }),
+        TransactionalTypeOrmModule.forRoot({ dataSource: 'custom' }),
       ],
     }).compile();
     await moduleRef.init();
@@ -115,8 +115,8 @@ describe('TypeOrmTransactionalModule.forRoot', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ]) as any,
           TransactionalModule.forRoot({ isGlobal: true }),
-          TypeOrmTransactionalModule.forRoot({ dataSource: 'primary' }),
-          TypeOrmTransactionalModule.forRoot({ dataSource: 'billing', isDefault: true }),
+          TransactionalTypeOrmModule.forRoot({ dataSource: 'primary' }),
+          TransactionalTypeOrmModule.forRoot({ dataSource: 'billing', isDefault: true }),
         ],
       }).compile();
       await moduleRef.init();
@@ -138,7 +138,7 @@ describe('TypeOrmTransactionalModule.forRoot', () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ]) as any,
         TransactionalModule.forRoot({ isGlobal: true }),
-        TypeOrmTransactionalModule.forRootAsync({
+        TransactionalTypeOrmModule.forRootAsync({
           useFactory: async () => {
             await Promise.resolve();
             return { dataSource: 'async-ds', isDefault: true };

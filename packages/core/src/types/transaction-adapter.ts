@@ -72,4 +72,25 @@ export interface TransactionAdapter<THandle extends TransactionHandle = Transact
    * @returns The value resolved by `fn`.
    */
   runInSavepoint<T>(parent: THandle, fn: (handle: THandle) => Promise<T>): Promise<T>;
+
+  /**
+   * The ORM's own transaction object behind `handle`: what the ORM hands
+   * the callback of its `transaction()` method, for TypeORM the
+   * `EntityManager`. Libraries that take a transaction explicitly, such
+   * as `@nestjs/outbox`'s `outbox.add(tx, ...)` or `@nestjs/workflows`'
+   * `start(..., { transaction })`, receive this object, so they write
+   * through the transaction `@Transactional` opened.
+   *
+   * Optional: an adapter without it cannot be bridged to those
+   * libraries, and {@link TransactionManager.nativeTransactionOf} says
+   * so with an error.
+   */
+  nativeTransaction?(handle: THandle): unknown;
+
+  /**
+   * Database dialect, e.g. `'postgres'` or `'mysql'`. Optional; bridges
+   * use it to apply checks that hold for one dialect only, and skip them
+   * when it is absent.
+   */
+  readonly dialect?: string;
 }

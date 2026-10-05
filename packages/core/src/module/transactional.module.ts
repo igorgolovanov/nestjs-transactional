@@ -50,7 +50,7 @@ import type { TransactionAdapter } from '../types/transaction-adapter.js';
  * The `infrastructure-only` shorthand `TransactionalModule.forRoot({})`
  * (no adapter) is preserved for setups where the adapter is contributed
  * by an integration package's `forFeature` (e.g.
- * `TypeOrmTransactionalModule.forFeature` calls `AdapterRegistry.register`
+ * `TransactionalTypeOrmModule.forFeature` calls `AdapterRegistry.register`
  * imperatively at module-init time).
  *
  * Q5 invariants on multi-call:
@@ -74,7 +74,7 @@ export interface TransactionalModuleOptions {
    * `forRoot` calls throw. When omitted, this call only registers
    * the process-wide infrastructure — adapters are then expected
    * from an integration package (e.g.
-   * `TypeOrmTransactionalModule.forFeature`).
+   * `TransactionalTypeOrmModule.forFeature`).
    */
   readonly adapter?: TransactionAdapter;
 
@@ -251,7 +251,7 @@ export class TransactionalModule {
    * @example Infrastructure-only (TypeORM forFeature handles adapters)
    * ```ts
    * TransactionalModule.forRoot({ isGlobal: true }),
-   * TypeOrmTransactionalModule.forFeature({ dataSource }),
+   * TransactionalTypeOrmModule.forFeature({ dataSource }),
    * ```
    */
   static forRoot(options: TransactionalModuleOptions = {}): DynamicModule {

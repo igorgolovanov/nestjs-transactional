@@ -5,9 +5,9 @@ import { OrderConfirmedEvent, OrderPlacedEvent } from '../shared/events.js';
 /**
  * Order aggregate. CQRS-style — `apply()` stages events on the
  * aggregate's internal queue; `commit()` (called inside the command
- * handler) routes them through `EventPublisher` (overridden by
- * `CqrsTransactionalModule` to `HybridEventPublisher`), which fans
- * out to BOTH the in-memory dispatcher AND the outbox.
+ * handler) publishes them on the `EventBus`, whose publisher
+ * (installed by `TransactionalCqrsModule`) fans out to BOTH the
+ * in-memory dispatcher AND the outbox.
  *
  * Both apply paths (`place`, `confirm`) push exactly one event onto
  * the queue. The handler calls `aggregate.commit()` once per use

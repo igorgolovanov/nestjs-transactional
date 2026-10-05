@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { CommandBus } from '@nestjs/cqrs';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 
 import { AppModule } from '../src/app.module.js';
 import { BillingNotificationListener } from '../src/billing.listener.js';
@@ -21,7 +21,7 @@ describe('multi-datasource-cqrs (Category B)', () => {
     // Multi-`forRoot` dedup uses static class storage — reset between
     // tests when each test rebuilds the module from scratch.
     TransactionalModule.resetForTesting();
-    TypeOrmTransactionalModule.resetForTesting();
+    TransactionalTypeOrmModule.resetForTesting();
 
     module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     await module.init();

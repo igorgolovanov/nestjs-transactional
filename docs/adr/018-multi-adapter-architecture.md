@@ -274,7 +274,7 @@ sets `this.manager` as an own-property in the `DataSource`
 constructor; a prototype-level getter would be shadowed.
 
 Patches install as a side effect of importing
-`typeorm-transactional.module.ts` (idempotent install-once flags
+`transactional-typeorm.module.ts` (idempotent install-once flags
 inside each patch module). NestJS resolves providers in dependency
 order, and a `useFactory` provider that calls
 `dataSource.getRepository(Entity)` may run BEFORE

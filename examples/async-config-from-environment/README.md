@@ -1,7 +1,7 @@
 # async-config-from-environment
 
 **Tier 5 — Production realism.** Wire the stack (`TypeOrmModule`,
-`TypeOrmTransactionalModule` and `@nestjs/outbox`'s `OutboxModule`)
+`TransactionalTypeOrmModule` and `@nestjs/outbox`'s `OutboxModule`)
 through `forRootAsync` + `ConfigService`,
 backed by per-environment `.env` files and Joi validation. The
 intent is "this is the boring, correct shape for a real
@@ -28,7 +28,7 @@ This example:
    environment, with all violations reported in one pass
    (`abortEarly: false`).
 2. Replaces the configurable `forRoot` calls with `forRootAsync`
-   (`TypeOrmModule`, `TypeOrmTransactionalModule`, `OutboxModule`).
+   (`TypeOrmModule`, `TransactionalTypeOrmModule`, `OutboxModule`).
    Every factory `inject`s `ConfigService` and reads the validated env
    into typed config blocks. `TransactionalOutboxModule` has nothing to
    tune per environment and stays `forRoot()`.
@@ -57,7 +57,7 @@ plumbing, not anything in `audit/`.
        ┌───────────────────────┼───────────────────────┐
        │                       │                       │
        ▼                       ▼                       ▼
-TypeOrmModule.       TypeOrmTransactional   OutboxModule.
+TypeOrmModule.       TransactionalTypeOrm   OutboxModule.
   forRootAsync         Module.forRootAsync    forRootAsync
        │                       │                       │
        │                       │                       │  relay:
@@ -81,17 +81,17 @@ TypeOrmModule.       TypeOrmTransactional   OutboxModule.
 defines the Joi schema and a typed `ValidatedEnv` shape — keep
 both in sync as you add keys.
 
-| Key                          | Type     | Constraint            | Why per-env                              |
-|------------------------------|----------|-----------------------|------------------------------------------|
-| `PG_HOST`                    | string   | required              | dev points at localhost, prod at VPC     |
-| `PG_PORT`                    | int      | 1–65535, default 5432 |                                          |
-| `PG_USER`, `PG_PASSWORD`     | string   | required              | secrets via vault in prod, not git       |
-| `PG_DATABASE`                | string   | required              | per-env database isolation               |
-| `OUTBOX_POLLING_INTERVAL_MS` | int      | 50–60000              | dev: 100ms (snappy); prod: 2000ms (DB-friendly) |
-| `OUTBOX_BATCH_SIZE`          | int      | 1–1000                | prod batches larger to amortize cost     |
-| `OUTBOX_MAX_CONCURRENT`      | int      | 1–100                 | prod runs more handlers in parallel      |
-| `HTTP_PORT`                  | int      | 1–65535, default 3000 |                                          |
-| `NODE_ENV`                   | enum     | dev/staging/prod/test | drives `envFilePath` resolution          |
+| Key                          | Type   | Constraint            | Why per-env                                     |
+| ---------------------------- | ------ | --------------------- | ----------------------------------------------- |
+| `PG_HOST`                    | string | required              | dev points at localhost, prod at VPC            |
+| `PG_PORT`                    | int    | 1–65535, default 5432 |                                                 |
+| `PG_USER`, `PG_PASSWORD`     | string | required              | secrets via vault in prod, not git              |
+| `PG_DATABASE`                | string | required              | per-env database isolation                      |
+| `OUTBOX_POLLING_INTERVAL_MS` | int    | 50–60000              | dev: 100ms (snappy); prod: 2000ms (DB-friendly) |
+| `OUTBOX_BATCH_SIZE`          | int    | 1–1000                | prod batches larger to amortize cost            |
+| `OUTBOX_MAX_CONCURRENT`      | int    | 1–100                 | prod runs more handlers in parallel             |
+| `HTTP_PORT`                  | int    | 1–65535, default 3000 |                                                 |
+| `NODE_ENV`                   | enum   | dev/staging/prod/test | drives `envFilePath` resolution                 |
 
 ## Prerequisites
 
@@ -160,7 +160,7 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
   earlier file's values mask later files' values. The integration
   test snapshots and restores `process.env` between cases. (2) In
   production, exported shell variables override `.env` files —
-  which is *intended*, since secrets-manager-injected env should
+  which is _intended_, since secrets-manager-injected env should
   win over a committed file. Don't rely on `.env` to "reset" a
   variable that has already been set in the deployment
   environment.
@@ -178,17 +178,17 @@ NODE_ENV=development pnpm -C examples/async-config-from-environment start
   own scope — its `inject` array still requires the importing
   module to have `ConfigModule` visible. The example always
   passes `imports: [ConfigModule]` next to `inject:
-  [ConfigService]` for clarity.
+[ConfigService]` for clarity.
 - **Treating `.env.production` as the source of truth for secrets.**
   The committed `.env.production` here carries illustrative
   values (`replace-me-via-secret-manager`) — a real deployment
   fetches secrets at boot through Vault / AWS Secrets Manager /
-  Doppler / Kubernetes secrets. Joi validation enforces *shape*,
+  Doppler / Kubernetes secrets. Joi validation enforces _shape_,
   not authenticity.
 - **`ConfigModule.forRoot` is async.** Its returned Promise is what
   rejects on a schema violation, so a test must await module
   compilation: `await expect(Test.createTestingModule(...).compile())
-  .rejects.toThrow(...)`. A synchronous `expect(() => ...).toThrow()`
+.rejects.toThrow(...)`. A synchronous `expect(() => ...).toThrow()`
   would pass while catching nothing.
 
 ## Related examples

@@ -7,7 +7,7 @@ through `@InjectRepository(ArticleRow, 'replica')` and bypass the
 transactional adapter entirely.
 
 The framework wiring is minimal: only the master DS is registered
-with `TypeOrmTransactionalModule.forRoot`. The replica is a plain
+with `TransactionalTypeOrmModule.forRoot`. The replica is a plain
 `TypeOrmModule.forRoot` with `synchronize: false`. A misplaced
 `@Transactional({ dataSource: 'replica' })` fails fast at bootstrap
 because no adapter is registered for that DS — the framework refuses
@@ -129,7 +129,7 @@ pnpm -C examples/read-write-separation start
 1. **Two `TypeOrmModule.forRoot` calls.** `'default'` (master) with
    `synchronize: true`; `'replica'` with `synchronize: false`. Same
    entity registered on both sides — entity metadata is per-DS.
-2. **Asymmetric `TypeOrmTransactionalModule.forRoot`.** Only master
+2. **Asymmetric `TransactionalTypeOrmModule.forRoot`.** Only master
    gets `forRoot({ isDefault: true })`. No corresponding call for
    replica — the replica adapter is intentionally absent, so a
    `@Transactional({ dataSource: 'replica' })` cannot resolve.

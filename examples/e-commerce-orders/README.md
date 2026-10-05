@@ -77,11 +77,11 @@ dependencies happen ONLY through the shared events
 (`src/shared/events.ts`); the inventory module never imports an orders
 type and vice versa.
 
-| Context  | Owns                       | Publishes          | Consumes                 |
-|----------|----------------------------|--------------------|--------------------------|
-| Orders   | `OrderRow`                 | `OrderPlacedEvent`, `OrderConfirmedEvent` | `PaymentChargedEvent` (confirm) + `*FailedEvent` (compensation) |
-| Inventory| `ProductRow`, `ReservationRow` | `StockReservedEvent`, `StockReservationFailedEvent` | `OrderPlacedEvent` (reserve) + `PaymentFailedEvent` (release) |
-| Billing  | `PaymentRow`               | `PaymentChargedEvent`, `PaymentFailedEvent` | `StockReservedEvent` |
+| Context   | Owns                           | Publishes                                           | Consumes                                                        |
+| --------- | ------------------------------ | --------------------------------------------------- | --------------------------------------------------------------- |
+| Orders    | `OrderRow`                     | `OrderPlacedEvent`, `OrderConfirmedEvent`           | `PaymentChargedEvent` (confirm) + `*FailedEvent` (compensation) |
+| Inventory | `ProductRow`, `ReservationRow` | `StockReservedEvent`, `StockReservationFailedEvent` | `OrderPlacedEvent` (reserve) + `PaymentFailedEvent` (release)   |
+| Billing   | `PaymentRow`                   | `PaymentChargedEvent`, `PaymentFailedEvent`         | `StockReservedEvent`                                            |
 
 Only `OrderConfirmedEvent` leaves the system. The saga's internal events
 are implementation details of this app's choreography; putting them on
@@ -93,8 +93,8 @@ business-meaningful terminal event crosses the boundary.
 1. **Place.** `POST /orders` → `PlaceOrderCommand`. The handler inserts
    the order and commits the `Order` aggregate. `OrderPlacedEvent`
    carries `@Externalized({ target: 'orders.placed', client: 'local' })`,
-   which is how an aggregate's event gets into the outbox: the
-   `HybridEventPublisher` takes only `@Externalized` events there, and
+   which is how an aggregate's event gets into the outbox: the cqrs
+   publisher takes only `@Externalized` events there, and
    `local` is `@nestjs/outbox`'s in-process transport.
 2. **Reserve.** `ReserveStockHandler` decrements stock and inserts
    reservations, then publishes `StockReservedEvent`. Out of stock rolls
@@ -164,7 +164,7 @@ docker compose exec kafka kafka-console-consumer \
 - [`src/app.module.ts`](src/app.module.ts) — one DataSource with the
   three schemas, `@nestjs/outbox` with the Kafka transport and
   `externalizedRoute()`, `TransactionalOutboxModule`,
-  `CqrsTransactionalModule`.
+  `TransactionalCqrsModule`.
 - [`src/shared/events.ts`](src/shared/events.ts) — the saga's events,
   including the two `@Externalized` ones.
 - [`src/orders/place-order.handler.ts`](src/orders/place-order.handler.ts)
@@ -190,7 +190,7 @@ docker compose exec kafka kafka-console-consumer \
   creates them in its `dataSourceFactory` before synchronising;
   production does it in migrations.
 - **Do not import `CqrsModule` alongside
-  `CqrsTransactionalModule.forRoot()`.** See
+  `TransactionalCqrsModule.forRoot()`.** See
   [`docs/status/conventions.md`](../../docs/status/conventions.md) #6.
 
 ## Related examples

@@ -59,7 +59,7 @@ Expected `pnpm start` output:
   regular `@Injectable()` method; data access through
   `@InjectRepository(UserEntity)`. **No `getCurrentEntityManager()` call.**
 - [`src/app.module.ts`](src/app.module.ts) — `TypeOrmModule.forRoot/forFeature`
-  + `TransactionalModule.forRoot` + `TypeOrmTransactionalModule.forRoot()`.
+  - `TransactionalModule.forRoot` + `TransactionalTypeOrmModule.forRoot()`.
 - [`src/main.ts`](src/main.ts) — `NestFactory.createApplicationContext`
   bootstrap; calls the service and logs results.
 - [`test/user.service.spec.ts`](test/user.service.spec.ts) — jest tests
@@ -90,7 +90,7 @@ at runtime by one of three coordinated mechanisms (see ADR-005):
   `BaseEntity.useDataSource(...)` stores a captured DataSource that bypasses
   the patches. Use the Repository pattern.
 - **Do not import `CqrsModule` directly alongside
-  `CqrsTransactionalModule.forRoot()`** — the latter overrides the
+  `TransactionalCqrsModule.forRoot()`** — the latter overrides the
   `EventPublisher` DI token, and a duplicate import shadows the override.
   (Not relevant in this example; mentioned for the cqrs-aware sibling
   examples.)

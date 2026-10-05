@@ -7,9 +7,16 @@ to the first-party [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox
 [ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md). The bridge's
 rules: [DD-028](../dd/028-outbox-bridge-contract.md).
 
-If you use only `@nestjs-transactional/core`, `typeorm` and `cqrs`
-without the outbox, the upgrade is a version bump. Two cqrs changes may
-still touch you: see [`@IntegrationEventsHandler`](#integrationeventshandler).
+Two more changes ship in the same major. cqrs events now go through the
+`@nestjs/cqrs` `EventBus` ([ADR-024](../adr/024-cqrs-events-through-the-event-bus.md)),
+which changes the module's options and what `@EventsHandler`s receive:
+see [cqrs and the EventBus](#cqrs-event-bus). And NestJS 10 leaves every
+peer range.
+
+If you use only `@nestjs-transactional/core` and `typeorm`, the upgrade
+is a version bump on NestJS 11 or 12. With `cqrs` and without the
+outbox, read [section 7](#cqrs-event-bus) and
+[`@IntegrationEventsHandler`](#integrationeventshandler).
 
 ## What changes, at a glance
 
@@ -26,7 +33,33 @@ still touch you: see [`@IntegrationEventsHandler`](#integrationeventshandler).
 | the bare event on the wire | the envelope `{ id, topic, key, headers, createdAt, payload }` |
 | an outbox per DataSource (ADR-019) | one outbox DataSource |
 | `event_publication`, `event_publication_archive` | the `nest_outbox` schema |
-| NestJS 10, 11, 12 | NestJS 11 or 12 for the outbox |
+| NestJS 10, 11, 12 | NestJS 11 or 12 |
+| `CqrsTransactionalModule` overrides `EventPublisher` | events go through the `EventBus`; `@EventsHandler`s and sagas receive aggregate events |
+| `HybridEventPublisher`, `TransactionalEventPublisher`, `TransactionalEventPublisherAdapter` | `TransactionalEventBusPublisher`, in the bus's publisher chain |
+| `useTransactionalEventPublisher` | removed |
+| `TypeOrmTransactionalModule`, `CqrsTransactionalModule`, `CQRS_TRANSACTIONAL_OPTIONS` | `TransactionalTypeOrmModule`, `TransactionalCqrsModule`, `TRANSACTIONAL_CQRS_OPTIONS`; the old names are deprecated aliases |
+| `CqrsModule` options nowhere | `TransactionalCqrsModule.forRoot({ cqrs, eventPublisher })` |
+
+## Renamed, with deprecated aliases
+
+Public names now lead with `Transactional`, then the library they
+integrate, the way NestJS names `WorkflowsCqrsModule`
+([DD-030](../dd/030-transactional-first-names.md)):
+
+| 2.x | 3.0 |
+| --- | --- |
+| `TypeOrmTransactionalModule` | `TransactionalTypeOrmModule` |
+| `TypeOrmTransactionalOptions`, `TypeOrmTransactionalAsyncOptions` | `TransactionalTypeOrmOptions`, `TransactionalTypeOrmAsyncOptions` |
+| `CqrsTransactionalModule` | `TransactionalCqrsModule` |
+| `CqrsTransactionalOptions`, `CqrsTransactionalAsyncOptions`, `CqrsTransactionalAsyncFactoryResult` | `TransactionalCqrsOptions`, `TransactionalCqrsAsyncOptions`, `TransactionalCqrsAsyncFactoryResult` |
+| `CqrsTransactionalBootstrap` | `TransactionalCqrsBootstrap` |
+| `CQRS_TRANSACTIONAL_OPTIONS` | `TRANSACTIONAL_CQRS_OPTIONS` |
+
+The old names still compile: they are the same classes and values,
+marked `@deprecated`, and go in the next major. A search and replace
+finishes the move. The one thing an alias cannot cover is the options
+token's string value: inject `TRANSACTIONAL_CQRS_OPTIONS`, not the
+literal `'CQRS_TRANSACTIONAL_OPTIONS'`.
 
 ## 1. Drain the old outbox first
 
@@ -185,10 +218,46 @@ transaction. Its `id` option is removed, along with
 on it becoming durable once the outbox was wired, move the handler to
 `@OnOutboxMessage`.
 
-## 7. Aggregate events
+## <a id="cqrs-event-bus"></a>7. cqrs and the EventBus
 
-`AggregateRoot.commit()` still reaches the outbox through
-`HybridEventPublisher`, and `TransactionalOutboxModule` now binds that
+`TransactionalCqrsModule` no longer overrides `EventPublisher`. It
+imports `CqrsModule.forRoot()` with its own publisher in the `EventBus`,
+so every event, from `aggregate.commit()` or `eventBus.publish()`, goes
+through the bus ([DD-029](../dd/029-cqrs-publisher-chain-contract.md)).
+What that changes for you:
+
+- **`@EventsHandler`s and sagas now receive aggregate events**, at once
+  and inside the transaction, as `@nestjs/cqrs` always delivered direct
+  publishes. If one of them must not see an aggregate's event, move it
+  to `@TransactionalEventsHandler` with the phase it needs.
+- **A direct `eventBus.publish()` now schedules phase handlers** and, for
+  an `@Externalized` event with the outbox wired, the outbox. Outside a
+  transaction, such an `@Externalized` event is dropped and logged, as
+  from `commit()`.
+- **The dispatcher context.** Inside `@Transactional`, a publish without
+  one, or with the aggregate, carries `{ transaction, aggregate? }`. A
+  custom `IEventPublisher` that read the aggregate from the context
+  finds it under `aggregate`.
+- **Options.** `useTransactionalEventPublisher` is gone. Options you
+  passed to `CqrsModule.forRoot()` go to
+  `TransactionalCqrsModule.forRoot({ cqrs: { ... } })`, and an
+  `eventPublisher` to `forRoot({ eventPublisher })`. Keep no other
+  `CqrsModule` import: bootstrap now fails on a second `EventBus`.
+- **`CommandBus`, `QueryBus` and `EventBus` are injectable anywhere.**
+  Controllers that injected handlers directly to work around their
+  absence can use the buses again.
+- **Removed exports**: `HybridEventPublisher`,
+  `TransactionalEventPublisher`, `TransactionalEventPublisherAdapter`,
+  `AggregateConstructor`.
+
+With `@nestjs/workflows`' `WorkflowsCqrsModule`, `@StartOn` and
+`@SignalOn` on events published inside `@Transactional` now write in the
+business transaction.
+
+## 8. Aggregate events
+
+`AggregateRoot.commit()` reaches the outbox through the cqrs publisher
+(section 7), and `TransactionalOutboxModule` now binds the scheduler
 port itself; remove any manual `OUTBOX_PUBLICATION_SCHEDULER` provider.
 
 Only `@Externalized` events go to the outbox from an aggregate. The rest
@@ -201,7 +270,7 @@ event, route it to `@nestjs/outbox`'s `local` transport:
 export class OrderPlaced { ... }
 ```
 
-## 8. Brokers
+## 9. Brokers
 
 - `@Externalized({ client })` is a string naming a transport in
   `OutboxModule`'s `transports`, conventionally the `ClientsModule` token.
@@ -215,7 +284,7 @@ export class OrderPlaced { ... }
 - Register `ClientsModule` in `OutboxModule.forRoot({ imports })` too:
   the transport resolves the client in `OutboxModule`'s context.
 
-## 9. Consumers of your events
+## 10. Consumers of your events
 
 This is the change other teams see. The message is now `@nestjs/outbox`'s
 envelope:
@@ -231,7 +300,7 @@ handle(@Payload() envelope: OutboxEnvelope<OrderPlaced>) {
 Upgrade consumers to read `payload` before the producer ships 3.0, or
 have them accept both shapes during the switch.
 
-## 10. More than one DataSource
+## 11. More than one DataSource
 
 The outbox lives in one DataSource, `'default'` unless set with
 `TransactionalOutboxModule.forRoot({ dataSource })`. Publishing from a
@@ -244,7 +313,7 @@ DataSource:
 - put the contexts that publish into one DataSource, as schemas, as
   [`e-commerce-orders`](../../examples/e-commerce-orders) does.
 
-## 11. Operator APIs
+## 12. Operator APIs
 
 | 2.x | 3.0 |
 | --- | --- |
@@ -257,13 +326,13 @@ Where 2.x left a failed publication `FAILED` for an operator, 3.0 retries
 it with backoff and dead-letters it once the attempts run out. Alert on
 `lagMs` and on dead letters.
 
-## 12. Tests
+## 13. Tests
 
 `@nestjs-transactional/outbox/testing` is gone. In integration tests,
 turn the relay off with `relay: { enabled: false }` and call
 `OutboxRelay.runOnce()` to deliver deterministically. Without a database,
 provide a recording `Outbox` and `TransactionalOutboxModule.forRoot({
 transactionResolver: (active) => active.handle })` with the in-memory
-adapter. Atomicity can only be asserted against a real database.
+adapter, which has no native transaction of its own. Atomicity can only be asserted against a real database.
 [`testing-patterns`](../../examples/testing-patterns) shows all three
 tiers.

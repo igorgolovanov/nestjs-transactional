@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { Outbox } from '@nestjs/outbox';
 import { Test } from '@nestjs/testing';
+import { TransactionManager } from '@nestjs-transactional/core';
 
 import { OutboxEventPublisher } from '../publisher/outbox-event-publisher.js';
 
@@ -9,8 +10,11 @@ import { TransactionalOutboxModule } from './transactional-outbox.module.js';
 
 @Global()
 @Module({
-  providers: [{ provide: Outbox, useValue: { add: () => undefined, notify: () => undefined } }],
-  exports: [Outbox],
+  providers: [
+    { provide: Outbox, useValue: { add: () => undefined, notify: () => undefined } },
+    { provide: TransactionManager, useValue: {} },
+  ],
+  exports: [Outbox, TransactionManager],
 })
 class FakeNestOutboxModule {}
 

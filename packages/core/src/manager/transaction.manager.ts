@@ -49,6 +49,7 @@ type InternalResult<T> =
 @Injectable()
 export class TransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
+  private readonly pending = new WeakMap<ActiveTransaction, Set<Promise<unknown>>>();
 
   constructor(
     @Inject(ADAPTER_REGISTRY)
@@ -234,6 +235,55 @@ export class TransactionManager {
    */
   registerBeforeCommit(hook: () => Promise<void>): void {
     this.currentTransaction().beforeCommitHooks.push(hook);
+  }
+
+  /**
+   * The ORM's transaction object behind `active`, as its adapter's
+   * {@link TransactionAdapter.nativeTransaction} returns it. This is what
+   * a library that takes a transaction explicitly needs to write inside
+   * the transaction `@Transactional` opened.
+   *
+   * @throws {IllegalTransactionStateError} If the adapter does not
+   *   implement `nativeTransaction`.
+   */
+  nativeTransactionOf(active: ActiveTransaction): unknown {
+    const adapter = this.registry.get(active.adapterName, active.adapterInstanceName);
+    if (adapter.nativeTransaction === undefined) {
+      throw new IllegalTransactionStateError(
+        `The '${active.adapterName}' adapter for dataSource '${active.adapterInstanceName}' does not ` +
+          'expose its native transaction (TransactionAdapter.nativeTransaction), so a library that ' +
+          'takes a transaction explicitly cannot join it.',
+      );
+    }
+    return adapter.nativeTransaction(active.handle);
+  }
+
+  /**
+   * Make COMMIT of `active` wait for `pending`, a write some library
+   * started inside the transaction without the caller awaiting it. If
+   * `pending` rejects, the transaction rolls back with that error.
+   *
+   * One before-commit hook per transaction drains every tracked promise,
+   * including those tracked while it drains. A rejection is observed at
+   * once, so a transaction that fails for another reason does not leave
+   * an unhandled rejection behind.
+   */
+  trackPending(active: ActiveTransaction, pending: Promise<unknown>): void {
+    let set = this.pending.get(active);
+    if (set === undefined) {
+      set = new Set();
+      this.pending.set(active, set);
+      const drained = set;
+      active.beforeCommitHooks.push(async () => {
+        while (drained.size > 0) {
+          const batch = [...drained];
+          drained.clear();
+          await Promise.all(batch);
+        }
+      });
+    }
+    pending.catch(() => undefined);
+    set.add(pending);
   }
 
   private async startNew<T>(

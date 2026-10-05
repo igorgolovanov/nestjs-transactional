@@ -9,11 +9,11 @@ import { CqrsHandlerWrapper } from './handler-wrapper.js';
  * call time, so a late wrap still takes effect for every subsequent
  * dispatch.
  *
- * Registered by `CqrsTransactionalModule` (added in a later iteration).
+ * Registered by `TransactionalCqrsModule` (added in a later iteration).
  * Not intended for direct consumer instantiation.
  */
 @Injectable()
-export class CqrsTransactionalBootstrap implements OnApplicationBootstrap {
+export class TransactionalCqrsBootstrap implements OnApplicationBootstrap {
   constructor(private readonly wrapper: CqrsHandlerWrapper) {}
 
   onApplicationBootstrap(): void {

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { OUTBOX_PUBLICATION_SCHEDULER } from '../event-publisher/hybrid-event-publisher.js';
+import { OUTBOX_PUBLICATION_SCHEDULER } from '../event-publisher/outbox-publication-scheduler.js';
 
 function collectTsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>

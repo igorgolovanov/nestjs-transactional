@@ -5,7 +5,7 @@ import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
-import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
 import { AuditArchivalHandler } from './audit/audit-archival.handler.js';
@@ -51,7 +51,7 @@ export class AppModule {
   /**
    * Static factory wiring the entire stack from environment
    * variables. The four `forRootAsync` calls — `TypeOrmModule`,
-   * `TypeOrmTransactionalModule`, `OutboxTypeOrmModule`,
+   * `TransactionalTypeOrmModule`, `OutboxTypeOrmModule`,
    * `OutboxModule` — all inject `ConfigService` and read the same
    * validated values, so a single env file controls every layer.
    *
@@ -108,7 +108,7 @@ export class AppModule {
         TypeOrmModule.forFeature([AuditLogEntry]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRootAsync({
+        TransactionalTypeOrmModule.forRootAsync({
           imports: [ConfigModule],
           inject: [ConfigService],
           useFactory: () => ({

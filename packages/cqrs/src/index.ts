@@ -33,23 +33,24 @@ export {
   type HandlerWrapperOptions,
 } from './handlers/handler-wrapper.js';
 
-export { CqrsTransactionalBootstrap } from './handlers/bootstrap.js';
+export { TransactionalCqrsBootstrap } from './handlers/bootstrap.js';
 
-export { TransactionalEventPublisher } from './event-publisher/transactional-event-publisher.js';
 export {
-  type AggregateConstructor,
-  TransactionalEventPublisherAdapter,
-} from './event-publisher/transactional-event-publisher-adapter.js';
+  TransactionalEventBusPublisher,
+  type TransactionalEventBusPublisherDependencies,
+} from './event-publisher/transactional-event-bus-publisher.js';
+export { CqrsEventBusBinding } from './event-publisher/event-bus-binding.js';
 export {
-  HybridEventPublisher,
   OUTBOX_PUBLICATION_SCHEDULER,
   type OutboxPublicationScheduler,
-} from './event-publisher/hybrid-event-publisher.js';
+} from './event-publisher/outbox-publication-scheduler.js';
 
 export {
-  CQRS_TRANSACTIONAL_OPTIONS,
-  CqrsTransactionalModule,
-  type CqrsTransactionalAsyncFactoryResult,
-  type CqrsTransactionalAsyncOptions,
-  type CqrsTransactionalOptions,
-} from './module/cqrs-transactional.module.js';
+  TRANSACTIONAL_CQRS_OPTIONS,
+  TransactionalCqrsModule,
+  type TransactionalCqrsAsyncFactoryResult,
+  type TransactionalCqrsAsyncOptions,
+  type TransactionalCqrsOptions,
+} from './module/transactional-cqrs.module.js';
+
+export * from './deprecated.js';

@@ -9,6 +9,7 @@ import { DynamicModule } from '@nestjs/common';
 import { Outbox } from '@nestjs/outbox';
 import type { OutboxEnvelope } from '@nestjs/outbox';
 import type { OutboxMessage } from '@nestjs/outbox';
+import { TransactionManager } from '@nestjs-transactional/core';
 
 // @public
 export const EVENT_TYPE_HEADER = "x-event-type";
@@ -88,7 +89,7 @@ export const OUTBOX_PUBLICATION_SCHEDULER: unique symbol;
 
 // @public
 export class OutboxEventPublisher {
-    constructor(outbox: Outbox, options?: TransactionalOutboxOptions);
+    constructor(outbox: Outbox, manager: TransactionManager, options?: TransactionalOutboxOptions);
     publish(event: object): Promise<void>;
     publishAll(events: readonly object[]): Promise<void>;
     scheduleForPublication(event: object): void;
