@@ -4,25 +4,13 @@ import type { IEvent, IEventPublisher } from '@nestjs/cqrs';
 import { TransactionalEventDispatcher } from '../event-dispatcher/event-dispatcher.js';
 
 /**
- * Minimal structural contract for the outbox-side publisher. Declared
- * here (and injected via the {@link OUTBOX_PUBLICATION_SCHEDULER}
- * token) rather than importing from
- * `@nestjs-transactional/outbox` directly — keeps `cqrs` usable
- * without pulling in the outbox stack.
+ * Minimal structural contract for the outbox side of
+ * {@link HybridEventPublisher}. Declared here rather than imported from
+ * `@nestjs-transactional/outbox`, so cqrs works without the outbox.
  *
- * `@nestjs-transactional/outbox`'s `OutboxEventPublisher`
- * satisfies this interface structurally (it exposes
- * `scheduleForPublication`). Wire the token in the host application
- * when the outbox is enabled:
- *
- * ```ts
- * providers: [
- *   {
- *     provide: OUTBOX_PUBLICATION_SCHEDULER,
- *     useExisting: OutboxEventPublisher,
- *   },
- * ]
- * ```
+ * `@nestjs-transactional/outbox`'s `OutboxEventPublisher` implements it,
+ * and `TransactionalOutboxModule.forRoot()` binds it to
+ * {@link OUTBOX_PUBLICATION_SCHEDULER} by itself.
  */
 export interface OutboxPublicationScheduler {
   scheduleForPublication(event: unknown): void;
@@ -32,44 +20,31 @@ export interface OutboxPublicationScheduler {
  * DI token for the optional outbox scheduler injected into
  * {@link HybridEventPublisher}. When unbound, the hybrid publisher
  * delegates only to the in-memory dispatcher.
+ *
+ * A `Symbol.for` key: `@nestjs-transactional/outbox` binds the same key
+ * without depending on this package.
  */
-export const OUTBOX_PUBLICATION_SCHEDULER = Symbol('OUTBOX_PUBLICATION_SCHEDULER');
+export const OUTBOX_PUBLICATION_SCHEDULER = Symbol.for(
+  '@nestjs-transactional/cqrs/outbox-publication-scheduler',
+);
 
 /**
  * `IEventPublisher` implementation that routes aggregate-emitted
- * events through BOTH the in-memory transactional dispatcher
- * (`@TransactionalEventsHandler`) AND — when wired — the outbox
- * (`@OutboxEventsHandler`, introduced in a later phase). Both paths
- * run inside the surrounding transaction:
+ * events through the in-memory transactional dispatcher
+ * (`@TransactionalEventsHandler`) and, when wired, the outbox. Both
+ * paths run inside the surrounding transaction:
  *
  * - In-memory: the dispatcher attaches hooks to the current
  *   transaction so listeners fire at the configured phase
  *   (`AFTER_COMMIT` by default). No database rows are written.
  * - Outbox: {@link OutboxPublicationScheduler.scheduleForPublication}
- *   buffers the event and flushes the buffer via one `beforeCommit`
- *   hook per transaction. Publication rows commit atomically with
- *   the business write; rollback skips the flush.
+ *   buffers `@Externalized` events and adds them to `@nestjs/outbox`
+ *   from one `beforeCommit` hook per transaction, so the messages
+ *   commit with the business write and a rollback skips them.
  *
- * When no outbox scheduler is bound, behaves identically to
- * {@link TransactionalEventPublisher}. Callers get outbox semantics
- * automatically as soon as the scheduler is wired — no code change
- * at the call site.
- *
- * Important: the outbox path is best-effort from the perspective of
- * `AggregateRoot.commit()`. `commit()` is synchronous, so we cannot
- * await the DB write here. Errors raised while the `beforeCommit`
- * hook flushes the buffer DO bubble up — they cause the transaction
- * to roll back, which is the intended behavior.
- *
- * **Multi-dataSource.** The outbox scheduler is the
- * smart-facade `OutboxEventPublisher` (DD-024). When wired,
- * AggregateRoot events are routed to the per-dataSource publisher
- * that owns the event class — the same routing semantics as
- * `OutboxEventPublisher.publish()`. Multi-DS apps with multiple
- * outbox stacks (one `OutboxModule.forRoot()` per dataSource per
- * ADR-019) bind `OUTBOX_PUBLICATION_SCHEDULER` to the smart facade
- * via `useExisting: OutboxEventPublisher`; the facade's internal
- * Map fans out to the correct per-DS publisher.
+ * `AggregateRoot.commit()` is synchronous, so the outbox write cannot be
+ * awaited here. An error from the `beforeCommit` hook still bubbles up
+ * and rolls the transaction back, which is the intended behaviour.
  */
 @Injectable()
 export class HybridEventPublisher implements IEventPublisher {

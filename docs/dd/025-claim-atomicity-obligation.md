@@ -1,5 +1,7 @@
 # DD-025: The claim carries the concurrency guarantee, not the poll
 
+> **Superseded from 3.0.0** by [ADR-023](../adr/023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 **Context**: [ADR-007](../adr/007-outbox-architecture.md) declared, in
 its `SPI contract` appendix, that production
 `findReadyForProcessing` implementations "must use
@@ -87,4 +89,4 @@ not acceptable.
 
 - [ADR-007 — Outbox architecture](../adr/007-outbox-architecture.md)
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
-- [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)
+- [`@nestjs-transactional/outbox-typeorm` README](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox-typeorm/README.md)

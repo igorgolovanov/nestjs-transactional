@@ -16,11 +16,11 @@ export class PlaceOrderCommand {
 }
 
 /**
- * Saga entry point. `@Transactional()` opens the **orders** DS
- * transaction (default DS); `aggregate.commit()` routes
- * `OrderPlacedEvent` through `HybridEventPublisher` which fans it
- * to both the in-memory dispatcher AND the orders DS outbox in one
- * commit (DD-019).
+ * Saga entry point. `@Transactional()` opens the transaction;
+ * `aggregate.commit()` routes `OrderPlacedEvent` through
+ * `HybridEventPublisher`, which hands it to the in-memory dispatcher
+ * and, because it is `@Externalized`, adds it to the outbox in the same
+ * transaction as the order row.
  *
  * Returns the new `orderId` so the controller can include it in the
  * 201 response Location header.

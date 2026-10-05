@@ -6,10 +6,6 @@ import { DEFAULT_DATA_SOURCE_NAME } from '@nestjs-transactional/core';
 /**
  * Metadata key under which {@link IntegrationEventsHandlerMetadata} is
  * stored on classes decorated with {@link IntegrationEventsHandler}.
- *
- * Private to the cqrs package — not shared with outbox (the
- * smart scanner routes the handler based on whether a registrar is
- * bound, not by inspecting shared metadata).
  */
 export const INTEGRATION_EVENTS_HANDLER_METADATA = Symbol('INTEGRATION_EVENTS_HANDLER_METADATA');
 
@@ -20,25 +16,8 @@ export interface IntegrationEventsHandlerOptions {
   /** Domain event classes the handler subscribes to. Must be non-empty. */
   readonly events: Type[];
   /**
-   * Stable, globally-unique listener id used by the outbox registry to
-   * resolve which handler to invoke for a stored publication. When
-   * omitted, the scanner derives one from
-   * `${ClassName}#${EventName}` per event type — a rename of the class
-   * therefore breaks resume of already-stored publications. Supply an
-   * explicit id to protect against this. When multiple events are
-   * declared, the scanner appends `#${EventName}` to the supplied id.
-   */
-  readonly id?: string;
-  /**
-   * dataSource the in-memory dispatcher fallback path attaches phase
-   * hooks to. Only consulted when the outbox is NOT
-   * wired (no `OUTBOX_LISTENER_REGISTRAR` binding) — the outbox path
-   * auto-resolves the dataSource by walking per-DS event-type
-   * registries.
-   *
-   * Defaults to `'default'`. Multi-dataSource apps using the
-   * dispatcher fallback declare it explicitly on a non-default
-   * handler.
+   * dataSource whose transaction the handler waits for: it runs after
+   * that transaction commits. Defaults to `'default'`.
    */
   readonly dataSource?: string;
 }
@@ -48,31 +27,14 @@ export interface IntegrationEventsHandlerOptions {
  */
 export interface IntegrationEventsHandlerMetadata {
   readonly eventTypes: Type[];
-  readonly id?: string;
   readonly dataSource: string;
 }
 
 /**
- * Smart-default decorator for cross-module / cross-service integration
- * event handlers. The NestJS-idiomatic equivalent of Spring Modulith's
- * `@ApplicationModuleListener` — see "Naming" below.
- *
- * Behaviour depends on module wiring, decided at bootstrap by
- * `IntegrationEventsHandlerScanner`:
- *
- * 1. **Outbox wired** (the `OUTBOX_LISTENER_REGISTRAR` provider is
- *    bound, typically via `OutboxModule`): the handler is registered
- *    as a persistent outbox listener with `newTransaction: true`
- *    semantics. Delivery is durable, at-least-once, retried on
- *    failure, and survives process restarts.
- *
- * 2. **Outbox NOT wired**: the handler is registered in-memory via
- *    `TransactionalEventDispatcher` with `phase: AFTER_COMMIT`,
- *    `async: true`, and wrapped in a `REQUIRES_NEW` transaction —
- *    mirroring the outbox-backed behaviour as closely as in-memory
- *    dispatch allows (minus persistence).
- *
- * Either way, consumer code is identical:
+ * Handler for cross-module integration events: it runs after the
+ * publishing transaction commits, asynchronously, in a transaction of
+ * its own. The NestJS-idiomatic counterpart of Spring Modulith's
+ * `@ApplicationModuleListener`, see "Naming" below.
  *
  * ```ts
  * @IntegrationEventsHandler(OrderPlacedEvent)
@@ -83,40 +45,23 @@ export interface IntegrationEventsHandlerMetadata {
  * }
  * ```
  *
- * Two forms:
- *
- * ```ts
- * // Short form:
- * @IntegrationEventsHandler(OrderPlacedEvent, OrderCancelledEvent)
- *
- * // Long form with stable id:
- * @IntegrationEventsHandler({
- *   events: [OrderPlacedEvent],
- *   id: 'inventory.reservation',
- * })
- * ```
+ * Delivery is in-memory: a crash between the commit and the handler
+ * loses the call. When the work must survive that, publish the event
+ * through `@nestjs-transactional/outbox` and handle it with
+ * `@nestjs/outbox`'s `@OnOutboxMessage`, which retries, deduplicates and
+ * dead-letters. Until 2.x this decorator switched to a durable outbox
+ * path by itself when the outbox was wired; from 3.0.0 delivery belongs
+ * to `@nestjs/outbox` (ADR-023).
  *
  * Behaviour is opinionated and fixed: AFTER_COMMIT phase, async
- * execution, REQUIRES_NEW transaction. If you need any of those to
- * differ, use {@link TransactionalEventsHandler} with explicit
- * options instead — that decorator exposes the full configuration
- * surface for in-memory event handling.
+ * execution, a new transaction. If you need any of those to differ, use
+ * {@link TransactionalEventsHandler} with explicit options instead.
  *
  * **Naming.** The Spring Modulith decorator with this role is called
  * `@ApplicationModuleListener`. We use `@IntegrationEventsHandler`
  * because (a) "Application Module" overlaps with NestJS's `@Module()`
  * (a DI concept), and (b) "Integration events" is the established
  * DDD/microservices term for cross-module/cross-service event flow.
- *
- * **Multi-dataSource setups.** When the outbox path
- * is wired, `OutboxModule.forRoot` auto-binds
- * `OUTBOX_LISTENER_REGISTRAR` to a smart
- * `MultiDsOutboxListenerRegistrar` that walks per-dataSource
- * `EventTypeRegistry` instances to find which dataSource owns each
- * handler's events and registers the listener with the matching
- * per-DS registry — automatic, no decorator option required.
- * Handlers subscribing to events across multiple dataSources are
- * rejected at bootstrap (handlers must be dataSource-scoped).
  *
  * @throws {Error} If no event types are supplied.
  */
@@ -146,7 +91,6 @@ function resolveMetadata(
     const options = args[0];
     return {
       eventTypes: [...options.events],
-      id: options.id,
       dataSource: options.dataSource ?? DEFAULT_DATA_SOURCE_NAME,
     };
   }

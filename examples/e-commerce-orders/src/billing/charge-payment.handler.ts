@@ -1,66 +1,44 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { QueryFailedError, Repository } from 'typeorm';
 
-import {
-  PaymentChargedEvent,
-  PaymentFailedEvent,
-  StockReservedEvent,
-} from '../shared/events.js';
+import { PaymentChargedEvent, PaymentFailedEvent, StockReservedEvent } from '../shared/events.js';
 import { PaymentRow } from './payment.entity.js';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 /**
- * Billing step. Subscribes to `StockReservedEvent` (owned by
- * inventory DS); needs to write to **billing DS**.
+ * Billing step. Subscribes to `StockReservedEvent`, published by the
+ * inventory context; writes the payment in the `billing` schema and
+ * publishes the outcome in the same transaction.
  *
- * **Why the inner-method pattern.** A naive
- * `@Transactional({ dataSource: 'billing' })` decoration on the
- * top-level `handle()` method does NOT take effect: the cqrs
- * `IntegrationEventsHandlerScanner` runs in `OnModuleInit` and
- * captures `instance.handle.bind(instance)` BEFORE
- * `TransactionalMethodsBootstrap` (`OnApplicationBootstrap`) gets
- * a chance to wrap the method. The captured reference is the
- * un-wrapped original.
+ * `@Transactional()` sits directly on the `@OnOutboxMessage` method:
+ * `@nestjs/outbox` looks the method up on the instance at delivery time,
+ * so it calls the transactional version that bootstrap installed.
  *
- * The workaround: `handle()` (un-wrapped, called by the worker)
- * delegates to a private method that IS wrapped. Method-call
- * indirection resolves `this.processInBillingTx` at call time —
- * by then bootstrap has installed the wrapped version on the
- * instance, so the billing-DS transaction opens correctly.
- *
- * Single-DS scenarios (e.g. `saga-pattern`) sidestep this because
- * the worker's outer `REQUIRES_NEW` tx is on the default DS, which
- * coincides with the listener's target DS. Cross-DS handlers like
- * this one need the inner-method indirection.
+ * Idempotency: the payment's primary key is the order id, so a
+ * redelivery that got past the inbox surfaces as `unique_violation` and
+ * is skipped.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [StockReservedEvent], id: 'Billing.ChargePayment' })
-export class ChargePaymentHandler implements IIntegrationEventHandler<StockReservedEvent> {
+export class ChargePaymentHandler {
   private readonly logger = new Logger(ChargePaymentHandler.name);
 
   /** Toy authorisation rule. Amounts at or above this fail. */
   static readonly UNAUTHORISED_AMOUNT_CENTS = 1_000_000;
 
   constructor(
-    @InjectRepository(PaymentRow, 'billing')
+    @InjectRepository(PaymentRow)
     private readonly payments: Repository<PaymentRow>,
     private readonly outbox: OutboxEventPublisher,
   ) {}
 
+  @OnOutboxMessage('StockReservedEvent', { consumer: 'billing.charge-payment' })
+  @Transactional()
   async handle(event: StockReservedEvent): Promise<void> {
-    await this.processInBillingTx(event);
-  }
-
-  @Transactional({ dataSource: 'billing' })
-  private async processInBillingTx(event: StockReservedEvent): Promise<void> {
     const willFail = event.totalAmountCents >= ChargePaymentHandler.UNAUTHORISED_AMOUNT_CENTS;
     const status = willFail ? 'failed' : 'charged';
 
@@ -85,17 +63,11 @@ export class ChargePaymentHandler implements IIntegrationEventHandler<StockReser
     if (willFail) {
       this.logger.warn(`Payment failed for ${event.orderId} — emitting failure`);
       await this.outbox.publish(
-        new PaymentFailedEvent(
-          event.orderId,
-          event.totalAmountCents,
-          'authorisation-declined',
-        ),
+        new PaymentFailedEvent(event.orderId, event.totalAmountCents, 'authorisation-declined'),
       );
       return;
     }
 
-    await this.outbox.publish(
-      new PaymentChargedEvent(event.orderId, event.totalAmountCents),
-    );
+    await this.outbox.publish(new PaymentChargedEvent(event.orderId, event.totalAmountCents));
   }
 }

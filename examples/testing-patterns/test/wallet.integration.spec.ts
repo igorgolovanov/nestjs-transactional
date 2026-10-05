@@ -2,16 +2,12 @@ import 'reflect-metadata';
 
 import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
+import { OutboxRelay } from '@nestjs/outbox';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, PublicationStatus } from '@nestjs-transactional/outbox';
-import { EventPublicationEntity } from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
 import { WalletProjection } from '../src/wallet.listener.js';
@@ -19,25 +15,15 @@ import { WalletModule } from '../src/wallet.module.js';
 import { WalletRow } from '../src/wallet.entity.js';
 import { WalletService } from '../src/wallet.service.js';
 
-async function waitFor(predicate: () => Promise<boolean> | boolean, timeoutMs = 8_000): Promise<void> {
-  const start = Date.now();
-  while (!(await predicate())) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(`waitFor: timed out after ${timeoutMs} ms`);
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
-
 /**
  * **Tier 3: Integration tests via testcontainers Postgres.**
  *
  * Same `WalletService`, same `WalletProjection`, but now wired
  * against the **production** `WalletModule` — real Postgres, real
- * outbox tables, real worker. Slower (~2–10 s for the suite once
+ * outbox tables, real relay. Slower (~2–10 s for the suite once
  * the image is cached) but exercises the parts the unit tiers
- * cannot: row-level isolation, the worker poll loop, status
- * transitions on the publication row.
+ * cannot: above all that the outbox message commits and rolls back
+ * with the wallet row, which only the database can show.
  *
  * Trade-off: any one of these tests catches significantly more
  * regressions than its unit-tier counterpart, and you should keep
@@ -50,9 +36,12 @@ describe('WalletService (integration, testcontainers Postgres)', () => {
   let ds: DataSource;
   let service: WalletService;
   let projection: WalletProjection;
+  let relay: OutboxRelay;
+
+  const pending = async (): Promise<number> =>
+    Number((await ds.query('SELECT count(*) AS n FROM nest_outbox.messages'))[0].n);
 
   beforeAll(async () => {
-    OutboxModule.resetForTesting();
     TransactionalModule.resetForTesting();
     TypeOrmTransactionalModule.resetForTesting();
 
@@ -60,19 +49,21 @@ describe('WalletService (integration, testcontainers Postgres)', () => {
 
     module = await Test.createTestingModule({
       imports: [
-        WalletModule.forConfig({
-          host: container.getHost(),
-          port: container.getPort(),
-          username: container.getUsername(),
-          password: container.getPassword(),
-          database: container.getDatabase(),
-        }),
+        WalletModule.forConfig(
+          {
+            host: container.getHost(),
+            port: container.getPort(),
+            username: container.getUsername(),
+            password: container.getPassword(),
+            database: container.getDatabase(),
+          },
+          // Drive delivery with `relay.runOnce()` rather than waiting on
+          // a background poll.
+          { relay: false },
+        ),
       ],
     }).compile();
 
-    // Worker briefly observes rolled-back rows during the rollback
-    // test — its `markFailed` then errors on a missing row. Expected
-    // noise; suppress all log levels for the suite.
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -83,6 +74,7 @@ describe('WalletService (integration, testcontainers Postgres)', () => {
     ds = module.get<DataSource>(getDataSourceToken());
     service = module.get(WalletService);
     projection = module.get(WalletProjection);
+    relay = module.get(OutboxRelay);
   }, 90_000);
 
   afterAll(async () => {
@@ -91,56 +83,42 @@ describe('WalletService (integration, testcontainers Postgres)', () => {
   });
 
   beforeEach(async () => {
-    await ds.query('TRUNCATE TABLE event_publication, event_publication_archive RESTART IDENTITY');
+    await ds.query('TRUNCATE nest_outbox.messages, nest_outbox.inbox');
     await ds.getRepository(WalletRow).clear();
     await ds.getRepository(WalletRow).insert({ id: 'w-1', balance: 100 });
     projection.invocations.length = 0;
   });
 
-  it('happy path: deposit commits balance + publication; listener fires after worker delivery', async () => {
+  it('happy path: deposit commits balance + message; the relay delivers it to the listener', async () => {
     await service.deposit('w-1', 25);
 
     expect((await ds.getRepository(WalletRow).findOneBy({ id: 'w-1' }))?.balance).toBe(125);
+    expect(await pending()).toBe(1);
 
-    // Outbox-routed listener — delivery is asynchronous via the
-    // worker, so we wait for it.
-    await waitFor(() => projection.invocations.length === 1);
-    expect(projection.invocations[0]?.balanceAfter).toBe(125);
+    await relay.runOnce();
 
-    // Publication transitions to COMPLETED once the worker has
-    // invoked the listener and the post-handler bookkeeping runs.
-    await waitFor(async () => {
-      const pub = await ds.getRepository(EventPublicationEntity).findOne({
-        where: { eventType: 'WalletOperationEvent' },
-      });
-      return pub?.status === PublicationStatus.COMPLETED;
-    });
+    expect(projection.invocations.map((e) => e.balanceAfter)).toEqual([125]);
+    expect(await pending()).toBe(0);
   });
 
-  it('rollback: insufficient funds throws; balance unchanged; no publication; listener not invoked', async () => {
+  it('rollback: insufficient funds throws; balance unchanged; no message; listener not invoked', async () => {
     await expect(service.withdraw('w-1', 99_999)).rejects.toThrow('insufficient');
 
-    // Brief wait — give the worker a chance to misbehave if the
-    // publication leaked.
-    await new Promise((r) => setTimeout(r, 200));
-
     expect((await ds.getRepository(WalletRow).findOneBy({ id: 'w-1' }))?.balance).toBe(100);
-    expect(
-      await ds
-        .getRepository(EventPublicationEntity)
-        .countBy({ eventType: 'WalletOperationEvent' }),
-    ).toBe(0);
+    expect(await pending()).toBe(0);
+
+    await relay.runOnce();
     expect(projection.invocations).toHaveLength(0);
   });
 
-  it('multiple deposits: ordering visible in projection', async () => {
+  it('multiple deposits: each one reaches the projection', async () => {
     await service.deposit('w-1', 10);
     await service.deposit('w-1', 20);
     await service.deposit('w-1', 30);
 
     expect((await ds.getRepository(WalletRow).findOneBy({ id: 'w-1' }))?.balance).toBe(160);
 
-    await waitFor(() => projection.invocations.length === 3);
+    await relay.runOnce();
     expect(projection.invocations.map((e) => e.balanceAfter).sort((a, b) => a - b)).toEqual([
       110, 130, 160,
     ]);

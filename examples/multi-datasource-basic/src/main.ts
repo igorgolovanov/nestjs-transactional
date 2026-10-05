@@ -25,11 +25,17 @@ async function main(): Promise<void> {
   await inventory.upsertStock('sku-1', 12);
 
   console.log('');
-  console.log('billing rows:', (await billing.listAll()).map((i) => i.id));
-  console.log('inventory rows:', (await inventory.listAll()).map((s) => s.sku));
+  console.log(
+    'billing rows:',
+    (await billing.listAll()).map((i) => i.id),
+  );
+  console.log(
+    'inventory rows:',
+    (await inventory.listAll()).map((s) => s.sku),
+  );
 
   console.log('');
-  console.log('Cross-check isolation — neither DB knows the other\'s entity:');
+  console.log("Cross-check isolation — neither DB knows the other's entity:");
   const billingDs = app.get<DataSource>(getDataSourceToken());
   const inventoryDs = app.get<DataSource>(getDataSourceToken('inventory'));
   const billingHasStock = await billingDs.query(
@@ -48,8 +54,14 @@ async function main(): Promise<void> {
   } catch (err) {
     console.log('   caught:', (err as Error).message);
   }
-  console.log('   billing rows (still):', (await billing.listAll()).map((i) => i.id));
-  console.log('   inventory rows (sku-2 absent):', (await inventory.listAll()).map((s) => s.sku));
+  console.log(
+    '   billing rows (still):',
+    (await billing.listAll()).map((i) => i.id),
+  );
+  console.log(
+    '   inventory rows (sku-2 absent):',
+    (await inventory.listAll()).map((s) => s.sku),
+  );
 
   await app.close();
 }

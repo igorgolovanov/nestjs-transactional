@@ -1,22 +1,19 @@
 # e-commerce-orders
 
-**Tier 5 flagship.** A realistic order-placement application using
-every framework feature at once: three bounded contexts × three
-Postgres DataSources × per-DS outbox stack × Kafka externalization
-× CQRS aggregate roots × REST API. The intent is "would I deploy
-this shape?" rather than "this is the shortest illustration of X."
+**Tier 5 flagship.** A realistic order-placement application using the
+framework's features together: three bounded contexts, a saga over the
+outbox, CQRS aggregate roots, Kafka, and a REST API. The intent is
+"would I deploy this shape?" rather than "this is the shortest
+illustration of X."
 
 ## When to use this example
 
 - You're starting a new NestJS app on this framework and want a
-  copy-paste skeleton with all the moving parts wired up
-  correctly.
-- You want to see how Tier 1–4 patterns compose: choreographed
-  saga (Tier 4), per-DS outbox (Tier 2), externalization (Tier
-  3), CQRS aggregate-root commit, REST surface (new in Tier 5) —
-  all in one app.
-- You're evaluating the framework against a non-trivial
-  benchmark.
+  copy-paste skeleton with all the moving parts wired up correctly.
+- You want to see how the Tier 1–4 patterns compose: a choreographed
+  saga (Tier 4), the outbox (Tier 1), externalization (Tier 3), CQRS
+  aggregate-root commit, and a REST surface.
+- You're evaluating the framework against a non-trivial benchmark.
 
 ## Architecture
 
@@ -30,64 +27,55 @@ this shape?" rather than "this is the shortest illustration of X."
                         │                           │
                         ▼                           ▼
                  PlaceOrderCommand            GetOrderQuery
-                        │                           │
-                        ▼                           ▼
-                 ┌──────────────┐             ┌──────────────┐
-                 │  Orders DS   │             │  Orders DS   │
-                 │  ┌────────┐  │             │  (read)      │
-                 │  │ orders │  │             └──────────────┘
-                 │  └────────┘  │
-                 │  outbox      │ OrderPlacedEvent
-                 └──────┬───────┘
-                        │ choreography via outbox
+                        │
+                        ▼  schema "orders": INSERT order,
+                           aggregate.commit() → OrderPlacedEvent
+                           (@Externalized to `local`)
+                        │
+                        ▼  topic orders.placed
+                 ReserveStockHandler        schema "inventory"
+                        │  → StockReservedEvent | StockReservationFailedEvent
                         ▼
-                 ┌──────────────────┐
-                 │  Inventory DS    │
-                 │  ┌────────────┐  │
-                 │  │ products   │  │ ← decrement available
-                 │  │ reservations│ │ ← insert reservation rows
-                 │  └────────────┘  │
-                 │  outbox          │ StockReservedEvent (or *Failed)
-                 └─────┬────────────┘
-                       │
-                       ▼
-                 ┌──────────────────┐
-                 │  Billing DS      │
-                 │  ┌────────────┐  │
-                 │  │ payments   │  │ ← INSERT charged | failed
-                 │  └────────────┘  │
-                 │  outbox          │ PaymentChargedEvent (or *Failed)
-                 └─────┬────────────┘
-                       │
-                       ▼
-                 ┌──────────────────┐
-                 │  Orders DS       │
-                 │  (confirm step)  │ ← status = 'confirmed'
-                 │  outbox          │ OrderConfirmedEvent (@Externalized)
-                 └─────┬────────────┘
-                       │
-                       ▼
-                 ┌─────────────────────┐
-                 │  Kafka              │
-                 │  topic:             │
-                 │    orders.confirmed │
-                 └─────────────────────┘
+                 ChargePaymentHandler       schema "billing"
+                        │  → PaymentChargedEvent | PaymentFailedEvent
+                        ▼
+                 ConfirmShipmentHandler     schema "orders"
+                        │  aggregate.confirm() + commit()
+                        ▼
+                 OrderConfirmedEvent ──► Kafka topic orders.confirmed
+                                         key = order id
+
+   Failure branches: OrdersCompensationHandler (orders) marks the order
+   failed; ReleaseStockHandler (inventory) restores reserved stock.
 ```
 
-Compensation flows mirror the happy path:
+Every arrow between steps is an outbox message: written in the
+transaction of the step that produced it, delivered by
+[`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox)'s relay to
+an `@OnOutboxMessage` handler, which runs the next step in its own
+`@Transactional()`.
 
-- `StockReservationFailedEvent` → orders' compensation handler
-  marks order `'failed'`.
-- `PaymentFailedEvent` → orders' compensation handler marks
-  order `'failed'` AND inventory's `ReleaseStockHandler` restores
-  the previously-reserved stock.
+## Why one database with three schemas
+
+Each bounded context owns its tables in its own Postgres schema. All
+three live on one DataSource, because the outbox lives in exactly one
+DataSource (ADR-023): a step publishes its outcome atomically only if
+the message goes into the same transaction as its writes. A context on a
+DataSource of its own could not do that, and publishing from it is
+refused rather than written outside its transaction.
+
+Schemas keep the contexts' data apart, by ownership and by grants if
+you want it enforced. Transactions across separate DataSources, without
+an outbox, are shown in `multi-datasource-basic` and
+`multi-datasource-cqrs`.
 
 ## Bounded contexts
 
-Each lives in its own folder (`src/{orders,inventory,billing}/`)
-with its own NestJS module. Cross-context dependencies happen
-ONLY through the shared events (`src/shared/events.ts`) — the
-inventory module never imports an orders type and vice versa.
+Each lives in its own folder (`src/{orders,inventory,billing}/`) with
+its own NestJS module and its own Postgres schema. Cross-context
+dependencies happen ONLY through the shared events
+(`src/shared/events.ts`); the inventory module never imports an orders
+type and vice versa.
 
 | Context  | Owns                       | Publishes          | Consumes                 |
 |----------|----------------------------|--------------------|--------------------------|
@@ -95,45 +83,55 @@ inventory module never imports an orders type and vice versa.
 | Inventory| `ProductRow`, `ReservationRow` | `StockReservedEvent`, `StockReservationFailedEvent` | `OrderPlacedEvent` (reserve) + `PaymentFailedEvent` (release) |
 | Billing  | `PaymentRow`               | `PaymentChargedEvent`, `PaymentFailedEvent` | `StockReservedEvent` |
 
-## Externalization
+Only `OrderConfirmedEvent` leaves the system. The saga's internal events
+are implementation details of this app's choreography; putting them on
+Kafka would couple downstream services to them. Only the
+business-meaningful terminal event crosses the boundary.
 
-Only ONE event class crosses the system boundary —
-`OrderConfirmedEvent`, the terminal happy-path event. It carries
-`@Externalized<OrderConfirmedEvent>({ target: 'orders.confirmed',
-client: KAFKA_CLIENT, ... })` metadata. The outbox worker delivers
-the publication, the externalizer pipeline picks it up, and a
-single `ClientProxy.emit(...)` call lands the message on Kafka.
+## The saga
 
-Why only one external event? The internal saga events
-(`StockReserved`, `PaymentCharged`, etc.) are **implementation
-details of this app's saga choreography** — exposing them on
-Kafka would couple downstream services to internals. Only the
-business-meaningful terminal event leaves the boundary.
+1. **Place.** `POST /orders` → `PlaceOrderCommand`. The handler inserts
+   the order and commits the `Order` aggregate. `OrderPlacedEvent`
+   carries `@Externalized({ target: 'orders.placed', client: 'local' })`,
+   which is how an aggregate's event gets into the outbox: the
+   `HybridEventPublisher` takes only `@Externalized` events there, and
+   `local` is `@nestjs/outbox`'s in-process transport.
+2. **Reserve.** `ReserveStockHandler` decrements stock and inserts
+   reservations, then publishes `StockReservedEvent`. Out of stock rolls
+   the whole reservation back and publishes `StockReservationFailedEvent`
+   from a fresh transaction.
+3. **Charge.** `ChargePaymentHandler` records the payment and publishes
+   `PaymentChargedEvent`, or `PaymentFailedEvent` above the toy
+   authorisation limit.
+4. **Confirm.** `ConfirmShipmentHandler` confirms the order through the
+   aggregate; `OrderConfirmedEvent` is `@Externalized` to Kafka and goes
+   out keyed by order id through `toKafkaPacket`.
+5. **Compensate.** `OrdersCompensationHandler` subscribes to both failure
+   events and marks the order failed; `ReleaseStockHandler` restores the
+   stock on `PaymentFailedEvent`.
+
+Every step is idempotent, by a primary key (`unique_violation` is a
+skip) or a conditional `UPDATE` on the previous status, because delivery
+is at-least-once. Each handler's inbox, keyed by its `consumer`, skips a
+message it already completed.
 
 ## Prerequisites
 
-- **Docker Desktop / Colima / Rancher Desktop running.** Tests
-  pull `postgres:16-alpine` (~30 MB) on first run via
-  testcontainers; `pnpm start` additionally pulls
-  `confluentinc/cp-kafka:7.7.1` (~1.2 GB) via the Compose stack.
-- For `pnpm start`: three Postgres databases (`orders`,
-  `inventory`, `billing`) on `localhost:5432` and a Kafka broker
-  on `localhost:9092`. The Compose stack provisions both.
+- **Docker Desktop / Colima / Rancher Desktop running.** The integration
+  test starts Postgres through testcontainers.
+- For the `pnpm start` demo: `docker-compose up -d` brings up Postgres
+  (database `ecommerce`) and Kafka in KRaft mode.
 
 ## Run
 
 ```bash
-pnpm install                                     # from monorepo root
+pnpm install                                            # from monorepo root
 
-# Integration tests (Docker required) — preferred:
+# Integration tests (Docker required):
 pnpm -C examples/e-commerce-orders test:integration
 
-# Unit tests (none currently; passWithNoTests for symmetry):
-pnpm -C examples/e-commerce-orders test
-
-# Visual demo with the docker-compose stack:
-pnpm -C examples/e-commerce-orders exec docker compose up -d   # Postgres + Kafka
-createdb orders && createdb inventory && createdb billing      # one-time
+# Visual demo against real Postgres + Kafka:
+docker-compose -f examples/e-commerce-orders/docker-compose.yml up -d
 pnpm -C examples/e-commerce-orders start
 ```
 
@@ -150,112 +148,62 @@ curl -X POST http://localhost:3000/orders \
 curl http://localhost:3000/orders/<orderId>
 ```
 
-Tail the Kafka topic to see the externalized event:
+Tail the Kafka topic to see the externalized event, keyed by order id:
 
 ```bash
 docker compose exec kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
   --topic orders.confirmed \
   --from-beginning \
+  --property print.key=true \
   --property print.headers=true
 ```
 
-## What it shows (verified by integration tests)
+## Key files
 
-1. **REST → CQRS → outbox → multi-DS saga → Kafka end-to-end.**
-   `POST /orders` → `PlaceOrderCommand` (CQRS handler with
-   `@Transactional` on orders DS) → `aggregate.commit()` →
-   `HybridEventPublisher` fans `OrderPlacedEvent` to in-memory
-   dispatcher AND outbox → inventory worker picks up → reserves →
-   billing worker picks up → charges → orders worker picks up →
-   confirms → Kafka emit.
-2. **Per-DS outbox isolation (DD-023).** Each DS has its own
-   `event_publication` table and worker. A crash mid-saga never
-   leaves an inconsistent state across DSes — every step's
-   business write commits atomically with its outcome event
-   publication (DD-019).
-3. **Choreographed compensation.** Failure events drive
-   compensation handlers. Out-of-stock fails before payment, so
-   compensation only marks the order failed. Payment-decline
-   fails AFTER stock is reserved, so two compensations run:
-   orders marks failed AND inventory releases stock.
-4. **Externalization on terminal event only.** The internal saga
-   events stay inside the system; only `OrderConfirmedEvent`
-   leaves on Kafka. The test mocks the proxy and asserts the emit
-   happened with the right headers; the real Kafka acknowledgement
-   path is measured in the `outbox-microservices` suite (ADR-021).
-5. **Idempotency at every cross-context handler.** Reservations
-   keyed on `${orderId}:${sku}`, payments keyed on `orderId`,
-   confirmations gated on `status = 'placed'`. Outbox at-least-
-   once delivery never doubles a side-effect.
+- [`src/app.module.ts`](src/app.module.ts) — one DataSource with the
+  three schemas, `@nestjs/outbox` with the Kafka transport and
+  `externalizedRoute()`, `TransactionalOutboxModule`,
+  `CqrsTransactionalModule`.
+- [`src/shared/events.ts`](src/shared/events.ts) — the saga's events,
+  including the two `@Externalized` ones.
+- [`src/orders/place-order.handler.ts`](src/orders/place-order.handler.ts)
+  — saga entry through the aggregate.
+- [`src/inventory/reserve-stock.handler.ts`](src/inventory/reserve-stock.handler.ts),
+  [`src/billing/charge-payment.handler.ts`](src/billing/charge-payment.handler.ts),
+  [`src/orders/confirm-shipment.handler.ts`](src/orders/confirm-shipment.handler.ts)
+  — the steps.
+- [`test/e-commerce-orders.integration.spec.ts`](test/e-commerce-orders.integration.spec.ts)
+  — 8 tests through the REST API: the happy path to Kafka, reads, input
+  validation, both failure branches, and the outbox draining with every
+  step recorded in its inbox.
 
 ## Common pitfalls
 
-- **Cross-DS `@Transactional` inside an `@IntegrationEventsHandler`
-  needs the inner-method indirection.** A naive
-  `@Transactional({ dataSource: 'X' })` on the public `handle()`
-  method does NOT take effect — the cqrs scanner captures
-  `instance.handle.bind(instance)` in `OnModuleInit`, BEFORE
-  `TransactionalMethodsBootstrap` (`OnApplicationBootstrap`) has
-  wrapped the method. Workaround: `handle()` (un-wrapped, called
-  by the worker) delegates to a private method that IS wrapped.
-  `this.processInTx(event)` resolves at call time, so by then the
-  bootstrap has installed the wrapped version on the instance.
-  See `ChargePaymentHandler` and `ReleaseStockHandler` for the
-  pattern. Single-DS handlers (e.g. `ConfirmShipmentHandler`)
-  don't need this — the worker's outer REQUIRES_NEW transaction
-  is on the default DS, which coincides with the listener's
-  target DS.
-- **Externalized events need a local `@OutboxEventsHandler`
-  listener too.** `OutboxEventPublisher.publish` is a silent
-  no-op without at least one listener registered for the event
-  class (Convention #15) — even if `@Externalized` is decorated.
-  This example registers `OrderConfirmedExternalizationStub` (an
-  empty handler) so the publication row is created and the
-  worker picks it up for externalization. Real apps may use this
-  same handler for an audit trail or read-model update.
-- **Importing `CqrsModule` directly.** Don't.
-  `CqrsTransactionalModule.forRoot()` imports it internally and
-  overrides `EventPublisher`. A duplicate import shadows the
-  override (Convention #6). The trade-off: `CommandBus` /
-  `QueryBus` from `CqrsModule` are not visible to consumers
-  outside `CqrsTransactionalModule`'s own scope. This example's
-  `OrdersController` therefore injects the handlers directly
-  rather than going through `CommandBus.execute` — a pragmatic
-  workaround that keeps the controller thin.
-- **Forgetting the second arg to `@InjectRepository(Entity, 'inventory')`.**
-  Without it, the inventory entity resolves against the default
-  (orders) DS, where its table does not exist. The integration
-  test's setup catches this on init.
-- **Routing externalization-bound events through the wrong
-  DataSource.** `OrderConfirmedEvent` is registered with
-  `OutboxModule.forFeature` on the **orders** DS — it's published
-  from the orders confirm-shipment handler, so its publication
-  lands in orders' `event_publication` table. The orders worker
-  is what drives externalization for it.
-- **Treating internal saga events as part of the public contract.**
-  Do not subscribe to `StockReservedEvent` from outside the app.
-  If a downstream service needs to react to "order is now
-  shipping", model that as a separate externalized event
-  published from the shipment-confirmation step.
+- **An aggregate's event without `@Externalized` never reaches the
+  outbox.** It still reaches `@TransactionalEventsHandler` listeners in
+  memory, so nothing errors; the saga simply does not start.
+- **`@Transactional()` and `@OnOutboxMessage` on one method is fine.**
+  `@nestjs/outbox` calls the method through the instance at delivery
+  time, so it gets the transactional version.
+- **TypeORM's `synchronize` does not create schemas.** The example
+  creates them in its `dataSourceFactory` before synchronising;
+  production does it in migrations.
+- **Do not import `CqrsModule` alongside
+  `CqrsTransactionalModule.forRoot()`.** See
+  [`docs/status/conventions.md`](../../docs/status/conventions.md) #6.
 
 ## Related examples
 
-- [`saga-pattern`](../saga-pattern) — choreographed saga on a
-  single DataSource. Foundation pattern.
-- [`multi-datasource-outbox`](../multi-datasource-outbox) — per-DS
-  outbox stacks without externalization.
-- [`externalization-multi-datasource`](../externalization-multi-datasource)
-  — multi-DS + per-event broker routing without the saga / REST.
-- [`basic-typeorm-outbox`](../basic-typeorm-outbox) — single-DS
-  outbox + Postgres baseline; this flagship is its multi-DS
-  composition.
+- [`saga-pattern`](../saga-pattern) — the same choreography on a smaller
+  domain.
+- [`externalization-kafka`](../externalization-kafka) — the Kafka record
+  in detail.
+- [`basic-cqrs`](../basic-cqrs) — aggregate roots and phase-aware
+  handlers without the outbox.
 
 ## Further reading
 
-- [DD-019 — single-unit atomicity invariant](../../docs/dd/019-hybrid-delivery-atomicity.md)
-- [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
-- [DD-024 — smart-facade `OutboxEventPublisher`](../../docs/dd/024-outbox-publisher-facade.md)
-- [ADR-018 — multi-adapter architecture](../../docs/adr/018-multi-adapter-architecture.md)
-- [Tier 5 status doc](../../docs/status/) (added on
-  closure of this tier)
+- [ADR-023 — delivery through `@nestjs/outbox`, one outbox DataSource](../../docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
+- [DD-028 — the bridge contract, including the aggregate path](../../docs/dd/028-outbox-bridge-contract.md)
+- [ADR-021 — what each transport acknowledges](../../docs/adr/021-externalization-acknowledgement-per-transport.md)

@@ -28,11 +28,7 @@ export class BillingService {
   }
 
   @Transactional()
-  async createInvoiceAndFail(
-    id: string,
-    customer: string,
-    amountCents: number,
-  ): Promise<void> {
+  async createInvoiceAndFail(id: string, customer: string, amountCents: number): Promise<void> {
     await this.invoices.save({ id, customer, amountCents });
     throw new Error('simulated billing failure — should roll back');
   }

@@ -11,24 +11,31 @@ for NestJS applications, not just Spring Framework core.
 - Multi-DataSource support (typeorm)
 - AsyncLocalStorage for transaction context (core)
 
-**Spring Modulith features (partially covered, expansion planned):**
-- Event Publication Registry with persistent log — outbox
-- `@IntegrationEventsHandler` shortcut — cqrs integration
-- Failed / Incomplete / Completed publications API — outbox
-- Staleness monitor — outbox
-- Republish on restart — outbox
-- Completion modes (UPDATE / DELETE / ARCHIVE) — outbox
-- `PublishedEvents` test utility — outbox `/testing`
-- Event externalization to brokers — SPI,
-  `@Externalized`, `outbox-microservices` package,
-  [ADR-015](../adr/015-event-externalization-architecture.md).
-  One package covers every usable `@nestjs/microservices` transport
-  ([DD-016](../dd/016-event-externalization.md)). What a successful
-  publish acknowledges varies by transport: Kafka and RabbitMQ match
-  Spring Modulith's broker-acked story, core NATS and TCP do not
-  acknowledge at all, and gRPC cannot be used. Per-transport table and
-  measurements in
-  [ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
+**Spring Modulith's event publication, from 3.0.0:**
+
+Until 2.x this repository shipped its own Event Publication Registry,
+mapped one to one onto Spring Modulith's: lifecycle states, completion
+modes, the Failed / Incomplete / Completed APIs, the staleness monitor,
+republishing on restart, `PublishedEvents`. From 3.0.0 delivery belongs
+to `@nestjs/outbox` (ADR-023), and that one-to-one claim is withdrawn.
+What remains, mapped honestly:
+
+| Spring Modulith | 3.0.0 |
+| --- | --- |
+| Publication written in the business transaction | `OutboxEventPublisher.publish()` inside `@Transactional` |
+| `@ApplicationModuleListener` | `@IntegrationEventsHandler` (in-memory), `@OnOutboxMessage` (durable, `@nestjs/outbox`) |
+| Retry of incomplete publications | `@nestjs/outbox` retries with backoff; dead letters for the rest |
+| `FailedEventPublications.resubmit` | `OutboxDeadLetters.requeue` |
+| Republish on restart / staleness | leases: a crashed instance's messages are reclaimed by any other |
+| Completion modes, audit of completed publications | none: a delivered message is removed |
+| `@Externalized` to brokers | `@Externalized` + `ClientProxyTransport` |
+| `PublishedEvents` test utility | none; `OutboxRelay.runOnce()` in integration tests |
+
+What a broker's acknowledgement means varies by transport: Kafka and
+RabbitMQ match Spring Modulith's broker-acked story, core NATS and TCP do
+not acknowledge at all, and gRPC cannot be used. Per-transport table and
+measurements in
+[ADR-021](../adr/021-externalization-acknowledgement-per-transport.md).
 
 **Explicitly out of scope:**
 - Module boundary verification (Spring Modulith's `ApplicationModuleVerification`)

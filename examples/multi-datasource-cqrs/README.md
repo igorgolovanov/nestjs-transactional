@@ -16,18 +16,13 @@ extended with a second DataSource. No Docker required.
 - You have multiple DataSources AND you use `@nestjs/cqrs` aggregates
   / phase listeners. Single source of truth: one decorator option
   binds a listener to the right DS's transaction.
-- You want to see the difference between Category A (auto-routing for
-  outbox-backed handlers — see
-  [`multi-datasource-outbox`](../multi-datasource-outbox)) and
-  Category B (explicit `dataSource` decorator for cqrs in-memory
-  handlers).
 - You want a regression template for cross-DS CQRS service tests
   exercising commit, rollback, and cross-DS isolation.
 
 For single-DS CQRS see [`basic-cqrs`](../basic-cqrs). For multi-DS
 without CQRS see [`multi-datasource-basic`](../multi-datasource-basic).
 For durable cross-DS event delivery see
-[`multi-datasource-outbox`](../multi-datasource-outbox).
+[`audit-logging`](../audit-logging).
 
 ## Run
 
@@ -144,8 +139,9 @@ semantics) — same pattern as
 - **`@TransactionalEventsHandler` is in-memory and process-local.**
   If the process crashes between `commit()` and the AFTER_COMMIT
   hook running, the event is lost. For durable cross-process
-  delivery use `@OutboxEventsHandler` (see
-  [`multi-datasource-outbox`](../multi-datasource-outbox)).
+  delivery publish through the outbox and handle with `@nestjs/outbox`'s
+  `@OnOutboxMessage` (see [`audit-logging`](../audit-logging) for an
+  outbox feeding another DataSource).
 - **Cross-DS transactions are NOT supported (DD-023).** A
   `@Transactional({ dataSource: 'billing' })` method that calls into
   a `@Transactional({ dataSource: 'inventory' })` method will run
@@ -156,15 +152,6 @@ semantics) — same pattern as
   each test rebuilds the module from scratch.** Multi-`forRoot` dedup
   uses static class storage.
 
-## Category A vs Category B
-
-| Aspect | Category A (outbox) | Category B (cqrs in-memory) |
-|---|---|---|
-| Decorator | `@OutboxEventsHandler` / `@IntegrationEventsHandler` | `@TransactionalEventsHandler` / `@IntegrationEventsHandler` (in-memory path) |
-| Routing source | Per-DS `EventTypeRegistry` (auto-resolved by scanner) | Explicit `dataSource` decorator option |
-| Why | Each event class is registered to ONE DS via `forFeature` — single source of truth | cqrs is decoupled from outbox, no per-DS event registry to consult |
-| Example | [`multi-datasource-outbox`](../multi-datasource-outbox) | this example |
-
 ## Related examples
 
 - [`basic-cqrs`](../basic-cqrs) — single DataSource, all three handler
@@ -172,12 +159,10 @@ semantics) — same pattern as
   Start there for CQRS basics.
 - [`multi-datasource-basic`](../multi-datasource-basic) — same two
   DataSources without CQRS or outbox.
-- [`multi-datasource-outbox`](../multi-datasource-outbox) — durable
-  variant: each DS has its own outbox + Postgres `event_publication`
-  table.
+- [`audit-logging`](../audit-logging) — durable cross-DS delivery
+  through an outbox on one of the DataSources.
 - [`e-commerce-orders`](../e-commerce-orders) — Tier 5 flagship
-  with multi-DS CQRS, REST, outbox saga, and Kafka externalization
-  on top of the same per-DS handler-binding pattern.
+  with CQRS, REST, an outbox saga, and Kafka externalization.
 
 ## Further reading
 
@@ -185,5 +170,3 @@ semantics) — same pattern as
   (the addendum documents the Category A/B framing)
 - [DD-023 — independent transaction contexts per dataSource](../../docs/dd/023-independent-tx-contexts-per-ds.md)
 - [`@nestjs-transactional/cqrs` README — public API and usage](../../packages/cqrs/README.md)
-- Multi-DS cqrs regression test at the package level:
-  [`packages/cqrs/src/module/cqrs-transactional.module.multi-datasource.spec.ts`](../../packages/cqrs/src/module/cqrs-transactional.module.multi-datasource.spec.ts).

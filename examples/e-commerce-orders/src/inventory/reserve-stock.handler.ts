@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { QueryFailedError, Repository } from 'typeorm';
 
@@ -28,10 +25,9 @@ class OutOfStockError extends Error {
 }
 
 /**
- * Inventory step. Subscribes to `OrderPlacedEvent` (owned by orders
- * DS); runs in **inventory DS** transaction —
- * `@Transactional({ dataSource: 'inventory' })` opens it
- * explicitly because the default DS is orders.
+ * Inventory step. Subscribes to `orders.placed`, the topic
+ * `OrderPlacedEvent` is `@Externalized` to, and works on the tables in
+ * the `inventory` schema.
  *
  * For each line item:
  *   1. Try a conditional `UPDATE products SET available = available - qty
@@ -41,27 +37,27 @@ class OutOfStockError extends Error {
  *      skip.
  *
  * If ANY line item fails, the reserve transaction rolls back —
- * partial reservations from earlier lines disappear (DD-019). The
+ * partial reservations from earlier lines disappear. The
  * handler catches the OOS marker outside the @Transactional and
  * publishes `StockReservationFailedEvent` from a **fresh**
- * inventory transaction so the failure is recorded durably.
+ * transaction so the failure is recorded durably.
  *
  * On all-success: emit `StockReservedEvent` atomically with the
  * reservation rows.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'Inventory.ReserveStock' })
-export class ReserveStockHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
+export class ReserveStockHandler {
   private readonly logger = new Logger(ReserveStockHandler.name);
 
   constructor(
-    @InjectRepository(ProductRow, 'inventory')
+    @InjectRepository(ProductRow)
     private readonly products: Repository<ProductRow>,
-    @InjectRepository(ReservationRow, 'inventory')
+    @InjectRepository(ReservationRow)
     private readonly reservations: Repository<ReservationRow>,
     private readonly outbox: OutboxEventPublisher,
   ) {}
 
+  @OnOutboxMessage('orders.placed', { consumer: 'inventory.reserve-stock' })
   async handle(event: OrderPlacedEvent): Promise<void> {
     try {
       await this.tryReserve(event);
@@ -79,7 +75,7 @@ export class ReserveStockHandler implements IIntegrationEventHandler<OrderPlaced
    * on first OOS line — rolls back every prior decrement / insert
    * in this call. The caller catches it.
    */
-  @Transactional({ dataSource: 'inventory' })
+  @Transactional()
   private async tryReserve(event: OrderPlacedEvent): Promise<void> {
     const reservedSkus: string[] = [];
 
@@ -133,10 +129,8 @@ export class ReserveStockHandler implements IIntegrationEventHandler<OrderPlaced
     );
   }
 
-  @Transactional({ dataSource: 'inventory' })
+  @Transactional()
   private async publishFailure(event: OrderPlacedEvent, reason: string): Promise<void> {
-    await this.outbox.publish(
-      new StockReservationFailedEvent(event.orderId, reason, []),
-    );
+    await this.outbox.publish(new StockReservationFailedEvent(event.orderId, reason, []));
   }
 }

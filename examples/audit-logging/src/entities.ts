@@ -14,8 +14,8 @@ export class AccountRow {
  * Business-DS operation log. Persisting the operation row in the
  * SAME transaction as the balance update is what makes the
  * `AccountOperationEvent` payload trustworthy — by the time the
- * outbox worker delivers the event, the operation row exists and
- * its fields match the event payload (DD-019 single-unit atomicity).
+ * outbox relay delivers the event, the operation row exists and
+ * its fields match the event payload.
  */
 @Entity({ name: 'account_operations' })
 export class AccountOperationRow {

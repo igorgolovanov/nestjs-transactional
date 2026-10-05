@@ -1,9 +1,6 @@
 import { AggregateRoot } from '@nestjs/cqrs';
 
-import {
-  OrderConfirmedEvent,
-  OrderPlacedEvent,
-} from '../shared/events.js';
+import { OrderConfirmedEvent, OrderPlacedEvent } from '../shared/events.js';
 
 /**
  * Order aggregate. CQRS-style — `apply()` stages events on the
@@ -31,22 +28,13 @@ export class Order extends AggregateRoot {
   }
 
   place(): void {
-    this.apply(
-      new OrderPlacedEvent(
-        this.id,
-        this.customerId,
-        this.items,
-        this.totalAmountCents,
-      ),
-    );
+    this.apply(new OrderPlacedEvent(this.id, this.customerId, this.items, this.totalAmountCents));
   }
 
   confirm(): void {
     this.status = 'confirmed';
     this.confirmedAt = new Date();
-    this.apply(
-      new OrderConfirmedEvent(this.id, this.customerId, this.totalAmountCents),
-    );
+    this.apply(new OrderConfirmedEvent(this.id, this.customerId, this.totalAmountCents));
   }
 
   fail(reason: string): void {

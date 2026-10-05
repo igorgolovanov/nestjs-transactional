@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { Repository } from 'typeorm';
 
 import { PaymentFailedEvent } from '../shared/events.js';
@@ -13,7 +10,7 @@ import { ReservationRow } from './reservation.entity.js';
 
 /**
  * Compensation step in the inventory context. On `PaymentFailedEvent`
- * (owned by billing DS), find every still-`'reserved'` row for this
+ * (published by billing), find every still-`'reserved'` row for this
  * order, restore its stock to `products.available`, and mark the
  * reservation row `'released'`.
  *
@@ -22,24 +19,24 @@ import { ReservationRow } from './reservation.entity.js';
  * and zero-affects.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [PaymentFailedEvent], id: 'Inventory.ReleaseStock' })
-export class ReleaseStockHandler implements IIntegrationEventHandler<PaymentFailedEvent> {
+export class ReleaseStockHandler {
   private readonly logger = new Logger(ReleaseStockHandler.name);
 
   constructor(
-    @InjectRepository(ProductRow, 'inventory')
+    @InjectRepository(ProductRow)
     private readonly products: Repository<ProductRow>,
-    @InjectRepository(ReservationRow, 'inventory')
+    @InjectRepository(ReservationRow)
     private readonly reservations: Repository<ReservationRow>,
   ) {}
 
+  @OnOutboxMessage('PaymentFailedEvent', { consumer: 'inventory.release-stock' })
   async handle(event: PaymentFailedEvent): Promise<void> {
     // Inner-method indirection for the same reason as
     // `ChargePaymentHandler` — see its JSDoc.
     await this.processInInventoryTx(event);
   }
 
-  @Transactional({ dataSource: 'inventory' })
+  @Transactional()
   private async processInInventoryTx(event: PaymentFailedEvent): Promise<void> {
     const rows = await this.reservations.find({
       where: { orderId: event.orderId, status: 'reserved' },
@@ -56,7 +53,7 @@ export class ReleaseStockHandler implements IIntegrationEventHandler<PaymentFail
         { status: 'released' },
       );
       if (update.affected === 0) {
-        // Lost the race to another worker; skip to avoid double-restoring.
+        // Lost the race to a concurrent delivery; skip to avoid double-restoring.
         continue;
       }
       await this.products

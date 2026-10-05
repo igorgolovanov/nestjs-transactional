@@ -1,5 +1,7 @@
 # ADR-007: Outbox architecture — split between `outbox` and `outbox-typeorm`
 
+> **Superseded from 3.0.0** by [ADR-023](./023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 ## Status
 
 Accepted — 2026-04-24.
@@ -189,4 +191,4 @@ and the rest of the library runs unchanged.
 - [DD-025 — Claim atomicity obligation](../dd/025-claim-atomicity-obligation.md)
 - [Outbox pattern overview](../architecture/outbox-pattern.md)
 - [`@nestjs-transactional/outbox` README](../../packages/outbox/README.md)
-- [`@nestjs-transactional/outbox-typeorm` README](../../packages/outbox-typeorm/README.md)
+- [`@nestjs-transactional/outbox-typeorm` README](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox-typeorm/README.md)

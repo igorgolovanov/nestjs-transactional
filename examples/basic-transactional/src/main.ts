@@ -16,7 +16,10 @@ async function main(): Promise<void> {
 
   console.log('1) createUser("alice") inside @Transactional');
   await users.createUser('alice', 'Alice');
-  console.log('   after commit, DB rows:', (await users.listAll()).map((u) => u.id));
+  console.log(
+    '   after commit, DB rows:',
+    (await users.listAll()).map((u) => u.id),
+  );
 
   console.log('2) createUserAndFail("bob") — service throws inside @Transactional');
   try {
@@ -24,7 +27,10 @@ async function main(): Promise<void> {
   } catch (err) {
     console.log('   caught:', (err as Error).message);
   }
-  console.log('   after rollback, DB rows:', (await users.listAll()).map((u) => u.id));
+  console.log(
+    '   after rollback, DB rows:',
+    (await users.listAll()).map((u) => u.id),
+  );
 
   console.log('   expected: bob is NOT in the list — write rolled back');
 

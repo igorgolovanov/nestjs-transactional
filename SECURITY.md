@@ -12,7 +12,7 @@ a suspected vulnerability before it has been addressed.
 
 What helps most in a report:
 
-- the affected package and version (all six packages ship as one
+- the affected package and version (all four packages ship as one
   version cohort, so naming one is usually enough);
 - what an attacker gains — the data they can read, write, or bypass;
 - a minimal reproduction, ideally a failing test rather than prose;
@@ -43,7 +43,7 @@ never maintained, and `1.0.0` is where this policy started.
 
 ## Scope
 
-In scope: anything in the six published packages under
+In scope: anything in the four published packages under
 `@nestjs-transactional/*`.
 
 Out of scope, though still worth telling us about as ordinary issues:
@@ -64,22 +64,23 @@ Out of scope, though still worth telling us about as ordinary issues:
 
 Two behaviours are worth knowing about when you assess risk:
 
-- **The outbox persists serialized event payloads** in
-  `event_publication.serialized_event` (and in
-  `event_publication_archive` under `ARCHIVE` completion mode) until
-  the row is purged. Anything you put in an event lands in your own
-  database, in plain text, for as long as you retain it. Retention is
-  yours to configure.
-- **Failure reasons are stored** in `event_publication.failure_reason`,
-  which means an exception message from a listener is persisted. Avoid
-  putting secrets in exception messages you expect to cross that
-  boundary.
+- **The outbox persists event payloads.** `@nestjs/outbox`, which the
+  outbox bridge delivers through, stores each message's payload as JSON
+  in `nest_outbox.messages` until it is delivered, and keeps it in
+  `nest_outbox.dead_letters` when delivery gives up. Anything you put in
+  an event lands in your own database, in plain text, for that long.
+  Dead letters are kept until you purge them, and the dead-letter APIs
+  expose full payloads, so guard any route that serves them.
+- **Failure reasons are stored** with each message, as its last error
+  and an attempt history, which means an exception message from a
+  handler or a broker is persisted. Avoid putting secrets in exception
+  messages you expect to cross that boundary.
 
 Neither is a vulnerability in itself. They are stated here so the
 data-at-rest footprint is not a surprise.
 
 There is no telemetry: nothing is reported to us or to any third party.
 The only outbound traffic the packages generate is to endpoints you
-configure yourself — your database through TypeORM, and, if you use
-`outbox-microservices`, your own broker through the `ClientProxy` you
-provide.
+configure yourself — your database through TypeORM, and, if you send
+events to a broker through the outbox, your own broker through the
+`ClientProxy` you provide.

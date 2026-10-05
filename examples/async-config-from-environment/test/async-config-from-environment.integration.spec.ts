@@ -4,24 +4,12 @@ import { jest } from '@jest/globals';
 import { join } from 'node:path';
 
 import { Logger } from '@nestjs/common';
+import { OUTBOX_MODULE_OPTIONS, type OutboxModuleOptions } from '@nestjs/outbox';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import {
-  OUTBOX_PROCESSOR_OPTIONS,
-  OutboxModule,
-  PublicationStatus,
-} from '@nestjs-transactional/outbox';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-} from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module.js';
@@ -50,27 +38,9 @@ async function waitFor(
   }
 }
 
-/**
- * Wait until this dataSource's publication rows satisfy `predicate`.
- *
- * The worker sets a row's terminal status *after* the handler — and, when
- * externalization is configured, after the broker emit — has returned.
- * So waiting on a handler flag or on an emit mock is not the same as
- * waiting on the row reaching COMPLETED: the gap is invisible on a fast
- * machine and real on a CI runner.
- */
-async function waitForPublications(
-  ds: DataSource,
-  predicate: (rows: EventPublicationEntity[]) => boolean,
-): Promise<void> {
-  await waitFor(async () => predicate(await ds.getRepository(EventPublicationEntity).find()));
-}
-
 function resetModuleState(): void {
-  OutboxModule.resetForTesting();
   TransactionalModule.resetForTesting();
   TypeOrmTransactionalModule.resetForTesting();
-  OutboxTypeOrmModule.resetForTesting();
 }
 
 /**
@@ -161,8 +131,7 @@ describe('async-config-from-environment (Postgres via testcontainers)', () => {
       audit = module.get(AuditService);
       archival = module.get(AuditArchivalHandler);
 
-      await dataSource.getRepository(EventPublicationArchiveEntity).clear();
-      await dataSource.getRepository(EventPublicationEntity).clear();
+      await dataSource.query('TRUNCATE nest_outbox.messages, nest_outbox.inbox');
       await dataSource.getRepository(AuditLogEntry).clear();
     });
 
@@ -170,43 +139,29 @@ describe('async-config-from-environment (Postgres via testcontainers)', () => {
       await module.close();
     });
 
-    it('boots from .env.development and commits the audit row + outbox publication atomically', async () => {
+    it('boots from .env.development; the audit row commits and its message reaches the handler', async () => {
       await audit.recordEvent('a-1', 'UserSignedIn', { userId: 'u-42' });
 
       const auditRows = await dataSource.getRepository(AuditLogEntry).find();
-      const publicationRows = await dataSource
-        .getRepository(EventPublicationEntity)
-        .find();
-
       expect(auditRows.map((r) => r.id)).toEqual(['a-1']);
-      expect(publicationRows).toHaveLength(1);
-      expect(publicationRows[0]?.eventType).toBe('AuditEventRecordedEvent');
 
+      // The relay polls every 100 ms in this profile, so delivery is
+      // asynchronous: wait for the handler, then for its inbox record.
       await waitFor(() => archival.archived.some((e) => e.entryId === 'a-1'));
-      await waitForPublications(
-        dataSource,
-        (rows) => rows[0]?.status === PublicationStatus.COMPLETED,
-      );
-
-      const completed = await dataSource
-        .getRepository(EventPublicationEntity)
-        .findOne({ where: { id: publicationRows[0]!.id } });
-      expect(completed?.status).toBe(PublicationStatus.COMPLETED);
+      await waitFor(async () => {
+        const rows: unknown[] = await dataSource.query(
+          `SELECT 1 FROM nest_outbox.inbox WHERE consumer = 'audit.archival'`,
+        );
+        return rows.length === 1;
+      });
     });
 
-    it('injects dev-profile outbox tunables into OUTBOX_PROCESSOR_OPTIONS', () => {
-      const options = module.get<{
-        pollingInterval: number;
-        batchSize: number;
-        maxConcurrent: number;
-      }>(OUTBOX_PROCESSOR_OPTIONS);
+    it('passes the dev-profile relay tunables to @nestjs/outbox', () => {
+      const options = module.get<OutboxModuleOptions>(OUTBOX_MODULE_OPTIONS);
 
-      // Mirror .env.development values — proves the async factory
-      // actually read them and passed them through to the outbox
-      // processor, not the framework defaults.
-      expect(options.pollingInterval).toBe(100);
-      expect(options.batchSize).toBe(50);
-      expect(options.maxConcurrent).toBe(10);
+      // Mirror .env.development values: the async factory read them and
+      // passed them through, rather than the package defaults.
+      expect(options.relay).toMatchObject({ pollInterval: 100, batchSize: 50, concurrency: 10 });
     });
   });
 
@@ -230,18 +185,15 @@ describe('async-config-from-environment (Postgres via testcontainers)', () => {
       await module.init();
 
       try {
-        const options = module.get<{
-          pollingInterval: number;
-          batchSize: number;
-          maxConcurrent: number;
-        }>(OUTBOX_PROCESSOR_OPTIONS);
+        const options = module.get<OutboxModuleOptions>(OUTBOX_MODULE_OPTIONS);
 
-        // Mirror .env.production values — different from dev profile,
-        // proving NODE_ENV / envFilePath actually switches the
-        // resolved config end-to-end.
-        expect(options.pollingInterval).toBe(2000);
-        expect(options.batchSize).toBe(500);
-        expect(options.maxConcurrent).toBe(50);
+        // Mirror .env.production values, different from the dev profile:
+        // NODE_ENV / envFilePath really switches the resolved config.
+        expect(options.relay).toMatchObject({
+          pollInterval: 2000,
+          batchSize: 500,
+          concurrency: 50,
+        });
       } finally {
         await module.close();
       }

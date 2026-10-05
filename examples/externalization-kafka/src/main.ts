@@ -3,13 +3,8 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Kafka } from 'kafkajs';
 
-import {
-  AppModule,
-  readKafkaConfigFromEnv,
-  readPostgresConfigFromEnv,
-} from './app.module.js';
+import { AppModule, readKafkaConfigFromEnv, readPostgresConfigFromEnv } from './app.module.js';
 import { OrderService } from './order.service.js';
-import { ShippingHandler } from './shipping.handler.js';
 
 async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const start = Date.now();
@@ -58,16 +53,11 @@ async function main(): Promise<void> {
   );
 
   const orders = app.get(OrderService);
-  const shipping = app.get(ShippingHandler);
 
   console.log('=== externalization-kafka ===');
 
   console.log('1) placeOrder("o-1") — INSERT + outbox.publish in one tx');
   await orders.placeOrder('o-1', 'alice@example.com', 5_000);
-
-  console.log('   waiting for local handler...');
-  await waitFor(() => shipping.handled.some((e) => e.orderId === 'o-1'));
-  console.log('   shipping handled:', shipping.handled.map((e) => e.orderId));
 
   console.log('   waiting for kafka consumer...');
   await waitFor(() => received.some((m) => m.key === 'o-1'));
@@ -76,17 +66,22 @@ async function main(): Promise<void> {
     console.log(`     key=${m.key} headers=${JSON.stringify(m.headers)} value=${m.value}`);
   }
 
-  console.log('2) placeOrderAndFail("o-2") — both rows roll back, no Kafka emit');
+  console.log('2) placeOrderAndFail("o-2") — order and message roll back, nothing reaches Kafka');
   try {
     await orders.placeOrderAndFail('o-2', 'bob@example.com', 7_500);
   } catch (err) {
     console.log('   caught:', (err as Error).message);
   }
   await new Promise((r) => setTimeout(r, 1_000));
-  console.log('   orders in DB:', (await orders.listAll()).map((o) => o.id));
-  console.log('   shipping handled:', shipping.handled.map((e) => e.orderId));
-  console.log('   kafka received keys:', received.map((m) => m.key));
-  console.log('   expected: o-2 in NEITHER list — atomicity holds across externalization');
+  console.log(
+    '   orders in DB:',
+    (await orders.listAll()).map((o) => o.id),
+  );
+  console.log(
+    '   kafka received keys:',
+    received.map((m) => m.key),
+  );
+  console.log('   expected: o-2 in neither list — the message rolled back with the order');
 
   await consumer.disconnect();
   await app.close();

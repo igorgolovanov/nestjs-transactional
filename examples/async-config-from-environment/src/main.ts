@@ -26,10 +26,9 @@ async function main(): Promise<void> {
   const env = process.env.NODE_ENV ?? 'development';
   const envFilePath = `.env.${env}`;
 
-  const app = await NestFactory.createApplicationContext(
-    AppModule.forEnv({ envFilePath }),
-    { logger: ['error', 'warn', 'log'] },
-  );
+  const app = await NestFactory.createApplicationContext(AppModule.forEnv({ envFilePath }), {
+    logger: ['error', 'warn', 'log'],
+  });
 
   const cfg = app.get(ConfigService);
   const audit = app.get(AuditService);

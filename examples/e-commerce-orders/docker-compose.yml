@@ -1,14 +1,16 @@
 # Visual-demo stack for `pnpm start`. The integration tests run a
-# testcontainers Postgres (3 databases inside one container) and a
-# mocked `ClientProxy` for Kafka — Docker Compose is NOT used by
-# tests, only by humans who want to see the saga emit real
-# messages onto a real broker.
+# testcontainers Postgres and a recorded `ClientProxy` for Kafka;
+# Docker Compose is NOT used by tests, only by humans who want to see
+# the saga emit real messages onto a real broker. One database holds
+# the three bounded contexts as schemas, plus the outbox's own
+# `nest_outbox` schema.
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ecommerce
     ports:
       - '5432:5432'
     healthcheck:

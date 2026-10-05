@@ -10,7 +10,7 @@ import { OrderPlacedEvent } from './events.js';
 /**
  * Saga entry point. `placeOrder` opens a transaction, persists the
  * order row in `placed` status, and publishes `OrderPlacedEvent` —
- * all atomically (DD-019). The reservation handler picks the event
+ * all atomically. The reservation handler picks the event
  * up via the outbox.
  *
  * `OutboxEventPublisher.publish` is the canonical class-token
@@ -28,12 +28,7 @@ export class OrderService {
   ) {}
 
   @Transactional()
-  async placeOrder(
-    orderId: string,
-    sku: string,
-    quantity: number,
-    amount: number,
-  ): Promise<void> {
+  async placeOrder(orderId: string, sku: string, quantity: number, amount: number): Promise<void> {
     await this.orders.insert({
       id: orderId,
       sku,

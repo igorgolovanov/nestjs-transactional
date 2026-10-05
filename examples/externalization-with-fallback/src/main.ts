@@ -1,30 +1,12 @@
 import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
-import { FailedEventPublications } from '@nestjs-transactional/outbox';
+import { type OutboxEnvelope, OutboxDeadLetters, OutboxRelay } from '@nestjs/outbox';
 
-import {
-  AppModule,
-  readPostgresConfigFromEnv,
-  readRabbitMqConfigFromEnv,
-} from './app.module.js';
+import { AppModule, readPostgresConfigFromEnv, readRabbitMqConfigFromEnv } from './app.module.js';
 import { RefundConsumerService } from './refund-consumer.service.js';
-import { RefundLedgerHandler } from './refund-ledger.handler.js';
-import { RefundRequestedEvent } from './refund-requested.event.js';
+import type { RefundRequestedEvent } from './refund-requested.event.js';
 import { RefundService } from './refund.service.js';
-
-async function waitFor(
-  predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 10_000,
-): Promise<void> {
-  const start = Date.now();
-  while (!(await predicate())) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(`waitFor: timed out after ${timeoutMs} ms`);
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
 
 async function main(): Promise<void> {
   const postgres = readPostgresConfigFromEnv();
@@ -36,67 +18,41 @@ async function main(): Promise<void> {
   );
 
   const refunds = app.get(RefundService);
-  const ledger = app.get(RefundLedgerHandler);
   const consumer = app.get(RefundConsumerService);
-  const failed = app.get(FailedEventPublications);
+  const relay = app.get(OutboxRelay);
+  const deadLetters = app.get(OutboxDeadLetters);
 
   console.log('=== externalization-with-fallback ===');
 
-  console.log('1) Happy path — broker reachable');
-  await refunds.requestRefund('rf-1', 'order-1', 5_000);
-  await waitFor(() => ledger.handled.some((e) => e.refundId === 'rf-1'));
-  console.log('   ledger handled:', ledger.handled.map((e) => e.refundId));
+  console.log('1) requestRefund("rf-1") — refund row + outbox message in one transaction');
+  await refunds.requestRefund('rf-1', 'order-1', 1_500);
+  await new Promise((r) => setTimeout(r, 1_000));
+  console.log('   relay stats:', await relay.stats());
+  console.log('   With the broker up, the message has been delivered and left the outbox.');
 
-  console.log('   The publication transitions to COMPLETED.');
-  console.log('   Verify on RabbitMQ management UI: queue `refunds` should have a message.');
+  console.log('2) Stop RabbitMQ now (docker compose stop rabbitmq) to watch the fallback:');
+  console.log('   the message stays in the outbox, is retried with backoff, and after');
+  console.log('   three attempts is dead-lettered with its error history.');
 
-  console.log('2) Broker down — the failure is surfaced, not swallowed');
-  console.log('   ACTION REQUIRED — in another terminal, stop RabbitMQ:');
-  console.log(
-    '     docker-compose -f examples/externalization-with-fallback/docker-compose.yml stop rabbitmq',
-  );
-  console.log('   Press ENTER when done...');
-  await new Promise<void>((resolve) => process.stdin.once('data', () => resolve()));
-
-  await refunds.requestRefund('rf-2', 'order-2', 7_500);
-  await waitFor(() => ledger.handled.some((e) => e.refundId === 'rf-2'));
-  console.log('   ledger handled:', ledger.handled.map((e) => e.refundId));
-  console.log('   The local handler ran regardless of the broker (DD-019 ordering).');
-
-  // RabbitMQ resolves `emit()` on a publisher confirm, so a stopped
-  // broker rejects and the publication lands in FAILED rather than
-  // being reported as delivered. ADR-021 has the measurements.
-  await waitFor(async () => (await failed.count()) > 0, 30_000);
-  const [failure] = await failed.findAll();
-  console.log(`   Publication for rf-2 is FAILED, reason: ${failure?.failureReason ?? '(none)'}`);
-  console.log('   Verify on RabbitMQ management UI: queue `refunds` got NO new message.');
-
-  console.log('3) Recovery — resubmit once the broker is back');
-  console.log('   Restart the broker:');
-  console.log(
-    '     docker-compose -f examples/externalization-with-fallback/docker-compose.yml start rabbitmq',
-  );
-  console.log('   Press ENTER when ready...');
-  await new Promise<void>((resolve) => process.stdin.once('data', () => resolve()));
-
-  const failedCount = await failed.count();
-  console.log(`   Currently ${failedCount} publications in FAILED state.`);
-  if (failedCount > 0) {
-    const resubmitted = await failed.resubmit();
-    console.log(`   Resubmitted ${resubmitted} for retry.`);
-    await waitFor(async () => (await failed.count()) === 0, 30_000);
-    console.log('   The next poll delivered them; nothing left in FAILED.');
-  } else {
-    console.log('   Nothing to resubmit; see the integration test for the full failure flow.');
+  console.log('3) Recovery — requeue dead letters once the broker is back');
+  const dead = await deadLetters.list();
+  console.log(`   ${dead.length} dead letter(s).`);
+  if (dead.length > 0) {
+    console.log(`   Requeued ${await deadLetters.requeue(dead.map((d) => d.id))} for delivery.`);
   }
 
-  console.log('4) Consumer-side dedup template');
-  const event = new RefundRequestedEvent('rf-3', 'order-3', 1_500);
-  const result1 = await consumer.process(event, 'pub-rf-3');
-  const result2 = await consumer.process(event, 'pub-rf-3');
-  console.log(`   first call: ${result1}, second call: ${result2}`);
-  console.log('   The dedup table guarantees at-most-once processing on the consumer side');
-  console.log('   even when the broker (or our framework) delivers the same event twice.');
+  console.log('4) Consumer-side inbox — the same message twice');
+  const envelope: OutboxEnvelope<RefundRequestedEvent> = {
+    id: 'demo-message-rf-3',
+    topic: 'refunds',
+    key: null,
+    headers: {},
+    createdAt: Date.now(),
+    payload: { refundId: 'rf-3', orderId: 'order-3', amountCents: 500 },
+  };
+  console.log('   first delivery: ', await consumer.process(envelope));
+  console.log('   second delivery:', await consumer.process(envelope));
+  console.log('   The inbox keeps the effect to one, however many times it arrives.');
 
   await app.close();
 }

@@ -95,9 +95,9 @@ export class CrossModuleHandler implements IIntegrationEventHandler<OrderPlacedE
   }
 }
 
-// 6. @IntegrationEventsHandler long form with stable id.
-@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'stable-id' })
-export class StableIdHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
+// 6. @IntegrationEventsHandler long form with a dataSource.
+@IntegrationEventsHandler({ events: [OrderPlacedEvent], dataSource: 'billing' })
+export class BillingScopedHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
   handle(event: OrderPlacedEvent): void {
     void event;
   }
@@ -108,6 +108,16 @@ export class StableIdHandler implements IIntegrationEventHandler<OrderPlacedEven
 // If any of these compiles without error, the build breaks with
 // "Unused '@ts-expect-error' directive".
 // ─────────────────────────────────────────────────────────────────────
+
+// `id` belonged to the 2.x outbox listener registry and was removed in
+// 3.0.0 (ADR-023). Accepting it silently would hide a stale option.
+// @ts-expect-error -- `id` is not an option any more
+@IntegrationEventsHandler({ events: [OrderPlacedEvent], id: 'stable-id' })
+export class RemovedIdHandler implements IIntegrationEventHandler<OrderPlacedEvent> {
+  handle(event: OrderPlacedEvent): void {
+    void event;
+  }
+}
 
 // N1. Missing `handle` method.
 // @ts-expect-error — `implements` requires a `handle` method.

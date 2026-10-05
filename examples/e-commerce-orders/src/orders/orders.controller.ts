@@ -1,12 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 
 import type { OrderResponseDto, PlaceOrderRequestDto } from '../shared/dtos.js';
 import { GetOrderHandler, GetOrderQuery } from './get-order.handler.js';
@@ -39,9 +31,7 @@ export class OrdersController {
 
   @Post()
   @HttpCode(201)
-  async placeOrder(
-    @Body() body: PlaceOrderRequestDto,
-  ): Promise<{ orderId: string }> {
+  async placeOrder(@Body() body: PlaceOrderRequestDto): Promise<{ orderId: string }> {
     if (!body?.customerId || !Array.isArray(body.items) || body.items.length === 0) {
       throw new BadRequestException('customerId and non-empty items[] are required');
     }

@@ -1,28 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { type IOutboxEventHandler, OutboxEventsHandler } from '@nestjs-transactional/outbox';
+import { OnOutboxMessage } from '@nestjs/outbox';
 
-import { AuditEventRecordedEvent } from './audit-event-recorded.event.js';
+import type { AuditEventRecordedEvent } from './audit-event-recorded.event.js';
 
 /**
- * Outbox listener — pushed by the per-DS worker (REQUIRES_NEW
- * transaction by default). Real apps might forward the audit row to
- * a long-term archive (S3, Snowflake) here; this stub just records
- * it in memory so the integration test can assert that the worker
- * actually dispatched.
+ * Outbox handler, delivered by `@nestjs/outbox`'s relay after the audit
+ * transaction commits. Real apps might forward the audit row to a
+ * long-term archive (S3, Snowflake) here; this stub just records it in
+ * memory so the integration test can assert the delivery happened.
  *
- * Without at least one listener registered, `OutboxEventPublisher`
- * silently drops `publish` calls (Convention #15) — even with
- * `forFeature` registration. So the example needs *some* handler
- * here even if it does nothing useful.
+ * It subscribes to the topic the bridge uses for an event without
+ * `@Externalized`: its class name. The payload is plain JSON.
  */
 @Injectable()
-@OutboxEventsHandler({ events: [AuditEventRecordedEvent], id: 'Audit.Archival' })
-export class AuditArchivalHandler implements IOutboxEventHandler<AuditEventRecordedEvent> {
+export class AuditArchivalHandler {
   private readonly logger = new Logger(AuditArchivalHandler.name);
 
   readonly archived: AuditEventRecordedEvent[] = [];
 
-  async handle(event: AuditEventRecordedEvent): Promise<void> {
+  @OnOutboxMessage('AuditEventRecordedEvent', { consumer: 'audit.archival' })
+  async archive(event: AuditEventRecordedEvent): Promise<void> {
     this.logger.log(`Archiving entry ${event.entryId} (${event.eventType})`);
     this.archived.push(event);
   }

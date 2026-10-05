@@ -1,117 +1,85 @@
 import 'reflect-metadata';
 
-/**
- * Metadata key under which {@link ExternalizedMetadata} is stored on
- * classes decorated with {@link Externalized}.
- *
- * Fresh `Symbol` (not `Symbol.for`) — externalization metadata is read
- * only by `ExternalizationRegistry` inside outbox; cross-package
- * sharing is not required.
- */
+/** Reflect-metadata key under which {@link Externalized} stores its options. */
 export const EXTERNALIZED_METADATA = Symbol('EXTERNALIZED_METADATA');
 
-/**
- * Options accepted by {@link Externalized}. The optional `TEvent`
- * generic types the `routingKey` and `headers` callbacks so users get
- * IDE assistance when extracting fields from the event:
- *
- * ```ts
- * @Externalized<OrderPlacedEvent>({
- *   target: 'orders',
- *   routingKey: (e) => e.tenantId, // `e` is OrderPlacedEvent
- * })
- * class OrderPlacedEvent { ... }
- * ```
- *
- * The generic is erased at storage time — the
- * {@link ExternalizationRegistry} sees the callbacks as `(event:
- * unknown) => ...` (see {@link ExternalizedMetadata}).
- */
 export interface ExternalizedOptions<TEvent = unknown> {
   /**
-   * Broker-side destination — Kafka topic, RabbitMQ exchange, NATS
-   * subject, gRPC service, etc. Required, must be a non-empty string.
-   * Interpretation is delegated to the
-   * `EventExternalizer` implementation.
+   * The message topic: what `@nestjs/outbox` stores, what
+   * `ClientProxyTransport` passes to `client.emit()` as the pattern, and
+   * so the Kafka topic, RabbitMQ pattern or NATS subject. Required.
    */
   readonly target: string;
   /**
-   * Optional override for which `ClientProxy` registration the
-   * externalizer should use when more than one is bound. Resolution
-   * semantics are owned by the externalizer; `outbox-microservices`
-   * interprets it as a token in the user's
-   * `ClientsModule` registration (DD-017).
+   * The `@nestjs/outbox` transport that delivers this event: a key of
+   * `OutboxModule`'s `transports`, conventionally the `ClientsModule`
+   * token it wraps. Omit it to use `externalizedRoute`'s
+   * `defaultTransport`.
+   *
+   * `'local'` is `@nestjs/outbox`'s in-process transport. It is how an
+   * event applied by an aggregate gets durable delivery to
+   * `@OnOutboxMessage` handlers, since `AggregateRoot.commit()` takes
+   * only `@Externalized` events into the outbox (DD-028).
    */
-  readonly client?: string | symbol;
+  readonly client?: string;
   /**
-   * Optional callback that derives a routing key from the event
-   * instance. Used by brokers that support secondary routing
-   * (RabbitMQ routing key, Kafka message key, ...). Implementations
-   * that do not understand routing keys ignore the field.
+   * Derives the message `key`. Messages sharing a key are delivered in
+   * commit order, and `toKafkaPacket` makes it the Kafka message key.
    */
   readonly routingKey?: (event: TEvent) => string;
-  /**
-   * Optional message headers. Either a static record, or a callback
-   * that derives headers from the event instance.
-   */
+  /** Message headers, static or derived from the event. */
   readonly headers?: Record<string, string> | ((event: TEvent) => Record<string, string>);
 }
 
-/**
- * Stored shape of {@link ExternalizedOptions} after decoration. The
- * `TEvent` generic from the input is erased — callbacks accept
- * `unknown` and are invoked with the original event instance by
- * {@link ExternalizationRegistry.buildMetadata}.
- */
 export interface ExternalizedMetadata {
   readonly target: string;
-  readonly client?: string | symbol;
+  readonly client?: string;
   readonly routingKey?: (event: unknown) => string;
   readonly headers?: Record<string, string> | ((event: unknown) => Record<string, string>);
 }
 
+/** Where messages for one externalized target go. */
+export interface ExternalizedRoute {
+  readonly client?: string;
+}
+
 /**
- * Mark an event class for externalization to a message broker.
- *
- * After a local outbox listener completes successfully for a
- * publication of this event type, the
- * `EventPublicationProcessor` invokes the bound
- * `EventExternalizer` (see DD-018) with the resolved
- * {@link ExternalizationMetadata}. Reliability — retry on broker
- * failure, recovery on restart — is provided by the existing outbox
- * machinery (single-unit atomicity per DD-019). The actual broker delivery requires a concrete externalizer
- * implementation (e.g.
- * `@nestjs-transactional/outbox-microservices`); without
- * one, decorated events are processed locally and the externalization
- * step is skipped without error.
- *
- * @throws {Error} If `target` is missing, not a string, or empty.
+ * Thrown at decoration time when two event classes declare the same
+ * `target` with different clients. A topic can only be routed one way,
+ * so the conflict is reported where it is written, not when the first
+ * message of one of them is dead-lettered.
+ */
+export class ExternalizedRouteConflictError extends Error {
+  constructor(
+    readonly target: string,
+    readonly existing: string | undefined,
+    readonly attempted: string | undefined,
+  ) {
+    super(
+      `@Externalized target '${target}' is already routed to ${describe(existing)}; ` +
+        `it cannot also be routed to ${describe(attempted)}. Give one of the events ` +
+        `its own target, or the same client.`,
+    );
+    this.name = 'ExternalizedRouteConflictError';
+  }
+}
+
+const routes = new Map<string, ExternalizedRoute>();
+
+/**
+ * Marks an event class for delivery to a broker through `@nestjs/outbox`.
+ * `OutboxEventPublisher.publish()` turns an instance into an outbox
+ * message on `target`, with `routingKey` as its key and `headers` as its
+ * headers (DD-028).
  *
  * @example
- * Static target:
  * ```ts
- * @Externalized({ target: 'orders.placed' })
- * export class OrderPlacedEvent {
- *   constructor(public readonly orderId: string) {}
- * }
- * ```
- *
- * @example
- * Per-event routing key and headers:
- * ```ts
- * @Externalized<OrderPlacedEvent>({
- *   target: 'orders',
- *   routingKey: (e) => e.tenantId,
- *   headers: (e) => ({ 'x-correlation-id': e.correlationId }),
- *   client: 'KAFKA_CLIENT', // forwarded to the externalizer
+ * @Externalized<OrderPlaced>({
+ *   target: 'orders.placed',
+ *   client: 'KAFKA',
+ *   routingKey: (e) => e.orderId,
  * })
- * export class OrderPlacedEvent {
- *   constructor(
- *     readonly orderId: string,
- *     readonly tenantId: string,
- *     readonly correlationId: string,
- *   ) {}
- * }
+ * export class OrderPlaced { constructor(readonly orderId: string) {} }
  * ```
  */
 export function Externalized<TEvent = unknown>(
@@ -121,9 +89,6 @@ export function Externalized<TEvent = unknown>(
     throw new Error('@Externalized requires "target" option as a non-empty string');
   }
 
-  // The `TEvent` generic is erased on storage — the registry invokes
-  // callbacks with `unknown` and passes the original event instance
-  // captured at publish time.
   const metadata: ExternalizedMetadata = {
     target: options.target,
     client: options.client,
@@ -133,16 +98,29 @@ export function Externalized<TEvent = unknown>(
   };
 
   return (target: object): void => {
+    const existing = routes.get(metadata.target);
+    if (existing !== undefined && existing.client !== metadata.client) {
+      throw new ExternalizedRouteConflictError(metadata.target, existing.client, metadata.client);
+    }
+    routes.set(metadata.target, { client: metadata.client });
     Reflect.defineMetadata(EXTERNALIZED_METADATA, metadata, target);
   };
 }
 
-/**
- * Read the {@link ExternalizedMetadata} attached to `target` by
- * {@link Externalized}. Returns `undefined` when the class was not
- * decorated.
- */
+/** The {@link ExternalizedMetadata} of an event class, or `undefined`. */
 export function getExternalizedMetadata(target: object): ExternalizedMetadata | undefined {
-  const value: unknown = Reflect.getMetadata(EXTERNALIZED_METADATA, target);
-  return value as ExternalizedMetadata | undefined;
+  return Reflect.getMetadata(EXTERNALIZED_METADATA, target) as ExternalizedMetadata | undefined;
+}
+
+/**
+ * Every externalized target seen so far, with its route. Filled as
+ * decorated classes are evaluated, so it is complete once the event
+ * modules have been imported, which happens before any message exists.
+ */
+export function externalizedRoutes(): ReadonlyMap<string, ExternalizedRoute> {
+  return routes;
+}
+
+function describe(client: string | undefined): string {
+  return client === undefined ? 'the default transport' : `client '${client}'`;
 }

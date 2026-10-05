@@ -1,23 +1,16 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientProxyTransport, OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
-import { OutboxMicroservicesModule } from '@nestjs-transactional/outbox-microservices';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
+import { externalizedRoute, TransactionalOutboxModule } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import type { DataSource } from 'typeorm';
 
 import { REFUNDS_BROKER } from './clients.js';
-import { ProcessedRefundEntity } from './processed-refunds.entity.js';
 import { RefundConsumerService } from './refund-consumer.service.js';
 import { RefundEntity } from './refund.entity.js';
-import { RefundLedgerHandler } from './refund-ledger.handler.js';
-import { RefundRequestedEvent } from './refund-requested.event.js';
 import { RefundService } from './refund.service.js';
 
 export interface PostgresConfig {
@@ -48,54 +41,69 @@ export function readRabbitMqConfigFromEnv(): RabbitMqConfig {
 
 @Module({})
 export class AppModule {
-  static forInfrastructure(postgres: PostgresConfig, rabbitmq: RabbitMqConfig): DynamicModule {
+  static forInfrastructure(
+    postgres: PostgresConfig,
+    rabbitmq: RabbitMqConfig,
+    options: { readonly relay?: boolean } = {},
+  ): DynamicModule {
+    const clients = ClientsModule.register([
+      {
+        name: REFUNDS_BROKER,
+        transport: Transport.RMQ,
+        options: {
+          urls: [rabbitmq.url],
+          queue: 'refunds',
+          queueOptions: { durable: true },
+          // NestJS defaults this to `false`, and RabbitMQ confirms a
+          // non-persistent message without writing it to disk, so a
+          // broker restart would lose a message the outbox already
+          // counted as published. Publisher confirms are on by default.
+          persistent: true,
+        },
+      },
+    ]);
+
     return {
       module: AppModule,
       imports: [
-        ClientsModule.register([
-          {
-            name: REFUNDS_BROKER,
-            transport: Transport.RMQ,
-            options: {
-              urls: [rabbitmq.url],
-              queue: 'refunds',
-              queueOptions: { durable: true },
-            },
-          },
-        ]),
+        clients,
 
         TypeOrmModule.forRoot({
           type: 'postgres',
           ...postgres,
-          entities: [
-            RefundEntity,
-            ProcessedRefundEntity,
-            EventPublicationEntity,
-            EventPublicationArchiveEntity,
-          ],
+          entities: [RefundEntity],
           synchronize: true,
           logging: false,
         }),
-        TypeOrmModule.forFeature([RefundEntity, ProcessedRefundEntity]),
+        TypeOrmModule.forFeature([RefundEntity]),
 
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
         TypeOrmTransactionalModule.forRoot(),
-        OutboxTypeOrmModule.forRoot({ schemaInitialization: { enabled: false } }),
 
         OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider(),
-          // Slightly slower poll than the other examples — Failed
-          // publication recovery in test 2 wants enough headroom
-          // for the FAILED row to settle before resubmit.
-          processor: { pollingInterval: 100, batchSize: 50 },
+          imports: [clients],
+          transports: { [REFUNDS_BROKER]: ClientProxyTransport(REFUNDS_BROKER) },
+          route: externalizedRoute(),
+          relay: { enabled: options.relay ?? true, pollInterval: 100 },
+          // Three attempts, a second apart at first. A real deployment
+          // sizes this to how long the broker may be down: the default,
+          // 20 attempts, spans 30 to 60 minutes. Once the attempts run
+          // out the message is dead-lettered with its error history, and
+          // an operator requeues it (`OutboxDeadLetters.requeue`).
+          retry: { attempts: 3, backoff: { delay: '1s', maxDelay: '10s' } },
         }),
-        OutboxModule.forFeature([RefundRequestedEvent]),
-
-        OutboxMicroservicesModule.forRoot({ defaultClient: REFUNDS_BROKER }),
-
-        OutboxProcessingModule,
+        TransactionalOutboxModule.forRoot(),
       ],
-      providers: [RefundService, RefundLedgerHandler, RefundConsumerService],
+      providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
+        RefundService,
+        RefundConsumerService,
+      ],
     };
   }
 }

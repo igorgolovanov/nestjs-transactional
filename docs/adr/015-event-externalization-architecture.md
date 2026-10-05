@@ -1,5 +1,7 @@
 # ADR-015: Event externalization architecture
 
+> **Superseded from 3.0.0** by [ADR-023](./023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 - **Status**: Accepted
 - **Date**: 2026-04-26
 - **Related**:

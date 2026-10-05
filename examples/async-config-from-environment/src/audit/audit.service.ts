@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import { InjectOutboxPublisher, OutboxEventPublisher } from '@nestjs-transactional/outbox';
+import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
 import { AuditEventRecordedEvent } from './audit-event-recorded.event.js';
@@ -11,7 +11,7 @@ import { AuditLogEntry } from './audit-log.entity.js';
  * Single-method service that demonstrates the framework still
  * behaves identically when wired through `forRootAsync` —
  * `@Transactional()` opens a transaction, the INSERT lands, the
- * outbox publication lands in the same transaction (DD-019). Nothing
+ * outbox message lands in the same transaction. Nothing
  * here changes from the sync-config baseline; that's the point.
  */
 @Injectable()
@@ -19,7 +19,6 @@ export class AuditService {
   constructor(
     @InjectRepository(AuditLogEntry)
     private readonly entries: Repository<AuditLogEntry>,
-    @InjectOutboxPublisher()
     private readonly outbox: OutboxEventPublisher,
   ) {}
 

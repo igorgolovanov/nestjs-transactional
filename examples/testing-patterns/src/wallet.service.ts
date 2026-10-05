@@ -39,9 +39,7 @@ export class WalletService {
     }
     const newBalance = wallet.balance + amount;
     await this.wallets.updateBalance(walletId, newBalance);
-    await this.outbox.publish(
-      new WalletOperationEvent(walletId, 'deposit', amount, newBalance),
-    );
+    await this.outbox.publish(new WalletOperationEvent(walletId, 'deposit', amount, newBalance));
   }
 
   @Transactional()
@@ -58,8 +56,6 @@ export class WalletService {
     }
     const newBalance = wallet.balance - amount;
     await this.wallets.updateBalance(walletId, newBalance);
-    await this.outbox.publish(
-      new WalletOperationEvent(walletId, 'withdraw', amount, newBalance),
-    );
+    await this.outbox.publish(new WalletOperationEvent(walletId, 'withdraw', amount, newBalance));
   }
 }

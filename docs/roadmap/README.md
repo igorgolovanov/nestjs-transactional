@@ -789,7 +789,7 @@ Architecture preserved:
   to a private typeorm-side token.
 
 Atomicity invariant verified by a dedicated
-[`atomicity.integration.spec.ts`](../../packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts)
+[`atomicity.integration.spec.ts`](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts)
 regression net (3 tests against real Postgres). Two parallel
 transactional mechanisms reach the same active
 `EntityManager` through `TransactionContext`:

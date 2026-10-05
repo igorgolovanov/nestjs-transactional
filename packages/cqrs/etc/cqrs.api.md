@@ -127,20 +127,17 @@ export interface IntegrationEventsHandlerMetadata {
     readonly dataSource: string;
     // (undocumented)
     readonly eventTypes: Type[];
-    // (undocumented)
-    readonly id?: string;
 }
 
 // @public
 export interface IntegrationEventsHandlerOptions {
     readonly dataSource?: string;
     readonly events: Type[];
-    readonly id?: string;
 }
 
 // @public
 export class IntegrationEventsHandlerScanner implements OnModuleInit {
-    constructor(discovery: DiscoveryService, dispatcher: TransactionalEventDispatcher, manager: TransactionManager, registrar?: OutboxListenerRegistrar | undefined);
+    constructor(discovery: DiscoveryService, dispatcher: TransactionalEventDispatcher, manager: TransactionManager);
     // (undocumented)
     onModuleInit(): void;
 }
@@ -152,20 +149,7 @@ export interface ITransactionalEventHandler<T = any> {
 }
 
 // @public
-export const OUTBOX_LISTENER_REGISTRAR: unique symbol;
-
-// @public
 export const OUTBOX_PUBLICATION_SCHEDULER: unique symbol;
-
-// @public
-export interface OutboxListenerRegistrar {
-    // (undocumented)
-    register(listener: {
-        readonly id: string;
-        readonly eventType: string;
-        readonly invoke: (event: unknown) => Promise<void>;
-    }): void;
-}
 
 // @public
 export interface OutboxPublicationScheduler {

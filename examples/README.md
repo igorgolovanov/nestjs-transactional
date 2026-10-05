@@ -4,16 +4,20 @@ Worked examples for `@nestjs-transactional/*`. Each folder is a runnable
 NestJS application with a `pnpm start` visual demo, jest regression
 tests, and a self-contained README.
 
+Every outbox example delivers through
+[`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox), with
+`@nestjs-transactional/outbox` adding the message inside the transaction
+`@Transactional` opened
+([ADR-023](../docs/adr/023-delegate-delivery-to-nestjs-outbox.md)).
+
 ## Tier 1 — Foundational
 
-The smallest possible illustrations of each core concept. Pick the one
-matching your need; the four cover the canonical entry points.
+The smallest possible illustrations of each core concept.
 
 | Example | Showcases | Database |
 |---|---|---|
 | [`basic-transactional`](basic-transactional) | `@Transactional()` on a plain service via `@InjectRepository` (transparent transactional repositories) | TypeORM + sqljs (in-memory) |
-| [`basic-outbox`](basic-outbox) | `@OutboxEventsHandler` + `OutboxEventPublisher.publish` with the in-memory test adapter | None |
-| [`basic-typeorm-outbox`](basic-typeorm-outbox) | Production-shape outbox with Postgres, atomicity verified by testcontainers | Postgres (testcontainers) |
+| [`basic-typeorm-outbox`](basic-typeorm-outbox) | The outbox end to end: a message committed with the order, delivered to an `@OnOutboxMessage` handler, recorded in its inbox | Postgres (testcontainers) |
 | [`basic-cqrs`](basic-cqrs) | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None |
 
 ## Tier 2 — Multi-DataSource
@@ -21,107 +25,71 @@ matching your need; the four cover the canonical entry points.
 - [`multi-datasource-basic`](multi-datasource-basic) —
   Billing + inventory DataSources, `@Transactional({ dataSource })`,
   no outbox/CQRS, cross-DS independence demonstrated.
-- [`multi-datasource-outbox`](multi-datasource-outbox) —
-  Two DataSources each with own outbox, per-DS event types via
-  `forFeature({ dataSource })`, decorator-driven per-dataSource
-  handler routing, real Postgres per-DS `event_publication` tables.
 - [`multi-datasource-cqrs`](multi-datasource-cqrs) —
   Two DataSources, CQRS handlers with dataSource option
   (per-dataSource handler routing for the cqrs in-memory
   dispatcher), per-DS transaction context.
-- [`shared-database-modular-monolith`](shared-database-modular-monolith) —
-  One Postgres, two schemas (billing + inventory),
-  per-module NestJS sub-modules, per-schema outbox stacks. Spring
-  Modulith-style architecture.
+
+The outbox lives in one DataSource. Publishing from a transaction on
+another one is refused rather than written outside it, so there is no
+multi-DataSource outbox example; `audit-logging` shows the shape that
+does work, an outbox on one DataSource feeding a consumer on another.
 
 ## Tier 3 — Externalization
 
 - [`externalization-kafka`](externalization-kafka) —
-  Single DataSource + single Kafka broker via `@nestjs/microservices`
-  `ClientProxy`. The canonical event-externalization baseline:
-  `@Externalized({ target, routingKey, headers })` on event class,
-  `OutboxMicroservicesModule.forRoot({ defaultClient })` wiring,
-  testcontainers Postgres + mocked ClientProxy + docker-compose
-  Kafka KRaft for the visual demo.
+  Single DataSource + single Kafka broker. `@Externalized({ target,
+  routingKey, headers })` on the event class, `ClientProxyTransport`
+  with `toKafkaPacket`, so the routing key is the Kafka key and the
+  envelope is the value. A rejected emit keeps the message for a retry.
 - [`externalization-multi-broker`](externalization-multi-broker) —
-  Single DataSource, three brokers (Kafka topic +
-  RabbitMQ queue + Redis pub/sub channel). Per-event
-  `@Externalized({ client })` routing, single global externalizer.
-  Tests pin per-event routing isolation and per-publication failure
-  isolation across brokers.
-- [`externalization-multi-datasource`](externalization-multi-datasource) —
-  Two physical Postgres DBs × two ClientProxy
-  registrations on a single RabbitMQ broker. Combines Tier 2 multi-DS
-  outbox (ADR-019 per-DS forRoot) with Tier 3 externalization. The
-  two routing axes (per-DS publication, per-event broker) are
-  orthogonal — DD-023 cross-DS isolation extended end-to-end.
+  Single DataSource, three brokers (Kafka topic + RabbitMQ queue +
+  Redis pub/sub channel), routed per event by `@Externalized({ client })`
+  and `externalizedRoute()`. Tests pin routing isolation and that one
+  broker failing holds back only its own message.
 - [`externalization-with-fallback`](externalization-with-fallback) —
-  what a `COMPLETED` publication does and does not prove, plus the
-  consumer-side patterns that hold regardless. Completion contract
-  pinned; consumer-side inbox / dedup template (real code, two
-  tests); `FailedEventPublications.resubmit` recovery flow (single +
-  batch). The visual demo includes a manual
-  `docker-compose stop rabbitmq` so the FAILED-then-resubmit path is
-  observable against a real broker.
+  What a delivered message does and does not prove, and what happens
+  when the broker is down: retries with backoff, dead-lettering after
+  the last attempt, an operator requeue that keeps the message id. On
+  the consumer side, `@nestjs/outbox`'s inbox driven through
+  `@Transactional`.
 
 ## Tier 4 — Advanced patterns
 
-- [`saga-pattern`](saga-pattern) Choreographed
-  4-step saga (place → reserve → charge → ship) on a single
-  Postgres DataSource, coordinated through the outbox.
-  Compensation handler subscribes to both
-  `InventoryReservationFailedEvent` and `PaymentFailedEvent`; the
-  payment-failure branch restores reserved stock atomically with
-  marking the order failed. Idempotency gates per step (PK
-  `unique_violation` catches and conditional `UPDATE` predicates).
-- [`audit-logging`](audit-logging) Two physical
-  Postgres DBs (business + audit) wired asymmetrically — full
-  outbox stack on business DS, only `TypeOrmTransactionalModule`
-  on audit DS (sink). `@Transactional({ dataSource: 'audit' })`
-  on the consumer; idempotency on `AuditLogRow.operationId` PK.
-  Audit-DS outage does not block business operations.
+- [`saga-pattern`](saga-pattern) — Choreographed 4-step saga (place →
+  reserve → charge → ship) on a single Postgres DataSource, coordinated
+  through the outbox. Each step is an `@OnOutboxMessage` handler that
+  publishes its outcome in its own transaction. Compensation on both
+  failure events; idempotency gates per step.
+- [`audit-logging`](audit-logging) — Two physical Postgres DBs
+  (business + audit). The outbox lives on the business DS; the
+  `@OnOutboxMessage` consumer writes through
+  `@Transactional({ dataSource: 'audit' })`, idempotent on the audit
+  row's primary key. An audit-DS outage does not block business writes;
+  the relay retries until it recovers.
 - [`read-write-separation`](read-write-separation) —
   Two `TypeOrmModule.forRoot` registrations (`'default'` master +
   `'replica'`); only master gets the transactional adapter.
-  `@InjectRepository(Entity, 'replica')` for reads, default
-  injection for writes. README documents the alternative TypeORM
-  native `replication` option and when each shape applies.
-- [`testing-patterns`](testing-patterns) Three test
-  tiers against the same `WalletService` domain: unit with
-  `InMemoryTransactionAdapter`, outbox unit with
-  `InMemoryEventPublicationRepository` + `PublishedEvents` /
-  `AssertablePublishedEvents`, integration with testcontainers
-  Postgres. README pins the gotchas (silent-no-op publish without
-  listener, `Node16` module resolution for subpath imports).
+- [`testing-patterns`](testing-patterns) — Three test tiers against the
+  same `WalletService` domain: unit with `InMemoryTransactionAdapter`,
+  outbox unit with a recording `Outbox` (and why it cannot prove
+  atomicity), integration with testcontainers Postgres and
+  `relay.runOnce()`.
 
 ## Tier 5 — Production realism
 
-- [`e-commerce-orders`](e-commerce-orders) Flagship.
-  Three bounded contexts (Orders / Inventory / Billing) on three
-  Postgres DataSources, each with its own outbox stack. Saga
-  choreographed through outbox integration events
-  (`OrderPlacedEvent → StockReserved → PaymentCharged →
-  OrderConfirmedEvent`). Externalization to Kafka on the terminal
-  event only. CQRS `@CommandHandler` / `@QueryHandler` plus a REST
-  `OrdersController`. Compensation handlers on both failure
-  branches. Idempotency gates everywhere. 8 integration tests via
-  testcontainers Postgres × 3 + mocked Kafka client.
+- [`e-commerce-orders`](e-commerce-orders) — Flagship. Three bounded
+  contexts (Orders / Inventory / Billing) as three Postgres schemas on
+  one DataSource, so every saga step publishes its outcome atomically.
+  The saga starts from an aggregate (`@Externalized` to the `local`
+  transport), runs over `@OnOutboxMessage` handlers, and ends with
+  `OrderConfirmedEvent` on Kafka. CQRS command and query handlers plus
+  a REST controller. 8 integration tests.
 - [`async-config-from-environment`](async-config-from-environment) —
-  `forRootAsync` end-to-end on three of four
-  framework modules; `TypeOrmTransactionalModule` falls back to
-  sync `forRoot()` per Convention #22. `ConfigModule.forRoot` with
-  Joi validation and `.env.{development,staging,production}`
-  profiles. Outbox tunables flow through `ConfigService` into
-  `OUTBOX_PROCESSOR_OPTIONS`. 5 integration tests including
-  per-profile assertion + Joi-rejection cases.
-- [`graceful-shutdown`](graceful-shutdown) —
-  `app.enableShutdownHooks()` plus the framework's bounded outbox
-  drain: `OutboxProcessingModule.onApplicationShutdown` awaits the
-  batch already in flight, with the budget set via
-  `processor.shutdownTimeout`.
-  Plus an `ExampleCleanupService` stand-in for arbitrary user
-  cleanup hooks. 4 integration tests including mid-handler
-  shutdown and mid-tx atomicity.
+  `forRootAsync` with `ConfigModule` and Joi validation across
+  `.env.{development,staging,production}` profiles. The relay tunables
+  flow from the validated env into `@nestjs/outbox`'s
+  `OutboxModule.forRootAsync`.
 
 ## How to run
 
@@ -129,18 +97,15 @@ From the monorepo root after `pnpm install`:
 
 ```bash
 pnpm -C examples/<name> start                # visual demo
-pnpm -C examples/<name> test                 # jest unit/integration tests
+pnpm -C examples/<name> test                 # jest unit tests
 pnpm -C examples/<name> test:integration     # testcontainers integration (where applicable)
 ```
 
-Each example honours these scripts; `test:integration` exists in
-examples that require Docker — currently `basic-typeorm-outbox`,
-every Tier 2 multi-DataSource example except `multi-datasource-basic`,
-every Tier 3 externalization example, every Tier 4 example (the
-unit-only branches of `testing-patterns` run under plain `pnpm
-test`), and every Tier 5 example (`e-commerce-orders` additionally
-pulls a Kafka KRaft image for its `pnpm start` visual demo; the
-integration tests use a mocked `ClientProxy` instead).
+`test:integration` exists in the examples that need Docker. The
+externalization examples record the `ClientProxy` in their tests rather
+than starting a broker; their `docker-compose.yml` is for the `pnpm start`
+demos. What a real broker's acknowledgement means for an outbox message is
+measured once, in the outbox package's broker suite (ADR-021).
 
 The root `pnpm test` deliberately excludes `examples/*` to keep the
 default dev loop fast — run the example tests directly when you change
@@ -148,21 +113,22 @@ example code.
 
 ## Conventions used by these examples
 
-- **One module per example** — kept in `src/app.module.ts`. Real
-  applications use NestJS's `forFeature` pattern; the examples
-  deliberately collapse to one module so the wiring is visible at a
-  glance.
-- **Stable `@OutboxEventsHandler` ids** — `id: 'Module.action'` so the
-  examples model the production discipline (renaming a class without
-  a stable id invalidates pending publication rows).
+- **One module per example** — kept in `src/app.module.ts`, so the
+  wiring is visible at a glance.
+- **`@nestjs/outbox` configured as its documentation shows** —
+  `OutboxModule` and a `PostgresOutboxStore` on `fromTypeOrm(dataSource)`.
+  `TransactionalOutboxModule` adds the transactional publisher on top.
+- **Tests drive the relay** — integration tests pass `relay: false` and
+  call `OutboxRelay.runOnce()`, so delivery happens exactly when the test
+  asks for it. `saga-pattern` and `e-commerce-orders` keep the relay
+  running, because a saga is a chain of deliveries and the tests wait for
+  its end state.
+- **Stable `consumer` names** on `@OnOutboxMessage` — each keys the
+  handler's inbox, so renaming one makes every past message look new.
 - **`@nestjs/typeorm` standard wiring** — `@InjectRepository`,
   `getDataSourceToken`, `TypeOrmModule.forRoot/forFeature`. The
   transparent-repository patches make them dispatch through the active
   `@Transactional()` scope automatically.
-- **No `getCurrentEntityManager()` in service code** unless an
-  explicit escape hatch is needed (known transparent-repository
-  limitations: `@InjectEntityManager() em.save()` direct call,
-  `BaseEntity` static methods).
 - **`InMemoryTransactionAdapter` for non-DB examples** — exported via
   `@nestjs-transactional/core/testing`. Test-only adapter; production
   examples use real persistence.
@@ -171,21 +137,20 @@ example code.
 
 - "I just want declarative transactions on a service method" →
   [`basic-transactional`](basic-transactional)
-- "I want durable AFTER_COMMIT delivery, no DB yet" →
-  [`basic-outbox`](basic-outbox)
 - "Show me the outbox with a real database, end-to-end" →
   [`basic-typeorm-outbox`](basic-typeorm-outbox)
 - "I'm using `@nestjs/cqrs` and want to know how phase listeners
   cooperate with transactions" → [`basic-cqrs`](basic-cqrs)
 - "I need multiple DataSources" →
   [`multi-datasource-basic`](multi-datasource-basic)
-- "End-to-end realistic application — multi-DS saga + Kafka +
-  CQRS + REST" → [`e-commerce-orders`](e-commerce-orders)
+- "Events to Kafka" → [`externalization-kafka`](externalization-kafka)
+- "What happens when the broker is down" →
+  [`externalization-with-fallback`](externalization-with-fallback)
+- "End-to-end realistic application — saga + Kafka + CQRS + REST" →
+  [`e-commerce-orders`](e-commerce-orders)
 - "`forRootAsync` + `ConfigService` + per-environment .env
   profiles" →
   [`async-config-from-environment`](async-config-from-environment)
-- "Worker drain + lifecycle hooks for SIGTERM-driven deploys" →
-  [`graceful-shutdown`](graceful-shutdown)
 - "Multi-step business process with compensation" →
   [`saga-pattern`](saga-pattern)
 - "Cross-DataSource audit trail through the outbox" →
@@ -199,7 +164,6 @@ example code.
 
 - [Architecture documents](../docs/architecture/)
 - [Architecture Decision Records](../docs/adr/)
-- [Migrating to outbox guide](../docs/guides/migrating-to-outbox.md)
 - [Implementation roadmap](../docs/roadmap/README.md) (per-phase
   history) and [per-phase status retrospectives](../docs/status/).
 - [Conventions discovered during implementation](../docs/status/conventions.md).

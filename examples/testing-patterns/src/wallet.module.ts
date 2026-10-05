@@ -1,17 +1,12 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
+import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import type { DataSource } from 'typeorm';
 
-import { WalletOperationEvent } from './events.js';
 import { WalletProjection } from './wallet.listener.js';
 import { WALLET_REPOSITORY, TypeOrmWalletRepository } from './wallet.repository.js';
 import { WalletRow } from './wallet.entity.js';
@@ -32,14 +27,21 @@ export interface PostgresConfig {
  */
 @Module({})
 export class WalletModule {
-  static forConfig(config: PostgresConfig): DynamicModule {
+  /**
+   * `relay: false` leaves the outbox's relay stopped, so a test can
+   * deliver with `OutboxRelay.runOnce()` exactly when it wants to.
+   */
+  static forConfig(
+    config: PostgresConfig,
+    options: { readonly relay?: boolean } = {},
+  ): DynamicModule {
     return {
       module: WalletModule,
       imports: [
         TypeOrmModule.forRoot({
           type: 'postgres',
           ...config,
-          entities: [WalletRow, EventPublicationEntity, EventPublicationArchiveEntity],
+          entities: [WalletRow],
           synchronize: true,
           logging: false,
         }),
@@ -48,17 +50,16 @@ export class WalletModule {
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
         TypeOrmTransactionalModule.forRoot({ isDefault: true }),
 
-        OutboxTypeOrmModule.forRoot({ schemaInitialization: { enabled: false } }),
-        OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider(),
-          processor: { pollingInterval: 100, batchSize: 50 },
-        }),
-        OutboxModule.forFeature([WalletOperationEvent]),
-        OutboxProcessingModule,
-
-        CqrsTransactionalModule.forRoot(),
+        OutboxModule.forRoot({ relay: { enabled: options.relay ?? true, pollInterval: 100 } }),
+        TransactionalOutboxModule.forRoot(),
       ],
       providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
         WalletService,
         WalletProjection,
         { provide: WALLET_REPOSITORY, useClass: TypeOrmWalletRepository },

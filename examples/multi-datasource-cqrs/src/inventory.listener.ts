@@ -22,17 +22,13 @@ import { ReservationPlacedEvent } from './reservation.aggregate.js';
   events: [ReservationPlacedEvent],
   dataSource: 'inventory',
 })
-export class InventoryNotificationListener
-  implements ITransactionalEventHandler<ReservationPlacedEvent>
-{
+export class InventoryNotificationListener implements ITransactionalEventHandler<ReservationPlacedEvent> {
   private readonly logger = new Logger(InventoryNotificationListener.name);
 
   readonly notified: string[] = [];
 
   handle(event: ReservationPlacedEvent): void {
     this.notified.push(event.reservationId);
-    this.logger.log(
-      `AFTER_COMMIT (inventory) — notifying for reservation ${event.reservationId}`,
-    );
+    this.logger.log(`AFTER_COMMIT (inventory) — notifying for reservation ${event.reservationId}`);
   }
 }

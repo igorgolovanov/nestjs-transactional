@@ -338,7 +338,7 @@ mechanisms reaching the same active `EntityManager`:
    through the same active EM via `TransactionContext`.
 
 A dedicated
-[`atomicity.integration.spec.ts`](../../packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts)
+[`atomicity.integration.spec.ts`](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox-typeorm/test/integration/atomicity.integration.spec.ts)
 regression net pins the contract against real Postgres.
 
 ## Alternatives considered
@@ -565,9 +565,9 @@ The end-to-end runnable demonstration of the final architecture is
 three Postgres DataSources, per-DS outbox stacks, CQRS aggregates,
 Kafka externalization. Smaller multi-DS examples
 ([`multi-datasource-basic`](../../examples/multi-datasource-basic/),
-[`multi-datasource-outbox`](../../examples/multi-datasource-outbox/),
+[`multi-datasource-outbox`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox%402.0.0/examples/multi-datasource-outbox),
 [`multi-datasource-cqrs`](../../examples/multi-datasource-cqrs/),
-[`shared-database-modular-monolith`](../../examples/shared-database-modular-monolith/))
+[`shared-database-modular-monolith`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox%402.0.0/examples/shared-database-modular-monolith))
 cover specific axes individually.
 
 ## Revision history

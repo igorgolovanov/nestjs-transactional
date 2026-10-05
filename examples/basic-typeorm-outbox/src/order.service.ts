@@ -1,32 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import { InjectOutboxPublisher, OutboxEventPublisher } from '@nestjs-transactional/outbox';
+import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
 import { OrderEntity } from './order.entity.js';
 import { OrderPlacedEvent } from './order-placed.event.js';
 
 /**
- * The single-unit atomicity demo (DD-019). Inside `@Transactional()`
- * we:
+ * The atomicity demo. Inside `@Transactional()` we:
  *
  *   1. INSERT into `orders` via the transparent repository
  *      (`@InjectRepository(OrderEntity)`).
- *   2. Append a publication row through `OutboxEventPublisher.publish`
- *      — `TypeOrmEventPublicationRepository` writes to
- *      `event_publication` through the same active EntityManager.
+ *   2. Add an outbox message through `OutboxEventPublisher.publish`,
+ *      which hands `@nestjs/outbox` the transaction `@Transactional`
+ *      opened.
  *
- * Both writes commit together (SAME database transaction) or roll back
- * together. The atomicity invariant — pinned by the
- * integration test — applies verbatim to this example.
+ * Both writes commit together or roll back together, and nothing passes
+ * the transaction by hand.
  */
 @Injectable()
 export class OrderService {
   constructor(
     @InjectRepository(OrderEntity)
     private readonly orders: Repository<OrderEntity>,
-    @InjectOutboxPublisher()
     private readonly outbox: OutboxEventPublisher,
   ) {}
 

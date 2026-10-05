@@ -60,12 +60,9 @@ export interface TransactionalEventsHandlerOptions {
    * the handler may attach to the wrong transaction (or none at all
    * if the default-DS has no active tx in the current async context).
    *
-   * Unlike `@OutboxEventsHandler` and `@IntegrationEventsHandler`'s
-   * outbox path — both of which auto-resolve the dataSource by
-   * walking per-DS event-type registries — the in-memory dispatcher
-   * has no event-type registry to consult. The cqrs package is
-   * decoupled from outbox by design, so the dataSource
-   * is declared explicitly on the decorator.
+   * The in-memory dispatcher has no registry that maps an event type
+   * to a dataSource, so the dataSource is declared explicitly on the
+   * decorator.
    */
   readonly dataSource?: string;
 }
@@ -127,10 +124,9 @@ export interface TransactionalEventsHandlerMetadata {
  * class BillingHandler { handle(event: BillingEvent) {} }
  * ```
  *
- * Unlike `@OutboxEventsHandler` (which auto-resolves the dataSource
- * by walking per-DS event-type registries), the in-memory dispatcher
- * has no event-type registry — the dataSource is declared explicitly
- * on the decorator.
+ * The in-memory dispatcher has no registry that maps an event type to
+ * a dataSource, so the dataSource is declared explicitly on the
+ * decorator.
  *
  * @throws {Error} If no event types are supplied.
  */

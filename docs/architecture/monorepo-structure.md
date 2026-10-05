@@ -44,55 +44,32 @@ nestjs-transactional-monorepo/
 │   │   │   ├── module/                    # CqrsTransactionalModule
 │   │   │   └── index.ts
 │   │
-│   ├── outbox/                            # @nestjs-transactional/outbox (alpha)
-│   │   ├── src/
-│   │   │   ├── types/                     # EventPublication, lifecycle states, errors
-│   │   │   ├── serialization/             # EventSerializer SPI, JsonEventSerializer, EventTypeRegistry
-│   │   │   ├── repository/                # EventPublicationRepository SPI
-│   │   │   ├── registry/                  # EventPublicationRegistry, listener registry, scanner
-│   │   │   ├── decorators/                # @OutboxEventsHandler, inject decorators
-│   │   │   ├── dispatcher/                # OutboxEventPublisher facade, EventPublicationProcessor
-│   │   │   ├── externalization/           # EventExternalizer SPI, @Externalized, registry
-│   │   │   ├── recovery/                  # StartupRecoveryService, StalenessMonitor
-│   │   │   ├── api/                       # FailedEventPublications, IncompleteEventPublications, CompletedEventPublications
-│   │   │   ├── module/                    # OutboxModule, OutboxProcessingModule
-│   │   │   └── testing/                   # InMemory repo, PublishedEvents, AssertablePublishedEvents (via /testing)
-│   │
-│   ├── outbox-typeorm/                    # @nestjs-transactional/outbox-typeorm (alpha)
-│   │   ├── src/
-│   │   │   ├── entity/                    # EventPublicationEntity, EventPublicationArchiveEntity
-│   │   │   ├── repository/                # TypeOrmEventPublicationRepository
-│   │   │   ├── migrations/                # Shipped migration
-│   │   │   ├── schema/                    # SchemaInitializer (development-only)
-│   │   │   └── module/                    # OutboxTypeOrmModule
-│   │
-│   └── outbox-microservices/              # @nestjs-transactional/outbox-microservices (alpha)
+│   └── outbox/                            # @nestjs-transactional/outbox: bridge onto @nestjs/outbox
 │       ├── src/
-│       │   ├── externalizer/              # MicroservicesEventExternalizer
-│       │   ├── module/                    # OutboxMicroservicesModule (forRoot/forRootAsync)
-│       │   └── types/                     # OutboxMicroservicesOptions, tokens
+│       │   ├── externalization/           # @Externalized and its target → client routes
+│       │   ├── publisher/                 # OutboxEventPublisher: outbox.add() in the ambient transaction
+│       │   ├── routing/                   # externalizedRoute(), toKafkaPacket()
+│       │   └── module/                    # TransactionalOutboxModule, tokens
+│       └── test/
+│           ├── integration/               # PostgreSQL suite (TypeORM matrix)
+│           └── brokers/                   # Kafka + RabbitMQ acknowledgement suite (ADR-021)
 │
 ├── examples/                              # Tier 1–5 example library — see examples/README.md
 │   ├── README.md                          # top-level index
 │   ├── basic-transactional/               # Tier 1
-│   ├── basic-outbox/                      # Tier 1
 │   ├── basic-typeorm-outbox/              # Tier 1
 │   ├── basic-cqrs/                        # Tier 1
 │   ├── multi-datasource-basic/            # Tier 2
-│   ├── multi-datasource-outbox/           # Tier 2
 │   ├── multi-datasource-cqrs/             # Tier 2
-│   ├── shared-database-modular-monolith/  # Tier 2
 │   ├── externalization-kafka/             # Tier 3
 │   ├── externalization-multi-broker/      # Tier 3
-│   ├── externalization-multi-datasource/  # Tier 3
 │   ├── externalization-with-fallback/     # Tier 3
 │   ├── saga-pattern/                      # Tier 4
 │   ├── audit-logging/                     # Tier 4
 │   ├── read-write-separation/             # Tier 4
 │   ├── testing-patterns/                  # Tier 4
 │   ├── e-commerce-orders/                 # Tier 5 (flagship)
-│   ├── async-config-from-environment/     # Tier 5
-│   └── graceful-shutdown/                 # Tier 5
+│   └── async-config-from-environment/     # Tier 5
 │
 ├── docs/
 │   ├── adr/                               # Architecture Decision Records (NNN-slug.md)

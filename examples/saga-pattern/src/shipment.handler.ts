@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnOutboxMessage } from '@nestjs/outbox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from '@nestjs-transactional/core';
-import {
-  IntegrationEventsHandler,
-  type IIntegrationEventHandler,
-} from '@nestjs-transactional/cqrs';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
@@ -25,8 +22,7 @@ import { OrderShippedEvent, PaymentChargedEvent } from './events.js';
  * notifications module here.
  */
 @Injectable()
-@IntegrationEventsHandler({ events: [PaymentChargedEvent], id: 'Saga.Shipment' })
-export class ShipmentHandler implements IIntegrationEventHandler<PaymentChargedEvent> {
+export class ShipmentHandler {
   private readonly logger = new Logger(ShipmentHandler.name);
 
   constructor(
@@ -35,6 +31,7 @@ export class ShipmentHandler implements IIntegrationEventHandler<PaymentChargedE
     private readonly outbox: OutboxEventPublisher,
   ) {}
 
+  @OnOutboxMessage('PaymentChargedEvent', { consumer: 'saga.shipment' })
   @Transactional()
   async handle(event: PaymentChargedEvent): Promise<void> {
     const update = await this.orders.update(

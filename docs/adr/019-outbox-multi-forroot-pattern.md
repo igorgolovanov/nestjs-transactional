@@ -1,5 +1,7 @@
 # ADR-019: OutboxModule multi-`forRoot` registration pattern
 
+> **Superseded from 3.0.0** by [ADR-023](./023-delegate-delivery-to-nestjs-outbox.md): the delivery engine this record describes was replaced by `@nestjs/outbox`. Kept as the record of how 2.x works.
+
 - **Status**: Accepted (final form after Phase 14.10 / 14.21 alignment)
 - **Date**: 2026-04-27
 - **Related**:
@@ -305,12 +307,12 @@ Key surfaces:
   publishers and event-type registries via `ModuleRef.get`.
 
 Test infrastructure precedent:
-[`packages/outbox/src/module/outbox.module.multi-datasource.spec.ts`](../../packages/outbox/src/module/outbox.module.multi-datasource.spec.ts)
+[`packages/outbox/src/module/outbox.module.multi-datasource.spec.ts`](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox/src/module/outbox.module.multi-datasource.spec.ts)
 demonstrates the multi-`forRoot` pattern end-to-end with three
 dataSources. Decorator-driven per-DS handler registration shipped in
 Phase 14.3.1 (Categories A / B), so the manual workaround the
 original spec showed is no longer needed — both
-[`OutboxModule.forFeature`](../../packages/outbox/src/module/outbox.module.ts)
+[`OutboxModule.forFeature`](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox/src/module/outbox.module.ts)
 auto-registration and the
 [`@TransactionalEventsHandler({ dataSource })`](../../packages/cqrs/src/decorators/transactional-events-handler.decorator.ts)
 per-DS option route handlers to the right dataSource transparently.
@@ -320,9 +322,9 @@ realism by
 [`examples/e-commerce-orders`](../../examples/e-commerce-orders/)
 (three Postgres DataSources, per-DS outbox stacks); smaller axis
 demonstrations in
-[`examples/multi-datasource-outbox`](../../examples/multi-datasource-outbox/)
+[`examples/multi-datasource-outbox`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox%402.0.0/examples/multi-datasource-outbox)
 and
-[`examples/shared-database-modular-monolith`](../../examples/shared-database-modular-monolith/).
+[`examples/shared-database-modular-monolith`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox%402.0.0/examples/shared-database-modular-monolith).
 
 ## Revision history
 

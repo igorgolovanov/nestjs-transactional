@@ -1,111 +1,66 @@
-import { jest } from '@jest/globals';
-
 import {
-  EXTERNALIZED_METADATA,
   Externalized,
+  ExternalizedRouteConflictError,
+  externalizedRoutes,
   getExternalizedMetadata,
 } from './externalized.decorator.js';
 
 describe('@Externalized', () => {
-  it('attaches metadata to the decorated class', () => {
-    @Externalized({ target: 'orders.placed' })
-    class OrderPlacedEvent {}
-
-    const metadata = getExternalizedMetadata(OrderPlacedEvent);
-
-    expect(metadata).toBeDefined();
-    expect(metadata?.target).toBe('orders.placed');
-  });
-
-  it('writes metadata under the public symbol so external tooling can read it', () => {
-    @Externalized({ target: 'orders.placed' })
-    class OrderPlacedEvent {}
-
-    const metadata = Reflect.getMetadata(EXTERNALIZED_METADATA, OrderPlacedEvent) as unknown;
-
-    expect(metadata).toBeDefined();
-  });
-
-  it('throws synchronously when target is missing (decorator-application time)', () => {
-    expect(() => Externalized({} as unknown as { target: string })).toThrow(/non-empty string/);
-  });
-
-  it('throws when target is an empty string', () => {
-    expect(() => Externalized({ target: '' })).toThrow(/non-empty string/);
-  });
-
-  it('throws when target is a non-string (e.g. number, undefined)', () => {
-    expect(() => Externalized({ target: undefined as unknown as string })).toThrow(
-      /non-empty string/,
-    );
-    expect(() => Externalized({ target: 42 as unknown as string })).toThrow(/non-empty string/);
-  });
-
-  it('returns undefined for classes that were not decorated', () => {
-    class PlainEvent {}
-
-    expect(getExternalizedMetadata(PlainEvent)).toBeUndefined();
-  });
-
-  it('preserves a routingKey callback verbatim — no resolution at decoration time', () => {
-    const routingKey = jest.fn<(tenantId: string) => string>().mockReturnValue('tenant-A');
-
-    @Externalized<{ tenantId: string }>({
-      target: 'orders',
-      routingKey: (e) => routingKey(e.tenantId),
+  it('stores the metadata on the event class', () => {
+    @Externalized<{ id: string }>({
+      target: 'spec.metadata',
+      client: 'KAFKA',
+      routingKey: (e) => e.id,
+      headers: { source: 'spec' },
     })
-    class OrderPlacedEvent {
-      constructor(readonly tenantId: string) {}
+    class OrderPlaced {
+      constructor(readonly id: string) {}
     }
 
-    expect(routingKey).not.toHaveBeenCalled();
-    const metadata = getExternalizedMetadata(OrderPlacedEvent);
-    expect(typeof metadata?.routingKey).toBe('function');
+    const meta = getExternalizedMetadata(OrderPlaced);
+    expect(meta?.target).toBe('spec.metadata');
+    expect(meta?.client).toBe('KAFKA');
+    expect(meta?.routingKey?.(new OrderPlaced('o-1'))).toBe('o-1');
+    expect(meta?.headers).toEqual({ source: 'spec' });
   });
 
-  it('preserves static headers as a record (not a function)', () => {
-    @Externalized({
-      target: 'orders',
-      headers: { 'x-version': '1.0', 'x-source': 'orders-svc' },
-    })
-    class OrderPlacedEvent {}
-
-    const metadata = getExternalizedMetadata(OrderPlacedEvent);
-    expect(metadata?.headers).toEqual({
-      'x-version': '1.0',
-      'x-source': 'orders-svc',
-    });
-    expect(typeof metadata?.headers).toBe('object');
+  it('returns undefined for a class without the decorator', () => {
+    class Plain {}
+    expect(getExternalizedMetadata(Plain)).toBeUndefined();
   });
 
-  it('preserves a headers callback verbatim — does not invoke it at decoration time', () => {
-    const headers = jest
-      .fn<(tenantId: string) => Record<string, string>>()
-      .mockReturnValue({ 'x-tenant': 'A' });
-
-    @Externalized<{ tenantId: string }>({
-      target: 'orders',
-      headers: (e) => headers(e.tenantId),
-    })
-    class OrderPlacedEvent {
-      constructor(readonly tenantId: string) {}
-    }
-
-    expect(headers).not.toHaveBeenCalled();
-    const metadata = getExternalizedMetadata(OrderPlacedEvent);
-    expect(typeof metadata?.headers).toBe('function');
+  it('rejects an empty target', () => {
+    expect(() => Externalized({ target: '' })).toThrow(/target/);
   });
 
-  it('captures the optional client identifier when given', () => {
-    const TOKEN = Symbol('KAFKA');
+  it('records target -> client for routing', () => {
+    @Externalized({ target: 'spec.route', client: 'RMQ' })
+    class Routed {}
+    void Routed;
 
-    @Externalized({ target: 'orders', client: TOKEN })
-    class WithSymbol {}
+    expect(externalizedRoutes().get('spec.route')).toEqual({ client: 'RMQ' });
+  });
 
-    @Externalized({ target: 'orders', client: 'KAFKA_STR' })
-    class WithString {}
+  it('accepts a second class on the same target and client', () => {
+    @Externalized({ target: 'spec.shared', client: 'KAFKA' })
+    class First {}
+    @Externalized({ target: 'spec.shared', client: 'KAFKA' })
+    class Second {}
+    void First;
+    void Second;
 
-    expect(getExternalizedMetadata(WithSymbol)?.client).toBe(TOKEN);
-    expect(getExternalizedMetadata(WithString)?.client).toBe('KAFKA_STR');
+    expect(externalizedRoutes().get('spec.shared')).toEqual({ client: 'KAFKA' });
+  });
+
+  it('fails at decoration when one target is declared with two clients', () => {
+    @Externalized({ target: 'spec.conflict', client: 'KAFKA' })
+    class First {}
+    void First;
+
+    expect(() => {
+      @Externalized({ target: 'spec.conflict', client: 'RMQ' })
+      class Second {}
+      void Second;
+    }).toThrow(ExternalizedRouteConflictError);
   });
 });

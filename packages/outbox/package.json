@@ -1,7 +1,7 @@
 {
   "name": "@nestjs-transactional/outbox",
   "version": "2.0.0",
-  "description": "Persistent Event Publication Registry for @nestjs-transactional — Spring Modulith equivalent (ORM-agnostic core)",
+  "description": "Transactional outbox bridge for @nestjs-transactional: @Externalized and an ambient-transaction publisher on top of @nestjs/outbox",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -18,10 +18,11 @@
   "keywords": [
     "nestjs",
     "outbox",
-    "event-publication-registry",
-    "spring-modulith",
     "transactional-outbox",
-    "transaction"
+    "transaction",
+    "nestjs-outbox",
+    "kafka",
+    "rabbitmq"
   ],
   "engines": {
     "node": ">=22.13.0"
@@ -38,17 +39,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
-    }
-  },
-  "typesVersions": {
-    "*": {
-      "testing": [
-        "./dist/testing/index.d.ts"
-      ]
     }
   },
   "publishConfig": {
@@ -63,29 +53,43 @@
     "test:cov": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",
-    "api:check": "api-extractor run && api-extractor run -c api-extractor.testing.json",
-    "api:update": "api-extractor run --local && api-extractor run --local -c api-extractor.testing.json",
-    "publish:check": "publint && attw --pack . --profile esm-only"
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack . --profile esm-only",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs",
+    "test:brokers": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.brokers.config.cjs"
   },
   "peerDependencies": {
     "@nestjs-transactional/core": "workspace:^",
-    "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0",
-    "@nestjs/core": "^10.0.0 || ^11.0.0 || ^12.0.0",
+    "@nestjs/common": "^11.0.0 || ^12.0.0",
+    "@nestjs/core": "^11.0.0 || ^12.0.0",
+    "@nestjs/outbox": "~0.1.0",
     "reflect-metadata": "^0.1.13 || ^0.2.0",
     "rxjs": "^7.0.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.2",
     "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/typeorm": "workspace:*",
     "@nestjs/common": "^11.2.6",
     "@nestjs/core": "^11.2.6",
+    "@nestjs/microservices": "^11.2.3",
+    "@nestjs/outbox": "0.1.0",
     "@nestjs/testing": "^11.2.3",
+    "@nestjs/typeorm": "^12.0.2",
+    "@testcontainers/kafka": "^12.1.0",
+    "@testcontainers/postgresql": "^12.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.2",
+    "amqplib": "^2.2.0",
     "jest": "^30.5.1",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "testcontainers": "^12.1.0",
     "ts-jest": "^29.4.12",
+    "typeorm": "^1.1.0",
     "typescript": "^6.0.3"
   }
 }

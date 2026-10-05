@@ -1,24 +1,17 @@
-import { type DynamicModule, Global, Module } from '@nestjs/common';
-import {
-  CqrsTransactionalModule,
-  OUTBOX_PUBLICATION_SCHEDULER,
-} from '@nestjs-transactional/cqrs';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientProxyTransport, OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
+import { CqrsTransactionalModule } from '@nestjs-transactional/cqrs';
 import {
-  OutboxEventPublisher,
-  OutboxModule,
-  OutboxProcessingModule,
+  externalizedRoute,
+  toKafkaPacket,
+  TransactionalOutboxModule,
 } from '@nestjs-transactional/outbox';
-import { OutboxMicroservicesModule } from '@nestjs-transactional/outbox-microservices';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import { DataSource } from 'typeorm';
 
 import { BillingModule } from './billing/billing.module.js';
 import { PaymentRow } from './billing/payment.entity.js';
@@ -28,231 +21,137 @@ import { ProductRow } from './inventory/product.entity.js';
 import { ReservationRow } from './inventory/reservation.entity.js';
 import { OrdersCompensationHandler } from './orders/compensation.handler.js';
 import { ConfirmShipmentHandler } from './orders/confirm-shipment.handler.js';
-import { OrderConfirmedExternalizationStub } from './orders/externalized-event-stub.js';
 import { GetOrderHandler } from './orders/get-order.handler.js';
 import { OrderRow } from './orders/order.entity.js';
 import { OrdersController } from './orders/orders.controller.js';
-import {
-  OrderConfirmedEvent,
-  OrderPlacedEvent,
-} from './shared/events.js';
 import { PlaceOrderHandler } from './orders/place-order.handler.js';
+
+/** One Postgres schema per bounded context, all on one DataSource. */
+const BOUNDED_CONTEXT_SCHEMAS = ['orders', 'inventory', 'billing'] as const;
 
 export interface PostgresConnection {
   readonly host: string;
   readonly port: number;
   readonly username: string;
   readonly password: string;
+  readonly database: string;
 }
 
 export interface ECommerceConfig {
-  readonly orders: PostgresConnection & { readonly database: string };
-  readonly inventory: PostgresConnection & { readonly database: string };
-  readonly billing: PostgresConnection & { readonly database: string };
+  readonly postgres: PostgresConnection;
   readonly kafkaBrokers: readonly string[];
 }
 
 export function readConfigFromEnv(): ECommerceConfig {
-  const shared = {
-    host: process.env.PGHOST ?? 'localhost',
-    port: Number(process.env.PGPORT ?? 5432),
-    username: process.env.PGUSER ?? 'postgres',
-    password: process.env.PGPASSWORD ?? 'postgres',
-  };
   return {
-    orders: { ...shared, database: process.env.PGORDERS ?? 'orders' },
-    inventory: { ...shared, database: process.env.PGINVENTORY ?? 'inventory' },
-    billing: { ...shared, database: process.env.PGBILLING ?? 'billing' },
+    postgres: {
+      host: process.env.PGHOST ?? 'localhost',
+      port: Number(process.env.PGPORT ?? 5432),
+      username: process.env.PGUSER ?? 'postgres',
+      password: process.env.PGPASSWORD ?? 'postgres',
+      database: process.env.PGDATABASE ?? 'ecommerce',
+    },
     kafkaBrokers: (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(','),
   };
 }
 
 /**
- * Cqrs ↔ outbox bridge. `HybridEventPublisher` (registered by
- * `CqrsTransactionalModule.forRoot()` as the `EventPublisher`
- * override) `@Optional()`-injects `OUTBOX_PUBLICATION_SCHEDULER`.
- * Without this bridge bound, the optional injection resolves to
- * undefined and `aggregate.commit()` events flow to the in-memory
- * dispatcher only — bypassing the outbox entirely. With the bridge,
- * a single commit fans to BOTH paths atomically.
- *
- * `@Global()` + explicit `exports` are required because
- * `HybridEventPublisher` lives inside `CqrsTransactionalModule`'s
- * own DI scope and cannot see `providers` from another non-global
- * sibling module.
- */
-@Global()
-@Module({
-  providers: [
-    { provide: OUTBOX_PUBLICATION_SCHEDULER, useExisting: OutboxEventPublisher },
-  ],
-  exports: [OUTBOX_PUBLICATION_SCHEDULER],
-})
-class OutboxCqrsBridgeModule {}
-
-/**
  * **Production-realism flagship.** Composition root that wires:
  *
- * 1. **Three Postgres DataSources** — orders (default) + inventory
- *    + billing. Each gets its own `event_publication` table, its
- *    own outbox worker, its own transactional adapter
- *    (ADR-019 multi-`forRoot`).
- * 2. **CQRS** — `CqrsTransactionalModule.forRoot` overrides the
- *    `EventPublisher` token to `HybridEventPublisher` so
- *    `aggregate.commit()` fans out to BOTH the in-memory
- *    dispatcher AND the orders-DS outbox in one transaction.
- * 3. **Kafka externalization** — `@Externalized<OrderConfirmedEvent>(...)`
- *    metadata + `OutboxMicroservicesModule.forRoot({ defaultClient })`
- *    + a single `ClientsModule.register` Kafka registration.
- *    `OrderConfirmedEvent` leaves the system on Kafka topic
- *    `orders.confirmed` once the worker delivers it.
- * 4. **REST API** — `OrdersController` exposes `POST /orders` and
- *    `GET /orders/:id` (the production-realism step over
- *    Tier 4's application-context-only examples).
- *
- * **Module structure trade-off.** Inventory and Billing live as
- * sub-modules — they own their entity registrations and outbox
- * `forFeature` calls cleanly. The orders pieces (controller +
- * cqrs handlers) live in AppModule directly because they inject
- * `EventPublisher` from `CqrsTransactionalModule`, and the cqrs
- * EventPublisher override is non-global — sub-modules cannot see
- * it through transitive imports. The orders folder structure
- * stays as documentation of the bounded context boundary even
- * though NestJS module isolation flattens at AppModule.
- *
- * Cross-DS coordination is **always** through the outbox (DD-023).
- * No `@Transactional` block in this example spans more than one
- * DataSource.
+ * 1. **Three bounded contexts in one database**: orders, inventory and
+ *    billing each own a Postgres schema of their own, on one DataSource.
+ *    That is what lets every step of the saga publish its outcome in the
+ *    same transaction as its writes: the outbox lives in exactly one
+ *    DataSource (ADR-023), and a context on a DataSource of its own could
+ *    not add a message atomically. For transactions across separate
+ *    DataSources without an outbox, see `multi-datasource-basic` and
+ *    `multi-datasource-cqrs`.
+ * 2. **CQRS**: `CqrsTransactionalModule.forRoot` overrides the
+ *    `EventPublisher` with `HybridEventPublisher`, and
+ *    `TransactionalOutboxModule` binds its outbox port, so
+ *    `aggregate.commit()` sends `@Externalized` events to the outbox in
+ *    the aggregate's transaction.
+ * 3. **The saga** runs over `@nestjs/outbox`: each step is an
+ *    `@OnOutboxMessage` handler, retried and deduplicated by its inbox.
+ *    `OrderPlacedEvent` is `@Externalized` to the `local` transport so the
+ *    aggregate can start the saga durably.
+ * 4. **Kafka**: `OrderConfirmedEvent` leaves the system on topic
+ *    `orders.confirmed`, keyed by order id through `toKafkaPacket`.
+ * 5. **REST API**: `OrdersController` exposes `POST /orders` and
+ *    `GET /orders/:id`.
  */
 @Module({})
 export class AppModule {
-  static forConfig(config: ECommerceConfig): DynamicModule {
+  /** `relay: false` lets tests drive the saga with `OutboxRelay.runOnce()`. */
+  static forConfig(
+    config: ECommerceConfig,
+    options: { readonly relay?: boolean } = {},
+  ): DynamicModule {
+    const clients = ClientsModule.register([
+      {
+        name: KAFKA_CLIENT,
+        transport: Transport.KAFKA,
+        options: { client: { brokers: [...config.kafkaBrokers] } },
+      },
+    ]);
+
     return {
       module: AppModule,
       imports: [
-        // ----- Three DataSources, three databases -----
-        TypeOrmModule.forRoot({
-          type: 'postgres',
-          ...config.orders,
-          entities: [OrderRow, EventPublicationEntity, EventPublicationArchiveEntity],
-          synchronize: true,
-          logging: false,
+        TypeOrmModule.forRootAsync({
+          useFactory: () => ({
+            type: 'postgres' as const,
+            ...config.postgres,
+            entities: [OrderRow, ProductRow, ReservationRow, PaymentRow],
+            logging: false,
+          }),
+          // Example-only bootstrap; production runs migrations. TypeORM's
+          // `synchronize` creates tables but not the schemas they live in,
+          // so the three contexts' schemas are created first.
+          dataSourceFactory: async (options) => {
+            const dataSource = await new DataSource(options!).initialize();
+            for (const schema of BOUNDED_CONTEXT_SCHEMAS) {
+              await dataSource.query(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
+            }
+            await dataSource.synchronize();
+            return dataSource;
+          },
         }),
         TypeOrmModule.forFeature([OrderRow]),
 
-        TypeOrmModule.forRoot({
-          name: 'inventory',
-          type: 'postgres',
-          ...config.inventory,
-          entities: [
-            ProductRow,
-            ReservationRow,
-            EventPublicationEntity,
-            EventPublicationArchiveEntity,
-          ],
-          synchronize: true,
-          logging: false,
-        }),
-        TypeOrmModule.forRoot({
-          name: 'billing',
-          type: 'postgres',
-          ...config.billing,
-          entities: [PaymentRow, EventPublicationEntity, EventPublicationArchiveEntity],
-          synchronize: true,
-          logging: false,
-        }),
-
-        // ----- Process-wide transactional infrastructure -----
         TransactionalModule.forRoot({ isGlobal: true, registerInterceptor: false }),
-        TypeOrmTransactionalModule.forRoot({ isDefault: true }),
-        TypeOrmTransactionalModule.forRoot({ dataSource: 'inventory' }),
-        TypeOrmTransactionalModule.forRoot({ dataSource: 'billing' }),
+        TypeOrmTransactionalModule.forRoot(),
 
-        // ----- Per-DS outbox stacks (ADR-019) -----
-        OutboxTypeOrmModule.forRoot({ schemaInitialization: { enabled: false } }),
-        OutboxTypeOrmModule.forRoot({
-          dataSource: 'inventory',
-          schemaInitialization: { enabled: false },
-        }),
-        OutboxTypeOrmModule.forRoot({
-          dataSource: 'billing',
-          schemaInitialization: { enabled: false },
-        }),
-
+        clients,
         OutboxModule.forRoot({
-          repository: typeOrmEventPublicationRepositoryProvider(),
-          processor: { pollingInterval: 100, batchSize: 50 },
-        }),
-        OutboxModule.forRoot({
-          dataSource: 'inventory',
-          repository: typeOrmEventPublicationRepositoryProvider('inventory'),
-          processor: { pollingInterval: 100, batchSize: 50 },
-        }),
-        OutboxModule.forRoot({
-          dataSource: 'billing',
-          repository: typeOrmEventPublicationRepositoryProvider('billing'),
-          processor: { pollingInterval: 100, batchSize: 50 },
-        }),
-
-        // Orders DS owns OrderPlacedEvent + OrderConfirmedEvent.
-        OutboxModule.forFeature([OrderPlacedEvent, OrderConfirmedEvent]),
-
-        // ----- Kafka client registration -----
-        // ONE Kafka client. The `@Externalized({ client: KAFKA_CLIENT })`
-        // decoration on `OrderConfirmedEvent` picks it up; downstream
-        // services subscribe to the `orders.confirmed` topic
-        // independently. ClientsModule is imported here, NOT through
-        // OutboxMicroservicesModule (DD-017): the user owns the
-        // client lifecycle.
-        ClientsModule.register([
-          {
-            name: KAFKA_CLIENT,
-            transport: Transport.KAFKA,
-            options: {
-              client: { brokers: [...config.kafkaBrokers] },
-            },
+          imports: [clients],
+          transports: {
+            [KAFKA_CLIENT]: ClientProxyTransport(KAFKA_CLIENT, { toPacket: toKafkaPacket }),
           },
-        ]),
+          // `@Externalized` events go to their client (`local` included);
+          // every other topic, the saga steps' events, to `local`.
+          route: externalizedRoute(),
+          relay: { enabled: options.relay ?? true, pollInterval: 100 },
+        }),
+        TransactionalOutboxModule.forRoot(),
 
-        // One global externalizer; per-event @Externalized({ client })
-        // routes to the right broker. Default is KAFKA_CLIENT — every
-        // externalized event in this example uses it explicitly, so
-        // the default never fires.
-        OutboxMicroservicesModule.forRoot({ defaultClient: KAFKA_CLIENT }),
-
-        // ----- CQRS infrastructure -----
-        // `CqrsTransactionalModule.forRoot()` imports `CqrsModule`
-        // internally and overrides the `EventPublisher` token.
-        // Convention #6 forbids importing `CqrsModule` directly
-        // here — it would shadow the override and aggregate events
-        // would bypass the dispatcher.
         CqrsTransactionalModule.forRoot(),
 
-        // Bridge cqrs's `HybridEventPublisher` to the outbox so
-        // `aggregate.commit()` fans events to BOTH the in-memory
-        // dispatcher AND the per-DS outbox in one transaction.
-        OutboxCqrsBridgeModule,
-
-        // ----- Bounded-context sub-modules -----
-        // Inventory and Billing handlers don't inject EventPublisher
-        // (only OutboxEventPublisher + repos), so sub-module
-        // isolation works for them. The cqrs scanner walks all
-        // providers at init regardless of module nesting, so
-        // `@IntegrationEventsHandler` decorations there are still
-        // discovered.
         InventoryModule,
         BillingModule,
-
-        // Auto-starts each per-DS worker.
-        OutboxProcessingModule,
       ],
       controllers: [OrdersController],
       providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
         PlaceOrderHandler,
         GetOrderHandler,
         ConfirmShipmentHandler,
         OrdersCompensationHandler,
-        OrderConfirmedExternalizationStub,
       ],
     };
   }

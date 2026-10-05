@@ -1,18 +1,14 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxModule, OutboxStorage } from '@nestjs/outbox';
+import { fromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionalModule } from '@nestjs-transactional/core';
-import { OutboxModule, OutboxProcessingModule } from '@nestjs-transactional/outbox';
-import {
-  EventPublicationArchiveEntity,
-  EventPublicationEntity,
-  OutboxTypeOrmModule,
-  typeOrmEventPublicationRepositoryProvider,
-} from '@nestjs-transactional/outbox-typeorm';
+import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
 import { TypeOrmTransactionalModule } from '@nestjs-transactional/typeorm';
+import type { DataSource } from 'typeorm';
 
 import { AuditArchivalHandler } from './audit/audit-archival.handler.js';
-import { AuditEventRecordedEvent } from './audit/audit-event-recorded.event.js';
 import { AuditLogEntry } from './audit/audit-log.entity.js';
 import { AuditService } from './audit/audit.service.js';
 import {
@@ -101,13 +97,10 @@ export class AppModule {
             username: options.databaseOverride?.username ?? read(cfg, 'PG_USER'),
             password: options.databaseOverride?.password ?? read(cfg, 'PG_PASSWORD'),
             database: options.databaseOverride?.database ?? read(cfg, 'PG_DATABASE'),
-            entities: [
-              AuditLogEntry,
-              EventPublicationEntity,
-              EventPublicationArchiveEntity,
-            ],
-            // Example-only — production runs the shipped outbox
-            // migration explicitly. See packages/outbox-typeorm/README.
+            entities: [AuditLogEntry],
+            // Example-only; production runs migrations. The outbox's
+            // tables are created by its store, in the `nest_outbox`
+            // schema (`npx nest-outbox migrate` in production).
             synchronize: true,
             logging: false,
           }),
@@ -125,40 +118,32 @@ export class AppModule {
           }),
         }),
 
-        OutboxTypeOrmModule.forRootAsync({
-          imports: [ConfigModule],
-          inject: [ConfigService],
-          useFactory: () => ({
-            // The TypeOrm `synchronize: true` above already creates
-            // the outbox tables, so the dedicated initializer would
-            // duplicate work. Production turns `synchronize` OFF and
-            // runs the shipped outbox migration explicitly.
-            schemaInitialization: { enabled: false },
-          }),
-        }),
-
+        // `@nestjs/outbox`'s own async registration: the relay tunables
+        // come from the validated env, so dev polls fast and prod polls
+        // in bigger, less frequent batches.
         OutboxModule.forRootAsync({
           imports: [ConfigModule],
-          // `repository` lives on the OPTIONS object, not on the
-          // async factory result — provider tokens must be resolvable
-          // at module-build time. The async factory only fills in
-          // *runtime tunables* (processor, staleness, etc.). See
-          // `OutboxModuleAsyncOptions` JSDoc.
-          repository: typeOrmEventPublicationRepositoryProvider(),
           inject: [ConfigService],
           useFactory: (cfg: ConfigService) => ({
-            processor: {
-              pollingInterval: read(cfg, 'OUTBOX_POLLING_INTERVAL_MS'),
+            relay: {
+              pollInterval: read(cfg, 'OUTBOX_POLLING_INTERVAL_MS'),
               batchSize: read(cfg, 'OUTBOX_BATCH_SIZE'),
-              maxConcurrent: read(cfg, 'OUTBOX_MAX_CONCURRENT'),
+              concurrency: read(cfg, 'OUTBOX_MAX_CONCURRENT'),
             },
           }),
         }),
-        OutboxModule.forFeature([AuditEventRecordedEvent]),
-
-        OutboxProcessingModule,
+        TransactionalOutboxModule.forRoot(),
       ],
-      providers: [AuditService, AuditArchivalHandler],
+      providers: [
+        {
+          provide: PostgresOutboxStore,
+          inject: [getDataSourceToken(), OutboxStorage],
+          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor: fromTypeOrm(dataSource) }, storage),
+        },
+        AuditService,
+        AuditArchivalHandler,
+      ],
     };
   }
 }

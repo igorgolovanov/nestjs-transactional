@@ -16,7 +16,7 @@ Backed by TypeORM + SQLite in-memory (via `sql.js`); no Docker required.
   that exercise commit + rollback paths.
 
 For multi-DataSource setups see `multi-datasource-basic`;
-for outbox-backed event delivery see `basic-outbox` and `basic-typeorm-outbox`.
+for outbox-backed event delivery see `basic-typeorm-outbox`.
 
 ## Run
 
@@ -97,8 +97,6 @@ at runtime by one of three coordinated mechanisms (see ADR-005):
 
 ## Related examples
 
-- [`basic-outbox`](../basic-outbox) — same shape but with the outbox stack
-  for durable event delivery (no TypeORM).
 - [`basic-typeorm-outbox`](../basic-typeorm-outbox) — full Postgres + outbox
   end-to-end via testcontainers.
 - [`basic-cqrs`](../basic-cqrs) — `@CommandHandler` + phase-aware in-memory

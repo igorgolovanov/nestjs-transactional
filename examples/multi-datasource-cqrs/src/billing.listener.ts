@@ -15,9 +15,7 @@ import { InvoiceIssuedEvent } from './invoice.aggregate.js';
  */
 @Injectable()
 @TransactionalEventsHandler(InvoiceIssuedEvent)
-export class BillingNotificationListener
-  implements ITransactionalEventHandler<InvoiceIssuedEvent>
-{
+export class BillingNotificationListener implements ITransactionalEventHandler<InvoiceIssuedEvent> {
   private readonly logger = new Logger(BillingNotificationListener.name);
 
   readonly notified: string[] = [];

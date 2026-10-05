@@ -12,10 +12,10 @@ import { OrderPlacedEvent } from './order.aggregate.js';
  * has actually committed. If the publishing transaction rolls back,
  * this handler is NEVER invoked.
  *
- * Distinct from `@OutboxEventsHandler` (durable, retried, persistent)
- * and `@IntegrationEventsHandler` (smart default that switches between
- * the two based on module wiring) — see `basic-outbox` for the
- * persistent variant.
+ * Not durable: a crash between the commit and the handler loses the
+ * call. For work that must survive that, publish through
+ * `@nestjs-transactional/outbox` and handle it with `@nestjs/outbox`'s
+ * `@OnOutboxMessage`; see `basic-typeorm-outbox`.
  */
 @Injectable()
 @TransactionalEventsHandler(OrderPlacedEvent)

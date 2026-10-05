@@ -6,7 +6,7 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
  * idempotency check single-column-PK simple. A real schema would
  * use a composite key.
  */
-@Entity({ name: 'reservations' })
+@Entity({ schema: 'inventory', name: 'reservations' })
 export class ReservationRow {
   /** `${orderId}:${sku}` — composite key encoded for single-column PK. */
   @PrimaryColumn({ type: 'text' })
