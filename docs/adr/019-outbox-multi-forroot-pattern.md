@@ -307,12 +307,12 @@ Key surfaces:
   publishers and event-type registries via `ModuleRef.get`.
 
 Test infrastructure precedent:
-[`packages/outbox/src/module/outbox.module.multi-datasource.spec.ts`](../../packages/outbox/src/module/outbox.module.multi-datasource.spec.ts)
+[`packages/outbox/src/module/outbox.module.multi-datasource.spec.ts`](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox/src/module/outbox.module.multi-datasource.spec.ts)
 demonstrates the multi-`forRoot` pattern end-to-end with three
 dataSources. Decorator-driven per-DS handler registration shipped in
 Phase 14.3.1 (Categories A / B), so the manual workaround the
 original spec showed is no longer needed — both
-[`OutboxModule.forFeature`](../../packages/outbox/src/module/outbox.module.ts)
+[`OutboxModule.forFeature`](https://github.com/igorgolovanov/nestjs-transactional/blob/%40nestjs-transactional/outbox%402.0.0/packages/outbox/src/module/outbox.module.ts)
 auto-registration and the
 [`@TransactionalEventsHandler({ dataSource })`](../../packages/cqrs/src/decorators/transactional-events-handler.decorator.ts)
 per-DS option route handlers to the right dataSource transparently.

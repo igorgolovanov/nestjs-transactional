@@ -51,14 +51,22 @@ and therefore public API under ADR-004.
    transport and is now a `string`, since transport names are strings.
    The decorator records `target → client` at decoration time, and two
    events declaring one target with different clients fail there, not
-   at runtime. `externalizedRoute({ fallback })` turns that table into
-   `OutboxModule`'s `route`; anything unlisted goes to `fallback`,
-   `'local'` by default.
-7. **Transport records.** `externalizedTransports(clients, { packet })`
-   builds the `transports` map. With `packet: 'envelope'`, the default,
-   the envelope is emitted as is. `'kafka'` and `'rmq'` map `key` and
-   `headers` onto the transport's record, so a Kafka consumer sees a
-   real message key and headers, and the value is still the envelope.
+   at runtime. `externalizedRoute({ defaultTransport, fallback })` turns
+   that table into `OutboxModule`'s `route`:
+   - a target with a client goes to that client;
+   - a target without one goes to `defaultTransport`. With no
+     `defaultTransport`, routing throws and the message dead-letters,
+     rather than being delivered by guess;
+   - any other topic goes to `fallback`, `'local'` by default.
+7. **Transport records.** `ClientProxyTransport` emits the envelope as
+   is. For Kafka, `toKafkaPacket` is passed as its `toPacket`: the
+   message key becomes the Kafka key, the headers become Kafka headers
+   with the outbox id added as `x-outbox-id`, and the value stays the
+   whole envelope. RabbitMQ needs no builder, because the envelope
+   already carries the id, key and headers. A wrapper that built the
+   whole `transports` map was considered and dropped: it would have
+   repeated `ClientProxyTransport` and added nothing beyond the
+   `toPacket` function.
 8. **What the application still configures itself.** `OutboxModule`,
    the store and the relay options are `@nestjs/outbox`'s, configured
    as its documentation shows. The bridge only adds the publisher and
@@ -74,4 +82,5 @@ builders) is the shortest path from 2.x's decorators to
 **Verified by** the bridge's integration suite against PostgreSQL. It
 covers commit and rollback, `REQUIRES_NEW` and `NESTED`,
 `SERIALIZABLE`, delivery through `ClientProxyTransport`, refusal outside
-a transaction, and, for the packet builders, a real Kafka record.
+a transaction, and, for `toKafkaPacket`, a message read back from a real
+Kafka broker with its key and headers.
