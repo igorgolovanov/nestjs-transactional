@@ -80,7 +80,7 @@
     "@nestjs/workflows": "0.0.1",
     "@testcontainers/postgresql": "^12.1.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.20.2",
+    "@types/node": "^22.20.5",
     "jest": "^30.5.1",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",

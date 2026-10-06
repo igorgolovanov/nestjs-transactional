@@ -48,7 +48,7 @@
     "@eslint/js": "^10.0.1",
     "@microsoft/api-extractor": "^7.59.2",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.20.2",
+    "@types/node": "^22.20.5",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.70.1",
     "eslint": "^10.11.0",
