@@ -85,7 +85,7 @@
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "testcontainers": "^12.1.0",
+    "testcontainers": "^12.2.0",
     "ts-jest": "^29.4.14",
     "typeorm": "^1.1.0",
     "typescript": "^6.0.3"
