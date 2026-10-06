@@ -1,13 +1,10 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { OutboxModule, OutboxStorage } from '@nestjs/outbox';
-import { fromTypeOrm as outboxFromTypeOrm, PostgresOutboxStore } from '@nestjs/outbox/postgres';
+import { PostgresOutboxStore } from '@nestjs/outbox/postgres';
 import { getDataSourceToken, TypeOrmModule } from '@nestjs/typeorm';
 import { WorkflowsModule, WorkflowStorage } from '@nestjs/workflows';
 import { WorkflowsCqrsModule } from '@nestjs/workflows/cqrs';
-import {
-  fromTypeOrm as workflowsFromTypeOrm,
-  PostgresWorkflowStore,
-} from '@nestjs/workflows/postgres';
+import { fromTypeOrm, PostgresWorkflowStore, type SqlExecutor } from '@nestjs/workflows/postgres';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TransactionalCqrsModule } from '@nestjs-transactional/cqrs';
 import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
@@ -22,6 +19,16 @@ import { FulfilOrder } from './fulfilment/fulfil-order.workflow.js';
 import { OrderEntity } from './orders/order.entity.js';
 import { OrdersService } from './orders/orders.service.js';
 import { PlaceOrderHandler } from './orders/place-order.handler.js';
+
+/**
+ * The one way both stores reach PostgreSQL. `fromTypeOrm` comes from
+ * `@nestjs/store-kit`, which `@nestjs/outbox/postgres` and
+ * `@nestjs/workflows/postgres` both re-export: the same function, so one
+ * executor serves both stores. It runs the stores' SQL on whatever
+ * TypeORM transaction it is handed, and the bridges hand it the
+ * `EntityManager` of the transaction `@Transactional` opened.
+ */
+const SQL_EXECUTOR = Symbol('SQL_EXECUTOR');
 
 export interface PostgresConfig {
   readonly host: string;
@@ -89,16 +96,21 @@ export class AppModule {
       ],
       providers: [
         {
+          provide: SQL_EXECUTOR,
+          inject: [getDataSourceToken()],
+          useFactory: (dataSource: DataSource): SqlExecutor => fromTypeOrm(dataSource),
+        },
+        {
           provide: PostgresOutboxStore,
-          inject: [getDataSourceToken(), OutboxStorage],
-          useFactory: (dataSource: DataSource, storage: OutboxStorage) =>
-            new PostgresOutboxStore({ executor: outboxFromTypeOrm(dataSource) }, storage),
+          inject: [SQL_EXECUTOR, OutboxStorage],
+          useFactory: (executor: SqlExecutor, storage: OutboxStorage) =>
+            new PostgresOutboxStore({ executor }, storage),
         },
         {
           provide: PostgresWorkflowStore,
-          inject: [getDataSourceToken(), WorkflowStorage],
-          useFactory: (dataSource: DataSource, storage: WorkflowStorage) =>
-            new PostgresWorkflowStore({ executor: workflowsFromTypeOrm(dataSource) }, storage),
+          inject: [SQL_EXECUTOR, WorkflowStorage],
+          useFactory: (executor: SqlExecutor, storage: WorkflowStorage) =>
+            new PostgresWorkflowStore({ executor }, storage),
         },
         PlaceOrderHandler,
         OrdersService,
