@@ -29,9 +29,10 @@ type PublishAll = (events: IEvent[], context?: unknown, asyncContext?: AsyncCont
  *   to `@EventsHandler`s that `@nestjs/cqrs`'s default publisher would
  *   have done;
  * - it wraps `EventBus.publish` and `publishAll` on the instance, so
- *   every publish inside a transaction, whatever publisher wraps ours,
- *   carries `{ transaction }` in its dispatcher context, and its
- *   asynchronous work finishes before the transaction commits;
+ *   every publish schedules its phases and outbox at once, inside the
+ *   publishing transaction, whatever publisher wraps ours; carries
+ *   `{ transaction }` in its dispatcher context; and has its asynchronous
+ *   work finish before the transaction commits;
  * - at bootstrap, it fails if the `EventBus` no longer reaches the
  *   publisher, which a second `CqrsModule.forRoot()` or a replaced
  *   `EventBus.publisher` would cause, silently, otherwise.
@@ -97,6 +98,7 @@ export class CqrsEventBusBinding implements OnApplicationBootstrap {
     const publishAll = eventBus.publishAll.bind(eventBus) as PublishAll;
 
     target.publish = (event: IEvent, contextOrAsync?: unknown, asyncContext?: AsyncContext) => {
+      this.publisher.schedule(event);
       const [context, async] = split(contextOrAsync, asyncContext);
       const active = this.active();
       return this.track(active, publish(event, this.contextFor(active, context), async));
@@ -106,6 +108,9 @@ export class CqrsEventBusBinding implements OnApplicationBootstrap {
       contextOrAsync?: unknown,
       asyncContext?: AsyncContext,
     ) => {
+      for (const event of events ?? []) {
+        this.publisher.schedule(event);
+      }
       const [context, async] = split(contextOrAsync, asyncContext);
       const active = this.active();
       return this.track(active, publishAll(events, this.contextFor(active, context), async));

@@ -19,10 +19,11 @@ export interface TransactionalEventBusPublisherDependencies {
  * alike, passes through it:
  *
  * 1. `@TransactionalEventsHandler` and `@IntegrationEventsHandler`
- *    listeners are scheduled for their transaction phase;
- * 2. an `@Externalized` event is scheduled for the outbox, when
- *    `@nestjs-transactional/outbox` is wired;
- * 3. the event is handed on at once to `@EventsHandler`s and sagas,
+ *    listeners are scheduled for their transaction phase, and an
+ *    `@Externalized` event for the outbox, when
+ *    `@nestjs-transactional/outbox` is wired ({@link schedule}, which
+ *    `EventBus.publish` calls first, at publish time);
+ * 2. the event is handed on at once to `@EventsHandler`s and sagas,
  *    exactly as `@nestjs/cqrs`'s own in-memory publisher would.
  *
  * It is installed through `CqrsModule.forRoot({ eventPublisher })`, so
@@ -33,6 +34,7 @@ export interface TransactionalEventBusPublisherDependencies {
  */
 export class TransactionalEventBusPublisher implements IEventPublisher {
   private dependencies: TransactionalEventBusPublisherDependencies | undefined;
+  private readonly scheduled = new WeakSet<object>();
 
   /**
    * @param delegate The application's own publisher, from
@@ -51,14 +53,33 @@ export class TransactionalEventBusPublisher implements IEventPublisher {
     return this.dependencies?.inner;
   }
 
+  /**
+   * Schedules the event's transaction phases and, for an `@Externalized`
+   * event, the outbox, once per event. `EventBus.publish` calls this as
+   * soon as an event is published, inside the publishing transaction and
+   * before any publisher that wraps this one runs: such a publisher may
+   * forward the event only after the transaction ended, or not at all
+   * when its own write fails, and the event must still meet its rollback.
+   */
+  schedule(event: object): void {
+    if (this.scheduled.has(event)) {
+      return;
+    }
+    const { dispatcher, outbox } = this.require();
+    this.scheduled.add(event);
+    dispatcher.scheduleDispatch(event);
+    outbox?.scheduleForPublication(event);
+  }
+
   publish<T extends IEvent>(
     event: T,
     dispatcherContext?: unknown,
     asyncContext?: unknown,
   ): unknown {
-    const { dispatcher, inner, outbox } = this.require();
-    dispatcher.scheduleDispatch(event);
-    outbox?.scheduleForPublication(event);
+    const { inner } = this.require();
+    // Already done when the event came through `EventBus.publish`; this
+    // covers a caller that invokes the bus's publisher directly.
+    this.schedule(event);
     return (inner.publish as (...args: unknown[]) => unknown)(
       event,
       dispatcherContext,
