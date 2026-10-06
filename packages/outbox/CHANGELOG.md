@@ -1,5 +1,109 @@
 # @nestjs-transactional/outbox
 
+## 3.0.0
+
+### Major Changes
+
+- [#93](https://github.com/igorgolovanov/nestjs-transactional/pull/93) [`6209829`](https://github.com/igorgolovanov/nestjs-transactional/commit/6209829f32cf2055519996f33afad4dc11159d3e) Thanks [@igorgolovanov](https://github.com/igorgolovanov)! - cqrs events go through the `@nestjs/cqrs` EventBus, and NestJS 10 leaves the peer ranges
+  
+  `TransactionalCqrsModule` no longer overrides `EventPublisher`. It
+  imports `CqrsModule.forRoot()` with its own publisher in the `EventBus`,
+  so every event, from `aggregate.commit()` or `eventBus.publish()`,
+  schedules its transaction phases and the outbox, then reaches
+  `@EventsHandler`s and sagas. Inside `@Transactional`, the bus hands its
+  publisher chain `{ transaction }`, which makes `@nestjs/cqrs` 12.1's
+  `commit(context)` work and lets `@nestjs/workflows`' `@StartOn` and
+  `@SignalOn` write in the business transaction. Why: ADR-024. The
+  contract: DD-029. Upgrading: section 7 of
+  `docs/guides/migrating-to-3.md`.
+  
+  ### Breaking
+  
+  - **NestJS 10 is no longer supported** by core, typeorm or cqrs. It was
+    declared and never tested. CI now runs NestJS 11 with `@nestjs/cqrs`
+    11.0.3, and NestJS 12 with 12.1.
+  - **`@EventsHandler`s and sagas receive aggregate events**, at once and
+    inside the transaction, as `@nestjs/cqrs` delivers any publish.
+  - **A direct `eventBus.publish()` schedules phase handlers** and, for an
+    `@Externalized` event with the outbox wired, the outbox.
+  - **Inside a transaction, the dispatcher context** of a publish without
+    one, or with the aggregate, is `{ transaction, aggregate? }`.
+  - **Removed from cqrs**: `HybridEventPublisher`,
+    `TransactionalEventPublisher`, `TransactionalEventPublisherAdapter`,
+    `AggregateConstructor` and the `useTransactionalEventPublisher` option.
+    `CqrsModule` options go to `TransactionalCqrsModule.forRoot({ cqrs })`,
+    a bus publisher of your own to `forRoot({ eventPublisher })`.
+  - **Bootstrap fails** when a second `EventBus` exists or
+    `EventBus.publisher` no longer reaches the transactional publisher.
+  
+  ### Added
+  
+  - `CommandBus`, `QueryBus` and `EventBus` are injectable anywhere in the
+    application.
+  - core: an optional adapter SPI method, `nativeTransaction(handle)`, and
+    `dialect`; `TransactionManager.nativeTransactionOf(active)` and
+    `TransactionManager.trackPending(active, promise)`.
+  - typeorm: the adapter implements `nativeTransaction` (the transactional
+    `EntityManager`) and `dialect`.
+  - outbox: the default `transactionResolver` asks the adapter for its
+    native transaction instead of reading `handle.entityManager`.
+
+- [#88](https://github.com/igorgolovanov/nestjs-transactional/pull/88) [`92bf389`](https://github.com/igorgolovanov/nestjs-transactional/commit/92bf389fe4e2ccf4a1aefa7941f05183bf5afd1b) Thanks [@igorgolovanov](https://github.com/igorgolovanov)! - The outbox delivers through `@nestjs/outbox`
+  
+  `@Transactional` and `@Externalized` stay. The outbox's own delivery
+  engine is replaced by `@nestjs/outbox`, the first-party NestJS outbox,
+  and `@nestjs-transactional/outbox` becomes a bridge: it adds your event
+  to `@nestjs/outbox` inside the transaction `@Transactional` opened, so
+  the message commits or rolls back with your rows and nothing passes the
+  transaction by hand. Why, and what was weighed: ADR-023. The bridge
+  contract: DD-028.
+  
+  Upgrading needs a drain and a schema switch. Follow the migration guide,
+  `docs/guides/migrating-to-3.md`, before deploying.
+  
+  ### Breaking
+  
+  - **`@nestjs-transactional/outbox-typeorm` and
+    `@nestjs-transactional/outbox-microservices` are discontinued.** Their
+    last release is 2.0.0. Storage is `@nestjs/outbox`'s store
+    (`PostgresOutboxStore` with `fromTypeOrm`), and brokers are reached
+    through its `ClientProxyTransport`.
+  - **`@nestjs-transactional/outbox` is a bridge.** It keeps
+    `@Externalized` and `OutboxEventPublisher`, and adds
+    `TransactionalOutboxModule`, `externalizedRoute()` and
+    `toKafkaPacket()`. Everything else is removed: `OutboxModule`,
+    `OutboxProcessingModule`, `@OutboxEventsHandler`, the
+    Failed/Incomplete/Completed publication APIs, the staleness, retry,
+    cleanup and startup-recovery schedulers, the serializer, the
+    repository SPI and the `/testing` entry point. `@nestjs/outbox`
+    provides their counterparts: `@OnOutboxMessage`, `OutboxDeadLetters`,
+    `OutboxRelay.stats()` and its own retry and lease recovery.
+  - **Peer dependency `@nestjs/outbox ~0.1.0`** on
+    `@nestjs-transactional/outbox`, and NestJS 11 or 12 for that package,
+    since `@nestjs/outbox` does not support 10.
+  - **The message on the wire is `@nestjs/outbox`'s envelope**,
+    `{ id, topic, key, headers, createdAt, payload }`. A consumer that read
+    the event as the whole message now reads `envelope.payload`, and gains
+    a stable `id` to deduplicate on.
+  - **`@Externalized({ client })` is a string**, the name of a
+    `@nestjs/outbox` transport. `routingKey` and `headers`, which 2.x
+    accepted and never put on the wire, now become the message key and
+    headers.
+  - **One outbox DataSource.** Publishing from a transaction on another
+    DataSource throws instead of writing outside your transaction. The
+    multi-DataSource outbox of ADR-019 is withdrawn.
+  - **`@IntegrationEventsHandler` is in-memory only**: after the commit,
+    asynchronously, in its own transaction. Its `id` option is removed,
+    along with `OUTBOX_LISTENER_REGISTRAR` and `OutboxListenerRegistrar`.
+    Durable in-process work moves to `@OnOutboxMessage`.
+  - **`core` and `typeorm`** change nothing themselves. They move to
+    3.0.0 because the packages version as one.
+
+### Patch Changes
+
+- Updated dependencies [[`6209829`](https://github.com/igorgolovanov/nestjs-transactional/commit/6209829f32cf2055519996f33afad4dc11159d3e), [`92bf389`](https://github.com/igorgolovanov/nestjs-transactional/commit/92bf389fe4e2ccf4a1aefa7941f05183bf5afd1b), [`f1a1717`](https://github.com/igorgolovanov/nestjs-transactional/commit/f1a171793e153a64d2941154891e44603413a8d0), [`127b2a9`](https://github.com/igorgolovanov/nestjs-transactional/commit/127b2a9bc408232a8888b9cea4f3ed31b4ede3f3)]:
+  - @nestjs-transactional/core@3.0.0
+
 ## 2.0.0
 
 ### Major Changes

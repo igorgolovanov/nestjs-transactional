@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/drizzle",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Drizzle ORM adapter for @nestjs-transactional/core: the db you inject joins the transaction, with savepoints and multiple databases",
   "license": "MIT",
   "type": "module",

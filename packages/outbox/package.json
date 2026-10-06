@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/outbox",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Transactional outbox bridge for @nestjs-transactional: @Externalized and an ambient-transaction publisher on top of @nestjs/outbox",
   "license": "MIT",
   "type": "module",

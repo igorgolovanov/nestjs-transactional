@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-transactional/workflows",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Durable workflows for @nestjs-transactional: @nestjs/workflows starts and signals inside the transaction @Transactional opened",
   "license": "MIT",
   "type": "module",
