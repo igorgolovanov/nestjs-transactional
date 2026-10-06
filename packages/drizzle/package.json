@@ -1,0 +1,86 @@
+{
+  "name": "@nestjs-transactional/drizzle",
+  "version": "3.0.0",
+  "description": "Drizzle ORM adapter for @nestjs-transactional/core: the db you inject joins the transaction, with savepoints and multiple databases",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "author": "Igor Golovanov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
+    "directory": "packages/drizzle"
+  },
+  "bugs": {
+    "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
+  },
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/drizzle#readme",
+  "keywords": [
+    "nestjs",
+    "drizzle",
+    "drizzle-orm",
+    "transaction",
+    "transactional",
+    "savepoint"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "!dist/**/*.spec.*"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist *.tsbuildinfo coverage",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
+    "test:cov": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.coverage.config.cjs --coverage",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack . --profile esm-only"
+  },
+  "peerDependencies": {
+    "@nestjs-transactional/core": "workspace:^",
+    "@nestjs/common": "^11.0.0 || ^12.0.0",
+    "@nestjs/core": "^11.0.0 || ^12.0.0",
+    "drizzle-orm": ">=0.40.0 <2 || >=1.0.0-0",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@jest/globals": "^30.4.2",
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/testing": "^12.1.2",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.1",
+    "postgres": "^3.4.9",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "testcontainers": "^12.1.0"
+  }
+}
