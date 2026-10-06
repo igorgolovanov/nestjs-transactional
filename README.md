@@ -127,7 +127,7 @@ already written.
 CommonJS application still consumes them: Node loads ESM from
 `require()` as of 22.12.0, which is what the `>=22.13.0` floor covers.
 What does not follow Node is tooling with its own module loader — Jest
-needs `--experimental-vm-modules` and a few settings, shown in all 14
+needs `--experimental-vm-modules` and a few settings, shown in all 15
 example applications. The reasoning, and why one build rather than two,
 is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 
@@ -192,7 +192,7 @@ The interesting guarantees are the ones a test can fail on:
 - The matrix covers **three TypeORM versions** (`0.3.31`, `1.0.0`,
   `1.1.0`) across **Node 22, 24 and 26**, so the declared peer range is
   a tested claim rather than an optimistic one.
-- All **14 example applications** are built and run in CI, so a library
+- All **15 example applications** are built and run in CI, so a library
   change that breaks the documented usage fails the build.
 - The **public API surface is committed** as api-extractor reports; any
   change to it shows up as a reviewable diff.
@@ -201,7 +201,7 @@ The interesting guarantees are the ones a test can fail on:
 
 ## Examples
 
-Fourteen runnable applications under [`examples/`](examples/), in five
+Fifteen runnable applications under [`examples/`](examples/), in five
 tiers from a single decorator to an e-commerce service with three
 bounded contexts, CQRS, a saga over the outbox and Kafka:
 
@@ -210,7 +210,9 @@ pnpm -C examples/basic-transactional start
 ```
 
 Start with [`basic-transactional`](examples/basic-transactional) for
-transactions, [`basic-typeorm-outbox`](examples/basic-typeorm-outbox) for durability, or
+transactions, [`basic-typeorm-outbox`](examples/basic-typeorm-outbox) for durability,
+[`workflows-order-fulfilment`](examples/workflows-order-fulfilment) for
+`@nestjs/workflows`, `@nestjs/outbox` and CQRS in one transaction, or
 [`e-commerce-orders`](examples/e-commerce-orders) to see everything at
 once. The [catalogue](examples/README.md) has a decision guide for
 picking a starting point.

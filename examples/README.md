@@ -14,11 +14,11 @@ Every outbox example delivers through
 
 The smallest possible illustrations of each core concept.
 
-| Example | Showcases | Database |
-|---|---|---|
-| [`basic-transactional`](basic-transactional) | `@Transactional()` on a plain service via `@InjectRepository` (transparent transactional repositories) | TypeORM + sqljs (in-memory) |
-| [`basic-typeorm-outbox`](basic-typeorm-outbox) | The outbox end to end: a message committed with the order, delivered to an `@OnOutboxMessage` handler, recorded in its inbox | Postgres (testcontainers) |
-| [`basic-cqrs`](basic-cqrs) | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None |
+| Example                                        | Showcases                                                                                                                                         | Database                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| [`basic-transactional`](basic-transactional)   | `@Transactional()` on a plain service via `@InjectRepository` (transparent transactional repositories)                                            | TypeORM + sqljs (in-memory) |
+| [`basic-typeorm-outbox`](basic-typeorm-outbox) | The outbox end to end: a message committed with the order, delivered to an `@OnOutboxMessage` handler, recorded in its inbox                      | Postgres (testcontainers)   |
+| [`basic-cqrs`](basic-cqrs)                     | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None                        |
 
 ## Tier 2 — Multi-DataSource
 
@@ -39,7 +39,7 @@ does work, an outbox on one DataSource feeding a consumer on another.
 
 - [`externalization-kafka`](externalization-kafka) —
   Single DataSource + single Kafka broker. `@Externalized({ target,
-  routingKey, headers })` on the event class, `ClientProxyTransport`
+routingKey, headers })` on the event class, `ClientProxyTransport`
   with `toKafkaPacket`, so the routing key is the Kafka key and the
   envelope is the value. A rejected emit keeps the message for a retry.
 - [`externalization-multi-broker`](externalization-multi-broker) —
@@ -78,6 +78,13 @@ does work, an outbox on one DataSource feeding a consumer on another.
 
 ## Tier 5 — Production realism
 
+- [`workflows-order-fulfilment`](workflows-order-fulfilment): one
+  `@Transactional` command saves the order and, through the aggregate's
+  `commit()`, starts a `@nestjs/workflows` workflow (`@StartOn`) and
+  adds an `@nestjs/outbox` message, all or nothing. The workflow
+  charges, reserves stock, marks the order paid, waits for a delivery
+  signal sent from a transactional webhook, and compensates when a step
+  fails for good. 6 integration tests on Postgres.
 - [`e-commerce-orders`](e-commerce-orders) — Flagship. Three bounded
   contexts (Orders / Inventory / Billing) as three Postgres schemas on
   one DataSource, so every saga step publishes its outcome atomically.
@@ -152,7 +159,11 @@ example code.
   profiles" →
   [`async-config-from-environment`](async-config-from-environment)
 - "Multi-step business process with compensation" →
-  [`saga-pattern`](saga-pattern)
+  [`saga-pattern`](saga-pattern) on outbox handlers, or
+  [`workflows-order-fulfilment`](workflows-order-fulfilment) as a
+  durable workflow
+- "`@nestjs/workflows`, `@nestjs/outbox` and CQRS in one transaction" →
+  [`workflows-order-fulfilment`](workflows-order-fulfilment)
 - "Cross-DataSource audit trail through the outbox" →
   [`audit-logging`](audit-logging)
 - "Master/replica DataSource setup" →
