@@ -14,11 +14,12 @@ Every outbox example delivers through
 
 The smallest possible illustrations of each core concept.
 
-| Example                                        | Showcases                                                                                                                                         | Database                    |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| [`basic-transactional`](basic-transactional)   | `@Transactional()` on a plain service via `@InjectRepository` (transparent transactional repositories)                                            | TypeORM + sqljs (in-memory) |
-| [`basic-typeorm-outbox`](basic-typeorm-outbox) | The outbox end to end: a message committed with the order, delivered to an `@OnOutboxMessage` handler, recorded in its inbox                      | Postgres (testcontainers)   |
-| [`basic-cqrs`](basic-cqrs)                     | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None                        |
+| Example                                        | Showcases                                                                                                                                         | Database                            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [`basic-transactional`](basic-transactional)   | `@Transactional()` on a plain service via `@InjectRepository` (transparent transactional repositories)                                            | TypeORM + sqljs (in-memory)         |
+| [`basic-typeorm-outbox`](basic-typeorm-outbox) | The outbox end to end: a message committed with the order, delivered to an `@OnOutboxMessage` handler, recorded in its inbox                      | Postgres (testcontainers)           |
+| [`drizzle-orders`](drizzle-orders)             | `@Transactional` on Drizzle ORM: the injected `db`, an `@nestjs/outbox` message and an `@nestjs/workflows` workflow commit together               | Drizzle + Postgres (testcontainers) |
+| [`basic-cqrs`](basic-cqrs)                     | All three `@nestjs/cqrs` handler types — `@CommandHandler` + `@QueryHandler` (auto-wrapped readonly) + AFTER_COMMIT `@TransactionalEventsHandler` | None                                |
 
 ## Tier 2 — Multi-DataSource
 

@@ -464,10 +464,10 @@ Releases are fully automated by the `release` workflow:
 
 Maintainers do not run `changeset publish` manually.
 
-### One version for all five
+### One version for every package
 
 The cohort is `fixed` in `.changeset/config.json`, not `linked`: every
-release publishes all five packages at the same version, including the
+release publishes every package at the same version, including the
 ones with no changes.
 
 That follows from how the packages are actually consumed. None of them
