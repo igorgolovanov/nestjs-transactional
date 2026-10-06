@@ -172,7 +172,9 @@ describe.each(DRIVERS)('Drizzle on PostgreSQL through %s (testcontainers)', (dri
 
     it('with retry, the failed one runs again and both commit', async () => {
       const skew = writeSkew();
-      const options = { isolation: 'SERIALIZABLE', retry: { maxAttempts: 3, delay: 0 } } as const;
+      // Room for a second conflict: a retried attempt can collide again
+      // with the other transaction while it is still committing.
+      const options = { isolation: 'SERIALIZABLE', retry: { maxAttempts: 5, delay: 0 } } as const;
 
       await Promise.all([
         transactional(() => skew.run('a'), options),
@@ -183,7 +185,8 @@ describe.each(DRIVERS)('Drizzle on PostgreSQL through %s (testcontainers)', (dri
       expect(ids).toHaveLength(2);
       expect(ids.some((id) => id.endsWith('-saw-0'))).toBe(true);
       expect(ids.some((id) => id.endsWith('-saw-1'))).toBe(true);
-      expect(skew.attempts()).toBe(3);
+      // Two first attempts, and at least one retry.
+      expect(skew.attempts()).toBeGreaterThanOrEqual(3);
     });
   });
 });
