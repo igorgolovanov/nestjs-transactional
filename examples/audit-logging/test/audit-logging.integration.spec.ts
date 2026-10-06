@@ -11,8 +11,8 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import type { DataSource } from 'typeorm';
 
 import { AccountService } from '../src/account.service.js';
-import { AuditHandler } from '../src/audit.handler.js';
 import { AuditLoggingModule } from '../src/app.module.js';
+import { AuditHandler } from '../src/audit.handler.js';
 import { AccountOperationRow, AccountRow, AuditLogRow } from '../src/entities.js';
 import { AccountOperationEvent } from '../src/events.js';
 

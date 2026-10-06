@@ -2,9 +2,9 @@ import { AggregateRoot } from '@nestjs/cqrs';
 
 export class ReservationPlacedEvent {
   constructor(
-    public readonly reservationId: string,
-    public readonly sku: string,
-    public readonly quantity: number,
+    readonly reservationId: string,
+    readonly sku: string,
+    readonly quantity: number,
   ) {}
 }
 
@@ -17,9 +17,9 @@ export class ReservationPlacedEvent {
  */
 export class Reservation extends AggregateRoot {
   constructor(
-    public readonly id: string,
-    public readonly sku: string,
-    public readonly quantity: number,
+    readonly id: string,
+    readonly sku: string,
+    readonly quantity: number,
   ) {
     super();
   }

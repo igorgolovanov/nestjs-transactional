@@ -8,10 +8,10 @@ import { Invoice } from './invoice.aggregate.js';
 
 export class IssueInvoiceCommand {
   constructor(
-    public readonly id: string,
-    public readonly customer: string,
-    public readonly amountCents: number,
-    public readonly shouldFail = false,
+    readonly id: string,
+    readonly customer: string,
+    readonly amountCents: number,
+    readonly shouldFail = false,
   ) {}
 }
 

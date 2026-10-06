@@ -8,10 +8,10 @@ import { Reservation } from './reservation.aggregate.js';
 
 export class PlaceReservationCommand {
   constructor(
-    public readonly id: string,
-    public readonly sku: string,
-    public readonly quantity: number,
-    public readonly shouldFail = false,
+    readonly id: string,
+    readonly sku: string,
+    readonly quantity: number,
+    readonly shouldFail = false,
   ) {}
 }
 

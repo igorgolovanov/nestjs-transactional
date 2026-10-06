@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
-import { Test, type TestingModule } from '@nestjs/testing';
 import { CommandBus } from '@nestjs/cqrs';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { TransactionalModule } from '@nestjs-transactional/core';
 import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 

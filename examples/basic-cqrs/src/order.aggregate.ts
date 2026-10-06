@@ -1,7 +1,7 @@
 import { AggregateRoot } from '@nestjs/cqrs';
 
 export class OrderPlacedEvent {
-  constructor(public readonly orderId: string) {}
+  constructor(readonly orderId: string) {}
 }
 
 /**
@@ -12,7 +12,7 @@ export class OrderPlacedEvent {
  * active transaction instead of being dispatched immediately.
  */
 export class Order extends AggregateRoot {
-  constructor(public readonly id: string) {
+  constructor(readonly id: string) {
     super();
   }
 

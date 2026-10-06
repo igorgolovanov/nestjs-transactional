@@ -80,6 +80,17 @@ export default [
     },
   },
   {
+    // Example applications print what they do: `main.ts` narrates the
+    // run, which is the point of running one. Their handlers keep the
+    // `async` signature a reader would copy into a real handler, whose
+    // body awaits something, even where the example's body does not.
+    files: ['examples/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/require-await': 'off',
+    },
+  },
+  {
     files: ['**/*.spec.ts', '**/*.integration.spec.ts', '**/test/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',

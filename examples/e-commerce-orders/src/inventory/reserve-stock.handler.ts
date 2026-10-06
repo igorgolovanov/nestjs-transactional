@@ -10,6 +10,7 @@ import {
   StockReservationFailedEvent,
   StockReservedEvent,
 } from '../shared/events.js';
+
 import { ProductRow } from './product.entity.js';
 import { ReservationRow } from './reservation.entity.js';
 

@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post } fro
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import type { OrderResponseDto, PlaceOrderRequestDto } from '../shared/dtos.js';
+
 import { GetOrderQuery } from './get-order.handler.js';
 import { PlaceOrderCommand } from './place-order.handler.js';
 
@@ -25,7 +26,10 @@ export class OrdersController {
   @Post()
   @HttpCode(201)
   async placeOrder(@Body() body: PlaceOrderRequestDto): Promise<{ orderId: string }> {
-    if (!body?.customerId || !Array.isArray(body.items) || body.items.length === 0) {
+    // Checked through a local: `Array.isArray` narrows a readonly array
+    // to `any[]`, which would untype `body.items` for the loop below.
+    const items: unknown = body?.items;
+    if (!body?.customerId || !Array.isArray(items) || items.length === 0) {
       throw new BadRequestException('customerId and non-empty items[] are required');
     }
     for (const item of body.items) {

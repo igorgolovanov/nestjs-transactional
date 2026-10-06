@@ -35,7 +35,7 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err: unknown) => {
-  // eslint-disable-next-line no-console -- bootstrap fault, no logger yet.
+   
   console.error(err);
   process.exit(1);
 });

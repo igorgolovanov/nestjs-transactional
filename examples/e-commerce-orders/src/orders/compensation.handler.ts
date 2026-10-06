@@ -5,6 +5,7 @@ import { Transactional } from '@nestjs-transactional/core';
 import { Repository } from 'typeorm';
 
 import { PaymentFailedEvent, StockReservationFailedEvent } from '../shared/events.js';
+
 import { OrderRow } from './order.entity.js';
 
 /**

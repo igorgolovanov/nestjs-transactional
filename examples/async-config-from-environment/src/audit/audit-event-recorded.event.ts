@@ -5,8 +5,8 @@
  */
 export class AuditEventRecordedEvent {
   constructor(
-    public readonly entryId: string,
-    public readonly eventType: string,
-    public readonly payload: Record<string, unknown>,
+    readonly entryId: string,
+    readonly eventType: string,
+    readonly payload: Record<string, unknown>,
   ) {}
 }

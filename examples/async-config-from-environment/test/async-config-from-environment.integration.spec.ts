@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 
-import { jest } from '@jest/globals';
 import { join } from 'node:path';
 
+import { jest } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { OUTBOX_MODULE_OPTIONS, type OutboxModuleOptions } from '@nestjs/outbox';
 import { Test, type TestingModule } from '@nestjs/testing';

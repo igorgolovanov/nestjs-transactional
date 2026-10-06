@@ -2,9 +2,9 @@ import { AggregateRoot } from '@nestjs/cqrs';
 
 export class InvoiceIssuedEvent {
   constructor(
-    public readonly invoiceId: string,
-    public readonly customer: string,
-    public readonly amountCents: number,
+    readonly invoiceId: string,
+    readonly customer: string,
+    readonly amountCents: number,
   ) {}
 }
 
@@ -15,9 +15,9 @@ export class InvoiceIssuedEvent {
  */
 export class Invoice extends AggregateRoot {
   constructor(
-    public readonly id: string,
-    public readonly customer: string,
-    public readonly amountCents: number,
+    readonly id: string,
+    readonly customer: string,
+    readonly amountCents: number,
   ) {
     super();
   }

@@ -4,8 +4,8 @@ import { Transactional } from '@nestjs-transactional/core';
 import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
-import { RefundEntity } from './refund.entity.js';
 import { RefundRequestedEvent } from './refund-requested.event.js';
+import { RefundEntity } from './refund.entity.js';
 
 /**
  * Producer side. The refund row and its outbox message commit together.

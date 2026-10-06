@@ -5,8 +5,8 @@
  */
 export class OrderPlacedEvent {
   constructor(
-    public readonly orderId: string,
-    public readonly customerEmail: string,
-    public readonly totalCents: number,
+    readonly orderId: string,
+    readonly customerEmail: string,
+    readonly totalCents: number,
   ) {}
 }

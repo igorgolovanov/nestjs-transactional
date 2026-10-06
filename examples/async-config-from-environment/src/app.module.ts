@@ -31,11 +31,11 @@ export interface AppModuleOptions {
 /**
  * Helper consumed by every `useFactory`. Pulling the validated env
  * through `ConfigService.get<T>(key, { infer: true })` is the
- * idiomatic way; the explicit `as ValidatedEnv[K]` typing surfaces
+ * idiomatic way; the explicit `ValidatedEnv[K]` type argument surfaces
  * a compile error if the schema and the typed shape ever drift.
  */
 function read<K extends keyof ValidatedEnv>(cfg: ConfigService, key: K): ValidatedEnv[K] {
-  const value = cfg.get(key);
+  const value = cfg.get<ValidatedEnv[K]>(key);
   if (value === undefined) {
     // ConfigModule's Joi step rejects missing required keys — so
     // reaching this branch means the schema and the typed shape
@@ -43,7 +43,7 @@ function read<K extends keyof ValidatedEnv>(cfg: ConfigService, key: K): Validat
     // into TypeORM/outbox config.
     throw new Error(`Config key ${key} resolved to undefined despite Joi schema`);
   }
-  return value as ValidatedEnv[K];
+  return value;
 }
 
 @Module({})

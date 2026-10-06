@@ -15,8 +15,8 @@ import type { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
 import { REFUNDS_BROKER } from '../src/clients.js';
 import { RefundConsumerService } from '../src/refund-consumer.service.js';
-import { RefundEntity } from '../src/refund.entity.js';
 import type { RefundRequestedEvent } from '../src/refund-requested.event.js';
+import { RefundEntity } from '../src/refund.entity.js';
 import { RefundService } from '../src/refund.service.js';
 
 describe('externalization-with-fallback (Postgres real, ClientProxy recorded)', () => {

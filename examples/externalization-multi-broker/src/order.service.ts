@@ -5,8 +5,8 @@ import { OutboxEventPublisher } from '@nestjs-transactional/outbox';
 import { Repository } from 'typeorm';
 
 import { CacheInvalidationEvent } from './cache-invalidation.event.js';
-import { OrderEntity } from './order.entity.js';
 import { OrderPlacedEvent } from './order-placed.event.js';
+import { OrderEntity } from './order.entity.js';
 import { RefundRequestedEvent } from './refund-requested.event.js';
 
 /**

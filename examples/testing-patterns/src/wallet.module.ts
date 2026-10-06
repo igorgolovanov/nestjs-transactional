@@ -7,9 +7,9 @@ import { TransactionalOutboxModule } from '@nestjs-transactional/outbox';
 import { TransactionalTypeOrmModule } from '@nestjs-transactional/typeorm';
 import type { DataSource } from 'typeorm';
 
+import { WalletRow } from './wallet.entity.js';
 import { WalletProjection } from './wallet.listener.js';
 import { WALLET_REPOSITORY, TypeOrmWalletRepository } from './wallet.repository.js';
-import { WalletRow } from './wallet.entity.js';
 import { WalletService } from './wallet.service.js';
 
 export interface PostgresConfig {

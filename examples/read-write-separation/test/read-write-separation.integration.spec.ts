@@ -8,8 +8,8 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import type { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module.js';
-import { ArticleQueryService } from '../src/article.query-service.js';
 import { ArticleRow } from '../src/article.entity.js';
+import { ArticleQueryService } from '../src/article.query-service.js';
 import { ArticleService } from '../src/article.service.js';
 
 describe('read-write-separation (Postgres via testcontainers)', () => {
