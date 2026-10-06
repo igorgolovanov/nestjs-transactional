@@ -82,13 +82,13 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.2",
     "amqplib": "^2.2.0",
-    "jest": "^30.5.1",
+    "jest": "^30.5.2",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "testcontainers": "^12.1.0",
-    "ts-jest": "^29.4.12",
+    "ts-jest": "^29.4.14",
     "typeorm": "^1.1.0",
     "typescript": "^6.0.3"
   }
