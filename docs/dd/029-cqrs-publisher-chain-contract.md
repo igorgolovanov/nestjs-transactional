@@ -27,13 +27,22 @@ observable by an application and is therefore public API under ADR-004.
    rejection rolls the transaction back with that error. This is what
    keeps `@nestjs/cqrs` 11's `commit()`, which drops the promise, inside
    the transaction.
-4. **Per event, `TransactionalEventBusPublisher`**, in this order:
-   - schedules `@TransactionalEventsHandler` and
-     `@IntegrationEventsHandler` listeners for their phase;
-   - calls `OUTBOX_PUBLICATION_SCHEDULER.scheduleForPublication(event)`
-     when the outbox bridge is wired, which takes `@Externalized` events
-     only (DD-028);
-   - hands the event on, with both contexts, and returns the result.
+4. **Scheduling happens at publish time.** `EventBus.publish` and
+   `publishAll` (our wrap) first call
+   `TransactionalEventBusPublisher.schedule(event)` for each event,
+   synchronously, inside the publishing transaction and before any
+   wrapping publisher runs. It schedules `@TransactionalEventsHandler`
+   and `@IntegrationEventsHandler` listeners for their phase, and calls
+   `OUTBOX_PUBLICATION_SCHEDULER.scheduleForPublication(event)` when the
+   outbox bridge is wired (`@Externalized` events only, DD-028). A
+   wrapping publisher may forward the event only after the transaction
+   ended, or never, when its own write fails; scheduling at publish time
+   is what keeps an `AFTER_ROLLBACK` handler from missing that rollback,
+   and the outbox from seeing the event outside its transaction. Each
+   event is scheduled once: `TransactionalEventBusPublisher.publish`, at
+   the bottom of the chain, schedules only an event that did not come
+   through the bus (a caller invoking the bus's publisher directly), then
+   hands the event on, with both contexts, and returns the result.
    `publishAll` does this event by event, in order.
 5. **Every route counts.** `AggregateRoot.commit()`, `apply()` with
    `autoCommit`, `@Publishable` aggregates and a direct
@@ -58,4 +67,7 @@ NestJS reliability module that takes a transaction explicitly join
 **Verified by** `packages/cqrs/src/module/event-bus-composition.spec.ts`
 on `@nestjs/cqrs` 12.1 and, in the CI `nest-11` job, 11.0.3. The spec
 covers both contexts, the asynchronous outer publisher, the rollback on
-its rejection, and both bootstrap checks.
+its rejection (which still reaches the `AFTER_ROLLBACK` handler),
+scheduling each event once, and both bootstrap checks. The
+`workflows-order-fulfilment` example runs the same chain against the
+real `WorkflowsCqrsModule`.

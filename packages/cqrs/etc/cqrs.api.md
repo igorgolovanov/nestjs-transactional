@@ -194,6 +194,7 @@ export class TransactionalEventBusPublisher implements IEventPublisher {
     publish<T extends IEvent>(event: T, dispatcherContext?: unknown, asyncContext?: unknown): unknown;
     // (undocumented)
     publishAll<T extends IEvent>(events: T[], dispatcherContext?: unknown, asyncContext?: unknown): unknown;
+    schedule(event: object): void;
 }
 
 // @public

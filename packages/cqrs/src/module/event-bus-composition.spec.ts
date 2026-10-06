@@ -348,9 +348,34 @@ describe('TransactionalCqrsModule and the @nestjs/cqrs EventBus', () => {
     await expect(module.get(CommandBus).execute(new PlaceOrder('o-5'))).rejects.toThrow(
       'workflow write failed',
     );
+    await settle();
 
     expect(await ds.manager.count(OrderRow)).toBe(0);
-    expect(module.get(Journal).entries).toEqual([]);
+    // The phases were scheduled when the event was published, inside the
+    // transaction, so the rollback reaches its handler; nothing else ran.
+    expect(module.get(Journal).entries).toEqual(['after-rollback o-5 workflow write failed']);
+  });
+
+  it('schedules the phases at publish time, so an outer publisher that forwards late cannot miss a rollback', async () => {
+    module = await build(ds, { providers: [OuterPublisher] });
+
+    await expect(module.get(CommandBus).execute(new PlaceOrder('o-8', true))).rejects.toThrow(
+      'simulated failure',
+    );
+    await settle();
+
+    const entries = module.get(Journal).entries;
+    expect(entries).toContain('after-rollback o-8 simulated failure');
+    expect(entries).not.toContain('after-commit o-8');
+  });
+
+  it('schedules an event once, even when it reaches the publisher through the bus', async () => {
+    module = await build(ds, { providers: [OuterPublisher] });
+
+    await module.get(CommandBus).execute(new PlaceOrder('o-9'));
+    await settle();
+
+    expect(module.get(Journal).entries.filter((e) => e === 'after-commit o-9')).toHaveLength(1);
   });
 
   itOnCommitContext(
