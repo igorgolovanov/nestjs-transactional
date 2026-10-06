@@ -1,5 +1,5 @@
 ---
-'@nestjs-transactional/drizzle': minor
+'@nestjs-transactional/drizzle': major
 ---
 
 New package: `@nestjs-transactional/drizzle`, `@Transactional` for Drizzle ORM

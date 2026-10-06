@@ -310,7 +310,7 @@ so `@nestjs/cqrs` 12.1's `commit(context)` and `@nestjs/workflows`'
 leaves the peer ranges. A fifth package, `@nestjs-transactional/workflows`,
 does for `@nestjs/workflows` what the outbox bridge does for
 `@nestjs/outbox` (DD-031). A sixth, `@nestjs-transactional/drizzle`,
-is the second ORM adapter (ADR-025), first released in 3.1. The cohort is
+is the second ORM adapter (ADR-025), released with 3.0. The cohort is
 `@nestjs-transactional/{core,typeorm,drizzle,cqrs,outbox,workflows}`, versioned as one
 (`fixed`): see CONTRIBUTING, "One version for every package". Upgrading is in
 `docs/guides/migrating-to-3.md`.
@@ -330,8 +330,8 @@ up as a reviewable diff.
 ### Blocked / Awaiting
 
 - **The `3.0.0` release itself.** The major changeset is on `main`.
-  The "Version Packages" PR waits for the cqrs change of ADR-024
-  (`feat/cqrs-event-bus`) to merge; after that, what remains is the
+  The "Version Packages" PR waits for the Drizzle adapter of ADR-025
+  (`feat/drizzle-adapter`) to merge; after that, what remains is the
   normal flow: merge the "Version Packages" PR and `release.yml` publishes
   under `latest`. Then, by hand: `npm deprecate` the two discontinued
   packages with a pointer to `docs/guides/migrating-to-3.md`, and move
