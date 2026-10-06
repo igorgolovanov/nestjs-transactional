@@ -33,8 +33,7 @@ export interface IntegrationEventsHandlerMetadata {
 /**
  * Handler for cross-module integration events: it runs after the
  * publishing transaction commits, asynchronously, in a transaction of
- * its own. The NestJS-idiomatic counterpart of Spring Modulith's
- * `@ApplicationModuleListener`, see "Naming" below.
+ * its own.
  *
  * ```ts
  * @IntegrationEventsHandler(OrderPlacedEvent)
@@ -57,10 +56,7 @@ export interface IntegrationEventsHandlerMetadata {
  * execution, a new transaction. If you need any of those to differ, use
  * {@link TransactionalEventsHandler} with explicit options instead.
  *
- * **Naming.** The Spring Modulith decorator with this role is called
- * `@ApplicationModuleListener`. We use `@IntegrationEventsHandler`
- * because (a) "Application Module" overlaps with NestJS's `@Module()`
- * (a DI concept), and (b) "Integration events" is the established
+ * **Naming.** "Integration events" is the established
  * DDD/microservices term for cross-module/cross-service event flow.
  *
  * @throws {Error} If no event types are supplied.

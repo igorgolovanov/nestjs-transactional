@@ -1,7 +1,6 @@
 /**
  * Transaction lifecycle phase at which a `@TransactionalEventsHandler`
- * runs. Mirrors Spring's `TransactionPhase` — see the package README
- * for semantics.
+ * runs. See the package README for semantics.
  *
  * - {@link BEFORE_COMMIT}: handler runs before commit; a thrown error
  *   causes the transaction to roll back (unless `async: true`).

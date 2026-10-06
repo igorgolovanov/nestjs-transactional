@@ -65,7 +65,7 @@ interface RegisteredListener {
  *
  * Error propagation:
  * - Errors thrown from a BEFORE_COMMIT listener propagate through the
- *   manager's commit path and trigger rollback (matches Spring).
+ *   manager's commit path and trigger rollback.
  * - Errors thrown from an AFTER_COMMIT / AFTER_ROLLBACK /
  *   AFTER_COMPLETION listener are logged and swallowed by
  *   {@link TransactionManager}'s hook runner — the transaction

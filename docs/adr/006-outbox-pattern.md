@@ -78,7 +78,7 @@ scope (Phase 7):
 
 The repository positioning updates from "Spring Framework
 equivalent" to "Spring Modulith equivalent" (see
-[`docs/architecture/spring-modulith-parity.md`](../architecture/spring-modulith-parity.md)).
+[`docs/architecture/scope-and-coverage.md`](../architecture/scope-and-coverage.md)).
 
 ## Alternatives considered
 
@@ -155,7 +155,7 @@ rest of the library.
 ### Neutral
 
 - The scope statement in
-  [`docs/architecture/spring-modulith-parity.md`](../architecture/spring-modulith-parity.md)
+  [`docs/architecture/scope-and-coverage.md`](../architecture/scope-and-coverage.md)
   rewrites from "Spring Framework" to "Spring Modulith". The
   library is no longer "just `@Transactional`"; it is "the
   Spring-equivalent transactional + event-delivery infrastructure

@@ -276,7 +276,7 @@ describe('TransactionManager (propagation REQUIRED)', () => {
       expect(afterRollbackReceived).toBe(boom);
     });
 
-    it('noRollbackFor wins over rollbackFor when both match (Spring precedence)', async () => {
+    it('noRollbackFor wins over rollbackFor when both match', async () => {
       let afterCommitRan = false;
       let afterRollbackRan = false;
       const boom = new BusinessErrorA('a');

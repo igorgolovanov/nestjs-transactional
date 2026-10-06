@@ -19,8 +19,8 @@ export interface TransactionOptions {
   readonly isolation?: IsolationLevel;
 
   /**
-   * Hint that the transaction will only issue reads. A hint by design,
-   * matching Spring's semantics: adapters honour it where the underlying
+   * Hint that the transaction will only issue reads. A hint by design:
+   * adapters honour it where the underlying
    * database allows, and ignore it where it cannot be expressed
    * (DD-027).
    *

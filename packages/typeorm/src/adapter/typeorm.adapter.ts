@@ -186,7 +186,7 @@ const READ_ONLY_DIALECTS: ReadonlySet<string> = new Set([
  * A silent no-op elsewhere, deliberately: `TransactionalCqrsModule`
  * defaults every query handler to `readOnly: true`, so throwing here
  * would break consumers on MySQL or SQLite over an option they never
- * set. `readOnly` is a hint in Spring too — honoured where possible
+ * set. `readOnly` is a hint by design, honoured where possible
  * (DD-027).
  *
  * Must run before any user statement; Postgres rejects the statement

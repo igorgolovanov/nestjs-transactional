@@ -20,7 +20,6 @@
     "cqrs",
     "transaction",
     "transactional",
-    "spring",
     "event-listener",
     "aggregate-root",
     "after-commit"

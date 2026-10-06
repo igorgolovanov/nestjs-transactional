@@ -2,10 +2,9 @@
  * Transaction propagation mode — how `@Transactional` behaves when invoked
  * in the presence (or absence) of an already-active transaction.
  *
- * Modeled on Spring Framework's
- * `org.springframework.transaction.annotation.Propagation`.
- *
- * @see https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html
+ * The seven modes are the established set for declarative transactions;
+ * each member below says what happens with and without an outer
+ * transaction.
  */
 export enum PropagationMode {
   /**

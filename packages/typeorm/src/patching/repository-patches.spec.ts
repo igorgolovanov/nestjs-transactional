@@ -163,7 +163,7 @@ describe('repository-patches', () => {
 
       // Active tx is for a DIFFERENT dataSource ('default') — the
       // repo lives on 'billing', so it must fall back to its own
-      // original manager (Spring-style cross-DS isolation, DD-023).
+      // original manager (cross-DS isolation, DD-023).
       const otherTxEm = new EntityManager(ds);
       await withFakeActiveTx('default', otherTxEm, async () => {
         expect(repo.manager).not.toBe(otherTxEm);
