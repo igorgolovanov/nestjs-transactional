@@ -78,9 +78,9 @@ describe('transaction retry on PostgreSQL (testcontainers)', () => {
       manager.run({ isolation: 'SERIALIZABLE' }, () => skew.run('b')),
     ]);
 
-    const rejected = results.filter((r) => r.status === 'rejected');
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
     expect(rejected).toHaveLength(1);
-    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({ code: '40001' });
+    expect(rejected[0]?.reason).toMatchObject({ code: '40001' });
     expect(await ctx.dataSource.getRepository(TestUser).count()).toBe(1);
   });
 
