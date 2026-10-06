@@ -309,15 +309,18 @@ picking a starting point.
 
 ## Status
 
-`2.0.0`, ESM only. The public API is under a
+`3.0.0`, ESM only. The public API is under a
 [stability policy](docs/adr/004-public-api-stability.md): breaking
 changes cost a major version and an ADR explaining why.
 
-Outbox delivery moves to `@nestjs/outbox` in 3.0.0
+Since 3.0.0 outbox delivery belongs to `@nestjs/outbox`
 ([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md)): storage,
 retries, dead letters, ordering, inboxes and observability are
 maintained there, and this repository keeps the transactional
-programming model on top. Nothing else is scheduled. The
+programming model on top, for the outbox, `@nestjs/workflows` and CQRS
+events, on TypeORM or Drizzle ORM. Upgrading from 2.x:
+[migrating to 3.0](docs/guides/migrating-to-3.md). Nothing else is
+scheduled. The
 [improvement plan](docs/roadmap/improvement-plan.md) records the earlier
 work.
 

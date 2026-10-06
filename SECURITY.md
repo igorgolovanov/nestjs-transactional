@@ -12,7 +12,7 @@ a suspected vulnerability before it has been addressed.
 
 What helps most in a report:
 
-- the affected package and version (all five packages ship as one
+- the affected package and version (all six packages ship as one
   version cohort, so naming one is usually enough);
 - what an attacker gains — the data they can read, write, or bypass;
 - a minimal reproduction, ideally a failing test rather than prose;
@@ -29,21 +29,25 @@ needs longer than that.
 
 | Version | Supported |
 | --- | --- |
-| `2.0.x` | ✅ |
+| `3.0.x` | ✅ |
+| `2.x` | ❌ |
 | `1.x` | ❌ |
 | `1.0.0-alpha.x` and earlier prereleases | ❌ |
 
 Fixes land on the latest minor of the current major. There are no
 backports to earlier minors, and none to earlier majors either, so
-upgrading to `2.x` is the supported path. `2.0.0` is an ESM-only
-release that raises the Node floor to `22.13.0`; what that costs a
-CommonJS application is covered in
+upgrading to `3.x` is the supported path. `3.0.0` hands outbox
+delivery to `@nestjs/outbox` and discontinues `outbox-typeorm` and
+`outbox-microservices`, both deprecated on npm; the upgrade is in
+[migrating from 2.x to 3.0](docs/guides/migrating-to-3.md). Since
+`2.0.0` the packages are ESM only, with a Node floor of `22.13.0`;
+what that costs a CommonJS application is covered in
 [ADR-022](docs/adr/022-esm-only-packaging.md). The alpha series was
 never maintained, and `1.0.0` is where this policy started.
 
 ## Scope
 
-In scope: anything in the five published packages under
+In scope: anything in the six published packages under
 `@nestjs-transactional/*`.
 
 Out of scope, though still worth telling us about as ordinary issues:

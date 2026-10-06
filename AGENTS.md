@@ -297,9 +297,9 @@ the docs — **stop and discuss** with the user. It may become an ADR.
 
 ## Current Status
 
-**Last update**: preparing `3.0.0`. Outbox delivery moves to the
+**Last update**: `3.0.0` is released, on `latest`. Outbox delivery moved to the
 first-party `@nestjs/outbox` (ADR-023): `@nestjs-transactional/outbox`
-becomes a bridge that adds messages inside the transaction
+became a bridge that adds messages inside the transaction
 `@Transactional` opened (DD-028), `outbox-typeorm` and
 `outbox-microservices` are discontinued, local durable handlers move to
 `@OnOutboxMessage`, the wire format becomes `@nestjs/outbox`'s
@@ -310,7 +310,8 @@ so `@nestjs/cqrs` 12.1's `commit(context)` and `@nestjs/workflows`'
 leaves the peer ranges. A fifth package, `@nestjs-transactional/workflows`,
 does for `@nestjs/workflows` what the outbox bridge does for
 `@nestjs/outbox` (DD-031). A sixth, `@nestjs-transactional/drizzle`,
-is the second ORM adapter (ADR-025), released with 3.0. The cohort is
+is the second ORM adapter (ADR-025), released with 3.0. `outbox-typeorm`
+and `outbox-microservices` are deprecated on npm, at 2.0.0. The cohort is
 `@nestjs-transactional/{core,typeorm,drizzle,cqrs,outbox,workflows}`, versioned as one
 (`fixed`): see CONTRIBUTING, "One version for every package". Upgrading is in
 `docs/guides/migrating-to-3.md`.
@@ -329,14 +330,9 @@ up as a reviewable diff.
 
 ### Blocked / Awaiting
 
-- **The `3.0.0` release itself.** The major changeset is on `main`.
-  The "Version Packages" PR waits for the Drizzle adapter of ADR-025
-  (`feat/drizzle-adapter`) to merge; after that, what remains is the
-  normal flow: merge the "Version Packages" PR and `release.yml` publishes
-  under `latest`. Then, by hand: `npm deprecate` the two discontinued
-  packages with a pointer to `docs/guides/migrating-to-3.md`, and move
-  SECURITY.md's supported-versions table and the README status line to
-  3.0.
+Nothing is blocked. `3.0.0` is published for all six packages, the two
+discontinued ones are deprecated with a pointer to
+`docs/guides/migrating-to-3.md`, and SECURITY.md supports `3.0.x`.
 
 ### Next
 
@@ -353,7 +349,7 @@ up as a reviewable diff.
   reproduce against live Kafka or RabbitMQ (ADR-021).
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
-  the five published packages to Trusted Publishing would let the
+  the six published packages to Trusted Publishing would let the
   long-lived Granular `NPM_TOKEN` secret be revoked. Setup is
   per-package in npm's UI; configure each with GitHub repo +
   workflow filename. Low priority; current token works fine until
@@ -377,6 +373,15 @@ up as a reviewable diff.
 
 ### Five most recent decisions
 
+- A second ORM adapter, `@nestjs-transactional/drizzle`
+  ([ADR-025](docs/adr/025-drizzle-adapter.md),
+  [DD-033](docs/dd/033-drizzle-adapter-contract.md)), released with
+  3.0.0. It patches the `drizzle()` instance the application registered,
+  so an existing `@Inject(DB)` runs on the active transaction's `tx`.
+  The bridges needed no change: they take the transaction from the
+  adapter SPI, and store-kit's `fromDrizzle()` accepts the `tx`.
+  PostgreSQL drivers only; CI's `drizzle-matrix` job runs it on
+  `0.40.1` and `1.0.0-beta.22` next to `0.45` from the lockfile.
 - cqrs events go through the `@nestjs/cqrs` `EventBus`
   ([ADR-024](docs/adr/024-cqrs-events-through-the-event-bus.md),
   [DD-029](docs/dd/029-cqrs-publisher-chain-contract.md)). Checked
