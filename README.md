@@ -139,6 +139,7 @@ is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 | [`typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | The TypeORM adapter and transparent transactional repositories |
 | [`cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | Transactions for `@nestjs/cqrs` handlers, phase-aware event handlers, `AggregateRoot` integration |
 | [`outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | `@Transactional` for [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox): publish inside the transaction, `@Externalized` routing to brokers |
+| [`workflows`](packages/workflows) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fworkflows?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/workflows) | `@Transactional` for [`@nestjs/workflows`](https://docs.nestjs.com/reliability/workflows): durable workflows started and signalled inside the transaction, `@StartOn` included |
 
 ## Where the sharp edges are
 

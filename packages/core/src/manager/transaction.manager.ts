@@ -259,6 +259,16 @@ export class TransactionManager {
   }
 
   /**
+   * The database dialect of `active`'s adapter
+   * ({@link TransactionAdapter.dialect}), or `undefined` when the adapter
+   * does not report one. Bridges use it for checks that hold on one
+   * dialect only.
+   */
+  dialectOf(active: ActiveTransaction): string | undefined {
+    return this.registry.get(active.adapterName, active.adapterInstanceName).dialect;
+  }
+
+  /**
    * Make COMMIT of `active` wait for `pending`, a write some library
    * started inside the transaction without the caller awaiting it. If
    * `pending` rejects, the transaction rolls back with that error.

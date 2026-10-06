@@ -45,7 +45,7 @@ All three of these should succeed on a clean clone.
 
 ESLint is deliberately not in the pre-commit hook: the config uses
 type-aware rules that resolve cross-package imports through
-`dist/*.d.ts`, so running it would mean building four packages on every
+`dist/*.d.ts`, so running it would mean building every package on every
 commit. `pnpm lint` and the `lint` CI job cover it instead.
 
 To bypass a hook once — a work-in-progress commit on a local branch,
@@ -464,10 +464,10 @@ Releases are fully automated by the `release` workflow:
 
 Maintainers do not run `changeset publish` manually.
 
-### One version for all four
+### One version for all five
 
 The cohort is `fixed` in `.changeset/config.json`, not `linked`: every
-release publishes all four packages at the same version, including the
+release publishes all five packages at the same version, including the
 ones with no changes.
 
 That follows from how the packages are actually consumed. None of them

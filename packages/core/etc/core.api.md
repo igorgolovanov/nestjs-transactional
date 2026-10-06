@@ -258,6 +258,7 @@ export interface TransactionHandle {
 // @public
 export class TransactionManager {
     constructor(registry: AdapterRegistry, observers?: readonly TransactionObserver[]);
+    dialectOf(active: ActiveTransaction): string | undefined;
     nativeTransactionOf(active: ActiveTransaction): unknown;
     registerAfterCommit(hook: () => Promise<void>): void;
     registerAfterRollback(hook: (error: unknown) => Promise<void>): void;

@@ -1,0 +1,93 @@
+{
+  "name": "@nestjs-transactional/workflows",
+  "version": "2.0.0",
+  "description": "Durable workflows for @nestjs-transactional: @nestjs/workflows starts and signals inside the transaction @Transactional opened",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "author": "Igor Golovanov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igorgolovanov/nestjs-transactional.git",
+    "directory": "packages/workflows"
+  },
+  "bugs": {
+    "url": "https://github.com/igorgolovanov/nestjs-transactional/issues"
+  },
+  "homepage": "https://github.com/igorgolovanov/nestjs-transactional/tree/main/packages/workflows#readme",
+  "keywords": [
+    "nestjs",
+    "workflows",
+    "durable-workflows",
+    "transaction",
+    "transactional",
+    "nestjs-workflows",
+    "cqrs",
+    "saga"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "!dist/**/*.spec.*"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist *.tsbuildinfo coverage",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
+    "test:cov": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local",
+    "publish:check": "publint && attw --pack . --profile esm-only",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs"
+  },
+  "peerDependencies": {
+    "@nestjs-transactional/core": "workspace:^",
+    "@nestjs/common": "^11.0.0 || ^12.0.0",
+    "@nestjs/core": "^11.0.0 || ^12.0.0",
+    "@nestjs/workflows": "~0.0.1",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.4.2",
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/cqrs": "workspace:*",
+    "@nestjs-transactional/typeorm": "workspace:*",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/cqrs": "^12.1.0",
+    "@nestjs/testing": "^12.1.2",
+    "@nestjs/typeorm": "^12.0.2",
+    "@nestjs/workflows": "0.0.1",
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.2",
+    "jest": "^30.5.1",
+    "pg": "^8.23.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "testcontainers": "^12.1.0",
+    "ts-jest": "^29.4.12",
+    "typeorm": "^1.1.0",
+    "typescript": "^6.0.3"
+  }
+}

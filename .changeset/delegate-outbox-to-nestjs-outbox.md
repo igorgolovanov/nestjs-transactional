@@ -54,4 +54,4 @@ Upgrading needs a drain and a schema switch. Follow the migration guide,
   along with `OUTBOX_LISTENER_REGISTRAR` and `OutboxListenerRegistrar`.
   Durable in-process work moves to `@OnOutboxMessage`.
 - **`core` and `typeorm`** change nothing themselves. They move to
-  3.0.0 because the four packages version as one.
+  3.0.0 because the packages version as one.

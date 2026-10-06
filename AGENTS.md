@@ -29,6 +29,12 @@ growing set of npm packages organised by concern.
   Storage, the relay, retries, dead letters, inboxes and broker
   transports are `@nestjs/outbox`'s. One outbox DataSource. What a
   successful publish acknowledges varies by transport: see ADR-021.
+- **@nestjs-transactional/workflows** — bridge onto the first-party
+  `@nestjs/workflows` (DD-031): `WorkflowClient.start()` and `signal()`
+  called inside `@Transactional`, directly or through
+  `WorkflowsCqrsModule`'s `@StartOn` / `@SignalOn`, write in that
+  transaction without a `transaction` option. A signal under a stricter
+  isolation than READ COMMITTED fails fast on PostgreSQL.
 
 Until 2.x the repository shipped its own outbox engine across `outbox`,
 `outbox-typeorm` and `outbox-microservices`; those two packages are
@@ -70,6 +76,7 @@ for the explicit scope-coverage matrix and Spring-Modulith mapping.
   against NestJS 12 and `@nestjs/cqrs` 12.1 (the lockfile); the CI
   `nest-11` job forces NestJS 11 and `@nestjs/cqrs` 11.0.3
 - **Outbox peer**: `@nestjs/outbox ~0.1.0` (pre-1.0, pinned)
+- **Workflows peer**: `@nestjs/workflows ~0.0.1` (pre-1.0, pinned)
 - **Package manager**: pnpm workspaces
 - **Build**: tsc with project references (no bundler — pure TypeScript)
 - **Test runner**: Jest + ts-jest, in ESM mode — see CONTRIBUTING,
@@ -179,6 +186,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-028](docs/dd/028-outbox-bridge-contract.md) - The outbox bridge contract
 - [DD-029](docs/dd/029-cqrs-publisher-chain-contract.md) - The cqrs publisher chain contract
 - [DD-030](docs/dd/030-transactional-first-names.md) - Public names lead with `Transactional`
+- [DD-031](docs/dd/031-workflows-bridge-contract.md) - The workflows bridge contract
 
 ## DO NOT cheat-sheet
 
@@ -282,10 +290,11 @@ envelope, and the outbox lives in one DataSource. In the same major,
 cqrs events go through the `@nestjs/cqrs` `EventBus` (ADR-024, DD-029),
 so `@nestjs/cqrs` 12.1's `commit(context)` and `@nestjs/workflows`'
 `@StartOn` / `@SignalOn` work inside `@Transactional`, and NestJS 10
-leaves the peer ranges. The cohort is four
-packages —
-`@nestjs-transactional/{core,typeorm,cqrs,outbox}` — versioned as one
-(`fixed`): see CONTRIBUTING, "One version for all four". Upgrading is in
+leaves the peer ranges. A fifth package, `@nestjs-transactional/workflows`,
+does for `@nestjs/workflows` what the outbox bridge does for
+`@nestjs/outbox` (DD-031). The cohort is five packages —
+`@nestjs-transactional/{core,typeorm,cqrs,outbox,workflows}` — versioned as one
+(`fixed`): see CONTRIBUTING, "One version for all five". Upgrading is in
 `docs/guides/migrating-to-3.md`.
 
 `2.0.0` was the ESM-only move (ADR-022) plus NestJS 12 support. Every
@@ -326,7 +335,7 @@ up as a reviewable diff.
   reproduce against live Kafka or RabbitMQ (ADR-021).
 - **Trusted Publishing migration** *(optional, deferred)* — npm
   now supports OIDC-based publisher trust per-package. Migrating
-  the four published packages to Trusted Publishing would let the
+  the five published packages to Trusted Publishing would let the
   long-lived Granular `NPM_TOKEN` secret be revoked. Setup is
   per-package in npm's UI; configure each with GitHub repo +
   workflow filename. Low priority; current token works fine until
