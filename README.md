@@ -184,6 +184,24 @@ is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 | [`outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | `@Transactional` for [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox): publish inside the transaction, `@Externalized` routing to brokers |
 | [`workflows`](packages/workflows) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fworkflows?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/workflows) | `@Transactional` for [`@nestjs/workflows`](https://docs.nestjs.com/reliability/workflows): durable workflows started and signalled inside the transaction, `@StartOn` included |
 
+### Discontinued at 3.0.0
+
+Up to 2.x this repository shipped its own outbox engine. From 3.0.0
+delivery belongs to NestJS's first-party `@nestjs/outbox`, which is
+ahead of that engine on every delivery concern: fenced leases, per-key
+ordering, consumer inboxes, retries with dead letters
+([ADR-023](docs/adr/023-delegate-delivery-to-nestjs-outbox.md)). The two
+packages that made up the engine's storage and broker side are
+deprecated on npm, and their last release, 2.0.0, stays installable.
+
+| Package | Last version | Replaced by |
+| --- | --- | --- |
+| [`outbox-typeorm`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox-typeorm%402.0.0/packages/outbox-typeorm) | 2.0.0 | `@nestjs/outbox`'s `PostgresOutboxStore` with `fromTypeOrm(dataSource)` |
+| [`outbox-microservices`](https://github.com/igorgolovanov/nestjs-transactional/tree/%40nestjs-transactional/outbox-microservices%402.0.0/packages/outbox-microservices) | 2.0.0 | `@nestjs/outbox`'s `ClientProxyTransport`, with `externalizedRoute()` and `toKafkaPacket()` from [`outbox`](packages/outbox) |
+
+Upgrading, including draining the 2.x outbox first:
+[migrating from 2.x to 3.0](docs/guides/migrating-to-3.md).
+
 ## Where the sharp edges are
 
 A library that only lists its strengths is telling you half the story.
