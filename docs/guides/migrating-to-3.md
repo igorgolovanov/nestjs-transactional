@@ -13,6 +13,12 @@ which changes the module's options and what `@EventsHandler`s receive:
 see [cqrs and the EventBus](#cqrs-event-bus). And NestJS 10 leaves every
 peer range.
 
+3.0 also adds two packages, which need nothing from a 2.x application:
+[`@nestjs-transactional/workflows`](../../packages/workflows/README.md),
+`@Transactional` for `@nestjs/workflows`, and
+[`@nestjs-transactional/drizzle`](../../packages/drizzle/README.md), an
+adapter for Drizzle ORM next to the TypeORM one.
+
 If you use only `@nestjs-transactional/core` and `typeorm`, the upgrade
 is a version bump on NestJS 11 or 12. With `cqrs` and without the
 outbox, read [section 7](#cqrs-event-bus) and

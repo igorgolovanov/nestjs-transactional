@@ -6,6 +6,7 @@
     [
       "@nestjs-transactional/core",
       "@nestjs-transactional/typeorm",
+      "@nestjs-transactional/drizzle",
       "@nestjs-transactional/cqrs",
       "@nestjs-transactional/outbox",
       "@nestjs-transactional/workflows"

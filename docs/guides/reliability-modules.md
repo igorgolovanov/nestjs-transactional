@@ -26,6 +26,14 @@ transaction when they are handed it: `outbox.add(tx, ...)`,
 
 Both join one DataSource, the one their store runs on.
 
+The ORM under them does not matter to the bridges. They take the
+transaction from the adapter, so they work the same on TypeORM and on
+Drizzle ORM ([`@nestjs-transactional/drizzle`](../../packages/drizzle/README.md)):
+give the stores `fromTypeOrm(dataSource)` or `fromDrizzle(db)` from
+`@nestjs/outbox/postgres` and `@nestjs/workflows/postgres`. The
+[`drizzle-orders`](../../examples/drizzle-orders) example wires all of
+it on Drizzle.
+
 ## CQRS: through the event bus
 
 `@nestjs-transactional/cqrs` puts its publisher in `@nestjs/cqrs`'s

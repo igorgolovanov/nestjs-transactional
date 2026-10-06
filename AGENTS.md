@@ -15,6 +15,10 @@ concern.
 - **@nestjs-transactional/typeorm** — TypeORM adapter, helper for retrieving
   the active EntityManager from the current async context, integration with
   `@nestjs/typeorm`.
+- **@nestjs-transactional/drizzle**: Drizzle ORM adapter (ADR-025,
+  DD-033). Patches the `drizzle()` instance the application registered,
+  so the injected database runs on the active transaction's `tx`;
+  savepoints in SQL, PostgreSQL drivers only, Drizzle 0.40+ and 1.0.
 - **@nestjs-transactional/cqrs** — integration with `@nestjs/cqrs`: runtime
   wrappers for CommandHandler/QueryHandler/EventHandler, class-level
   `@TransactionalEventsHandler` with commit-aware phases,
@@ -79,6 +83,9 @@ with Spring where the comparison carries information.
   `@nestjs/typeorm ^11.0.0 || ^12.0.0`. Development happens
   against `1.1.0` (what the lockfile pins); CI additionally forces
   `0.3.31` and `1.0.0` via `pnpm.overrides`
+- **Drizzle peer**: `drizzle-orm >=0.40.0 <2 || >=1.0.0-0`. Development
+  happens against `0.45` (the lockfile); the CI `drizzle-matrix` job
+  forces `0.40.1` and `1.0.0-beta.22`
 - **CQRS peer**: `@nestjs/cqrs ^11.0.0 || ^12.0.0`. Development happens
   against NestJS 12 and `@nestjs/cqrs` 12.1 (the lockfile); the CI
   `nest-11` job forces NestJS 11 and `@nestjs/cqrs` 11.0.3
@@ -142,6 +149,7 @@ the Design Decisions list below.
 - **ADR-022**: ESM-only packaging, and the 2.0.0 that comes with it — [`docs/adr/022-esm-only-packaging.md`](docs/adr/022-esm-only-packaging.md)
 - **ADR-023**: Delegate outbox delivery to `@nestjs/outbox`, keep the programming model - [`docs/adr/023-delegate-delivery-to-nestjs-outbox.md`](docs/adr/023-delegate-delivery-to-nestjs-outbox.md)
 - **ADR-024**: Aggregate events go through the `@nestjs/cqrs` EventBus - [`docs/adr/024-cqrs-events-through-the-event-bus.md`](docs/adr/024-cqrs-events-through-the-event-bus.md)
+- **ADR-025**: A Drizzle ORM adapter that patches the injected database - [`docs/adr/025-drizzle-adapter.md`](docs/adr/025-drizzle-adapter.md)
 
 Superseded / Skipped (number reserved, not reused):
 
@@ -195,6 +203,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-030](docs/dd/030-transactional-first-names.md) - Public names lead with `Transactional`
 - [DD-031](docs/dd/031-workflows-bridge-contract.md) - The workflows bridge contract
 - [DD-032](docs/dd/032-transaction-retry-and-timeout.md) - Retry a transaction the database asks to retry; deprecate `timeout`
+- [DD-033](docs/dd/033-drizzle-adapter-contract.md) - The Drizzle adapter contract
 
 ## DO NOT cheat-sheet
 
@@ -300,9 +309,10 @@ so `@nestjs/cqrs` 12.1's `commit(context)` and `@nestjs/workflows`'
 `@StartOn` / `@SignalOn` work inside `@Transactional`, and NestJS 10
 leaves the peer ranges. A fifth package, `@nestjs-transactional/workflows`,
 does for `@nestjs/workflows` what the outbox bridge does for
-`@nestjs/outbox` (DD-031). The cohort is five packages,
-`@nestjs-transactional/{core,typeorm,cqrs,outbox,workflows}`, versioned as one
-(`fixed`): see CONTRIBUTING, "One version for all five". Upgrading is in
+`@nestjs/outbox` (DD-031). A sixth, `@nestjs-transactional/drizzle`,
+is the second ORM adapter (ADR-025), released with 3.0. The cohort is
+`@nestjs-transactional/{core,typeorm,drizzle,cqrs,outbox,workflows}`, versioned as one
+(`fixed`): see CONTRIBUTING, "One version for every package". Upgrading is in
 `docs/guides/migrating-to-3.md`.
 
 `2.0.0` was the ESM-only move (ADR-022) plus NestJS 12 support. Every
@@ -320,8 +330,8 @@ up as a reviewable diff.
 ### Blocked / Awaiting
 
 - **The `3.0.0` release itself.** The major changeset is on `main`.
-  The "Version Packages" PR waits for the cqrs change of ADR-024
-  (`feat/cqrs-event-bus`) to merge; after that, what remains is the
+  The "Version Packages" PR waits for the Drizzle adapter of ADR-025
+  (`feat/drizzle-adapter`) to merge; after that, what remains is the
   normal flow: merge the "Version Packages" PR and `release.yml` publishes
   under `latest`. Then, by hand: `npm deprecate` the two discontinued
   packages with a pointer to `docs/guides/migrating-to-3.md`, and move

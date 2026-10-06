@@ -159,7 +159,10 @@ pnpm add @nestjs-transactional/core @nestjs-transactional/typeorm
 export class AppModule {}
 ```
 
-That is the entire setup for the first half of this page. Add
+That is the entire setup for the first half of this page. On Drizzle
+ORM, install `@nestjs-transactional/drizzle` instead and import
+`TransactionalDrizzleModule.forRoot({ db: DB })` with the token your
+`drizzle()` database is registered under. Add
 `@nestjs-transactional/cqrs` for the event phases,
 `@nestjs-transactional/outbox` with `@nestjs/outbox` for durable delivery
 and brokers, `@nestjs-transactional/workflows` with `@nestjs/workflows`
@@ -170,7 +173,7 @@ you have already written.
 CommonJS application still consumes them: Node loads ESM from
 `require()` as of 22.12.0, which is what the `>=22.13.0` floor covers.
 What does not follow Node is tooling with its own module loader — Jest
-needs `--experimental-vm-modules` and a few settings, shown in all 15
+needs `--experimental-vm-modules` and a few settings, shown in all 16
 example applications. The reasoning, and why one build rather than two,
 is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 
@@ -180,6 +183,7 @@ is in [ADR-022](docs/adr/022-esm-only-packaging.md).
 | --- | --- | --- |
 | [`core`](packages/core) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcore?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/core) | `@Transactional`, the propagation modes, the adapter SPI. ORM-agnostic |
 | [`typeorm`](packages/typeorm) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Ftypeorm?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/typeorm) | The TypeORM adapter and transparent transactional repositories |
+| [`drizzle`](packages/drizzle) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fdrizzle?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/drizzle) | The Drizzle ORM adapter: the `db` you inject joins the transaction. PostgreSQL drivers |
 | [`cqrs`](packages/cqrs) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fcqrs?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/cqrs) | Transactions for `@nestjs/cqrs` handlers, phase-aware event handlers, `AggregateRoot` integration |
 | [`outbox`](packages/outbox) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Foutbox?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/outbox) | `@Transactional` for [`@nestjs/outbox`](https://docs.nestjs.com/reliability/outbox): publish inside the transaction, `@Externalized` routing to brokers |
 | [`workflows`](packages/workflows) | [![npm](https://img.shields.io/npm/v/%40nestjs-transactional%2Fworkflows?label=npm)](https://www.npmjs.com/package/@nestjs-transactional/workflows) | `@Transactional` for [`@nestjs/workflows`](https://docs.nestjs.com/reliability/workflows): durable workflows started and signalled inside the transaction, `@StartOn` included |
@@ -256,9 +260,10 @@ The interesting guarantees are the ones a test can fail on:
 - Transactions, savepoints and isolation run against **real Postgres**
   through testcontainers — not a mock, not SQLite standing in.
 - The matrix covers **three TypeORM versions** (`0.3.31`, `1.0.0`,
-  `1.1.0`) across **Node 22, 24 and 26**, so the declared peer range is
-  a tested claim rather than an optimistic one.
-- All **15 example applications** are built and run in CI, so a library
+  `1.1.0`) and **three Drizzle versions** (`0.40.1`, `0.45`,
+  `1.0.0-beta.22`) across **Node 22, 24 and 26**, so the declared peer
+  ranges are a tested claim rather than an optimistic one.
+- All **16 example applications** are built and run in CI, so a library
   change that breaks the documented usage fails the build.
 - The **public API surface is committed** as api-extractor reports; any
   change to it shows up as a reviewable diff.
@@ -267,7 +272,7 @@ The interesting guarantees are the ones a test can fail on:
 
 ## Examples
 
-Fifteen runnable applications under [`examples/`](examples/), in five
+Sixteen runnable applications under [`examples/`](examples/), in five
 tiers from a single decorator to an e-commerce service with three
 bounded contexts, CQRS, a saga over the outbox and Kafka:
 
@@ -278,7 +283,8 @@ pnpm -C examples/basic-transactional start
 Start with [`basic-transactional`](examples/basic-transactional) for
 transactions, [`basic-typeorm-outbox`](examples/basic-typeorm-outbox) for durability,
 [`workflows-order-fulfilment`](examples/workflows-order-fulfilment) for
-`@nestjs/workflows`, `@nestjs/outbox` and CQRS in one transaction, or
+`@nestjs/workflows`, `@nestjs/outbox` and CQRS in one transaction,
+[`drizzle-orders`](examples/drizzle-orders) for the same on Drizzle ORM, or
 [`e-commerce-orders`](examples/e-commerce-orders) to see everything at
 once. The [catalogue](examples/README.md) has a decision guide for
 picking a starting point.
@@ -286,7 +292,7 @@ picking a starting point.
 ## Documentation
 
 - **Per-package guides** — [core](packages/core/README.md),
-  [typeorm](packages/typeorm/README.md), [cqrs](packages/cqrs/README.md),
+  [typeorm](packages/typeorm/README.md), [drizzle](packages/drizzle/README.md), [cqrs](packages/cqrs/README.md),
   [outbox](packages/outbox/README.md), [workflows](packages/workflows/README.md)
 - **Architecture** — [core design](docs/architecture/core-design.md),
   [the outbox pattern](docs/architecture/outbox-pattern.md),

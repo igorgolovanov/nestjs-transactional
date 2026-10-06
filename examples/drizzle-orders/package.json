@@ -1,0 +1,42 @@
+{
+  "name": "@nestjs-transactional-examples/drizzle-orders",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "@Transactional on Drizzle ORM: the injected db, an @nestjs/outbox message and an @nestjs/workflows workflow commit or roll back together, with no transaction passed",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "start": "tsc && node dist/main.js",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@nestjs-transactional/core": "workspace:*",
+    "@nestjs-transactional/drizzle": "workspace:*",
+    "@nestjs-transactional/outbox": "workspace:*",
+    "@nestjs-transactional/workflows": "workspace:*",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/outbox": "~0.1.0",
+    "@nestjs/workflows": "~0.0.1",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.4.2",
+    "@nestjs/testing": "^12.1.2",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "jest": "^30.5.2",
+    "rimraf": "^6.0.1",
+    "testcontainers": "^12.1.0",
+    "ts-jest": "^29.4.14",
+    "typescript": "^6.0.3"
+  }
+}

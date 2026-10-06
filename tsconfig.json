@@ -6,6 +6,7 @@
     { "path": "./packages/typeorm/tsconfig.build.json" },
     { "path": "./packages/cqrs/tsconfig.build.json" },
     { "path": "./packages/outbox/tsconfig.build.json" },
-    { "path": "./packages/workflows/tsconfig.build.json" }
+    { "path": "./packages/workflows/tsconfig.build.json" },
+    { "path": "./packages/drizzle/tsconfig.build.json" }
   ]
 }
