@@ -23,7 +23,7 @@
     "@nestjs/typeorm": "^12.0.2",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^2.2.0",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^1.1.0"

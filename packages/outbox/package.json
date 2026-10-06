@@ -84,7 +84,7 @@
     "amqplib": "^2.2.0",
     "jest": "^30.5.2",
     "kafkajs": "^2.2.4",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "testcontainers": "^12.1.0",

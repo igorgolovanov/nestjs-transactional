@@ -82,7 +82,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
     "jest": "^30.5.2",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "testcontainers": "^12.1.0",
