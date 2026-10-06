@@ -48,6 +48,7 @@ export class TypeOrmTransactionAdapter implements TransactionAdapter<TypeOrmTran
     get dataSourceName(): string;
     get dialect(): string;
     readonly instanceName: string;
+    isRetryableError(error: unknown): boolean;
     // (undocumented)
     readonly name = "typeorm";
     nativeTransaction(handle: TypeOrmTransactionHandle): EntityManager;

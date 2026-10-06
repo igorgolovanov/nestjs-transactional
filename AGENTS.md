@@ -187,6 +187,7 @@ an ADR — the cross-link is on the DD's own page.
 - [DD-029](docs/dd/029-cqrs-publisher-chain-contract.md) - The cqrs publisher chain contract
 - [DD-030](docs/dd/030-transactional-first-names.md) - Public names lead with `Transactional`
 - [DD-031](docs/dd/031-workflows-bridge-contract.md) - The workflows bridge contract
+- [DD-032](docs/dd/032-transaction-retry-and-timeout.md) - Retry a transaction the database asks to retry; deprecate `timeout`
 
 ## DO NOT cheat-sheet
 

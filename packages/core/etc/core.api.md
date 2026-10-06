@@ -66,6 +66,7 @@ export interface ExtendedTransactionOptions extends TransactionOptions {
     readonly dataSource?: string;
     readonly noRollbackFor?: readonly Type<Error>[];
     readonly propagation?: PropagationMode;
+    readonly retry?: number | TransactionRetryOptions;
     readonly rollbackFor?: readonly Type<Error>[];
 }
 
@@ -129,6 +130,7 @@ export const TRANSACTION_OBSERVERS: unique symbol;
 export interface TransactionAdapter<THandle extends TransactionHandle = TransactionHandle> {
     readonly dataSourceName: string;
     readonly dialect?: string;
+    isRetryableError?(error: unknown): boolean;
     readonly name: string;
     nativeTransaction?(handle: THandle): unknown;
     runInSavepoint<T>(parent: THandle, fn: (handle: THandle) => Promise<T>): Promise<T>;
@@ -281,7 +283,15 @@ export interface TransactionObserver {
 export interface TransactionOptions {
     readonly isolation?: IsolationLevel;
     readonly readOnly?: boolean;
+    // @deprecated
     readonly timeout?: number;
+}
+
+// @public
+export interface TransactionRetryOptions {
+    readonly delay?: number | ((attempt: number, error: unknown) => number);
+    readonly maxAttempts: number;
+    readonly retryIf?: (error: unknown) => boolean;
 }
 
 // @public

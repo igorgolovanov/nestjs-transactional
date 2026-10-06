@@ -137,12 +137,43 @@ Two options carry caveats worth knowing before you rely on them:
   Elsewhere it documents intent and nothing rejects a write. Spring
   treats it as a hint too. See
   [DD-027](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/027-readonly-and-timeout-semantics.md).
-- **`timeout`** is accepted by the type but **not implemented** by the
-  TypeORM adapter. It is deliberately not approximated: Postgres'
-  `statement_timeout` bounds each statement rather than the
-  transaction, so `timeout: 5000` on a method issuing four queries
-  would allow twenty seconds. It stays in the surface for adapters
-  whose driver exposes a real transaction budget.
+- **`timeout`** is **deprecated** and goes in the next major. It was
+  never implemented by the TypeORM adapter, and deliberately not
+  approximated: Postgres' `statement_timeout` bounds each statement
+  rather than the transaction, so `timeout: 5000` on a method issuing
+  four queries would allow twenty seconds. Bound slow work in the
+  database instead
+  ([DD-032](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/032-transaction-retry-and-timeout.md)).
+
+## Retrying serialization failures
+
+Under `SERIALIZABLE`, and on any deadlock, the database rolls a
+transaction back and expects the client to run it again. `retry` does
+that:
+
+```ts
+@Transactional({ isolation: 'SERIALIZABLE', retry: 3 })
+async transfer(from: string, to: string, amount: number) {
+  // runs again, from the start, if PostgreSQL reports 40001 or 40P01
+}
+```
+
+- A number is the total number of attempts. The object form takes
+  `maxAttempts`, a `delay` in milliseconds or as a function of the
+  attempt, and `retryIf` to decide which errors to retry. The default
+  delay is a jittered exponential backoff from 10 ms, capped at 1 s.
+- By default, the adapter decides what is retryable. The TypeORM adapter
+  retries PostgreSQL's serialization failure (40001) and deadlock
+  (40P01), and MySQL's deadlock (1213).
+- Only the call that starts the transaction retries. A `REQUIRED` call
+  inside an outer transaction cannot, because the failed transaction is
+  the outer one's. Put `retry` on the outermost `@Transactional`.
+- The method runs again from the start, so it must not call out to the
+  world in a way a retry would repeat. Each attempt gets fresh
+  transaction hooks, so after-commit handlers fire once, for the attempt
+  that committed.
+
+([DD-032](https://github.com/igorgolovanov/nestjs-transactional/blob/main/docs/dd/032-transaction-retry-and-timeout.md))
 
 ## Commit and rollback hooks
 
