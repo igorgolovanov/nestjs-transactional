@@ -26,7 +26,7 @@
   "devDependencies": {
     "@jest/globals": "^30.4.2",
     "@nestjs/testing": "^12.1.2",
-    "@testcontainers/postgresql": "^12.1.0",
+    "@testcontainers/postgresql": "^12.2.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
