@@ -61,6 +61,14 @@ The demo and the integration tests walk through six steps:
 | `OutboxModule` + `PostgresOutboxStore`, `TransactionalOutboxModule`                                | the outbox, and the bridge that adds messages inside the transaction                                                 |
 | `WorkflowsModule` + `PostgresWorkflowStore`, `WorkflowsCqrsModule`, `TransactionalWorkflowsModule` | the workflows with their worker, `@StartOn`, and the bridge that makes `start()` and `signal()` join the transaction |
 
+Both stores take one `SqlExecutor`, made by `fromTypeOrm(dataSource)`.
+The function comes from `@nestjs/store-kit`, and `@nestjs/outbox/postgres`
+and `@nestjs/workflows/postgres` each re-export it, so neither module
+depends on TypeORM. The executor runs a store's SQL on the TypeORM
+transaction it is handed. The bridges hand it the `EntityManager` of the
+transaction `@Transactional` opened, which `TransactionalTypeOrmModule`
+exposes through the adapter's `nativeTransaction`.
+
 The two places to read first:
 
 - [`place-order.handler.ts`](src/orders/place-order.handler.ts): the
@@ -109,6 +117,7 @@ pnpm -C examples/workflows-order-fulfilment start
 
 ## See also
 
+- [`@Transactional` with the NestJS reliability modules](../../docs/guides/reliability-modules.md)
 - [`@nestjs-transactional/workflows`](../../packages/workflows/README.md)
   and [DD-031](../../docs/dd/031-workflows-bridge-contract.md)
 - [`@nestjs-transactional/outbox`](../../packages/outbox/README.md)
