@@ -465,6 +465,59 @@ jobs:
       - name: Integration tests
         run: pnpm -r --filter './packages/*' test:integration
 
+  drizzle-matrix:
+    name: Drizzle ${{ matrix.drizzle }} (Node 22)
+    runs-on: ubuntu-latest
+    # The lockfile pins drizzle-orm 0.45, which every other job tests.
+    # This one forces the bottom of the peer range and the 1.0 line,
+    # whose classes and relational API differ from 0.x. The instance
+    # patch reaches into Drizzle's prototypes, so the contract spec and
+    # the suites run on each.
+    strategy:
+      fail-fast: false
+      matrix:
+        drizzle: ['0.40.1', '1.0.0-beta.22']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          npm pkg set "pnpm.overrides.drizzle-orm=${{ matrix.drizzle }}"
+          pnpm install --no-frozen-lockfile
+
+      # Overrides fail silently when pnpm ignores them; see the TypeORM
+      # matrix above. Assert what actually landed.
+      - name: Verify the Drizzle version under test
+        run: |
+          resolved=$(node -p "require('./packages/drizzle/node_modules/drizzle-orm/package.json').version")
+          if [ "$resolved" != "${{ matrix.drizzle }}" ]; then
+            echo "::error::expected drizzle-orm ${{ matrix.drizzle }}, resolved $resolved"
+            exit 1
+          fi
+          echo "drizzle-orm $resolved"
+
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Type check
+        run: pnpm -C packages/drizzle exec tsc --noEmit
+
+      - name: Unit tests
+        run: pnpm -C packages/drizzle test
+
+      - name: Integration tests
+        run: pnpm -C packages/drizzle test:integration
+
   broker-integration:
     name: Broker integration tests (Kafka, RabbitMQ)
     runs-on: ubuntu-latest

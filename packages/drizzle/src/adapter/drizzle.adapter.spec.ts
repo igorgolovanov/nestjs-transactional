@@ -1,6 +1,12 @@
 import { entityKind, sql } from 'drizzle-orm';
 
-import { accountIds, accounts, createTestDb, type TestDb } from '../../test/support/pglite.js';
+import {
+  accountIds,
+  accounts,
+  createTestDb,
+  sqlStateOf,
+  type TestDb,
+} from '../../test/support/pglite.js';
 import type { DrizzleTransactionHandle } from '../types/drizzle-transaction-handle.js';
 
 import { DrizzleTransactionAdapter } from './drizzle.adapter.js';
@@ -75,9 +81,10 @@ describe('DrizzleTransactionAdapter', () => {
   });
 
   it('opens a read-only transaction that refuses writes', async () => {
-    await expect(
-      adapter.runInTransaction({ readOnly: true }, (handle) => insert(handle, 'a')),
-    ).rejects.toMatchObject({ cause: { code: '25006' } });
+    const error = await adapter
+      .runInTransaction({ readOnly: true }, (handle) => insert(handle, 'a'))
+      .catch((e: unknown) => e);
+    expect(sqlStateOf(error)).toBe('25006');
 
     expect(await accountIds(db)).toEqual([]);
   });

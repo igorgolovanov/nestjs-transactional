@@ -1233,15 +1233,33 @@ importers:
       '@nestjs-transactional/core':
         specifier: workspace:*
         version: link:../core
+      '@nestjs-transactional/cqrs':
+        specifier: workspace:*
+        version: link:../cqrs
+      '@nestjs-transactional/outbox':
+        specifier: workspace:*
+        version: link:../outbox
+      '@nestjs-transactional/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@nestjs/common':
         specifier: ^12.1.2
         version: 12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
         specifier: ^12.1.2
         version: 12.1.2(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@12.1.2)(@nestjs/platform-express@12.1.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/cqrs':
+        specifier: ^12.1.0
+        version: 12.1.0(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/outbox':
+        specifier: 0.1.0
+        version: 0.1.0(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(drizzle-orm@0.45.3(@electric-sql/pglite@0.5.8)(@types/pg@8.23.1)(@types/sql.js@1.4.11)(pg@8.23.1)(postgres@3.4.9)(sql.js@1.14.2))(pg@8.23.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/testing':
         specifier: ^12.1.2
         version: 12.1.2(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(@nestjs/microservices@12.1.2)(@nestjs/platform-express@12.1.2)
+      '@nestjs/workflows':
+        specifier: 0.0.1
+        version: 0.0.1(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(@nestjs/cqrs@12.1.0(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(drizzle-orm@0.45.3(@electric-sql/pglite@0.5.8)(@types/pg@8.23.1)(@types/sql.js@1.4.11)(pg@8.23.1)(postgres@3.4.9)(sql.js@1.14.2))(pg@8.23.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@testcontainers/postgresql':
         specifier: ^12.2.0
         version: 12.2.0
