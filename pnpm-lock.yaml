@@ -1299,11 +1299,11 @@ importers:
         specifier: ^30.0.0
         version: 30.0.0
       '@types/node':
-        specifier: ^22.20.2
-        version: 22.20.2
+        specifier: ^22.20.5
+        version: 22.20.5
       jest:
-        specifier: ^30.5.1
-        version: 30.5.1(@types/node@22.20.2)
+        specifier: ^30.5.2
+        version: 30.5.2(@types/node@22.20.5)
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -1317,8 +1317,8 @@ importers:
         specifier: ^12.1.0
         version: 12.1.0
       ts-jest:
-        specifier: ^29.4.12
-        version: 29.4.12(@babel/core@7.29.7)(@jest/transform@30.5.1)(@jest/types@30.5.1)(babel-jest@30.5.1(@babel/core@7.29.7))(jest-util@30.5.1)(jest@30.5.1(@types/node@22.20.2))(typescript@6.0.3)
+        specifier: ^29.4.14
+        version: 29.4.14(@babel/core@7.29.7)(@jest/transform@30.5.2)(@jest/types@30.5.1)(babel-jest@30.5.2(@babel/core@7.29.7))(jest-util@30.5.1)(jest@30.5.2(@types/node@22.20.5))(typescript@6.0.3)
       typeorm:
         specifier: ^1.1.0
         version: 1.1.0(ioredis@5.11.1)(pg@8.23.0)(sql.js@1.14.2)
