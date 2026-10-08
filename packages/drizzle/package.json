@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@jest/globals": "^30.4.2",
+    "@jest/globals": "^30.5.2",
     "@nestjs-transactional/core": "workspace:*",
     "@nestjs-transactional/cqrs": "workspace:*",
     "@nestjs-transactional/outbox": "workspace:*",
