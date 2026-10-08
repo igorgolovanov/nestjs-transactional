@@ -73,7 +73,7 @@
     "rxjs": "^7.0.0"
   },
   "devDependencies": {
-    "@jest/globals": "^30.4.2",
+    "@jest/globals": "^30.5.2",
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",
     "@nestjs/platform-express": "^12.1.2",
