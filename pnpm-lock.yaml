@@ -1394,8 +1394,8 @@ importers:
         specifier: ^12.0.2
         version: 12.0.2(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.0(ioredis@5.11.1)(pg@8.23.1)(sql.js@1.14.2))
       '@testcontainers/kafka':
-        specifier: ^12.1.0
-        version: 12.1.0
+        specifier: ^12.2.0
+        version: 12.2.0
       '@testcontainers/postgresql':
         specifier: ^12.2.0
         version: 12.2.0
@@ -2575,8 +2575,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@testcontainers/kafka@12.1.0':
-    resolution: {integrity: sha512-hllpKME5id18IIhwvzibVp+CG7eEvrrzlTZ0HHai5HzXpZe1/fqHWN40GZAWssuowpmVgBDbIwcwhuDdmWFr8A==}
+  '@testcontainers/kafka@12.2.0':
+    resolution: {integrity: sha512-Q6z0n240NDLiYLsZOIaJiDx9U1vG+sDFHUHjD2SzZEf8YFnG9D5lkmqhjWX7ZeJlJVb+v0mHPW53qo8wriu0JQ==}
 
   '@testcontainers/postgresql@12.2.0':
     resolution: {integrity: sha512-14oNBbKdqIkWTiw8XwP6YqWnuBebiij8m4fF03WTSHvNt5FfvQpGTLwIV3p07UpDnqWRFvY50YFzbiYdB+SWuA==}
@@ -6566,7 +6566,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@testcontainers/kafka@12.1.0':
+  '@testcontainers/kafka@12.2.0':
     dependencies:
       compare-versions: 6.1.1
       testcontainers: 12.2.0
