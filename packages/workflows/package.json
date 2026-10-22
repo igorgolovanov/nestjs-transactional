@@ -68,7 +68,7 @@
     "rxjs": "^7.0.0"
   },
   "devDependencies": {
-    "@jest/globals": "^30.4.2",
+    "@jest/globals": "^30.5.2",
     "@nestjs-transactional/core": "workspace:*",
     "@nestjs-transactional/cqrs": "workspace:*",
     "@nestjs-transactional/typeorm": "workspace:*",
