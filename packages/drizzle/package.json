@@ -82,7 +82,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1",
     "postgres": "^3.4.9",
     "reflect-metadata": "^0.2.2",
